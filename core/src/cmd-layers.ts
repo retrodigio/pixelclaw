@@ -1,7 +1,9 @@
 // Layers and frames (plan §3.2). Layers are listed bottom to top; each author draws on their own
 // layer and frame (`layer <name>`, `frame <n>`), so one author's choice never moves another's.
-// Frames are numbered from 1 in the language. Durations, tags and linked cels come with G6.
+// Frames are numbered from 1 in the language; each has a duration in ticks (`frame set`), and
+// tags and views (cmd-anim.ts) follow frames as they are added, removed and moved.
 
+import { insertFrames, moveFrame, moveMap, removeFrame, viewOf } from './anim.ts';
 import { Args, fn, needDoc, registerCommand, type CommandSpec } from './commands.ts';
 import { TRANSPARENT, ctxOf, newLayer, remapCtx, setCtx, type Doc } from './doc.ts';
 import { DiagError, type ParsedCommand, type Token } from './parser.ts';
@@ -132,6 +134,8 @@ const layerCmd: CommandSpec = {
       return {
         text: `layer merge ${target.v}`,
         op: fn((d) => {
+          // Linked cels below would take every frame's top layer in turn: the merge unlinks them.
+          d.cels[i - 1] = d.cels[i - 1]!.map((c) => c.slice());
           for (let f = 0; f < d.frameCount; f++) {
             const top = d.cels[i]![f]!;
             const dst = d.cels[i - 1]![f]!;
@@ -156,7 +160,7 @@ function removeLayer(d: Doc, i: number): void {
   remapCtx(d, (l) => (l > i ? l - 1 : l === i ? Math.max(0, i - 1) : l), (f) => f);
 }
 
-const FRAME_WORDS = new Set(['add', 'remove', 'move']);
+const FRAME_WORDS = new Set(['add', 'remove', 'move', 'set']);
 
 function frameNumber(doc: Doc, t: Token | undefined, cmd: ParsedCommand, what: string, max = doc.frameCount): number {
   if (!t || t.t !== 'int') throw new DiagError(t?.line ?? cmd.line, t?.col ?? cmd.col, `frame: expected ${what}`);
@@ -164,74 +168,113 @@ function frameNumber(doc: Doc, t: Token | undefined, cmd: ParsedCommand, what: s
   return t.v;
 }
 
+/** A frame number given as an option (copy=, link=, to=): 1..max. */
+function frameOpt(doc: Doc, o: Extract<Token, { t: 'kv' }>, max = doc.frameCount): number {
+  if (!/^\d+$/.test(o.value) || Number(o.value) < 1 || Number(o.value) > max) throw new DiagError(o.line, o.vcol, `${o.key}= must be a frame 1..${max}`);
+  return Number(o.value);
+}
+
+/** Frames as `<n>`, `<a>-<b>` or `all`, 1-based and inclusive. */
+export function frameRange(doc: Doc, t: Token | undefined, cmd: ParsedCommand): { from: number; to: number; text: string } {
+  const bad = () => new DiagError(t?.line ?? cmd.line, t?.col ?? cmd.col, `${cmd.name}: expected frames as <n>, <a>-<b> or all (frames 1..${doc.frameCount})`);
+  if (!t) throw bad();
+  let from: number;
+  let to: number;
+  if (t.t === 'int') from = to = t.v;
+  else if (t.t === 'word' && t.v === 'all') { from = 1; to = doc.frameCount; }
+  else if (t.t === 'word' && /^\d+-\d+$/.test(t.v)) [from, to] = t.v.split('-').map(Number) as [number, number];
+  else throw bad();
+  if (from < 1 || to > doc.frameCount || from > to) throw new DiagError(t.line, t.col, `${cmd.name}: frames ${from}-${to} are not within 1..${doc.frameCount}`);
+  return { from, to, text: from === to ? String(from) : `${from}-${to}` };
+}
+
+/** Ticks as an option: a whole number 1..65535. */
+export function ticksOpt(o: Extract<Token, { t: 'kv' }>): number {
+  if (!/^\d+$/.test(o.value) || Number(o.value) < 1 || Number(o.value) > 65535) throw new DiagError(o.line, o.vcol, `ticks= must be a whole number 1..65535`);
+  return Number(o.value);
+}
+
+/** Refuse a change to a mirror view's own frames: they follow their source. */
+function notMirror(doc: Doc, f: number, t: { line: number; col: number }, what: string): void {
+  const v = viewOf(doc, f);
+  if (v?.mirror) throw new DiagError(t.line, t.col, `${what}: frame ${f + 1} is in view ${v.name}, a live mirror of ${v.mirror} (change ${v.mirror}, or view ${v.name} mirror=off)`);
+}
+
 const frameCmd: CommandSpec = {
   name: 'frame',
-  summary: 'frame <n> | frame add [<n>] [copy=<m>|empty] | frame remove <n> | frame move <n> to=<m>   (frames count from 1)',
+  summary: 'frame <n> | frame add [<n>] [copy=<m>|link=<m>|empty] [ticks=<t>] | frame set <n>|<a>-<b>|all ticks=<t> | frame remove <n> | frame move <n> to=<m>   (frames count from 1; ticks are game ticks)',
   normalise(cmd, ctx) {
     const doc = needDoc(cmd, ctx);
-    const a = new Args(cmd, ['copy', 'to'], ['empty']);
+    const a = new Args(cmd, ['copy', 'to', 'link', 'ticks'], ['empty']);
     const first = a.peek();
+    const noOpts = (what: string, except: string[] = []) => {
+      for (const o of a.opts.values()) if (!except.includes(o.key)) throw new DiagError(o.line, o.col, `${what} takes no ${o.key}=`);
+    };
     if (first?.t === 'int') {
       const n = frameNumber(doc, a.take('int', 'a frame number'), cmd, 'a frame number');
       a.done();
-      for (const o of a.opts.values()) throw new DiagError(o.line, o.col, `frame <n> takes no ${o.key}=`);
+      noOpts('frame <n>');
       return { text: `frame ${n}`, op: fn((d, by) => setCtx(d, by, { frame: n - 1 })) };
     }
-    const how = a.take('word', 'a frame number, or add, remove or move');
-    if (!FRAME_WORDS.has(how.v)) throw new DiagError(how.line, how.col, `frame: expected a frame number, add, remove or move`);
+    const how = a.take('word', 'a frame number, or add, set, remove or move');
+    if (!FRAME_WORDS.has(how.v)) throw new DiagError(how.line, how.col, `frame: expected a frame number, add, set, remove or move`);
+    if (how.v === 'set') {
+      const r = frameRange(doc, a.rest()[0], cmd);
+      noOpts('frame set', ['ticks']);
+      if (a.flags.length) throw new DiagError(a.flags[0]!.line, a.flags[0]!.col, `frame set: unexpected '${a.flags[0]!.v}'`);
+      const tk = a.opts.get('ticks');
+      if (!tk) throw new DiagError(cmd.line, cmd.col, `frame set: give ticks=<t>`);
+      const ticks = ticksOpt(tk);
+      for (let f = r.from - 1; f < r.to; f++) notMirror(doc, f, cmd, 'frame set');
+      return {
+        text: `frame set ${r.text} ticks=${ticks}`,
+        op: fn((d) => { for (let f = r.from - 1; f < r.to; f++) d.ticks[f] = ticks; }),
+      };
+    }
     if (how.v === 'add') {
       const pos = a.peek()?.t === 'int' ? frameNumber(doc, a.take('int', 'a position'), cmd, 'a position', doc.frameCount + 1) : doc.frameCount + 1;
       a.done();
+      noOpts('frame add', ['copy', 'link', 'ticks']);
       const copyOpt = a.opts.get('copy');
+      const linkOpt = a.opts.get('link');
       const empty = a.flags.length > 0;
-      if (copyOpt && empty) throw new DiagError(copyOpt.line, copyOpt.col, `frame add: give copy= or empty, not both`);
-      const toOpt = a.opts.get('to');
-      if (toOpt) throw new DiagError(toOpt.line, toOpt.col, `frame add takes no to=`);
-      let copy = ctxOf(doc, ctx.by).frame + 1;
-      if (copyOpt) {
-        if (!/^\d+$/.test(copyOpt.value) || Number(copyOpt.value) < 1 || Number(copyOpt.value) > doc.frameCount) {
-          throw new DiagError(copyOpt.line, copyOpt.vcol, `copy= must be a frame 1..${doc.frameCount}`);
-        }
-        copy = Number(copyOpt.value);
-      }
+      if ([copyOpt, linkOpt, empty || undefined].filter(Boolean).length > 1) throw new DiagError(cmd.line, cmd.col, `frame add: give one of copy=, link= or empty`);
+      const src = linkOpt ? frameOpt(doc, linkOpt) : copyOpt ? frameOpt(doc, copyOpt) : ctxOf(doc, ctx.by).frame + 1;
+      if (linkOpt) notMirror(doc, src - 1, linkOpt, 'frame add link=');
+      const tk = a.opts.get('ticks');
+      const ticks = tk ? ticksOpt(tk) : null;
+      const how2 = linkOpt ? `link=${src}` : empty ? 'empty' : `copy=${src}`;
       return {
-        text: `frame add ${pos} ${empty ? 'empty' : `copy=${copy}`}`,
+        text: `frame add ${pos} ${how2}${ticks !== null ? ` ticks=${ticks}` : ''}`,
         op: fn((d) => {
           const n = d.width * d.height;
-          for (const fr of d.cels) fr.splice(pos - 1, 0, empty ? new Uint16Array(n).fill(TRANSPARENT) : fr[copy - 1]!.slice());
-          d.frameCount++;
-          // Authors keep the frame they were on.
-          remapCtx(d, (l) => l, (f) => (f >= pos - 1 ? f + 1 : f));
+          const make = (l: number) => (empty ? new Uint16Array(n).fill(TRANSPARENT) : linkOpt ? d.cels[l]![src - 1]! : d.cels[l]![src - 1]!.slice());
+          insertFrames(d, pos - 1, 1, make, [ticks ?? d.ticks[src - 1]!]);
         }),
       };
     }
     const n = frameNumber(doc, a.take('int', 'a frame number'), cmd, 'a frame number');
     if (how.v === 'remove') {
       a.done();
-      for (const o of a.opts.values()) throw new DiagError(o.line, o.col, `frame remove takes no ${o.key}=`);
+      noOpts('frame remove');
       if (doc.frameCount === 1) throw new DiagError(cmd.line, cmd.col, `frame remove: frame 1 is the only frame`);
-      return {
-        text: `frame remove ${n}`,
-        op: fn((d) => {
-          for (const fr of d.cels) fr.splice(n - 1, 1);
-          d.frameCount--;
-          remapCtx(d, (l) => l, (f) => (f > n - 1 ? f - 1 : Math.min(f, d.frameCount - 1)));
-        }),
-      };
+      notMirror(doc, n - 1, cmd, 'frame remove');
+      return { text: `frame remove ${n}`, op: fn((d) => removeFrame(d, n - 1)) };
     }
     a.done();
+    noOpts('frame move', ['to']);
     const toOpt = a.opts.get('to');
     if (!toOpt) throw new DiagError(cmd.line, cmd.col, `frame move: missing to=<n>`);
-    if (!/^\d+$/.test(toOpt.value) || Number(toOpt.value) < 1 || Number(toOpt.value) > doc.frameCount) throw new DiagError(toOpt.line, toOpt.vcol, `to= must be a frame 1..${doc.frameCount}`);
-    const to = Number(toOpt.value);
-    return {
-      text: `frame move ${n} to=${to}`,
-      op: fn((d) => {
-        for (const fr of d.cels) { const [c] = fr.splice(n - 1, 1); fr.splice(to - 1, 0, c!); }
-        const map = (f: number) => (f === n - 1 ? to - 1 : n - 1 < f && f <= to - 1 ? f - 1 : to - 1 <= f && f < n - 1 ? f + 1 : f);
-        remapCtx(d, (l) => l, map);
-      }),
-    };
+    const to = frameOpt(doc, toOpt);
+    // A frame stays in its view (or out of every view): views are directions, not just ranges.
+    const map = moveMap(n - 1, to - 1);
+    for (const v of doc.views) {
+      const fs = Array.from({ length: v.to - v.from + 1 }, (_, k) => map(v.from + k));
+      const lo = Math.min(...fs);
+      if (Math.max(...fs) - lo !== fs.length - 1) throw new DiagError(toOpt.line, toOpt.vcol, `frame move: view ${v.name} would no longer be one run of frames`);
+    }
+    if (viewOf(doc, n - 1)?.mirror) notMirror(doc, n - 1, cmd, 'frame move');
+    return { text: `frame move ${n} to=${to}`, op: fn((d) => moveFrame(d, n - 1, to - 1)) };
   },
 };
 

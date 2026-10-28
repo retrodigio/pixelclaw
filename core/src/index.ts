@@ -17,3 +17,4 @@ export { expandMacro } from './cmd-macros.ts';
 export * from './checks.ts';
 export * from './themes.ts';
 export * from './style.ts';
+export * from './anim.ts';

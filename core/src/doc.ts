@@ -1,6 +1,8 @@
 // The indexed document: layers x frames of cels (palette indices or transparent), a cell grid, a
-// wrap flag, the document's own palette (lockable), open notes, stamps, macros, and each author's
-// editing context (the layer and frame they draw on, their selection, symmetry and brush).
+// wrap flag, the document's own palette (lockable), open notes, stamps, macros, each author's
+// editing context (the layer and frame they draw on, their selection, symmetry and brush), and the
+// animation (plan §4.4): frame durations in ticks, tags, directional views (a view can be a live
+// mirror of another), a pivot and a ground line. Linked cels are one shared pixel array.
 
 import type { Palette, Role } from './palette.ts';
 
@@ -62,6 +64,27 @@ export interface Macro {
   body: string;
 }
 
+/** The default frame duration in ticks (the engine profile's `frameTicks` default, §7.4). */
+export const DEFAULT_TICKS = 10;
+
+export type Loop = 'cycle' | 'pingpong';
+
+/** A named frame range (0-based, inclusive) and how it loops. */
+export interface Tag {
+  name: string;
+  from: number;
+  to: number;
+  loop: Loop;
+}
+
+/** A direction's frames (0-based, inclusive). A mirror view's cels are its source's, flipped left to right. */
+export interface View {
+  name: string;
+  from: number;
+  to: number;
+  mirror: string | null;
+}
+
 export interface Doc {
   kind: DocKind;
   name: string;
@@ -85,6 +108,14 @@ export interface Doc {
   notes: Note[];
   stamps: Record<string, Stamp>;
   macros: Record<string, Macro>;
+  /** Each frame's duration in ticks (the project sets the tick rate). */
+  ticks: number[];
+  tags: Tag[];
+  views: View[];
+  /** The pixel the sprite stands on (null: not set). */
+  pivot: [number, number] | null;
+  /** The row the feet rest on (null: not set). */
+  ground: number | null;
 }
 
 export function newLayer(name: string, o: Partial<Layer> = {}): Layer {
@@ -100,7 +131,35 @@ export function createDoc(o: {
     kind: o.kind, name: o.name, width: o.width, height: o.height, cellW: o.cellW, cellH: o.cellH,
     wrap: o.wrap, palette: o.palette, paletteLocked: false, layers: [newLayer('main')], frameCount: 1, cels: [[pixels]],
     ctx: {}, home: { layer: 0, frame: 0 }, notes: [], stamps: {}, macros: {},
+    ticks: [DEFAULT_TICKS], tags: [], views: [], pivot: null, ground: null,
   };
+}
+
+/** Copy each layer's cels, keeping linked cels (one shared array) linked in the copy. */
+function cloneCels(cels: Uint16Array[][]): Uint16Array[][] {
+  return cels.map((fr) => {
+    const seen = new Map<Uint16Array, Uint16Array>();
+    return fr.map((c) => {
+      let k = seen.get(c);
+      if (!k) seen.set(c, (k = c.slice()));
+      return k;
+    });
+  });
+}
+
+/** Linked cels as [layer, frame, the first frame sharing its array], for frames after the first of each link. */
+export function celLinks(d: Doc): [number, number, number][] {
+  const out: [number, number, number][] = [];
+  d.cels.forEach((fr, l) => fr.forEach((c, f) => {
+    const g = fr.indexOf(c);
+    if (g !== f) out.push([l, f, g]);
+  }));
+  return out;
+}
+
+/** Is anything about the animation set beyond a plain list of frames at the default duration? */
+function hasAnim(d: Doc): boolean {
+  return d.ticks.some((t) => t !== DEFAULT_TICKS) || d.tags.length > 0 || d.views.length > 0 || d.pivot !== null || d.ground !== null || celLinks(d).length > 0;
 }
 
 function cloneCtx(c: AuthorCtx): AuthorCtx {
@@ -109,7 +168,8 @@ function cloneCtx(c: AuthorCtx): AuthorCtx {
 
 export function cloneDoc(d: Doc): Doc {
   return {
-    ...d, layers: d.layers.map((l) => ({ ...l })), cels: d.cels.map((fr) => fr.map((c) => c.slice())),
+    ...d, layers: d.layers.map((l) => ({ ...l })), cels: cloneCels(d.cels),
+    ticks: [...d.ticks], tags: d.tags.map((t) => ({ ...t })), views: d.views.map((v) => ({ ...v })), pivot: d.pivot ? [d.pivot[0], d.pivot[1]] : null,
     ctx: Object.fromEntries(Object.entries(d.ctx).map(([k, v]) => [k, cloneCtx(v)])),
     home: { ...d.home },
     notes: d.notes.map((n) => ({ ...n })),
@@ -227,6 +287,13 @@ export function serializeDoc(d: Doc): Uint8Array {
     }),
     stamps: stamps.map((s) => [s, d.stamps[s]!.w, d.stamps[s]!.h]),
     macros: macros.map((m) => [m, d.macros[m]!.params, d.macros[m]!.body]),
+    // Written only when set, so documents without animation keep the bytes (and hashes) they had.
+    ...(hasAnim(d) ? {
+      anim: {
+        ticks: d.ticks, tags: d.tags.map((t) => [t.name, t.from, t.to, t.loop]), views: d.views.map((v) => [v.name, v.from, v.to, v.mirror]),
+        pivot: d.pivot, ground: d.ground, links: celLinks(d),
+      },
+    } : {}),
   });
   const head = utf8('PCLAWDOC 2\n' + header + '\n');
   const n = d.width * d.height;
@@ -256,6 +323,10 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
     layers: [string, boolean, boolean, boolean][]; frameCount: number; home: [number, number]; notes: [string, number, number, number, number, string][];
     ctx: [string, number, number, boolean, [number | null, number | null] | null, [string, string | number] | null][];
     stamps: [string, number, number][]; macros: [string, string[], string][];
+    anim?: {
+      ticks: number[]; tags: [string, number, number, Loop][]; views: [string, number, number, string | null][];
+      pivot: [number, number] | null; ground: number | null; links: [number, number, number][];
+    };
   };
   const h = JSON.parse(utf8Decode(bytes.subarray(magic.length, nl))) as Header;
   let o = nl + 1;
@@ -266,6 +337,7 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
     return a;
   };
   const cels = h.layers.map(() => Array.from({ length: h.frameCount }, () => u16(n)));
+  for (const [l, f, g] of h.anim?.links ?? []) cels[l]![f] = cels[l]![g]!;
   const ctx: Record<string, AuthorCtx> = {};
   for (const [a, layer, frame, hasSel, mirror, brush] of h.ctx) {
     ctx[a] = {
@@ -288,6 +360,10 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
     frameCount: h.frameCount, cels, ctx, home: { layer: h.home[0], frame: h.home[1] },
     notes: h.notes.map(([id, x, y, w, nh, text]) => ({ id, x, y, w, h: nh, text })),
     stamps, macros: Object.fromEntries(h.macros.map(([m, params, body]) => [m, { params, body }])),
+    ticks: h.anim?.ticks ?? Array.from({ length: h.frameCount }, () => DEFAULT_TICKS),
+    tags: (h.anim?.tags ?? []).map(([name, from, to, loop]) => ({ name, from, to, loop })),
+    views: (h.anim?.views ?? []).map(([name, from, to, mirror]) => ({ name, from, to, mirror })),
+    pivot: h.anim?.pivot ?? null, ground: h.anim?.ground ?? null,
   };
 }
 
@@ -298,7 +374,7 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
  */
 export function serializeDocV1(d: Doc): Uint8Array | null {
   const authors = Object.keys(d.ctx);
-  if (d.paletteLocked || d.home.layer || d.home.frame || d.frameCount !== 1 || d.layers.length !== 1 || Object.keys(d.stamps).length || Object.keys(d.macros).length) return null;
+  if (hasAnim(d) || d.paletteLocked || d.home.layer || d.home.frame || d.frameCount !== 1 || d.layers.length !== 1 || Object.keys(d.stamps).length || Object.keys(d.macros).length) return null;
   const l = d.layers[0]!;
   if (l.hidden || l.locked || l.reference) return null;
   if (authors.length > 1 || authors.some((a) => d.ctx[a]!.mirror || d.ctx[a]!.brush || d.ctx[a]!.layer || d.ctx[a]!.frame)) return null;

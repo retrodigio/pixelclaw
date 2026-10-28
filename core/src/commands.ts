@@ -2,6 +2,7 @@
 // command text that goes onto the tape: defaults filled in, colours by palette name, seeds chosen
 // and written down. Normalising a normalised line gives the same line back.
 
+import { syncMirrors, viewOf } from './anim.ts';
 import { DOC_KINDS, TRANSPARENT, createDoc, ctxOf, type Doc, type DocKind } from './doc.ts';
 import { drawColoured, drawPoints, mirrored, targetOf } from './draw.ts';
 import { DEFAULT_ROLE_HEX, RESERVED_KEYS, ROLES, autoKeys, isRole, normaliseHex, paletteRows, parsePaletteRows, type Palette, type PaletteEntry } from './palette.ts';
@@ -166,6 +167,13 @@ export function drawable(cmd: ParsedCommand, ctx: NormaliseContext): Doc {
   const doc = needDoc(cmd, ctx);
   const l = doc.layers[ctxOf(doc, ctx.by).layer]!;
   if (l.locked) throw new DiagError(cmd.line, cmd.col, `layer '${l.name}' is locked (layer set ${l.name} locked=off to draw on it)`);
+  const f = ctxOf(doc, ctx.by).frame;
+  const v = viewOf(doc, f);
+  if (v?.mirror) {
+    const src = doc.views.find((x) => x.name === v.mirror);
+    const at = src ? ` (frame ${src.from + f - v.from + 1})` : '';
+    throw new DiagError(cmd.line, cmd.col, `frame ${f + 1} is in view ${v.name}, a live mirror of ${v.mirror}: draw on ${v.mirror}${at}, or view ${v.name} mirror=off`);
+  }
   return doc;
 }
 
@@ -650,7 +658,9 @@ export function applyOp(doc: Doc | null, op: Op, by = ''): Doc {
   if (op.k === 'new') return createDoc(op);
   if (!doc) throw new Error('applyOp: no document');
   if (op.k === 'fork') doc.name = op.name;
-  else if (op.k === 'fn') op.run(doc, by);
-  else throw new Error('applyOp: undo is applied by replay');
+  else if (op.k === 'fn') {
+    op.run(doc, by);
+    if (doc.views.length) syncMirrors(doc);
+  } else throw new Error('applyOp: undo is applied by replay');
   return doc;
 }
