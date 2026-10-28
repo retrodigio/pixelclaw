@@ -8,12 +8,12 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  animGifFrames, animText, diffPixels, diffText, encodeGif, encodePng, renderAnimSheet, renderDiff, renderGame, renderGrid, renderRecolour, renderScaled, renderTile3x3, type Doc, type Pt, type Region,
-  type Theme,
+  animGifFrames, animText, diffPixels, diffText, encodeGif, encodePng, mapGifFrames, mapText, renderAnimSheet, renderDiff, renderFamilyView, renderGame, renderGrid, renderMap,
+  renderRecolour, renderScaled, renderTile3x3, layoutOf, schemeOf, type Doc, type Pt, type Region, type Theme,
 } from '@pixelclaw/core';
 import { ProjectError } from './project.ts';
 
-export const VIEW_MODES = ['render', 'grid', 'tile3x3', 'diff', 'game', 'recolour', 'anim'] as const;
+export const VIEW_MODES = ['render', 'grid', 'tile3x3', 'diff', 'game', 'recolour', 'anim', 'map', 'family'] as const;
 export type ViewMode = (typeof VIEW_MODES)[number];
 
 export interface ViewOptions {
@@ -33,6 +33,8 @@ export interface ViewOptions {
   tickRate?: number;
   /** recolour: the themes to show. */
   themes?: Theme[];
+  /** map: its size in tiles, the island's seed, overlays played over it, and (for an overlay) the tile or family under it. */
+  map?: { cols?: number; rows?: number; seed?: number; overlays: Doc[]; ground: Doc | null };
 }
 
 export type View =
@@ -90,6 +92,30 @@ export function makeView(doc: Doc, mode: ViewMode, o: ViewOptions, outDir: strin
     writeFileSync(path, text);
     return { mode, kind: 'text', text, path };
   }
+  if (mode === 'map') {
+    const mo = { cols: o.map?.cols, rows: o.map?.rows, seed: o.map?.seed, overlays: o.map?.overlays, ground: o.map?.ground, scale: o.scale, theme: o.theme, tickRate: o.tickRate };
+    const img = renderMap(doc, mo);
+    const png = encodePng(img);
+    const path = join(outDir, `${doc.name}.map.png`);
+    writeFileSync(path, png);
+    let text = mapText(doc, mo);
+    let gif: string | undefined;
+    const frames = mapGifFrames(doc, mo);
+    if (frames.length > 1) {
+      gif = join(outDir, `${doc.name}.map.gif`);
+      writeFileSync(gif, encodeGif(frames));
+      text += `\nanimated GIF at game speed: ${gif}`;
+    }
+    return { mode, kind: 'image', png, width: img.width, height: img.height, path, text, ...(gif ? { gif } : {}) };
+  }
+  if (mode === 'family') {
+    if (!doc.family) throw new ProjectError(`'${doc.name}' is not a family (the family view shows each variant among its neighbours)`);
+    const img = renderFamilyView(doc, { scale: o.scale, frame: o.frame, theme: o.theme });
+    const png = encodePng(img);
+    const path = join(outDir, `${doc.name}.family.png`);
+    writeFileSync(path, png);
+    return { mode, kind: 'image', png, width: img.width, height: img.height, path, text: familyText(doc) };
+  }
   if (mode === 'anim') {
     const img = renderAnimSheet(doc, { scale: o.scale, theme: o.theme });
     const png = encodePng(img);
@@ -108,4 +134,23 @@ export function makeView(doc: Doc, mode: ViewMode, o: ViewOptions, outDir: strin
   const path = join(outDir, `${doc.name}.${mode}.png`);
   writeFileSync(path, png);
   return { mode, kind: 'image', png, width: img.width, height: img.height, path };
+}
+
+/** A family's sheet in words: where every cell is (for @cell and coordinates), which are pieces and which detached. */
+export function familyText(doc: Doc): string {
+  const f = doc.family!;
+  const s = schemeOf(f);
+  const L = layoutOf(f);
+  const t = f.tile;
+  const pieces = new Set(s.pieces);
+  const det = new Set(f.detached);
+  const g = f.geometry;
+  const lines = [
+    `${doc.name}: ${s.name}, ${s.variants.length} variants of ${t}x${t}; band ${g.bands.length ? g.bands.map((b) => `${b.w}:${typeof b.fill === 'number' ? doc.palette.entries[b.fill]!.name : b.fill}`).join(' ') : 'none'} radius ${g.radius} inset ${g.inset}`,
+    `textures: inside @cell(inside) at ${L.inside[0] * t},${L.inside[1] * t}; outside @cell(outside) at ${L.outside[0] * t},${L.outside[1] * t}`,
+    `pieces (draw these on layer band; the others are built from their quadrants): ${s.pieces.join(', ')}`,
+    'cells: ' + s.variants.map((v, i) => `${v.name} ${L.cells[i]![0] * t},${L.cells[i]![1] * t}${pieces.has(v.name) ? ' (piece)' : det.has(v.name) ? ' (detached)' : ''}`).join('; '),
+  ];
+  if (f.mapCols) lines.push(`coverage map: ${f.mapCols}x${f.mapRows} tiles from 0,${L.mapRow * t}${f.terrain.length ? '' : ' (not laid out yet: family coverage)'}`);
+  return lines.join('\n');
 }

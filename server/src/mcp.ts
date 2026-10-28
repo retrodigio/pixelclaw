@@ -3,7 +3,7 @@
 
 import { McpServer, type CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { CHECK_IDS, checkSummary, ctxOf, diffPixels, diffText, type CheckResult, type Note, type TapeEntry } from '@pixelclaw/core';
+import { BUILTIN_SCHEMES, CHECK_IDS, checkSummary, ctxOf, diffPixels, diffText, type CheckResult, type Note, type TapeEntry } from '@pixelclaw/core';
 import { ProjectError, listAssets, readPaletteFile } from './project.ts';
 import { formatChecks } from './report.ts';
 import { writeReview } from './review.ts';
@@ -19,7 +19,7 @@ export const INSTRUCTIONS = `PixelClaw is a pixel art editor you drive with a sm
 
 Start with the \`project\` tool: it lists palettes and assets, and gives a watch link (http://127.0.0.1:…/?token=…). Give the person that link so they can watch you draw live, and edit too.
 
-Draw with \`run\` (one batch = one undo group; any error applies nothing); every result ends with a one-line check summary. Look with \`view\` (render: scaled PNG with grid and rulers; tile3x3: seams and repetition; grid: exact palette keys per pixel; diff: what the last group changed; game: a sprite on its ground at 1x and the draw scale beside its set; recolour: role art under preview themes; marks: "failing" circles flagged pixels in magenta). \`check\` gives the full table: each check's score against the style guide's threshold and the exact pixels it flags; fix them by coordinates. Read the tape with \`history\`. \`review\` writes a blind review bundle: hand its folder to a fresh agent with no context, and bring its findings back as notes on the pixels.
+Draw with \`run\` (one batch = one undo group; any error applies nothing); every result ends with a one-line check summary. Look with \`view\` (render: scaled PNG with grid and rulers; tile3x3: seams and repetition; grid: exact palette keys per pixel; diff: what the last group changed; game: a sprite on its ground at 1x and the draw scale beside its set; recolour: role art under preview themes; map: a family on a random island with the seam score; family: every variant among its neighbours; marks: "failing" circles flagged pixels in magenta). \`check\` gives the full table: each check's score against the style guide's threshold and the exact pixels it flags; fix them by coordinates. Read the tape with \`history\`. \`review\` writes a blind review bundle: hand its folder to a fresh agent with no context, and bring its findings back as notes on the pixels.
 
 People edit in the watch view too. Their edits are commands on the same tape, written by human:<name>. Call \`changes\` at the start of each turn while someone is watching, and whenever they say they changed something: it returns their commands and notes since you last looked, with a before/after diff image. Carry on from what they did; never silently redo their pixels. Close a note you have dealt with: note done <id>.
 
@@ -53,11 +53,18 @@ Commands (one per line, or ';' between them; '#' comments). Full reference: docs
   note <x,y> [<W>x<H>] "text"   |   note done <id>
   undo [group=<g>] [by=<author>]   |   redo [group=<undo group>]
   fork <from> <to> [at=<n>]  (as the first command of a run on a new asset: a branch of <from>)
+Autotile families (a sheet of every variant of a scheme: blob47, wang16-corner, path, bridge8, single, face):
+  new family <name> <T>x<T> scheme=<scheme> [map=<C>x<R>]   layers ground (the textures, laid by the band) and band (the band's art)
+  family texture inside|outside from=<tile asset> [frame=<n>]    copy a seamless tile into the inside or outside texture
+  family band <w>:<colour|outside|inside>... [radius=<r>] [inset=<n>] [draw=on|off]   the band from the edge in (3:outside 1:foam 2:sand1); draws it on the pieces
+  layer band ; paint @cell(o) 0,0 << ... >>   hand-detail a piece (cells by name: @cell(inside), @cell(nesw)); every other variant is built from the pieces' quadrants, live
+  family detach|attach <variant>|all   draw a variant by hand instead   |   family coverage [seed=] [copies=] [fill=on] (a coverage map to paint)   |   family cut [textures=on]
+  new overlay <name> <W>x<H> ; overlay set mode=cycle|pingpong|wave|sparkle on=outside|inside|all [anchor=x,y] [spread=4x2] [every=3]   sub-tile sprites over a map (view map with=)
 Colours: an entry name (c=stone3), its key (c=3), its exact hex, or none. Coordinates wrap on wrap=on documents (tiles by default). @cell(cx,cy) after a command name offsets it to a cell of the cell grid. Generators write their seed into the tape line; give seed= to choose one (another seed is another variant). Your layer, frame, selection, symmetry and brush are yours alone: people in the watch view have their own.
 
 Habits: after each meaningful batch, look once at an image (render or tile3x3), and use the grid to check exact pixels. Never judge a tile alone when it will be seen tiled; judge a sprite in the game view, on its ground. Keep the checks green, but do not stop at green: look at the 3x3 or the game view and judge it as a player would.
 
-Checks: palette (colours in the style palettes; role art uses only roles), orphans (stray pixels per 100), jaggies (doubled L-corners, irregular step runs, spikes, notches), banding (pillow shading), outline (share of the silhouette edge in ink), seam (tiles: the border vs the interior; about 1 or less reads as no seam), coverage (sizes, empty frames or cells), readability (edge contrast against the ground in ΔL*, silhouette distinct from the set, lightness spread), revert (share copied from a reference: ref=), repetition (tiles: the most visible stripe when tiled, ΔL*·√width). Thresholds come from project.json style.checks.`;
+Checks: palette (colours in the style palettes; role art uses only roles), orphans (stray pixels per 100), jaggies (doubled L-corners, irregular step runs, spikes, notches), banding (pillow shading), outline (share of the silhouette edge in ink), seam (tiles: the border vs the interior; families: over a random island map; about 1 or less reads as no seam), coverage (sizes, empty frames or cells; families: every variant and texture drawn), readability (edge contrast against the ground in ΔL*, silhouette distinct from the set, lightness spread), revert (share copied from a reference: ref=), repetition (tiles: the most visible stripe when tiled, ΔL*·√width). Thresholds come from project.json style.checks.`;
 
 const text = (t: string) => ({ type: 'text' as const, text: t });
 const fail = (t: string): CallToolResult => ({ content: [text(t)], isError: true });
@@ -92,6 +99,7 @@ export function projectSummary(w: Writer, url: string): string {
     const ramps = Object.entries(pal.ramps);
     if (ramps.length) lines.push('  ramps: ' + ramps.map(([k, v]) => `${k} [${v.join(' ')}]`).join('; '));
   }
+  lines.push(`autotile schemes: ${[...BUILTIN_SCHEMES.values()].map((x) => `${x.name} (${x.variants.length})`).join(', ')}`);
   const assets = listAssets(p);
   lines.push('', assets.length ? `assets (${assets.length}):` : `assets: none yet. Create one with run(asset, "new tile <name> 24x24 ...").`);
   for (const a of assets) {
@@ -105,6 +113,8 @@ export function projectSummary(w: Writer, url: string): string {
         doc.paletteLocked ? 'palette locked' : '',
         Object.keys(doc.stamps).length ? `stamps ${Object.keys(doc.stamps).sort().join(', ')}` : '',
         Object.keys(doc.macros).length ? `macros ${Object.keys(doc.macros).sort().join(', ')}` : '',
+        doc.family ? `family ${doc.family.scheme} of ${doc.family.tile}px tiles` : '',
+        doc.overlay ? `overlay (${doc.overlay.mode} on ${doc.overlay.on})` : '',
       ].filter(Boolean).map((x) => `; ${x}`).join('') : '';
       lines.push(`  ${a}: ${doc ? `${doc.kind} ${doc.width}x${doc.height}${doc.wrap ? ' wrap' : ''}${doc.cellW < doc.width || doc.cellH < doc.height ? ` cell ${doc.cellW}x${doc.cellH}` : ''}, palette ${doc.palette.name}, ` : ''}${entries.length} commands in ${groups} groups${extra}${notes}`);
     } catch (e) {
@@ -213,6 +223,8 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
       'diff: before and after the latest group (or since a command number) with changed pixels outlined in magenta and notes in yellow, plus the changed pixels as text (up to 60; per frame on animated assets). ' +
       'game: the asset on its ground tile at 1x and at the engine\'s draw scale, beside its other directions (views) and the rest of its set. recolour: role art under several preview themes. ' +
       'anim: a contact sheet of every sequence (tags, views): each frame with its ticks, the frame before it as a tinted onion skin, the pivot and ground line, and the share of pixels changed from the frame before; plus an animated GIF at the game\'s speed saved for the person, and the numbers as text. ' +
+      'map: a sample map built with a family\'s autotile scheme (a random island; size and seed choose another), at the game\'s draw scale, with the seam score over it and the variants it used; overlays given in with= play over it (a GIF when anything moves). ' +
+      'family: every variant of a family in the middle of the 3x3 map that resolves to it, plus where each cell is on the sheet (for @cell(<name>)). ' +
       'marks="failing" circles every pixel a failing check flags. ' +
       'Images come back inline and are also saved as files; the person watching sees the last image you were shown.',
     annotations: { readOnlyHint: true },
@@ -227,7 +239,9 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
       theme: z.string().optional().describe('render, tile3x3, game: show role entries under this preview theme'),
       themes: z.array(z.string()).optional().describe('recolour: the themes to show (default: the first six)'),
       ground: z.string().optional().describe('game: the ground tile (default: the style guide\'s, else the first tile)'),
-      with: z.array(z.string()).optional().describe('game: the assets shown beside this one (default: its set: same kind and size)'),
+      with: z.array(z.string()).optional().describe('game: the assets shown beside this one (default: its set: same kind and size). map: overlays to play over the map'),
+      size: z.string().optional().describe('map: the map\'s size in tiles, "16x12" (default 12x10)'),
+      seed: z.number().int().min(1).optional().describe('map: the random island\'s seed (default 1)'),
     }),
   }, (a) => w.enqueue(() => {
     try {
@@ -236,7 +250,10 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
       const frame = a.frame !== undefined ? a.frame - 1 : ctxOf(w.doc(a.asset), AGENT).frame;
       const marks = parseMarks(a.marks);
       if (marks === null) return fail(`error: marks must be "failing" or check names (${CHECK_IDS.join(', ')})`);
-      const v = w.view(a.asset, a.mode as ViewMode, { scale: a.scale, region, since: a.since, frame, marks, theme: a.theme, themes: a.themes, ground: a.ground, with: a.with });
+      const sz = a.size ? /^(\d+)x(\d+)$/.exec(a.size) : null;
+      if (a.size && (!sz || Number(sz[1]) < 1 || Number(sz[2]) < 1 || Number(sz[1]) > 128 || Number(sz[2]) > 128)) return fail(`error: size must look like "16x12" (tiles, up to 128 each way)`);
+      const size = sz ? { cols: Number(sz[1]), rows: Number(sz[2]) } : undefined;
+      const v = w.view(a.asset, a.mode as ViewMode, { scale: a.scale, region, since: a.since, frame, marks, theme: a.theme, themes: a.themes, ground: a.ground, with: a.with, size, seed: a.seed });
       w.showEye(a.asset, v);
       return { content: viewContent(v) };
     } catch (e) {

@@ -27,8 +27,11 @@ export interface ViewRequest extends Omit<ViewOptions, 'marks' | 'theme' | 'them
   themes?: string[];
   /** game: the ground tile (default: the style guide's, else the first tile). */
   ground?: string;
-  /** game: the neighbours shown beside the asset (default: its set). */
+  /** game: the neighbours shown beside the asset (default: its set). map: overlays played over the map. */
   with?: string[];
+  /** map: its size in tiles and the island's seed. */
+  size?: { cols: number; rows: number };
+  seed?: number;
 }
 
 /** Run summaries check every frame up to this many pixels (width x height x frames), else only the frame being drawn on. */
@@ -268,7 +271,11 @@ export class Writer {
       throw new ProjectError(`no asset '${name}' in ${this.project.dir}; start the commands with 'new <kind> ${name} <W>x<H>'`);
     }
     if (startsFork && !parsed.errors.length) state = this.forkPrefix(first);
-    const r = runBatch(state, req.commands, { by: req.by, at: this.now(), palettes: paletteSource(this.project) });
+    const assets = (n: string): Doc | undefined => {
+      if (n === name || !this.assets().includes(n)) return undefined;
+      try { return this.doc(n); } catch { return undefined; }
+    };
+    const r = runBatch(state, req.commands, { by: req.by, at: this.now(), palettes: paletteSource(this.project), assets });
     if (!r.ok) return { ok: false, errors: r.errors };
     const base = { asset: name, doc: r.state.doc, group: r.group, added: r.added, changed: r.changed, created: creates };
     const totals = (s: AssetState) => ({ commands: s.entries.length, groups: new Set(s.entries.map((e) => e.group)).size });
@@ -462,6 +469,21 @@ export class Writer {
       const here = doc.views.find((v) => v.from <= f && f <= v.to);
       const dirs = [f, ...[...doc.views].sort((x, y) => VIEW_NAMES.indexOf(x.name as never) - VIEW_NAMES.indexOf(y.name as never)).flatMap((v) => (v === here ? [] : [v.from]))];
       o.game = { ground: ground?.doc ?? null, with: others.map((x) => x.doc), scale: drawScaleOf(style), frames: [...new Set(dirs)] };
+    }
+    if (mode === 'map') {
+      const overlays = (req.with ?? []).map((n) => {
+        const d = this.doc(n);
+        if (!d.overlay) throw new ProjectError(`'${n}' is not an overlay (with= takes overlays for the map view)`);
+        return d;
+      });
+      let ground: Doc | null = null;
+      if (doc.overlay) {
+        const all = this.assetDocs().filter((x) => x.name !== asset && (x.doc.family || x.doc.wrap));
+        const g = req.ground ? all.find((x) => x.name === req.ground) : all.find((x) => x.doc.family) ?? groundOf(asset, all, style, undefined) ?? all[0];
+        if (!g) throw new ProjectError(req.ground ? `no family or tile '${req.ground}' to put the overlay on` : 'no family or tile to put the overlay on (ground=<asset>)');
+        ground = g.doc;
+      }
+      o.map = { cols: req.size?.cols, rows: req.size?.rows, seed: req.seed, overlays, ground };
     }
     if (mode === 'recolour') o.themes = req.themes ? req.themes.map((n) => this.themeNamed(n)) : this.themes().slice(0, 6);
     if (mode !== 'diff' || before !== undefined) return makeView(doc, mode, o, dir, before);

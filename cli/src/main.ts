@@ -35,12 +35,14 @@ export const USAGE = `pixelclaw: a pixel art editor driven by commands
   pixelclaw run <project> (<script.pclaw> | - | -e "<commands>") [--asset <name>] [--replace] [--by <author>] [--view <mode>]
       Apply commands as one undo group. Any error applies nothing.
       A script that starts with 'new' creates the asset (--replace starts its tape again).
-  pixelclaw view <project> <asset> [render|grid|tile3x3|diff|game|recolour|all]... [--scale N] [--region x,y,WxH] [--frame N] [--out <dir>]
-         [--marks failing|<check>,...] [--theme <name>] [--themes a,b,c] [--ground <tile>] [--with <asset>]...
+  pixelclaw view <project> <asset> [render|grid|tile3x3|diff|game|recolour|anim|map|family|all]... [--scale N] [--region x,y,WxH] [--frame N] [--out <dir>]
+         [--marks failing|<check>,...] [--theme <name>] [--themes a,b,c] [--ground <tile>] [--with <asset>]... [--size CxR] [--seed N]
       Write views (default: <project>/views/<asset>.<mode>.png|txt). The grid is also printed.
       diff shows what the latest group changed; game shows a sprite on its ground at 1x and the
-      draw scale beside its set; recolour shows role art under preview themes; all is render,
-      grid and tile3x3. --marks circles the pixels checks flag.
+      draw scale beside its set; recolour shows role art under preview themes; map puts a family
+      on a random island (--size, --seed; overlays --with) with the seam score; family shows each
+      variant among its neighbours; all is render, grid and tile3x3. --marks circles the pixels
+      checks flag.
   pixelclaw check <project> [<asset>...] [--checks a,b] [--frame N] [--ground <tile>] [--ref <asset>] [--marks]
       Run the quality checks against the style guide (project.json style): scores, pass or fail,
       and the flagged pixels. Exits 1 if any check fails. --marks writes the render (tile3x3 for
@@ -180,12 +182,19 @@ function writeViews(io: Io, proj: Project, doc: Doc, modesIn: string[], p: Parse
   const marksS = one(p, 'marks');
   const marks = marksS === undefined ? undefined : marksS === 'failing' ? 'failing' as const : marksS.split(',').map((x) => x.trim());
   if (Array.isArray(marks) && !marks.every(isCheckId)) throw new UsageError(`--marks takes failing or check names (${CHECK_IDS.join(', ')})`);
+  const sizeS = one(p, 'size');
+  const sm = sizeS ? /^(\d+)x(\d+)$/.exec(sizeS) : null;
+  if (sizeS && !sm) throw new UsageError('--size must look like 16x12 (tiles)');
+  const size = sm ? { cols: Number(sm[1]), rows: Number(sm[2]) } : undefined;
+  const seedS = one(p, 'seed');
+  const seed = seedS === undefined ? undefined : Number(seedS);
+  if (seed !== undefined && (!Number.isInteger(seed) || seed < 1)) throw new UsageError('--seed must be a whole number from 1');
   const w = new Writer(proj);
   for (const m of modes as ViewMode[]) {
     const out = one(p, 'out') ?? join(proj.dir, 'views');
     const v = w.view(doc.name, m, {
       scale, region, frame, marks: marks as CheckId[] | 'failing' | undefined, theme: one(p, 'theme'), themes: one(p, 'themes')?.split(','),
-      ground: one(p, 'ground'), with: p.flags.get('with'),
+      ground: one(p, 'ground'), with: p.flags.get('with'), size, seed,
     }, out);
     if (v.kind === 'text') {
       io.out(v.text);
@@ -350,9 +359,9 @@ export function main(argv: string[], io: Io = nodeIo): number {
         return p.pos.length === 1 ? cmdNewProject(io, p.pos[0], p) : cmdNewAsset(io, p.pos[0], p);
       }
       case 'run':
-        return cmdRun(io, parseArgs(rest, ['asset', 'by', 'e', 'view', 'scale', 'region', 'out', 'frame', 'marks', 'theme', 'themes', 'ground', 'with'], ['replace']));
+        return cmdRun(io, parseArgs(rest, ['asset', 'by', 'e', 'view', 'scale', 'region', 'out', 'frame', 'marks', 'theme', 'themes', 'ground', 'with', 'size', 'seed'], ['replace']));
       case 'view':
-        return cmdView(io, parseArgs(rest, ['scale', 'region', 'out', 'frame', 'marks', 'theme', 'themes', 'ground', 'with'], []));
+        return cmdView(io, parseArgs(rest, ['scale', 'region', 'out', 'frame', 'marks', 'theme', 'themes', 'ground', 'with', 'size', 'seed'], []));
       case 'check':
         return cmdCheck(io, parseArgs(rest, ['checks', 'frame', 'ground', 'ref'], ['marks']));
       case 'review':
