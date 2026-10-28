@@ -39,7 +39,7 @@ claude mcp add pixelclaw -- npx -y pixelclaw serve --project ~/art/mossy-ruins.p
 ```
 
 Claude Code starts the server with the session. The server's instructions ask Claude to call
-`project` first and give you the watch link; you can also ask for it ("give me the Pixel Claw
+`project` first and give you the watch link; you can also ask for it ("give me the PixelClaw
 link").
 
 ## Tools

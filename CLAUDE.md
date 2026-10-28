@@ -1,6 +1,6 @@
 # pixelclaw
 
-Pixel Claw: a pixel art editor built for an AI agent to drive by command (an MCP server and a CLI),
+PixelClaw: a pixel art editor built for an AI agent to drive by command (an MCP server and a CLI),
 with a live browser view where people watch and edit. Indexed colour only. TypeScript, pnpm
 workspaces (`core`, `server`, `ui`, `cli`, `skill/`).
 

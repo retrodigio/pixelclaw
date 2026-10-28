@@ -39,7 +39,7 @@ export interface Served {
 
 function openProject(dir: string, create: boolean, name: string | undefined, log: (s: string) => void): Project {
   if (existsSync(join(dir, 'project.json'))) return loadProject(dir);
-  if (!create) throw new ProjectError(`${dir} is not a Pixel Claw project (no project.json); pass create: true to make one`);
+  if (!create) throw new ProjectError(`${dir} is not a PixelClaw project (no project.json); pass create: true to make one`);
   log(`pixelclaw: created an empty project at ${dir}`);
   return createProject(dir, { name, palettes: [] });
 }

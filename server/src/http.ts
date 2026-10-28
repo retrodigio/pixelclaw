@@ -47,7 +47,7 @@ function page(res: ServerResponse, status: number, title: string, body: string):
   res.writeHead(status, { ...HEADERS, 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
   res.end(`<!doctype html><meta charset="utf-8"><title>${title}</title>
 <body style="font:15px system-ui;background:#16171b;color:#d8dbe0;padding:3em;max-width:40em">
-<h1 style="font-size:20px">Pixel Claw: ${title}</h1>${body}</body>`);
+<h1 style="font-size:20px">PixelClaw: ${title}</h1>${body}</body>`);
 }
 
 export interface WatchServer {

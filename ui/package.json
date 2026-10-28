@@ -3,7 +3,7 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Pixel Claw watch view: canvas, tape with live playback, Claude's eye (Vite + React + canvas 2D).",
+  "description": "PixelClaw watch view: canvas, tape with live playback, Claude's eye (Vite + React + canvas 2D).",
   "dependencies": {
     "@pixelclaw/core": "workspace:*",
     "react": "^19.3.1",

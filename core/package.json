@@ -3,6 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Pixel Claw core: indexed document, command language, raster ops, renders, PNG encoder. No DOM or Node APIs.",
+  "description": "PixelClaw core: indexed document, command language, raster ops, renders, PNG encoder. No DOM or Node APIs.",
   "exports": { ".": "./src/index.ts" }
 }

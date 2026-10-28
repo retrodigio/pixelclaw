@@ -73,7 +73,7 @@ export function createProject(dir: string, o: { name?: string; palettes: Palette
 
 export function loadProject(dir: string): Project {
   const pj = join(dir, 'project.json');
-  if (!existsSync(pj)) throw new ProjectError(`${dir} is not a Pixel Claw project (no project.json); create one with 'pixelclaw new ${dir}'`);
+  if (!existsSync(pj)) throw new ProjectError(`${dir} is not a PixelClaw project (no project.json); create one with 'pixelclaw new ${dir}'`);
   const json = JSON.parse(readFileSync(pj, 'utf8')) as ProjectJson;
   if (json.format !== PROJECT_FORMAT) throw new ProjectError(`${pj}: not a ${PROJECT_FORMAT} file`);
   const palettes = new Map<string, Palette>();

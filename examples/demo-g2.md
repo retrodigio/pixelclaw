@@ -20,12 +20,12 @@ pnpm build
    ```
 
    Then start Claude Code (`claude`) in the same folder (`claude mcp add` registers servers for the
-   current folder unless you add `--scope user`). It starts the Pixel Claw server with the
+   current folder unless you add `--scope user`). It starts the PixelClaw server with the
    session; `/mcp` shows it as connected.
 
 2. **Open the URL.** Ask Claude:
 
-   > Open the Pixel Claw project, add the palette `<repo>/examples/src/mossy-ruins.json`, and give
+   > Open the PixelClaw project, add the palette `<repo>/examples/src/mossy-ruins.json`, and give
    > me the watch link.
 
    Claude calls the `project` tool and replies with a link like

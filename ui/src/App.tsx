@@ -40,7 +40,7 @@ export function App({ store }: { store: Store }) {
   return (
     <div className="app">
       <header>
-        <span className="logo">Pixel Claw</span>
+        <span className="logo">PixelClaw</span>
         <span className="crumbs">
           {store.project?.name ?? '…'}
           {a && <> <span className="sep">▸</span> {a.name}</>}

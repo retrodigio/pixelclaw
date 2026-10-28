@@ -1,4 +1,4 @@
-# Pixel Claw
+# PixelClaw
 
 A pixel art editor built for an AI agent to drive by command. The agent draws with exact
 commands, sees exact feedback, and checks its own work. People can watch, and later edit, in a

@@ -1,6 +1,6 @@
 # Command reference (language version 1)
 
-Pixel Claw documents are edited with a small line-based command language. The same text works from
+PixelClaw documents are edited with a small line-based command language. The same text works from
 the CLI (`pixelclaw run`) now and from the MCP server later. Every command is written to the
 asset's tape in its **normal form** (defaults filled in, colours by name), so replaying the tape
 gives the same pixels even if a default changes later.

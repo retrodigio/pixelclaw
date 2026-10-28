@@ -10,7 +10,7 @@ import type { Writer } from './writer.ts';
 
 export const SERVER_NAME = 'pixelclaw';
 
-export const INSTRUCTIONS = `Pixel Claw is a pixel art editor you drive with a small command language. All art is indexed colour (every pixel is a palette entry).
+export const INSTRUCTIONS = `PixelClaw is a pixel art editor you drive with a small command language. All art is indexed colour (every pixel is a palette entry).
 
 Start with the \`project\` tool: it lists palettes and assets, and gives a watch link (http://127.0.0.1:…/?token=…). Give the person that link so they can watch you draw live.
 

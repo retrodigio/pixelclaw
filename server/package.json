@@ -3,7 +3,7 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Pixel Claw server: the single writer for a project, the MCP server (stdio), and HTTP + WebSocket for the watch view.",
+  "description": "PixelClaw server: the single writer for a project, the MCP server (stdio), and HTTP + WebSocket for the watch view.",
   "exports": {
     ".": "./src/index.ts",
     "./serve": "./src/serve.ts",

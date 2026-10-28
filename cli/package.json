@@ -3,7 +3,7 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Pixel Claw: a pixel art editor driven by commands, with an MCP server and a live watch view.",
+  "description": "PixelClaw: a pixel art editor driven by commands, with an MCP server and a live watch view.",
   "license": "MIT",
   "engines": {
     "node": ">=22"

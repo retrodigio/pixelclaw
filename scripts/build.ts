@@ -55,7 +55,7 @@ for (const dir of [...pkgDirs].sort()) {
   const file = ['LICENSE', 'LICENSE.md', 'LICENSE.txt', 'license', 'LICENCE'].map((f) => join(dir, f)).find(existsSync);
   notices.push(`${pkg.name}@${pkg.version} (${pkg.license ?? 'see below'})\n\n${file ? readFileSync(file, 'utf8').trim() : `licence: ${pkg.license}`}\n`);
 }
-writeFileSync(join(OUT, 'THIRD_PARTY_LICENSES.txt'), `Pixel Claw bundles the following packages.\n\n${notices.join('\n' + '-'.repeat(72) + '\n\n')}`);
+writeFileSync(join(OUT, 'THIRD_PARTY_LICENSES.txt'), `PixelClaw bundles the following packages.\n\n${notices.join('\n' + '-'.repeat(72) + '\n\n')}`);
 
 const kb = (f: string) => Math.round(readFileSync(f).length / 1024);
 console.log(`built ${relative(REPO, OUT)}${sep}pixelclaw.js (${kb(join(OUT, 'pixelclaw.js'))} KB, ${pkgDirs.size} third-party packages) and ui/`);
