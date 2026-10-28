@@ -5,3 +5,5 @@ export * from './project.ts';
 export * from './views.ts';
 export * from './writer.ts';
 export * from './protocol.ts';
+export * from './review.ts';
+export * from './report.ts';

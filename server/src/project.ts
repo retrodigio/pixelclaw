@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync
 import { basename, join } from 'node:path';
 import {
   deserializeDoc, tapeLang, encodePng, entryToJson, importPalette, paletteToJson, parseTape, renderFlat, serializeDoc, tapeToJsonl,
-  type AssetState, type Doc, type Layer, type Note, type Palette, type PaletteSource, type TapeEntry,
+  type AssetState, type Doc, type Layer, type Note, type Palette, type PaletteSource, type StyleJson, type TapeEntry,
 } from '@pixelclaw/core';
 
 export const PROJECT_FORMAT = 'pixelclaw-project';
@@ -20,7 +20,10 @@ export interface ProjectJson {
   tickRate: number;
   defaultPalette: string | null;
   grid: number;
-  style: Record<string, unknown>;
+  /** The style guide's settings for checks and previews (see core's style.ts). */
+  style: StyleJson;
+  /** Preview themes for role art, by name: `{ "light": "#…", "dark": "#…", "darkest": "#…" }`. */
+  themes?: Record<string, unknown>;
   profiles: string[];
 }
 

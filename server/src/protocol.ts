@@ -1,7 +1,7 @@
 // Messages between the server and the watch view (WebSocket, JSON). Types only, so the UI can
 // import them without pulling in any Node code.
 
-import type { Diag, Palette, TapeEntry } from '@pixelclaw/core';
+import type { Diag, Palette, StyleJson, TapeEntry, Theme } from '@pixelclaw/core';
 
 export interface AssetTape {
   name: string;
@@ -25,6 +25,10 @@ export interface Snapshot {
   project: { name: string; dir: string };
   palettes: Palette[];
   defaultPalette: string | null;
+  /** The style guide's check and preview settings (project.json `style`). */
+  style: StyleJson;
+  /** Preview themes for role art: built in, then the project's. */
+  themes: Theme[];
   assets: AssetTape[];
   /** The asset written most recently, if any. */
   live: string | null;
@@ -39,6 +43,8 @@ export type ServerMessage =
    */
   | { type: 'batch'; asset: string; by: string; group: string; entries: TapeEntry[]; changed: number; reset: boolean }
   | { type: 'eye'; eye: Eye }
+  /** project.json's style guide or themes changed. */
+  | { type: 'style'; style: StyleJson; themes: Theme[] }
   /** Palettes were added to the project. */
   | { type: 'palettes'; palettes: Palette[]; defaultPalette: string | null }
   /** The answer to one page's `run` (only to that page; the batch itself goes to every page). */

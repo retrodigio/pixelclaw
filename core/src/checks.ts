@@ -397,8 +397,9 @@ function thinChains(img: Img, min: number): Pt[][] {
 
 function checkJaggies(img: Img, p: Params): CheckResult {
   // A doubled L-corner: a pixel whose only same-colour 4-neighbours are one horizontal and one
-  // vertical, with the corner between them empty, inside a line that carries on (a pixel-perfect
-  // line steps diagonally there). A right angle between two straight arms is meant (a box).
+  // vertical, with the corner between them empty, where the line zig-zags through it (it steps
+  // the same way before and after, as a staircase does): a pixel-perfect line steps diagonally
+  // there. A corner where the line turns and carries on (a box, a hook) is meant.
   const elbows: Pt[] = [];
   for (let i = 0; i < img.px.length; i++) {
     const c = img.px[i]!;
@@ -409,11 +410,8 @@ function checkJaggies(img: Img, p: Params): CheckResult {
     const h = n4.find(([, dy]) => dy === 0);
     const v = n4.find(([dx]) => dx === 0);
     if (!h || !v || img.get(x + h[0] + v[0], y + v[1]) === c) continue;
-    if (img.get(x + 2 * h[0], y) === c && img.get(x, y + 2 * v[1]) === c) continue;
-    const hp: Pt = [x + h[0], y];
-    const vp: Pt = [x, y + v[1]];
-    const onward = (q: Pt, other: Pt) => sameN8(img, q[0], q[1]).some((r) => img.at(r[0], r[1]) !== i && img.at(r[0], r[1]) !== img.at(other[0], other[1]));
-    if (onward(hp, vp) || onward(vp, hp)) elbows.push([x, y]);
+    const zig = img.get(x + v[0] - h[0], y + v[1]) === c || img.get(x + h[0], y - v[1]) === c;
+    if (zig) elbows.push([x, y]);
   }
   // Touching elbows are one doubled corner.
   let corners = 0;

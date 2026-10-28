@@ -3,10 +3,12 @@
 // to every listener (the watch view's sockets). It also keeps each agent's read position for
 // `changes`, and a timeline per asset so any earlier state is quick to rebuild.
 
+import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  TapeCursor, Timeline, activeGroups, paletteToJson, parse, replay, runBatch, type AssetState, type Diag, type Doc, type Note, type Palette,
-  type TapeEntry, type Token,
+  CHECK_IDS, TapeCursor, Timeline, activeGroups, checkContextFor, drawScaleOf, groundOf, paletteToJson, parse, projectThemes, replay, runBatch,
+  runChecks, setOf, type AssetDoc, type AssetState, type CheckId, type CheckResult, type Diag, type Doc, type Note, type Palette, type Pt,
+  type TapeEntry, type Theme, type Token,
 } from '@pixelclaw/core';
 import {
   ProjectError, addPalettes, assetExists, forkOf, latestCheckpoint, listAssets, paletteSource, readReads, readTape, saveAsset, writeReads,
@@ -14,6 +16,29 @@ import {
 } from './project.ts';
 import type { Eye, ServerMessage, Snapshot } from './protocol.ts';
 import { makeView, type View, type ViewMode, type ViewOptions } from './views.ts';
+
+/** What a view asks for, by name: the writer finds the documents, themes and check marks. */
+export interface ViewRequest extends Omit<ViewOptions, 'marks' | 'theme' | 'themes' | 'game'> {
+  /** Circle the pixels these checks flag ('failing': every failing check). */
+  marks?: CheckId[] | 'failing';
+  /** render, tile3x3, game: show role entries under this theme. */
+  theme?: string;
+  /** recolour: these themes (default: the first six). */
+  themes?: string[];
+  /** game: the ground tile (default: the style guide's, else the first tile). */
+  ground?: string;
+  /** game: the neighbours shown beside the asset (default: its set). */
+  with?: string[];
+}
+
+export interface CheckRequest {
+  checks?: CheckId[];
+  /** 0-based frame (default the first). */
+  frame?: number;
+  ground?: string;
+  ref?: string;
+  set?: string[];
+}
 
 /** Thrown when a batch names no asset and does not start with `new`. */
 export class NoAssetError extends ProjectError {}
@@ -108,11 +133,17 @@ export class Writer {
   private queue: Promise<unknown> = Promise.resolve();
   private readonly now: () => string;
   private live: string | null = null;
+  private styleStamp = '';
   lastEye: Eye | null = null;
 
   constructor(project: Project, o: WriterOptions = {}) {
     this.project = project;
     this.now = o.now ?? utcNow;
+  }
+
+  /** The writer's clock (UTC, whole seconds), as tape lines are stamped. */
+  stamp(): string {
+    return this.now();
   }
 
   /** Listen to applied batches and views; returns the unsubscribe function. */
@@ -141,6 +172,7 @@ export class Writer {
   /** Switch to another project (an MCP `project` call). Listeners should send a fresh snapshot. */
   setProject(p: Project): void {
     this.project = p;
+    this.styleStamp = '';
     this.states.clear();
     this.timelines.clear();
     this.live = null;
@@ -249,6 +281,7 @@ export class Writer {
     this.writePalettes(saved);
     this.states.set(name, r.state);
     this.live = name;
+    this.freshStyle();
     const warnings: string[] = [];
     const drew = r.added.some((e) => DRAWING_RE.test(e.cmd));
     if (drew && r.changed === 0) warnings.push('the batch changed no pixels');
@@ -332,19 +365,103 @@ export class Writer {
   }
 
   /**
+   * The style guide and themes from project.json, read again when the file changes (people edit
+   * it by hand while a session runs). Pages are told when they change.
+   */
+  private freshStyle(): void {
+    const f = join(this.project.dir, 'project.json');
+    let stamp: string;
+    try {
+      const st = statSync(f);
+      stamp = `${st.mtimeMs}:${st.size}`;
+    } catch {
+      return;
+    }
+    if (stamp === this.styleStamp) return;
+    const first = this.styleStamp === '';
+    this.styleStamp = stamp;
+    try {
+      const json = JSON.parse(readFileSync(f, 'utf8')) as Project['json'];
+      const changed = JSON.stringify([json.style, json.themes]) !== JSON.stringify([this.project.json.style, this.project.json.themes]);
+      this.project.json.style = json.style ?? {};
+      this.project.json.themes = json.themes;
+      if (changed && !first) this.emit({ type: 'style', style: this.project.json.style, themes: this.themes() });
+    } catch {
+      // a half-written file: keep what we had, and look again next time
+      this.styleStamp = '';
+    }
+  }
+
+  /** Every asset's document, with what it was forked from (for checks and previews). */
+  assetDocs(): AssetDoc[] {
+    return this.assets().flatMap((name) => {
+      try {
+        const { doc, entries } = this.state(name);
+        return doc ? [{ name, doc, forkOf: forkOf(entries)?.from ?? null }] : [];
+      } catch {
+        return []; // an asset that does not replay is reported by verify, not here
+      }
+    });
+  }
+
+  /** The preview themes: built in, then the project's. */
+  themes(): Theme[] {
+    return projectThemes(this.project.json.themes);
+  }
+
+  private themeNamed(name: string): Theme {
+    const t = this.themes().find((x) => x.name === name);
+    if (!t) throw new ProjectError(`no theme '${name}' (themes: ${this.themes().map((x) => x.name).join(', ')})`);
+    return t;
+  }
+
+  /** Run checks on an asset with the project's style guide (all of them by default). */
+  checks(asset: string, o: CheckRequest = {}): { results: CheckResult[]; problems: string[] } {
+    this.freshStyle();
+    const doc = this.doc(asset);
+    if (o.frame !== undefined && (o.frame < 0 || o.frame >= doc.frameCount)) throw new ProjectError(`frame ${o.frame + 1} does not exist (frames 1..${doc.frameCount})`);
+    const { ctx, problems } = checkContextFor(asset, doc, this.assetDocs(), this.project.json.style, (n) => this.project.palettes.get(n), o);
+    return { results: runChecks(doc, o.checks ?? CHECK_IDS, ctx), problems };
+  }
+
+  /**
    * Render a view and save it (under views/ unless outDir is given). The diff compares with the
    * document after command `since`, by default the one before the latest group.
    */
-  view(asset: string, mode: ViewMode, o: ViewOptions = {}, outDir?: string, before?: Doc | null): View {
+  view(asset: string, mode: ViewMode, req: ViewRequest = {}, outDir?: string, before?: Doc | null): View {
     const dir = outDir ?? join(this.project.dir, 'views');
-    if (mode !== 'diff' || before !== undefined) return makeView(this.doc(asset), mode, o, dir, before);
+    this.freshStyle();
+    const doc = this.doc(asset);
+    const style = this.project.json.style;
+    const o: ViewOptions = { scale: req.scale, region: req.region, since: req.since, frame: req.frame };
+    if (req.theme) o.theme = this.themeNamed(req.theme);
+    if (req.marks) {
+      const ids = req.marks === 'failing' ? undefined : req.marks;
+      const rs = this.checks(asset, { checks: ids, frame: req.frame }).results;
+      const seen = new Set<string>();
+      const marks: Pt[] = [];
+      for (const r of rs) {
+        if (req.marks === 'failing' && r.status !== 'fail') continue;
+        for (const p of r.flagged) if (!seen.has(String(p))) { seen.add(String(p)); marks.push(p); }
+      }
+      o.marks = marks;
+    }
+    if (mode === 'game') {
+      const all = this.assetDocs();
+      const ground = groundOf(asset, all, style, req.ground);
+      if (req.ground && !ground) throw new ProjectError(`no asset '${req.ground}' to use as ground`);
+      const others = req.with ? req.with.map((n) => ({ name: n, doc: this.doc(n) })) : setOf(asset, doc, all, style).slice(0, 7);
+      o.game = { ground: ground?.doc ?? null, with: others.map((x) => x.doc), scale: drawScaleOf(style) };
+    }
+    if (mode === 'recolour') o.themes = req.themes ? req.themes.map((n) => this.themeNamed(n)) : this.themes().slice(0, 6);
+    if (mode !== 'diff' || before !== undefined) return makeView(doc, mode, o, dir, before);
     const { entries } = this.state(asset);
-    let since = o.since;
+    let since = req.since;
     if (since === undefined) {
       const g = entries.at(-1)?.group;
       since = (entries.find((e) => e.group === g)?.seq ?? 1) - 1;
     }
-    return makeView(this.doc(asset), mode, o, dir, since > 0 ? this.docAt(asset, since) : null);
+    return makeView(doc, mode, o, dir, since > 0 ? this.docAt(asset, since) : null);
   }
 
   /** Record an image view as the last one shown to the agent, and tell the watchers. */
@@ -370,11 +487,14 @@ export class Writer {
   }
 
   snapshot(): Snapshot {
+    this.freshStyle();
     const assets = this.assets().map((name) => ({ name, entries: this.states.get(name)?.entries ?? readTape(this.project, name) }));
     return {
       project: { name: this.project.json.name, dir: this.project.dir },
       palettes: [...this.project.palettes.values()],
       defaultPalette: this.project.json.defaultPalette,
+      style: this.project.json.style ?? {},
+      themes: this.themes(),
       assets,
       live: this.live,
       eye: this.lastEye,

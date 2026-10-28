@@ -3,8 +3,10 @@
 
 import { McpServer, type CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { ctxOf, diffPixels, diffText, type Note, type TapeEntry } from '@pixelclaw/core';
+import { CHECK_IDS, checkSummary, ctxOf, diffPixels, diffText, type CheckResult, type Note, type TapeEntry } from '@pixelclaw/core';
 import { ProjectError, listAssets, readPaletteFile } from './project.ts';
+import { formatChecks } from './report.ts';
+import { writeReview } from './review.ts';
 import { VIEW_MODES, parseRegion, type View, type ViewMode } from './views.ts';
 import type { AssetChanges, Writer } from './writer.ts';
 
@@ -17,7 +19,7 @@ export const INSTRUCTIONS = `PixelClaw is a pixel art editor you drive with a sm
 
 Start with the \`project\` tool: it lists palettes and assets, and gives a watch link (http://127.0.0.1:…/?token=…). Give the person that link so they can watch you draw live, and edit too.
 
-Draw with \`run\` (one batch = one undo group; any error applies nothing). Look with \`view\` (render: scaled PNG with grid and rulers; tile3x3: seams and repetition; grid: exact palette keys per pixel; diff: what the last group changed). Read the tape with \`history\`.
+Draw with \`run\` (one batch = one undo group; any error applies nothing); every result ends with a one-line check summary. Look with \`view\` (render: scaled PNG with grid and rulers; tile3x3: seams and repetition; grid: exact palette keys per pixel; diff: what the last group changed; game: a sprite on its ground at 1x and the draw scale beside its set; recolour: role art under preview themes; marks: "failing" circles flagged pixels in magenta). \`check\` gives the full table: each check's score against the style guide's threshold and the exact pixels it flags; fix them by coordinates. Read the tape with \`history\`. \`review\` writes a blind review bundle: hand its folder to a fresh agent with no context, and bring its findings back as notes on the pixels.
 
 People edit in the watch view too. Their edits are commands on the same tape, written by human:<name>. Call \`changes\` at the start of each turn while someone is watching, and whenever they say they changed something: it returns their commands and notes since you last looked, with a before/after diff image. Carry on from what they did; never silently redo their pixels. Close a note you have dealt with: note done <id>.
 
@@ -46,13 +48,15 @@ Commands (one per line, or ';' between them; '#' comments). Full reference: docs
   voronoi [box] cells=<n> ramp=<r> [gap=<colour>] [relax=1] [seed=n]     bricks [box] size=8x4 ramp=<r> [gap=<colour>] [seed=n]
   stamp save <name> <x,y> <W>x<H> (or a << block >>) | stamp <name> <x,y> [flip=h|v|hv]    brush square|circle <n> | brush stamp <name> | brush off
   def tuft(x,y) { px $x,$y $x+1,$y-1 c=moss2 }   call tuft 5,18
-  palette set <entry> hex=#rrggbb | palette add [<name>] hex=#rrggbb [key=<k>]   this asset's palette
+  palette set <entry> hex=#rrggbb [role=<r>|none] | palette add [<name>] hex=#rrggbb|role=<r> [key=<k>]   this asset's palette; roles black|white|light|dark|darkest for recolourable art
   note <x,y> [<W>x<H>] "text"   |   note done <id>
   undo [group=<g>] [by=<author>]   |   redo [group=<undo group>]
   fork <from> <to> [at=<n>]  (as the first command of a run on a new asset: a branch of <from>)
 Colours: an entry name (c=stone3), its key (c=3), its exact hex, or none. Coordinates wrap on wrap=on documents (tiles by default). @cell(cx,cy) after a command name offsets it to a cell of the cell grid. Generators write their seed into the tape line; give seed= to choose one (another seed is another variant). Your layer, frame, selection, symmetry and brush are yours alone: people in the watch view have their own.
 
-Habits: after each meaningful batch, look once at an image (render or tile3x3), and use the grid to check exact pixels. Never judge a tile alone when it will be seen tiled.`;
+Habits: after each meaningful batch, look once at an image (render or tile3x3), and use the grid to check exact pixels. Never judge a tile alone when it will be seen tiled; judge a sprite in the game view, on its ground. Keep the checks green, but do not stop at green: look at the 3x3 or the game view and judge it as a player would.
+
+Checks: palette (colours in the style palettes; role art uses only roles), orphans (stray pixels per 100), jaggies (doubled L-corners, irregular step runs, spikes, notches), banding (pillow shading), outline (share of the silhouette edge in ink), seam (tiles: the border vs the interior; about 1 or less reads as no seam), coverage (sizes, empty frames or cells), readability (edge contrast against the ground in ΔL*, silhouette distinct from the set, lightness spread), revert (share copied from a reference: ref=), repetition (tiles: the most visible stripe when tiled, ΔL*·√width). Thresholds come from project.json style.checks.`;
 
 const text = (t: string) => ({ type: 'text' as const, text: t });
 const fail = (t: string): CallToolResult => ({ content: [text(t)], isError: true });
@@ -187,6 +191,7 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
         out.push(`tape: ${r.commands} commands in ${r.groups} groups`);
       }
       out.push(r.warnings.length ? `warnings: ${r.warnings.join('; ')}` : 'warnings: none');
+      if (r.doc) out.push(checkSummary(w.checks(r.asset, { frame: ctxOf(r.doc, AGENT).frame }).results));
       const content: CallToolResult['content'] = [text(out.join('\n'))];
       if (a.view && r.doc) {
         const v = w.view(r.asset, a.view, { frame: ctxOf(r.doc, AGENT).frame });
@@ -203,7 +208,9 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
     title: 'View an asset',
     description: 'Look at an asset. render: a scaled PNG (about 192 px, faint pixel grid, rulers every 8 px). ' +
       'tile3x3: the asset repeated 3x3 at 1x and 4x, for seams and repetition. grid: text, one palette key per pixel, with coordinates and a legend. ' +
-      'diff: before and after the latest group (or since a command number) with changed pixels outlined in magenta and notes in yellow, plus the changed pixels as text (up to 60). ' +
+      'diff: before and after the latest group (or since a command number) with changed pixels outlined in magenta and notes in yellow, plus the changed pixels as text (up to 60; per frame on animated assets). ' +
+      'game: the asset on its ground tile at 1x and at the engine\'s draw scale, beside the rest of its set. recolour: role art under several preview themes. ' +
+      'marks="failing" circles every pixel a failing check flags. ' +
       'Images come back inline and are also saved as files; the person watching sees the last image you were shown.',
     annotations: { readOnlyHint: true },
     inputSchema: z.object({
@@ -212,14 +219,21 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
       scale: z.number().int().min(1).max(64).optional().describe('render only: pixels per pixel'),
       region: z.string().optional().describe('grid only: part of the canvas, "x,y WxH" (e.g. "8,0 12x10")'),
       since: z.number().int().min(0).optional().describe('diff only: compare with the document after this command number (default: before the latest group)'),
-      frame: z.number().int().min(1).optional().describe('render, grid, tile3x3: the frame to show (default: the frame you are drawing on)'),
+      frame: z.number().int().min(1).optional().describe('render, grid, tile3x3, game, recolour: the frame to show (default: the frame you are drawing on)'),
+      marks: z.string().optional().describe('render, tile3x3, game: circle the pixels checks flag in magenta: "failing", or check names ("orphans,jaggies")'),
+      theme: z.string().optional().describe('render, tile3x3, game: show role entries under this preview theme'),
+      themes: z.array(z.string()).optional().describe('recolour: the themes to show (default: the first six)'),
+      ground: z.string().optional().describe('game: the ground tile (default: the style guide\'s, else the first tile)'),
+      with: z.array(z.string()).optional().describe('game: the assets shown beside this one (default: its set: same kind and size)'),
     }),
   }, (a) => w.enqueue(() => {
     try {
       const region = a.region ? parseRegion(a.region) : undefined;
       if (region === null) return fail(`error: region must look like "8,0 12x10"`);
       const frame = a.frame !== undefined ? a.frame - 1 : ctxOf(w.doc(a.asset), AGENT).frame;
-      const v = w.view(a.asset, a.mode as ViewMode, { scale: a.scale, region, since: a.since, frame });
+      const marks = parseMarks(a.marks);
+      if (marks === null) return fail(`error: marks must be "failing" or check names (${CHECK_IDS.join(', ')})`);
+      const v = w.view(a.asset, a.mode as ViewMode, { scale: a.scale, region, since: a.since, frame, marks, theme: a.theme, themes: a.themes, ground: a.ground, with: a.with });
       w.showEye(a.asset, v);
       return { content: viewContent(v) };
     } catch (e) {
@@ -282,5 +296,74 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
     }
   }));
 
+  server.registerTool('check', {
+    title: 'Check an asset',
+    description: 'Run the quality checks on an asset against the project\'s style guide: each check\'s score, pass or fail, and the exact pixel coordinates it flags. ' +
+      'With one asset, also returns its render (tile3x3 for tiles) with the flagged pixels of failing checks circled in magenta. Without an asset, one line per asset. ' +
+      `Checks: ${CHECK_IDS.join(', ')}.`,
+    annotations: { readOnlyHint: true },
+    inputSchema: z.object({
+      asset: z.string().optional().describe('The asset to check (default: every asset, one summary line each)'),
+      checks: z.array(z.enum(CHECK_IDS)).optional().describe('Only these checks (default: all)'),
+      frame: z.number().int().min(1).optional().describe('The frame to check (default: the frame you are drawing on)'),
+      ground: z.string().optional().describe('readability: the ground tile (default: the style guide\'s, else the first tile)'),
+      ref: z.string().optional().describe('revert: the reference asset the art must not simply copy'),
+      set: z.array(z.string()).optional().describe('readability: the assets its silhouette must differ from (default: same kind and size)'),
+      image: z.boolean().optional().describe('Return the image with the flagged pixels (default: true when something fails)'),
+    }),
+  }, (a) => w.enqueue(() => {
+    try {
+      if (!a.asset) {
+        const lines = w.assets().map((n) => {
+          try {
+            return `${n}: ${checkSummary(w.checks(n, { checks: a.checks }).results).replace(/^checks: /, '')}`;
+          } catch (e) {
+            return `${n}: cannot check: ${(e as Error).message}`;
+          }
+        });
+        return { content: [text(lines.length ? lines.join('\n') : 'no assets yet')] };
+      }
+      const frame = a.frame !== undefined ? a.frame - 1 : ctxOf(w.doc(a.asset), AGENT).frame;
+      const { results, problems } = w.checks(a.asset, { checks: a.checks, frame, ground: a.ground, ref: a.ref, set: a.set });
+      const content: CallToolResult['content'] = [text(formatChecks(a.asset, results, problems, w.doc(a.asset).frameCount > 1 ? frame : undefined))];
+      const failing = results.filter((r) => r.status === 'fail').map((r) => r.id);
+      if (a.image ?? failing.length > 0) {
+        const v = w.view(a.asset, w.doc(a.asset).wrap ? 'tile3x3' : 'render', { frame, marks: failing.length ? failing : undefined });
+        w.showEye(a.asset, v);
+        content.push(...viewContent(v));
+      }
+      return { content };
+    } catch (e) {
+      return errorResult(e);
+    }
+  }));
+
+  server.registerTool('review', {
+    title: 'Write a blind review bundle',
+    description: 'Write a review bundle for a fresh-context reviewer (plan §5): each asset at game scale and with rulers for coordinates, tiles repeated 3x3, ' +
+      'sprites on their ground beside their set, the palette, the style guide and a rubric (readability, cohesion, seams, style-guide fit, defects with coordinates). ' +
+      'It names no method and no author, so the reviewer judges blind. Hand the folder to a new agent with no other context, ask it to follow rubric.md, ' +
+      'then pin its findings on the pixels with note commands.',
+    inputSchema: z.object({
+      assets: z.array(z.string()).optional().describe('The assets to review (default: all)'),
+      name: z.string().regex(/^[a-z0-9][a-z0-9_-]*$/).optional().describe('A name for the set, used in the folder name (default: all)'),
+    }),
+  }, (a) => w.enqueue(() => {
+    try {
+      const r = writeReview(w, { assets: a.assets, name: a.name });
+      return { content: [text(`review bundle: ${r.dir}\n${r.files.length} files: ${r.files.join(', ')}\nGive the folder to a fresh agent: "Review the art in ${r.dir} by following rubric.md in it."`)] };
+    } catch (e) {
+      return errorResult(e);
+    }
+  }));
+
   return server;
+}
+
+/** "failing" or a comma list of check names; undefined for none, null when something is not a check. */
+function parseMarks(s: string | undefined): CheckResult['id'][] | 'failing' | undefined | null {
+  if (!s) return undefined;
+  if (s.trim() === 'failing') return 'failing';
+  const ids = s.split(',').map((x) => x.trim()).filter(Boolean);
+  return ids.every((x) => (CHECK_IDS as readonly string[]).includes(x)) ? (ids as CheckResult['id'][]) : null;
 }

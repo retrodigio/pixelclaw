@@ -1,12 +1,12 @@
-// pixelclaw: new | run | view | verify. A thin layer over @pixelclaw/core and the project folder.
+// pixelclaw: new | run | view | check | review | verify. A thin layer over @pixelclaw/core and the project folder.
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { TapeCursor, serializeDoc, serializeDocV1, type AssetState, type Doc } from '@pixelclaw/core';
+import { CHECK_IDS, TapeCursor, checkSummary, isCheckId, serializeDoc, serializeDocV1, type AssetState, type CheckId, type Doc } from '@pixelclaw/core';
 import {
-  AssetExistsError, NoAssetError, ProjectError, VIEW_MODES, Writer, assetDir, checkpointNames, createProject, isViewMode, listAssets,
-  loadProject, lockHolder, makeView, paletteSource, parseRegion, prefixHash, previewPng, readAssetJson, readCheckpoints, readPaletteFile,
-  readTape, sha256, type Project, type ViewMode,
+  AssetExistsError, NoAssetError, ProjectError, VIEW_MODES, Writer, assetDir, checkpointNames, createProject, formatChecks, isViewMode, listAssets,
+  loadProject, lockHolder, paletteSource, parseRegion, prefixHash, previewPng, readAssetJson, readCheckpoints, readPaletteFile,
+  readTape, sha256, writeReview, type Project, type ViewMode,
 } from '@pixelclaw/server';
 
 export interface Io {
@@ -32,9 +32,18 @@ export const USAGE = `pixelclaw: a pixel art editor driven by commands
   pixelclaw run <project> (<script.pclaw> | - | -e "<commands>") [--asset <name>] [--replace] [--by <author>] [--view <mode>]
       Apply commands as one undo group. Any error applies nothing.
       A script that starts with 'new' creates the asset (--replace starts its tape again).
-  pixelclaw view <project> <asset> [render|grid|tile3x3|diff|all]... [--scale N] [--region x,y,WxH] [--frame N] [--out <dir>]
+  pixelclaw view <project> <asset> [render|grid|tile3x3|diff|game|recolour|all]... [--scale N] [--region x,y,WxH] [--frame N] [--out <dir>]
+         [--marks failing|<check>,...] [--theme <name>] [--themes a,b,c] [--ground <tile>] [--with <asset>]...
       Write views (default: <project>/views/<asset>.<mode>.png|txt). The grid is also printed.
-      diff shows what the latest group changed; all is render, grid and tile3x3.
+      diff shows what the latest group changed; game shows a sprite on its ground at 1x and the
+      draw scale beside its set; recolour shows role art under preview themes; all is render,
+      grid and tile3x3. --marks circles the pixels checks flag.
+  pixelclaw check <project> [<asset>...] [--checks a,b] [--frame N] [--ground <tile>] [--ref <asset>] [--marks]
+      Run the quality checks against the style guide (project.json style): scores, pass or fail,
+      and the flagged pixels. Exits 1 if any check fails. --marks writes the render (tile3x3 for
+      tiles) with the flagged pixels circled.
+  pixelclaw review <project> [<asset>...] [--name <set>]
+      Write a blind review bundle under <project>/reviews/<date>-<set>/ (rubric.md inside).
   pixelclaw verify <project> [<asset>...]
       Replay every tape and compare with asset.json, preview.png and checkpoints.
   pixelclaw serve --project <project> [--port 7417] [--no-mcp]
@@ -111,6 +120,7 @@ function apply(io: Io, proj: Project, text: string, source: string, o: { asset?:
   io.out(`${r.asset}: applied ${r.added.length} command${r.added.length === 1 ? '' : 's'} as group ${r.group}; ${r.changed} px changed\n`);
   io.out(`  tape: ${r.commands} commands in ${r.groups} group${r.groups === 1 ? '' : 's'}; preview: ${join(r.dir!, 'preview.png')}\n`);
   for (const wn of r.warnings) io.out(`  warning: ${wn}\n`);
+  io.out(`  ${checkSummary(w.checks(r.asset).results)}\n`);
   return { code: 0, doc: r.doc };
 }
 
@@ -161,15 +171,53 @@ function writeViews(io: Io, proj: Project, doc: Doc, modesIn: string[], p: Parse
   const frameS = one(p, 'frame');
   const frame = frameS === undefined ? undefined : Number(frameS) - 1;
   if (frame !== undefined && (!Number.isInteger(frame) || frame < 0 || frame >= doc.frameCount)) throw new UsageError(`--frame must be 1..${doc.frameCount}`);
+  const marksS = one(p, 'marks');
+  const marks = marksS === undefined ? undefined : marksS === 'failing' ? 'failing' as const : marksS.split(',').map((x) => x.trim());
+  if (Array.isArray(marks) && !marks.every(isCheckId)) throw new UsageError(`--marks takes failing or check names (${CHECK_IDS.join(', ')})`);
+  const w = new Writer(proj);
   for (const m of modes as ViewMode[]) {
     const out = one(p, 'out') ?? join(proj.dir, 'views');
-    // The diff needs the tape (what came before the latest group), so the writer renders it.
-    const v = m === 'diff' ? new Writer(proj).view(doc.name, 'diff', { scale }, out) : makeView(doc, m, { scale, region, frame }, out);
+    const v = w.view(doc.name, m, {
+      scale, region, frame, marks: marks as CheckId[] | 'failing' | undefined, theme: one(p, 'theme'), themes: one(p, 'themes')?.split(','),
+      ground: one(p, 'ground'), with: p.flags.get('with'),
+    }, out);
     if (v.kind === 'text') {
       io.out(v.text);
       io.out(`wrote ${v.path}\n`);
     } else io.out(`${v.text ? v.text + '\n' : ''}wrote ${v.path} (${v.width}x${v.height})\n`);
   }
+  return 0;
+}
+
+function cmdCheck(io: Io, p: Parsed): number {
+  const [dir, ...names] = p.pos;
+  if (!dir) throw new UsageError('check: give a project folder');
+  const proj = loadProject(dir);
+  const w = new Writer(proj);
+  const ids = one(p, 'checks')?.split(',').map((x) => x.trim());
+  if (ids && !ids.every(isCheckId)) throw new UsageError(`--checks takes check names (${CHECK_IDS.join(', ')})`);
+  const frameS = one(p, 'frame');
+  const frame = frameS === undefined ? undefined : Number(frameS) - 1;
+  if (frame !== undefined && (!Number.isInteger(frame) || frame < 0)) throw new UsageError('--frame must be a frame number from 1');
+  let failing = 0;
+  for (const name of names.length ? names : w.assets()) {
+    const { results, problems } = w.checks(name, { checks: ids as CheckId[] | undefined, frame, ground: one(p, 'ground'), ref: one(p, 'ref') });
+    const bad = results.filter((r) => r.status === 'fail').map((r) => r.id);
+    if (bad.length) failing++;
+    io.out(formatChecks(name, results, problems, frame) + '\n');
+    if (p.flags.has('marks') && bad.length) {
+      const v = w.view(name, w.doc(name).wrap ? 'tile3x3' : 'render', { frame, marks: bad });
+      io.out(`  wrote ${v.path}\n`);
+    }
+  }
+  return failing ? 1 : 0;
+}
+
+function cmdReview(io: Io, p: Parsed): number {
+  const [dir, ...names] = p.pos;
+  if (!dir) throw new UsageError('review: give a project folder');
+  const r = writeReview(new Writer(loadProject(dir), { now: io.now }), { assets: names.length ? names : undefined, name: one(p, 'name') });
+  io.out(`wrote ${r.files.length} files to ${r.dir}\n${r.files.map((f) => `  ${f}\n`).join('')}Hand the folder to a fresh reviewer: "Review the art in ${r.dir} by following rubric.md."\n`);
   return 0;
 }
 
@@ -260,9 +308,13 @@ export function main(argv: string[], io: Io = nodeIo): number {
         return p.pos.length === 1 ? cmdNewProject(io, p.pos[0], p) : cmdNewAsset(io, p.pos[0], p);
       }
       case 'run':
-        return cmdRun(io, parseArgs(rest, ['asset', 'by', 'e', 'view', 'scale', 'region', 'out', 'frame'], ['replace']));
+        return cmdRun(io, parseArgs(rest, ['asset', 'by', 'e', 'view', 'scale', 'region', 'out', 'frame', 'marks', 'theme', 'themes', 'ground', 'with'], ['replace']));
       case 'view':
-        return cmdView(io, parseArgs(rest, ['scale', 'region', 'out', 'frame'], []));
+        return cmdView(io, parseArgs(rest, ['scale', 'region', 'out', 'frame', 'marks', 'theme', 'themes', 'ground', 'with'], []));
+      case 'check':
+        return cmdCheck(io, parseArgs(rest, ['checks', 'frame', 'ground', 'ref'], ['marks']));
+      case 'review':
+        return cmdReview(io, parseArgs(rest, ['name'], []));
       case 'verify':
         return cmdVerify(io, parseArgs(rest, [], []));
       case undefined: case 'help': case '-h': case '--help':

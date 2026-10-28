@@ -67,6 +67,9 @@ describe('jaggies', () => {
     const r = check(doc('new sprite s 8x4\npx 0,0 1,0 1,1 2,1 3,1 3,2 4,2 5,2 c=ink'), 'jaggies');
     expect(r.groups.find((g) => g.label === 'doubled L-corner')!.pts.map(String).sort()).toEqual(['1,0', '1,1', '3,1', '3,2']);
     expect(r.detail).toMatch(/^2 doubled L-corners/);
+    // A hook (a line that turns and stops) and a bracket are meant: no zig-zag through the corner.
+    expect(check(doc('new sprite s 8x8\npx 3,0 3,1 3,2 3,3 2,3 c=ink'), 'jaggies').score).toBe(0);
+    expect(check(doc('new sprite s 8x8\npx 1,1 2,1 3,1 3,2 3,3 2,3 c=ink'), 'jaggies').score).toBe(0);
     // The same shape drawn as a pixel-perfect line has none.
     expect(check(doc('new sprite s 8x4\nline 0,0 5,2 c=ink'), 'jaggies').score).toBe(0);
   });

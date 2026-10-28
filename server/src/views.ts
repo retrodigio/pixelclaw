@@ -1,15 +1,18 @@
 // The views of plan §2 that exist so far: the scaled render, the text index grid, the 3x3 tile
-// preview and the diff (before / after with the changed pixels marked, plus the list of changes).
-// Each is rendered from a document and saved under <project>/views/ (or another folder).
+// preview, the diff (before / after with the changed pixels marked, plus the list of changes),
+// and the in-context previews `game` (sprites on their ground at 1x and the draw scale) and
+// `recolour` (role art under preview themes). Render and tile3x3 can circle the pixels checks
+// flagged. Each is rendered from a document and saved under <project>/views/ (or another folder).
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  diffPixels, diffText, encodePng, renderDiff, renderGrid, renderScaled, renderTile3x3, type Doc, type Region,
+  diffPixels, diffText, encodePng, renderDiff, renderGame, renderGrid, renderRecolour, renderScaled, renderTile3x3, type Doc, type Pt, type Region,
+  type Theme,
 } from '@pixelclaw/core';
 import { ProjectError } from './project.ts';
 
-export const VIEW_MODES = ['render', 'grid', 'tile3x3', 'diff'] as const;
+export const VIEW_MODES = ['render', 'grid', 'tile3x3', 'diff', 'game', 'recolour'] as const;
 export type ViewMode = (typeof VIEW_MODES)[number];
 
 export interface ViewOptions {
@@ -19,6 +22,14 @@ export interface ViewOptions {
   since?: number;
   /** The frame to show, 0-based (default the first). */
   frame?: number;
+  /** render, tile3x3, game: pixels to circle in magenta (from checks). */
+  marks?: readonly Pt[];
+  /** render, tile3x3, game: the preview theme for role entries. */
+  theme?: Theme | null;
+  /** game: the ground tile, the neighbours shown beside the asset, and the draw scale. */
+  game?: { ground: Doc | null; with: Doc[]; scale: number };
+  /** recolour: the themes to show. */
+  themes?: Theme[];
 }
 
 export type View =
@@ -76,7 +87,10 @@ export function makeView(doc: Doc, mode: ViewMode, o: ViewOptions, outDir: strin
     writeFileSync(path, text);
     return { mode, kind: 'text', text, path };
   }
-  const img = mode === 'render' ? renderScaled(doc, { scale: o.scale, frame: o.frame }) : renderTile3x3(doc, o.frame);
+  const img = mode === 'render' ? renderScaled(doc, { scale: o.scale, frame: o.frame, marks: o.marks, theme: o.theme })
+    : mode === 'tile3x3' ? renderTile3x3(doc, o.frame, { marks: o.marks, theme: o.theme })
+    : mode === 'game' ? renderGame([{ doc, frame: o.frame }, ...(o.game?.with ?? []).map((d) => ({ doc: d }))], { ground: o.game?.ground, scale: o.game?.scale ?? 2, theme: o.theme, marks: o.marks })
+    : renderRecolour(doc, o.themes ?? [], { scale: o.scale, frame: o.frame });
   const png = encodePng(img);
   const path = join(outDir, `${doc.name}.${mode}.png`);
   writeFileSync(path, png);
