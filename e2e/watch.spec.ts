@@ -5,7 +5,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
-import { REPO, canvasPixels, mismatches, serverDoc, startAgent, type Agent } from './helpers.ts';
+import { REPO, canvasPixels, mismatches, pageTape, serverDoc, startAgent, tapeRow, type Agent } from './helpers.ts';
 
 const STONE_FLOOR = readFileSync(join(REPO, 'examples', 'scripts', 'stone_floor.pclaw'), 'utf8');
 const SPRITE = `new sprite idol 12x16 bg=none
@@ -65,8 +65,10 @@ test('live playback draws command by command, and the canvas then equals the cor
   expect(seen.map(Number)).toEqual(Array.from({ length: last }, (_, i) => i + 1));
   const { doc } = await serverDoc(agent.url, 'stone_floor');
   expect(mismatches(doc, await canvasPixels(page))).toEqual([]);
-  // The tape panel lists every command, coloured as the agent's.
-  await expect(page.locator('.cmd-row.by-claude')).toHaveCount(last);
+  // The tape panel lists every command (only the rows in view are in the page), coloured as the agent's.
+  await expect(page.getByTestId('tape')).toHaveAttribute('data-lines', String(last));
+  expect(await page.locator('.cmd-row').count()).toBeGreaterThan(10);
+  expect(await page.locator('.cmd-row:not(.by-claude)').count()).toBe(0);
 
   // A sprite with transparent pixels, at another zoom, with the grids off.
   await page.getByText('pixel grid').click();
@@ -104,14 +106,14 @@ test('clicking a tape line shows the document at that point, read-only', async (
   await agent.call('run', { asset: 'stone_floor', commands: STONE_FLOOR });
   const last = await lastSeq('stone_floor');
   await expect(page.locator('[data-testid=canvas]')).toHaveAttribute('data-seq', String(last));
-  await page.locator('.cmd-row[data-seq="8"]').click();
+  await (await tapeRow(page, 8)).click();
   await expect(page.locator('.banner')).toContainText('after #8 (read-only)');
   await expect(page.locator('[data-testid=canvas]')).toHaveAttribute('data-seq', '8');
   const at8 = await serverDoc(agent.url, 'stone_floor', 8);
   expect(mismatches(at8.doc, await canvasPixels(page))).toEqual([]);
   // New commands keep arriving on the tape while travelling; the view stays put.
   await agent.call('run', { asset: 'stone_floor', commands: 'px 0,0 c=ink' });
-  await expect(page.locator(`.cmd-row[data-seq="${last + 1}"]`)).toBeVisible();
+  await expect(page.getByTestId('tape')).toHaveAttribute('data-lines', String(last + 1));
   expect(await seqOf(page)).toBe('8');
   await page.getByRole('button', { name: 'Back to live' }).click();
   await expect(page.locator('[data-testid=canvas]')).toHaveAttribute('data-seq', String(last + 1));
@@ -148,9 +150,9 @@ test('two connected browsers receive the same stream', async ({ browser }) => {
     await p.getByTestId('speed').selectOption('Infinity');
     await expect(p.locator('[data-testid=canvas]')).toHaveAttribute('data-seq', String(last), { timeout: 20_000 });
   }
-  const tapeA = await a.getByTestId('tape').innerText();
-  expect(await b.getByTestId('tape').innerText()).toBe(tapeA);
-  expect(tapeA).toContain('undo group=g2');
+  const tapeA = await pageTape(a);
+  expect(await pageTape(b)).toEqual(tapeA);
+  expect(tapeA.at(-1)!.cmd).toBe('undo group=g2');
   const { doc } = await serverDoc(agent.url, 'stone_floor');
   expect(mismatches(doc, await canvasPixels(a))).toEqual([]);
   expect(mismatches(doc, await canvasPixels(b))).toEqual([]);

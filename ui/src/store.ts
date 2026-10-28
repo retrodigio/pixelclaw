@@ -1,9 +1,10 @@
-// The watch view's state: the project's tapes as the server streams them, a playhead per asset
-// (live playback applies incoming commands one at a time with core's TapeCursor), pause and
-// speed, time travel, and the agent's last image view. React reads it via useSyncExternalStore.
+// The page's state: the project's tapes as the server streams them, a playhead per asset (live
+// playback applies incoming commands one at a time with core's TapeCursor), pause and speed, time
+// travel (from a Timeline's snapshots), the agent's last image view, and this person's author name
+// for the edits the page sends. React reads it via useSyncExternalStore.
 
-import { TapeCursor, activeGroups, type Doc, type Palette, type PaletteSource, type TapeEntry } from '@pixelclaw/core';
-import type { Eye, ServerMessage, Snapshot } from '@pixelclaw/server/protocol';
+import { TapeCursor, Timeline, activeGroups, type Diag, type Doc, type Palette, type PaletteSource, type TapeEntry } from '@pixelclaw/core';
+import { HUMAN_RE, type Eye, type ServerMessage, type Snapshot } from '@pixelclaw/server/protocol';
 
 export interface AssetModel {
   name: string;
@@ -11,6 +12,26 @@ export interface AssetModel {
   /** The live playhead: cursor.done is the part of the tape shown so far. */
   cursor: TapeCursor;
   problem: string | null;
+  /** Snapshots for time travel. */
+  timeline: Timeline;
+}
+
+export type RunResult = { ok: true; asset: string; group: string | null; seq: number | null } | { ok: false; errors: Diag[] };
+
+const isHuman = (by: string) => by === 'human' || by.startsWith('human:');
+
+/** The author name this page writes as: ?name=…, else the last one used here, else human:guest. */
+function initialAuthor(): string {
+  const q = new URLSearchParams(location.search).get('name');
+  const stored = (() => {
+    try {
+      return localStorage.getItem('pixelclaw.author');
+    } catch {
+      return null;
+    }
+  })();
+  for (const c of [q && (q.startsWith('human:') ? q : `human:${q}`), stored]) if (c && HUMAN_RE.test(c)) return c;
+  return 'human:guest';
 }
 
 export type Status = 'connecting' | 'open' | 'closed';
@@ -32,9 +53,15 @@ export class Store {
   /** Time travel: the tape position (seq) shown read-only, or null for live. */
   travel: number | null = null;
   eye: Eye | null = null;
+  /** The author this page's edits are written as. */
+  me: string = initialAuthor();
+  /** The last error from an edit this page sent (shown until the next edit). */
+  error: string | null = null;
   /** Assets in the order their batches arrived and have not played yet. */
   private queue: string[] = [];
   private travelCache: { key: string; doc: Doc | null } | null = null;
+  private nextId = 0;
+  private waiting = new Map<number, (r: RunResult) => void>();
   private listeners = new Set<() => void>();
   private version = 0;
   private ws: WebSocket | null = null;
@@ -46,6 +73,10 @@ export class Store {
   private idle = true;
   private readonly source: PaletteSource = { get: (n) => this.palettes.get(n) };
 
+  get paletteSource(): PaletteSource {
+    return this.source;
+  }
+
   subscribe = (fn: () => void): (() => void) => {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
@@ -53,9 +84,43 @@ export class Store {
 
   getVersion = (): number => this.version;
 
-  private changed(): void {
+  /** Tell React something changed. */
+  changed(): void {
     this.version++;
     for (const fn of this.listeners) fn();
+  }
+
+  private model(name: string, tape: TapeEntry[]): AssetModel {
+    return { name, tape, cursor: new TapeCursor(this.source), problem: null, timeline: new Timeline(this.source) };
+  }
+
+  setMe(name: string): boolean {
+    const by = name.startsWith('human:') ? name : `human:${name}`;
+    if (!HUMAN_RE.test(by)) return false;
+    this.me = by;
+    try {
+      localStorage.setItem('pixelclaw.author', by);
+    } catch {
+      // private mode: the name lasts for this page only
+    }
+    this.changed();
+    return true;
+  }
+
+  /**
+   * Send commands to the single writer as this person: one batch, one undo group. The batch
+   * comes back to every page (this one included) like any other; the promise gives the answer.
+   */
+  send(asset: string, commands: string): Promise<RunResult> {
+    const ws = this.ws;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return Promise.resolve({ ok: false, errors: [{ line: 0, col: 0, message: 'not connected' }] });
+    const id = ++this.nextId;
+    ws.send(JSON.stringify({ type: 'run', id, asset, commands, by: this.me }));
+    return new Promise((resolve) => this.waiting.set(id, (r) => {
+      this.error = r.ok ? null : r.errors.map((e) => (e.line ? `${e.line}:${e.col}: ${e.message}` : e.message)).join('\n');
+      this.changed();
+      resolve(r);
+    }));
   }
 
   // --- connection
@@ -86,16 +151,23 @@ export class Store {
       this.palettes = new Map(m.palettes.map((p) => [p.name, p]));
       this.defaultPalette = m.defaultPalette;
     } else if (m.type === 'eye') this.eye = m.eye;
-    else if (m.type === 'batch') {
+    else if (m.type === 'result') {
+      const done = this.waiting.get(m.id);
+      this.waiting.delete(m.id);
+      done?.(m.ok ? { ok: true, asset: m.asset, group: m.group, seq: m.seq } : { ok: false, errors: m.errors });
+    } else if (m.type === 'batch') {
       let a = this.assets.get(m.asset);
       if (!a || m.reset) {
-        a = { name: m.asset, tape: [], cursor: new TapeCursor(this.source), problem: null };
+        a = this.model(m.asset, []);
         this.assets.set(m.asset, a);
         if (this.travel !== null && this.selected === m.asset) this.travel = null;
       }
+      const caughtUp = this.pending(a) === 0;
       a.tape.push(...m.entries);
-      this.queue.push(m.asset);
       if (!this.selected) this.selected = m.asset;
+      // A person's edit shows at once (it is one stroke or one action, not a script to watch).
+      if (isHuman(m.by) && caughtUp && !this.paused) this.advance(a, m.entries.length);
+      else this.queue.push(m.asset);
       this.schedule();
     }
     this.changed();
@@ -111,8 +183,14 @@ export class Store {
     this.travel = null;
     this.assets = new Map();
     for (const t of s.assets) {
-      const a: AssetModel = { name: t.name, tape: t.entries, cursor: new TapeCursor(this.source), problem: null };
-      this.advance(a, a.tape.length);
+      const a = this.model(t.name, t.entries);
+      // One pass through the timeline: it keeps snapshots for time travel on the way.
+      const r = a.timeline.docAt(a.tape, a.tape.length);
+      if (r.problem) {
+        this.advance(a, a.tape.length);
+      } else {
+        a.cursor = TapeCursor.resume(this.source, r.doc, a.tape);
+      }
       this.assets.set(t.name, a);
     }
     if (!this.selected || !this.assets.has(this.selected)) this.selected = s.live ?? s.assets[0]?.name ?? null;
@@ -145,6 +223,10 @@ export class Store {
     const dt = Math.min(250, now - this.lastTick);
     this.lastTick = now;
     if (this.paused) return;
+    // People's edits that queued behind a batch still play at once when their turn comes.
+    for (const a of this.assets.values()) {
+      while (this.pending(a) > 0 && !a.problem && isHuman(a.tape[a.cursor.done.length]!.by)) this.advance(a, 1);
+    }
     let cur = this.selected ? this.assets.get(this.selected) : undefined;
     // Following: once the shown asset has caught up, move to the next asset with new commands.
     if (this.follow && this.pending(cur) === 0) {
@@ -217,6 +299,16 @@ export class Store {
     this.changed();
   }
 
+  /** Show every received command at once (before an edit, so the person edits what is there). */
+  catchUp(): void {
+    const a = this.current;
+    if (a && this.pending(a) > 0) {
+      this.advance(a, this.pending(a));
+      this.queue = this.queue.filter((n) => n !== a.name);
+      this.changed();
+    }
+  }
+
   // --- what to draw
 
   get current(): AssetModel | undefined {
@@ -230,17 +322,19 @@ export class Store {
     if (this.travel === null) return { doc: a.cursor.doc, seq: a.cursor.done.at(-1)?.seq ?? null };
     const key = `${a.name}:${this.travel}:${a.tape.length}:${a.tape[0]?.seq ?? 0}`;
     if (this.travelCache?.key !== key) {
-      const c = new TapeCursor(this.source);
-      for (const e of a.tape) {
-        if (e.seq > this.travel || c.step(e) !== null) break;
-      }
-      this.travelCache = { key, doc: c.doc };
+      this.travelCache = { key, doc: a.timeline.docAfter(a.tape, this.travel).doc };
     }
     return { doc: this.travelCache.doc, seq: this.travel };
   }
 
+  private undoneCache: { tape: TapeEntry[]; n: number; set: Set<string> } | null = null;
+
   undoneGroups(a: AssetModel): Set<string> {
+    const c = this.undoneCache;
+    if (c && c.tape === a.tape && c.n === a.tape.length) return c.set;
     const active = activeGroups(a.tape);
-    return new Set(a.tape.map((e) => e.group).filter((g) => !active.has(g)));
+    const set = new Set(a.tape.map((e) => e.group).filter((g) => !active.has(g)));
+    this.undoneCache = { tape: a.tape, n: a.tape.length, set };
+    return set;
   }
 }

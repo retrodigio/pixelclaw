@@ -93,3 +93,30 @@ export function mismatches(doc: Doc, got: { width: number; height: number; data:
   }
   return bad;
 }
+
+/** Scroll the (virtualised) tape until the row of command `seq` is in the page (a binary search), and return it. */
+export async function tapeRow(page: Page, seq: number) {
+  await page.getByTestId('tape').evaluate(async (el, want) => {
+    const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    let lo = 0;
+    let hi = el.scrollHeight;
+    for (let i = 0; i < 60; i++) {
+      const rows = [...el.querySelectorAll<HTMLElement>('.cmd-row')].map((r) => Number(r.dataset.seq));
+      if (rows.includes(want) || rows.length === 0) return;
+      if (want < Math.min(...rows)) hi = el.scrollTop;
+      else lo = el.scrollTop;
+      el.scrollTop = Math.floor((lo + hi) / 2);
+      el.dispatchEvent(new Event('scroll'));
+      await frame();
+    }
+  }, seq);
+  return page.locator(`.cmd-row[data-seq="${seq}"]`);
+}
+
+/** The shown asset's tape as the page holds it. */
+export function pageTape(page: Page): Promise<{ seq: number; by: string; group: string; cmd: string }[]> {
+  return page.evaluate(() => {
+    const s = (window as unknown as { pixelclaw: { current?: { tape: { seq: number; by: string; group: string; cmd: string }[] } } }).pixelclaw;
+    return (s.current?.tape ?? []).map(({ seq, by, group, cmd }) => ({ seq, by, group, cmd }));
+  });
+}
