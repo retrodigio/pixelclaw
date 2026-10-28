@@ -35,7 +35,8 @@ Commands (one per line, or ';' between them; '#' comments). Full reference: docs
   >>
   stroke pencil c=<colour> [pp=on|off] <x,y> <x,y>...    a freehand drag; stroke eraser <x,y>...
   layer add <name> [above=|below=<layer>] [reference] | layer <name> (draw on it) | layer set <name> hidden=|locked=|reference=on|off | layer move|merge|rename|remove
-  frame add [<n>] [copy=<m>|empty] | frame <n> (draw on it, from 1) | frame remove|move
+  frame add [<n>] [copy=<m>|link=<m>|empty] | frame <n> (draw on it, from 1) | frame remove|move | frame set <n>|<a>-<b>|all ticks=<t>
+  tag add <name> <a>-<b> [loop=cycle|pingpong] | view S|N|E|W frames=<a>-<b> | view W mirror=E (live mirror) | cel link|unlink <a>-<b> | pivot <x,y> | ground <y>
   select rect|ellipse|lasso|wand|colour|layer|all|none|invert ... [add|sub|and]; deselect   your selection clips your drawing
   clear | shift <dx,dy> [wrap] | flip h|v | rotate 90|180|270       the selection, or your whole layer
   mirror x=11.5 [y=..] live (later strokes mirrored) | mirror off | mirror x=11.5 from=left (copy once)

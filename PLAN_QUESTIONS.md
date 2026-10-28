@@ -438,3 +438,81 @@ Points where the plan was unclear or silent. Each has the reading that was follo
 
 65. **Variants' acceptance rule** (§4.1, item 53). Still not built: it compares a variant's colour
     mix with its base, which belongs with `consistency` (G10) or the family tools (G7).
+
+## G6
+
+66. **G5's "Notes for G6".** They were in G5's final report, not in the repo; §14 carries the
+    items the reader kept (upgrade, checks over every frame, throttling, the floor). *Reading:* §14
+    is the list.
+
+67. **Views and frames.** §4.4: "views S, N, E, W, each holding its own frames".
+    *Reading:* a view is a named run of the document's frames (`view S frames=1-2`), so the
+    timeline, the cels and every frame command stay one list; views never overlap and a frame
+    cannot move out of its view. Directions are S N E W and the four diagonals.
+
+68. **Live mirror links.** `view W mirror=E` "updates live". *Reading:* after every command the
+    mirror view has as many frames as its source (added or removed at its own end), each layer's
+    cel is the source's flipped left to right about the canvas (x → W−1−x), and its durations are
+    the source's. Drawing on a mirror frame is refused with the frame to draw on; `mirror=off`
+    keeps the pixels. Only views facing the other way left to right may mirror (E/W, SE/SW,
+    NE/NW). How a mirror exports (draw-time or baked) is G9's profile.
+
+69. **Linked cels.** *Reading:* as in Aseprite, one cel shown in several frames: a shared pixel
+    array, so any author drawing on any of the frames changes all. `cel link a-b` takes frame a's
+    pixels; `cel unlink` copies. `layer merge` unlinks the layer below first.
+
+70. **Durations and the tick rate.** *Reading:* every frame has ticks (default 10, the engine
+    profile's `frameTicks`); `tickRate` in project.json (already 60 since G1) sets the speed of
+    playback, the anim view's text and the GIF. A new frame takes its source's ticks; `frame set`
+    over a range sets every frame that is not a mirror's.
+
+71. **Sequences.** Playback, the anim view and the anim checks need "what loops". *Reading:*
+    every tag; every view with no tag inside it; or, with neither, all frames as one cycle. A
+    ping-pong plays there and back without repeating its ends (1 2 3 2).
+
+72. **The anim checks' numbers.** §4.4 gives the pilot's good pairs (16-19 % changed) but no
+    limits. *Reading:* frame diff share = pixels whose colour differs (opacity included) over the
+    union of both frames' silhouettes, 8-35 % for sprites (3-35 % for tiles, whose shimmer is
+    subtle); pivot drift = the spread of the silhouette's centre column over a sequence, ≤ 1 px;
+    ground drift = the lowest row against the ground line (or the first frame's lowest row), 0 px;
+    area jumps ≤ 15 %; the loop seam (last frame back to the first, cycles only) in the same band.
+    The pivot itself is an export field: drift is measured between frames, not from it.
+
+73. **The view distinctness check.** *Reading:* a separate check, `views`: each pair of views,
+    by their first frames, must differ by colour over both silhouettes by ≥ 20 %; mirror views
+    count as their source and views facing each other left to right are not compared.
+
+74. **Checks over every frame** (§14). *Reading:* every check of one image runs on every frame;
+    the result is the worst frame's, its detail starts `frame N:`, each flagged group carries its
+    frame, and views draw the marks of the frame shown. `check frame=` still checks one frame.
+
+75. **Throttled checks** (§14). *Reading:* run summaries (and the page) check every frame up to
+    262,144 pixels (w × h × frames) and otherwise only the frame being drawn on, saying so; `check`
+    always covers every frame. The page also recomputes at most twice a second while a batch plays
+    on such a canvas.
+
+76. **Onion skin and playback in the UI.** "Every new UI control replays from its logged
+    command". *Reading:* controls that change the document log commands (ticks, tags, views,
+    mirrors, links, pivot, ground); playing, the onion skin and the guides only change what the
+    person sees, like zoom and the theme in G5, and log nothing (tested). The onion skin shows the
+    frames before and after yours in its view or tag.
+
+77. **`pixelclaw upgrade`** (§14). *Reading:* only the `new` line changes (it takes the palette
+    it read from the project); the tape is replayed before and after and written only when the
+    state bytes are the same, then verified; checkpoints are written again (their prefix hashes
+    change). A tape already in language 2 is left alone.
+
+78. **The stone floor as a floor** (§14). *Reading:* redrawn on its own tape (the history stays)
+    as flagstones from above; G5's reviewer found the bevelled courses read as a wall. The
+    repetition check fails every jointed slab layout tried (about thirty): the joints make rows
+    and columns darker. The style guide's exception for this tile stays, reworded ("its joints
+    are its pattern"). G6's blind reviewer reads it as flagstones; its other findings (a lit edge
+    on the flags, more moss) are polish.
+
+79. **New palettes for the demo.** The walker and the water need skin, cloth and water colours.
+    *Reading:* as the chest did in G4, each tape adds its entries and saves them as a project
+    palette (`ruins-folk`, `ruins-water`), and the style guide lists them.
+
+80. **`view … all` in the CLI.** docs/commands.md said `all` is the first three views; the code
+    wrote every view but the diff (and so, from G6, the anim GIF too). *Reading:* the docs:
+    `all` is render, grid and tile3x3.

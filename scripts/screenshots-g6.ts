@@ -12,6 +12,8 @@ const out = (n: string, ext = 'png') => join(REPO, 'docs', 'screenshots', `${n}.
 const settled = (page: Page) => page.waitForFunction(() => document.querySelector('[data-testid=waiting]')?.textContent === '');
 
 const agent = await startAgent({ copy: join(REPO, 'examples', 'mossy-ruins.pclaw') });
+// The walker's two open review notes would cover it in every picture: closed on this copy only.
+await agent.call('run', { asset: 'walker', commands: 'note done n2\nnote done n3' });
 const browser = await chromium.launch();
 try {
   const page = await browser.newPage({ viewport: { width: 1400, height: 900 }, deviceScaleFactor: 1 });
