@@ -90,7 +90,7 @@ export interface AssetChanges {
 export type Listener = (m: ServerMessage) => void;
 
 /** Commands that write pixels: a batch of these that changes nothing gets a warning. */
-const DRAWING_RE = /^(px|line|rect|ellipse|fill|paint|stroke|shift|flip|rotate|clear|curve|polygon|dither|gradient|outline|shade|clean|noise|scatter|voronoi|bricks|stamp|call)\b/;
+const DRAWING_RE = /^(px|line|rect|ellipse|fill|paint|stroke|shift|flip|rotate|clear|curve|polygon|dither|gradient|outline|shade|clean|noise|scatter|voronoi|bricks|stamp (?!save |remove )|call)\b/;
 const words = (args: Token[]): string[] => args.flatMap((t) => (t.t === 'word' ? [t.v] : []));
 
 export interface WriterOptions {
