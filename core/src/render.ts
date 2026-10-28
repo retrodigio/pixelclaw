@@ -270,7 +270,7 @@ export function diffText(before: Doc | null, after: Doc, changes: PixelChange[],
  */
 export function renderDiff(before: Doc | null, after: Doc, o: { scale?: number; limit?: number } = {}): Rgba {
   const changes = diffPixels(before, after);
-  const s = o.scale ?? Math.max(1, Math.min(16, Math.floor(160 / Math.max(after.width, after.height))));
+  const s = o.scale ?? defaultScale(after);
   const pad = 8;
   const W = after.width * s;
   const H = after.height * s;

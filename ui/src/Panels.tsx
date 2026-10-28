@@ -59,10 +59,11 @@ export function PalettePanel({ palette, ed, editable }: { palette: Palette; ed: 
             <input className="pname" placeholder="name" value={editing.newName} aria-label="name"
               onChange={(e) => setEditing({ ...editing, newName: e.target.value })} />
           )}
-          <button onClick={() => void save()} disabled={!HEX_RE.test(editing.hex)} data-testid="palette-save">
-            {editing.name === null ? 'Add' : `Set ${editing.name}`}
+          <button onClick={() => void save()} disabled={!HEX_RE.test(editing.hex)} data-testid="palette-save"
+            title={editing.name === null ? 'Add this colour (palette add)' : `Set ${editing.name} to this colour (palette set)`}>
+            {editing.name === null ? 'Add' : 'Set'}
           </button>
-          <button onClick={() => setEditing(null)}>✕</button>
+          <button onClick={() => setEditing(null)} title="Cancel (Esc)">✕</button>
         </div>
       )}
       <div className="swatches" data-testid="swatches">

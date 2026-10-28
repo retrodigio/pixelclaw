@@ -62,7 +62,7 @@ describe('changes', () => {
   it('returns exactly the people\'s lines and notes with a diff image, then nothing new', async () => {
     // Everything so far (the edits above) is unread; read it once to start clean.
     const first = await s.call('changes', {});
-    expect(texts(first.content)).toContain('slab: 4 commands (3 by human:chris, 1 by human:ana) on a tape you have not read yet');
+    expect(texts(first.content)).toContain('slab: 4 commands (3 by human:chris, 1 by human:ana) since #3');
     expect(texts((await s.call('changes', {})).content)).toBe('No changes since you last looked.');
 
     // The person fixes three pixels and leaves a note; the agent draws one line in between.

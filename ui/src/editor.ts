@@ -30,7 +30,7 @@ export const TOOLS: ToolInfo[] = [
   { id: 'picker', label: 'Colour picker', key: 'I', icon: '◉', hint: 'click a pixel to use its colour (or Alt+click with any tool)' },
   { id: 'select', label: 'Rectangle select', key: 'M', icon: '⬚', hint: 'drag to select; drag inside to move; Delete clears; Esc deselects' },
   { id: 'move', label: 'Move', key: 'V', icon: '✣', hint: 'drag to move the selection (or everything); arrow keys nudge' },
-  { id: 'note', label: 'Note', key: 'N', icon: '✍', hint: 'click a pixel or drag a region, then write a note for the agent' },
+  { id: 'note', label: 'Note', key: 'N', icon: '✍\uFE0E', hint: 'click a pixel or drag a region, then write a note for the agent' },
 ];
 
 const KEYS: Record<string, ToolId> = { b: 'pencil', e: 'eraser', l: 'line', u: 'rect', U: 'ellipse', g: 'fill', i: 'picker', m: 'select', v: 'move', n: 'note' };
@@ -66,6 +66,8 @@ export class Editor {
   activeNote: string | null = null;
   private lastTool: ToolId = 'pencil';
   private readonly store: Store;
+  /** The latest batch sent and not yet answered: undo and redo wait for it. */
+  private inflight: Promise<unknown> = Promise.resolve();
 
   constructor(store: Store) {
     this.store = store;
@@ -111,6 +113,8 @@ export class Editor {
     this.store.catchUp();
     const doc = this.doc;
     if (!doc) return;
+    // The canvas must not switch to whatever the agent draws next while a person is editing.
+    if (this.store.follow) this.store.setFollow(false);
     this.noteDraft = null;
     if (o.alt || this.tool === 'picker') {
       this.pick(doc, p);
@@ -280,7 +284,10 @@ export class Editor {
     if (!a) return false;
     this.preview = { text, doc: this.apply(text), sel: this.sel };
     this.changed();
-    const r = await this.store.send(a.name, text);
+    const sent = this.store.send(a.name, text);
+    const before = this.inflight;
+    this.inflight = before.then(() => sent);
+    const r = await sent;
     if (this.preview?.text === text) this.preview = null;
     this.changed();
     return r.ok;
@@ -308,12 +315,13 @@ export class Editor {
     return !!a && this.editable && 'group' in findRedo(a.tape, null, this.store.me);
   }
 
+  /** Undo this person's latest edit, once every edit sent before it has been answered. */
   undo(): void {
-    if (this.canUndo()) void this.commit(`undo by=${this.store.me}`);
+    this.inflight = this.inflight.then(() => (this.canUndo() ? this.commit(`undo by=${this.store.me}`) : undefined));
   }
 
   redo(): void {
-    if (this.canRedo()) void this.commit(`redo by=${this.store.me}`);
+    this.inflight = this.inflight.then(() => (this.canRedo() ? this.commit(`redo by=${this.store.me}`) : undefined));
   }
 
   deleteSelection(): void {

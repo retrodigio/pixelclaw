@@ -131,7 +131,7 @@ export function App({ store }: { store: Store }) {
       <aside className="left">
         <div className="panel-title">
           Assets
-          <label className="follow" title="Show whichever asset the agent is drawing on">
+          <label className="follow" title="Show whichever asset the agent is drawing on (turns off when you start editing)">
             <input type="checkbox" checked={store.follow} onChange={(e) => store.setFollow(e.target.checked)} /> follow
           </label>
         </div>

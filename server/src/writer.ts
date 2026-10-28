@@ -247,8 +247,9 @@ export class Writer {
 
   /**
    * What other authors did since `agent` last called this: their tape lines per asset, the open
-   * notes, and the documents before and after. Moves the agent's read position to the end of
-   * every tape, so a second call returns nothing new. `since` reads from that command instead.
+   * notes, and the documents before and after. The agent's own commands that come straight after
+   * its read position count as read (it wrote them). Moves the read position to the end of every
+   * tape, so a second call returns nothing new. `since` reads from that command instead.
    */
   changes(agent: string, o: { asset?: string; since?: number } = {}): AssetChanges[] {
     const reads = readReads(this.project);
@@ -262,6 +263,11 @@ export class Writer {
       // A branch the agent never read starts at its fork point: what came before is the source's.
       let from = o.since ?? mine[name] ?? forkOf(entries)?.at ?? 0;
       if (from > last) from = 0; // the tape was started again
+      if (o.since === undefined) {
+        // The agent knows its own commands: skip past those that come next.
+        let i = entries.findIndex((e) => e.seq > from);
+        while (i >= 0 && i < entries.length && entries[i]!.by === agent) from = entries[i++]!.seq;
+      }
       mine[name] = last;
       const after = entries.filter((e) => e.seq > from);
       const lines = after.filter((e) => e.by !== agent);
