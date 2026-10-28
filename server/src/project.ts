@@ -137,9 +137,15 @@ export function assetExists(p: Project, name: string): boolean {
 }
 
 export function readTape(p: Project, name: string): TapeEntry[] {
+  return readTapeFile(p, name).entries;
+}
+
+/** An asset's tape file: its bytes (the state cache's key) and its entries. */
+export function readTapeFile(p: Project, name: string): { bytes: Uint8Array; entries: TapeEntry[] } {
   const f = join(assetDir(p, name), 'tape.jsonl');
   if (!existsSync(f)) throw new ProjectError(`no asset '${name}' in ${p.dir}`);
-  return parseTape(readFileSync(f, 'utf8'));
+  const bytes = readFileSync(f);
+  return { bytes, entries: parseTape(bytes.toString('utf8')) };
 }
 
 export function readAssetJson(p: Project, name: string): AssetJson {

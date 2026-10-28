@@ -6,15 +6,16 @@
 import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  CHECK_IDS, TapeCursor, Timeline, activeGroups, checkContextFor, drawScaleOf, groundOf, paletteToJson, parse, projectThemes, replay, runBatch,
+  CHECK_IDS, ReplayCache, TapeCursor, Timeline, serializeDoc, tapeLang, tapeToJsonl, activeGroups, checkContextFor, drawScaleOf, groundOf, paletteToJson, parse, projectThemes, replay, runBatch,
   VIEW_NAMES, cameraOf, flaggedOn, footprintOf, mapWorld, runChecks, setOf, type AssetDoc, type AssetState, type CheckId, type CheckResult, type Diag, type Doc, type Note, type Palette, type Pt,
   type TapeEntry, type Theme, type Token,
 } from '@pixelclaw/core';
 import {
-  ProjectError, addPalettes, assetExists, forkOf, latestCheckpoint, listAssets, paletteSource, readReads, readTape, saveAsset, writeReads,
+  ProjectError, addPalettes, assetExists, forkOf, latestCheckpoint, listAssets, paletteSource, readReads, readTape, readTapeFile, saveAsset, writeReads,
   type Project,
 } from './project.ts';
 import type { Eye, ServerMessage, Snapshot } from './protocol.ts';
+import { readStateCache, stateKey, writeStateCache } from './cache.ts';
 import { makeView, type View, type ViewMode, type ViewOptions } from './views.ts';
 
 /** What a view asks for, by name: the writer finds the documents, themes and check marks. */
@@ -197,13 +198,22 @@ export class Writer {
   }
 
   /**
-   * The asset's state, replayed from its tape on first use (from its newest matching checkpoint,
-   * when there is one) and kept in memory after that.
+   * The asset's state: from the state cache when its key matches the tape, else replayed from
+   * the tape (from its newest matching checkpoint, when there is one) and cached; kept in memory
+   * after that.
    */
   state(name: string): AssetState {
     const cached = this.states.get(name);
     if (cached) return cached;
-    const entries = readTape(this.project, name);
+    const { bytes, entries } = readTapeFile(this.project, name);
+    const key = stateKey(this.project, bytes, tapeLang(entries));
+    const hit = entries.length ? readStateCache(this.project, name, key) : null;
+    if (hit) {
+      this.timeline(name).seed(entries, entries.length, hit);
+      const s = { doc: hit, entries, cache: new ReplayCache() };
+      this.states.set(name, s);
+      return s;
+    }
     const ck = latestCheckpoint(this.project, name, entries);
     let s: AssetState;
     if (ck) {
@@ -221,6 +231,7 @@ export class Writer {
       }
       s = { doc: r.doc, entries, cache: r.cache };
     }
+    if (s.doc) writeStateCache(this.project, name, key, serializeDoc(s.doc));
     this.states.set(name, s);
     return s;
   }
@@ -294,6 +305,7 @@ export class Writer {
       return at.doc;
     }, creates);
     this.writePalettes(saved);
+    writeStateCache(this.project, name, stateKey(this.project, Buffer.from(tapeToJsonl(r.state.entries), 'utf8'), tapeLang(r.state.entries)), serializeDoc(r.state.doc));
     this.states.set(name, r.state);
     this.live = name;
     this.freshStyle();

@@ -42,7 +42,8 @@ describe('checkpoints', () => {
     const v = verify();
     expect(v.out).toContain('2 checkpoints checked');
     expect(v.code).toBe(0);
-    // A fresh writer loads from the newest checkpoint and gets the same state.
+    // A fresh writer loads from the newest checkpoint (with no state cache) and gets the same state.
+    rmSync(join(proj.dir, '.cache'), { recursive: true, force: true });
     const fresh = new Writer(loadProject(proj.dir));
     expect(serializeDoc(fresh.doc('grass'))).toEqual(serializeDoc(w.doc('grass')));
     // An undo across a checkpoint still matches a replay.

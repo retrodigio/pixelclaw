@@ -3,13 +3,13 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import {
-  CHECK_IDS, LANG_VERSION, TapeCursor, Timeline, checkSummary, isCheckId, replay, serializeDoc, serializeDocV1, upgradeTape, type AssetState, type CheckId, type Doc,
+  CHECK_IDS, LANG_VERSION, TapeCursor, tapeLang, Timeline, checkSummary, isCheckId, replay, serializeDoc, serializeDocV1, upgradeTape, type AssetState, type CheckId, type Doc,
   type TapeEntry,
 } from '@pixelclaw/core';
 import {
   AssetExistsError, NoAssetError, ProjectError, VIEW_MODES, Writer, assetDir, checkpointNames, createProject, formatChecks, isViewMode, listAssets,
   loadProject, lockHolder, paletteSource, parseRegion, prefixHash, previewPng, readAssetJson, readCheckpoints, readPaletteFile,
-  readTape, saveAsset, sha256, writeReview, SUMMARY_BUDGET, EXPORT_FORMATS, exportAsset, exportWithProfile, importSummary, planImport, type ExportFormat, type Project, type ViewMode,
+  readTape, readTapeFile, readStateCacheRaw, stateKey, saveAsset, sha256, writeReview, SUMMARY_BUDGET, EXPORT_FORMATS, exportAsset, exportWithProfile, importSummary, planImport, type ExportFormat, type Project, type ViewMode,
 } from '@pixelclaw/server';
 
 export interface Io {
@@ -404,9 +404,13 @@ function cmdVerify(io: Io, p: Parsed): number {
         else if (c.n > entries.length) problems.push(`checkpoint ${c.file} is past the end of the tape`);
         else if (c.file !== `${String(c.n).padStart(6, '0')}.gwc`) problems.push(`checkpoint ${c.file} holds command ${c.n}`);
       }
+      // The state cache: when its key is this tape's, its bytes must be the replay's.
+      const cached = readStateCacheRaw(proj, name);
+      const current = cached?.key === stateKey(proj, readTapeFile(proj, name).bytes, tapeLang(entries));
+      if (cached && current && Buffer.compare(Buffer.from(bytes), Buffer.from(cached.body)) !== 0) problems.push('the state cache differs from the replay (delete .cache/ to rebuild it)');
       const missing = checkpointNames(entries.length).filter((f) => !cps.some((c) => c.file === f));
       if (missing.length) problems.push(`checkpoint${missing.length === 1 ? '' : 's'} missing: ${missing.join(', ')}`);
-      summary = `${entries.length} commands, ${new Set(entries.map((e) => e.group)).size} groups, state ${hash.slice(0, 12)}${legacy ? ' (asset.json has the G1-G3 state hash; it is updated on the next save)' : ''}, ${cps.length ? cps.length + ' checkpoint' + (cps.length === 1 ? '' : 's') + ' checked' : 'no checkpoints'}`;
+      summary = `${entries.length} commands, ${new Set(entries.map((e) => e.group)).size} groups, state ${hash.slice(0, 12)}${legacy ? ' (asset.json has the G1-G3 state hash; it is updated on the next save)' : ''}, ${cps.length ? cps.length + ' checkpoint' + (cps.length === 1 ? '' : 's') + ' checked' : 'no checkpoints'}${current ? ', cache checked' : ''}`;
     } else if (!a.doc && !a.problems.length) problems.push('the tape has no document');
     if (problems.length) {
       failed++;
