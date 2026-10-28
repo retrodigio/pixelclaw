@@ -26,6 +26,7 @@ function decodeGif(b: Uint8Array): { width: number; height: number; frames: { de
       continue;
     }
     expect(b[o]).toBe(0x2c);
+    const [fx, fy, fw] = [b[o + 1]! | (b[o + 2]! << 8), b[o + 3]! | (b[o + 4]! << 8), b[o + 5]! | (b[o + 6]! << 8)];
     o += 10;
     const min = b[o++]!;
     const data: number[] = [];
@@ -48,7 +49,10 @@ function decodeGif(b: Uint8Array): { width: number; height: number; frames: { de
       prev = entry;
       if (dict.length === 1 << sizeBits && sizeBits < 12) sizeBits++;
     }
-    frames.push({ delay, rgb: out.map((k) => (table[k * 3]! << 16) | (table[k * 3 + 1]! << 8) | table[k * 3 + 2]!) });
+    // A frame covers its box; the rest of the picture is the frame before (frames are left in place).
+    const rgb = frames.length ? [...frames.at(-1)!.rgb] : new Array<number>(width * height).fill(0);
+    out.forEach((k, i) => { rgb[(fy + Math.floor(i / fw)) * width + fx + (i % fw)] = (table[k * 3]! << 16) | (table[k * 3 + 1]! << 8) | table[k * 3 + 2]!; });
+    frames.push({ delay, rgb });
   }
   return { width, height, frames, loops };
 }
@@ -56,6 +60,19 @@ function decodeGif(b: Uint8Array): { width: number; height: number; frames: { de
 const rgbOfImg = (img: Rgba) => Array.from({ length: img.width * img.height }, (_, i) => (img.data[i * 4]! << 16) | (img.data[i * 4 + 1]! << 8) | img.data[i * 4 + 2]!);
 
 describe('the GIF encoder', () => {
+  it('with delta, writes only the changed box of each frame and decodes to the same pictures', () => {
+    const imgs = [0, 1, 2].map((k) => {
+      const img = createRgba(40, 30);
+      for (let i = 0; i < 40 * 30; i++) img.data.set([i % 7 ? 30 : 90, 60, 90, 255], i * 4);
+      if (k) for (let y = 5 + k; y < 9 + k; y++) for (let x = 10 * k; x < 10 * k + 3; x++) img.data.set([250, 250, 250, 255], (y * 40 + x) * 4);
+      return { img, delay: 5 };
+    });
+    const full = encodeGif(imgs), delta = encodeGif(imgs, { delta: true });
+    expect(delta.length).toBeLessThan(full.length);
+    expect(decodeGif(delta).frames.map((f) => f.rgb)).toEqual(decodeGif(full).frames.map((f) => f.rgb));
+    expect(decodeGif(delta).frames[2]!.rgb).toEqual(rgbOfImg(imgs[2]!.img));
+  });
+
   it('round-trips frames, delays and the loop, including long runs that fill the code table', () => {
     const a = createRgba(70, 70);
     const b = createRgba(70, 70);

@@ -214,7 +214,7 @@ describe('maps and overlays (§2 map, §4.3)', () => {
       expect(o.overlay!.mode).toBe(mode);
       const frames = mapGifFrames(fam, { cols: 6, rows: 5, seed: 2, overlays: [o], scale: 1 });
       expect(frames.length, mode).toBeGreaterThan(1);
-      if (mode === 'wave') golden('g7/overlay-wave.gif', encodeGif(frames));
+      if (mode === 'wave') golden('g7/overlay-wave.gif', encodeGif(frames, { delta: true }));
       // Overlays draw only on outside tiles here.
       const m = composeMap(fam, islandTerrain(BUILTIN_SCHEMES.get('blob47')!, 6, 5, 2), 0);
       const shown = renderMap(fam, { cols: 6, rows: 5, seed: 2, overlays: [o], scale: 1 });

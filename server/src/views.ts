@@ -103,7 +103,7 @@ export function makeView(doc: Doc, mode: ViewMode, o: ViewOptions, outDir: strin
     const frames = mapGifFrames(doc, mo);
     if (frames.length > 1) {
       gif = join(outDir, `${doc.name}.map.gif`);
-      writeFileSync(gif, encodeGif(frames));
+      writeFileSync(gif, encodeGif(frames, { delta: true }));
       text += `\nanimated GIF at game speed: ${gif}`;
     }
     return { mode, kind: 'image', png, width: img.width, height: img.height, path, text, ...(gif ? { gif } : {}) };

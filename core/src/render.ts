@@ -753,17 +753,20 @@ export function mapText(doc: Doc, o: MapViewOptions = {}): string {
   return lines.join('\n');
 }
 
-/** The map playing at the game's speed (family frames and overlays), as GIF frames. */
+/**
+ * The map playing at the game's speed (family frames and overlays), as GIF frames: one loop of
+ * everything on it, at most four seconds, in steps of at least 3 ticks.
+ */
 export function mapGifFrames(doc: Doc, o: MapViewOptions = {}): GifFrame[] {
   const rate = o.tickRate ?? 60;
   const first = mapScene(doc, o, 0);
-  const period = mapPeriod(first.base, first.overlays, rate * 10);
+  const period = mapPeriod(first.base, first.overlays, rate * 4);
   const s = o.scale ?? 2;
   const cs = (t: number) => Math.round((t * 100) / rate);
   const out: GifFrame[] = [];
   let prev: Uint16Array | null = null;
   let start = 0;
-  for (let t = 0; t <= period; t++) {
+  for (let t = 0; t <= period; t += t === period ? 1 : Math.min(3, period - t)) {
     const sc = t === 0 ? first : t < period ? mapScene(doc, o, t) : null;
     const same = sc && prev && sc.img.px.every((v, i) => v === prev![i]);
     if (same) continue;

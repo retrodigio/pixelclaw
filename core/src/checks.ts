@@ -108,7 +108,8 @@ const DEFAULTS: Record<CheckId, { all: Params } & Partial<Record<string, Params>
   palette: { all: { max: 0 } },
   // Stray pixels per 100 opaque pixels. Tiles are texture: a stray one ramp step from its
   // surroundings is allowed there.
-  orphans: { all: { max: 1, texture: false }, tile: { max: 2, texture: true }, family: { max: 2, texture: true } },
+  // An overlay is flecks and sparkles: its lone pixels are its art.
+  orphans: { all: { max: 1, texture: false }, tile: { max: 2, texture: true }, family: { max: 2, texture: true }, overlay: { off: true } },
   jaggies: { all: { max: 0 }, tile: { max: 2 }, family: { max: 2 } },
   // The pillow share: 1 when ramp steps follow the outline on every side alike.
   banding: { all: { max: 0.5, minEdges: 8 } },
@@ -122,7 +123,7 @@ const DEFAULTS: Record<CheckId, { all: Params } & Partial<Record<string, Params>
   repetition: { all: { max: 3 } },
   // Frame diff share (changed pixels over the silhouette; the pilot's good pairs changed 16-19 %),
   // pivot drift and ground drift in pixels, silhouette area jumps, and the loop seam.
-  anim: { all: { minDiff: 0.08, maxDiff: 0.35, maxPivot: 1, maxGround: 0, maxArea: 0.15 }, tile: { minDiff: 0.03 }, family: { minDiff: 0.03 } },
+  anim: { all: { minDiff: 0.08, maxDiff: 0.35, maxPivot: 1, maxGround: 0, maxArea: 0.15 }, tile: { minDiff: 0.03 }, family: { minDiff: 0.01 }, overlay: { minDiff: 0, maxDiff: 1 } },
   // Views must differ from each other (by colour, over both silhouettes) by at least this share.
   views: { all: { min: 0.2 } },
 };
@@ -208,8 +209,8 @@ function result(id: CheckId, o: Partial<CheckResult> & { status: CheckResult['st
 const skip = (id: CheckId, why: string): CheckResult => result(id, { status: 'skip', detail: why });
 
 /** Is the document a texture tile (wraps), or a sprite with a silhouette? */
-/** Tiles and families are ground, not figures. */
-const isTile = (d: Doc): boolean => d.wrap || d.kind === 'family';
+/** Tiles and families are ground, not figures; an overlay is an effect drawn over ground. */
+const isTile = (d: Doc): boolean => d.wrap || d.kind === 'family' || d.kind === 'overlay';
 
 // --- palette
 

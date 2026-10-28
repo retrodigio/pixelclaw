@@ -73,8 +73,11 @@ function lzw(out: Bytes, indices: Uint8Array, minSize: number): void {
   out.push(0);
 }
 
-/** Encode frames as a looping animated GIF. */
-export function encodeGif(frames: GifFrame[]): Uint8Array {
+/**
+ * Encode frames as a looping animated GIF. With `delta`, each frame after the first holds only the
+ * box that changed since the frame before (drawn over it), which keeps long map loops small.
+ */
+export function encodeGif(frames: GifFrame[], o: { delta?: boolean } = {}): Uint8Array {
   if (!frames.length) throw new Error('encodeGif: no frames');
   const { width, height } = frames[0]!.img;
   const colours: number[] = [];
@@ -110,13 +113,28 @@ export function encodeGif(frames: GifFrame[]): Uint8Array {
   out.ascii('NETSCAPE2.0');
   out.push(3, 1, 0, 0, 0);
   frames.forEach((f, n) => {
-    out.push(0x21, 0xf9, 4, 0);
+    let [x0, y0, x1, y1] = [0, 0, width - 1, height - 1];
+    let px = indexed[n]!;
+    if (o.delta && n > 0) {
+      // The box of pixels that differ from the frame before (at least one pixel).
+      const a = indexed[n - 1]!, b = px;
+      [x0, y0, x1, y1] = [width, height, -1, -1];
+      for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+        if (a[y * width + x] === b[y * width + x]) continue;
+        if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+      }
+      if (x1 < 0) [x0, y0, x1, y1] = [0, 0, 0, 0];
+      const w = x1 - x0 + 1;
+      px = new Uint8Array(w * (y1 - y0 + 1));
+      for (let y = y0; y <= y1; y++) px.set(b.subarray(y * width + x0, y * width + x1 + 1), (y - y0) * w);
+    }
+    out.push(0x21, 0xf9, 4, o.delta ? 0x04 : 0);
     out.u16(Math.max(1, Math.min(65535, Math.round(f.delay))));
     out.push(0, 0);
     out.push(0x2c);
-    out.u16(0); out.u16(0); out.u16(width); out.u16(height);
+    out.u16(x0); out.u16(y0); out.u16(x1 - x0 + 1); out.u16(y1 - y0 + 1);
     out.push(0);
-    lzw(out, indexed[n]!, Math.max(2, bitsPer));
+    lzw(out, px, Math.max(2, bitsPer));
   });
   out.push(0x3b);
   return out.done();

@@ -138,7 +138,7 @@ export function writeReview(w: Writer, o: { assets?: string[]; name?: string; ma
     const mo = { cols: o.map?.cols ?? 16, rows: o.map?.rows ?? 12, seed: o.map?.seed ?? 1, overlays, scale };
     save(`maps/${a.name}.png`, encodePng(renderMap(a.doc, mo)));
     const frames = mapGifFrames(a.doc, { ...mo, tickRate: w.project.json.tickRate ?? 60 });
-    if (frames.length > 1) save(`maps/${a.name}.gif`, encodeGif(frames));
+    if (frames.length > 1) save(`maps/${a.name}.gif`, encodeGif(frames, { delta: true }));
     const s = schemeOf(a.doc.family!);
     const m = composeMap(a.doc, islandTerrain(s, mo.cols, mo.rows, mo.seed), 0);
     const rows = Array.from({ length: mo.rows }, (_, r) => `${String(r).padStart(2)}: ` + Array.from({ length: mo.cols }, (_, c) => {
