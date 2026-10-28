@@ -1,0 +1,98 @@
+{
+  "name": "village",
+  "kind": "map",
+  "size": [
+    40,
+    30
+  ],
+  "cell": [
+    1,
+    1
+  ],
+  "wrap": false,
+  "palette": "ruins-shore",
+  "layers": [
+    {
+      "name": "floor",
+      "hidden": false,
+      "locked": false,
+      "reference": false,
+      "map": {
+        "kind": "tiles"
+      }
+    },
+    {
+      "name": "sea",
+      "hidden": false,
+      "locked": false,
+      "reference": false,
+      "map": {
+        "kind": "terrain",
+        "family": "shore",
+        "outside": true
+      }
+    },
+    {
+      "name": "meadow",
+      "hidden": false,
+      "locked": false,
+      "reference": false,
+      "map": {
+        "kind": "terrain",
+        "family": "meadow",
+        "outside": false
+      }
+    },
+    {
+      "name": "lanes",
+      "hidden": false,
+      "locked": false,
+      "reference": false,
+      "map": {
+        "kind": "terrain",
+        "family": "lane",
+        "outside": false
+      }
+    },
+    {
+      "name": "glints",
+      "hidden": false,
+      "locked": false,
+      "reference": false,
+      "map": {
+        "kind": "overlay",
+        "overlay": "glint",
+        "on": "sea:out"
+      }
+    },
+    {
+      "name": "props",
+      "hidden": false,
+      "locked": false,
+      "reference": false,
+      "map": {
+        "kind": "objects"
+      }
+    }
+  ],
+  "frames": 1,
+  "paletteLocked": false,
+  "stamps": [],
+  "macros": [],
+  "tags": [],
+  "views": [],
+  "links": [],
+  "notes": [],
+  "tape": {
+    "lang": 2,
+    "commands": 14,
+    "groups": 2
+  },
+  "state": {
+    "sha256": "32eea227ed2ee0934ccc6e4779bba96a9cb95f938461f778f5c26bdb09c71c6b"
+  },
+  "checkpoints": {
+    "every": 200,
+    "files": []
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "name": "well",
+  "kind": "object",
+  "size": [
+    24,
+    24
+  ],
+  "cell": [
+    24,
+    24
+  ],
+  "wrap": false,
+  "palette": "ruins-props",
+  "layers": [
+    {
+      "name": "main",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    }
+  ],
+  "frames": 1,
+  "paletteLocked": false,
+  "stamps": [],
+  "macros": [],
+  "tags": [],
+  "views": [],
+  "links": [],
+  "notes": [],
+  "tape": {
+    "lang": 2,
+    "commands": 15,
+    "groups": 1
+  },
+  "state": {
+    "sha256": "88750df9d6fd60075c769d847dda90bcef073bae6c50838a2bbd80fc8e256e53"
+  },
+  "checkpoints": {
+    "every": 200,
+    "files": []
+  }
+}

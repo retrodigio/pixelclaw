@@ -103,11 +103,49 @@ frames and ticks as usual, then
 `view map` shows a family on a random island (or a tile repeated), with overlays given in
 `with=`; see *Views*.
 
+### Oversized assets, maps and scenes
+
+**Oversized tiles and objects** (plan §4.10) are any asset bigger than a cell of the grid:
+`new object house 48x48 cell=24x24` is two cells by two. Its **footprint** says where it stands on
+a map:
+
+| Command | Normal form | Notes |
+|---|---|---|
+| `footprint <C>x<R> [at=<cx,cy>] [anchor=<x,y>] [<< flags >>]` | `footprint 2x2 at=0,0 anchor=0,1 <<` rows `>>` | The footprint is `C` x `R` cells of the art grid (the canvas in cells), starting at art cell `at` (default: the bottom-left of the art). `anchor` is the footprint cell it is placed by (default its bottom-left). The block has a row per art row, a character per art cell: `.` nothing, `b` blocks movement, `r` a roof or canopy (drawn above actors), `x` both. Footprint cells that do not block are walkable. Without a block, the footprint blocks and nothing is a roof. `footprint off` removes it (an asset without one stands on its whole art grid, by its bottom-left cell). |
+| `variant of=<asset>`, `variant off` | `variant of=lane` | This asset is a **texture variant** of another (plan §4.1): maps pick among an asset and its variants cell by cell (a hash of the cell, moved on when it would repeat both the cell to the left and the one above). Make one with `fork`, then change the inside (keep the border, or redraw a family's band and move its detail). The `variant` check compares their colour mix. |
+
+A 24x48 tree with `footprint 1x1 << r / b >>` stands on one cell; its crown overhangs the cell
+above as a canopy. The `fit` check flags an empty footprint cell and art outside the footprint
+that is not a roof.
+
+**Map documents** (plan §4.11) are grids of cells that hold names, not pixels: `new map village
+40x30 tile=24` is 40 x 30 cells of 24 px. Its canvas is the grid of cells (one "pixel" per cell,
+so notes and coordinates are cells), and its layers say what they hold:
+
+| Command | Normal form | Notes |
+|---|---|---|
+| `new map <name> <C>x<R> [tile=<T>] [palette=]` | `new map village 40x30 tile=24 palette=ruins-shore <<` rows `>>` | Starts with one tiles layer, `floor`. |
+| `layer add <name> terrain=<family> [outside=on\|off]` | `layer add sea terrain=shore outside=on above=floor` | A terrain layer: cells are the family's terrain or not; when the map is drawn the family's scheme picks every edge tile, exactly as `resolveMap` does for sample maps. With `outside=on` the cells outside the terrain show the family's outside texture (the layer fills the map); otherwise they show what is below. |
+| `layer add <name> tiles`, `layer add <name> objects` | `layer add props objects above=lanes` | Things placed by name. Objects on every objects layer are drawn in order of their footprint's bottom row (then layer, then column), above all the ground; roof cells are drawn again last. A footprint may not overlap another on any objects layer (on a tiles layer, on that layer). |
+| `layer add <name> overlay=<overlay> on=<where>` | `layer add glints overlay=glint on=sea:out` | An overlay played over the cells `on=` names: a terrain layer (its terrain), `<layer>:out` (outside it), or `all`. |
+| `terrain <layer> rect <x,y> <W>x<H> [erase]` | `terrain sea rect 0,20 40x10` | Also `ellipse <x,y> <W>x<H>`, `brush <x,y>... [size=<n>]` (a line through the points), `fill <x,y>` (4-connected), `paint <x,y> <<` rows of `#` (terrain), `-` (not) and `.` (leave) `>>`, and `clear`. |
+| `place <asset>\|<family>.<variant> <x,y> [layer=] [cells=<C>x<R> anchor=<x,y>]` | `place house 12,8 layer=props cells=2x2 anchor=0,1` | By its anchor cell, on your layer or `layer=`. The line records the footprint the asset had, so replay reads no other asset. A family's variant by name (`shore.ns`, bridge8's `bridge.v`) goes on a tiles layer. |
+| `move <x,y> <x,y> [layer=]` | `move 20,15 20,18 layer=props` | Moves what is placed on the first cell (any cell of its footprint) so its anchor is on the second. |
+| `remove <x,y> [layer=]` | `remove 20,18 layer=props` | Takes away what is placed on that cell. |
+| `road <terrain layer> <x,y> <x,y> ... [width=<n>]` | `road lanes 4,4 20,4 20,12 width=1` | Lays the terrain along x, then y, between each pair of points (4-connected, so path schemes join it up). |
+| `scatter <asset>[,<asset>] [<x,y> <W>x<H>] count=<n> [on=<terrain layer>] [off=<terrain layer>] [minDist=<n>] [layer=] [seed=]` | `scatter tree count=22 on=meadow off=lanes minDist=2 layer=props fp=1x1:0,0 seed=31` | Places at seeded spots, each footprint on `on=`'s terrain, off `off=`'s, free, and `minDist` cells (Chebyshev) from the others; fewer when no more fit. `fp=` records each asset's footprint (cells and anchor). On other documents `scatter` is the stamp generator. |
+| `map gen island\|village\|dungeon [layers=<a>,<b>,...] [seed=]` | `map gen village layers=sea,meadow,lanes seed=8` | Lays out the terrain layers for a quick test scene (then edit it): island, the land (seeded value noise, smoothed: no one-cell spits); village, the land, a ground two cells in from the shore and lanes crossing it; dungeon, rooms joined by corridors on the first layer. Default layers: the map's terrain layers in order. |
+
+Drawing commands (`px`, `rect`, …) are refused on a map. `view map` shows a map whole at 1x, a
+region of cells (`region=`) or the camera (`camera=x,y`: the engine's screen, project.json
+`style.camera`, default `384x216`, around that cell) at the game's draw scale, with the cells as
+text; `export` writes a map for Tiled and splits an oversized asset (see docs/mcp.md).
+
 ## Commands
 
 | Command | Normal form | Notes |
 |---|---|---|
-| `new <kind> <name> <W>x<H> [palette=] [wrap=] [cell=] [bg=] [<< rows >>]` | `new tile floor 24x24 palette=mossy-ruins wrap=on cell=24x24 bg=none <<` palette rows `>>` | First command of a tape only. Kinds: `tile`, `sprite`, `sheet`, `icon`, `family`, `overlay` (see *Autotile families*). `wrap` defaults to `on` for tiles, `off` otherwise. `cell` defaults to the canvas size. `palette` defaults to the project's default palette, and the line records the whole palette in a block (see *The palette in the tape*). |
+| `new <kind> <name> <W>x<H> [palette=] [wrap=] [cell=] [bg=] [<< rows >>]` | `new tile floor 24x24 palette=mossy-ruins wrap=on cell=24x24 bg=none <<` palette rows `>>` | First command of a tape only. Kinds: `tile`, `sprite`, `sheet`, `icon`, `object`, `family`, `overlay` (see *Autotile families*), `map` (see *Oversized assets, maps and scenes*). `wrap` defaults to `on` for tiles, `off` otherwise. `cell` defaults to the canvas size. `palette` defaults to the project's default palette, and the line records the whole palette in a block (see *The palette in the tape*). |
 | `px <x,y> [<x,y> ...] c=` | `px 3,4 4,4 c=ink` | Single pixels. |
 | `line <x,y> <x,y> [<x,y> ...] c= [pp=on\|off]` | `line 3,10 9,7 c=stone2 pp=on` | A line or polyline. See *Lines* below. |
 | `curve <x,y> <x,y> <x,y> [<x,y>] c= [pp=on\|off]` | `curve 2,20 8,12 16,14 c=soil2 pp=on` | A quadratic (3 points) or cubic (4 points) Bezier. See *Curves and polygons*. |

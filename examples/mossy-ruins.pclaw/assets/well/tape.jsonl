@@ -1,0 +1,16 @@
+{"pclaw":"tape","lang":2}
+{"seq":1,"by":"claude","at":"2026-10-28T08:25:10Z","group":"g1","cmd":"new object well 24x24 palette=ruins-props wrap=off cell=24x24 bg=none <<\n  k ink #17181d\n  0 stone0 #272a30\n  1 stone1 #3b4044\n  2 stone2 #535a5b\n  3 stone3 #6c7570\n  4 stone4 #8b9489\n  5 stone5 #afb6a5\n  a moss0 #1c2e21\n  b moss1 #2c4729\n  c moss2 #486a32\n  d moss3 #6c8c3a\n  e lichen #a2ab52\n  f soil0 #2a211c\n  g soil1 #44352a\n  h soil2 #65503a\n  w pool #34566a\n  W wood0 #3a2418\n  X wood1 #603c22\n  Y wood2 #8a5a30\n  Z wood3 #b58044\n  B brass0 #6a4f1f\n  C brass1 #b08a35\n  D brass2 #efd47c\n  ramp stone stone0 stone1 stone2 stone3 stone4 stone5\n  ramp moss moss0 moss1 moss2 moss3 lichen\n  ramp soil soil0 soil1 soil2\n  ramp wood wood0 wood1 wood2 wood3\n  ramp brass brass0 brass1 brass2\n>>"}
+{"seq":2,"by":"claude","at":"2026-10-28T08:25:10Z","group":"g1","cmd":"ellipse 2,9 20x13 c=stone3 fill"}
+{"seq":3,"by":"claude","at":"2026-10-28T08:25:10Z","group":"g1","cmd":"ellipse 2,9 20x13 c=stone2 outline"}
+{"seq":4,"by":"claude","at":"2026-10-28T08:25:10Z","group":"g1","cmd":"ellipse 5,11 14x7 c=pool fill"}
+{"seq":5,"by":"claude","at":"2026-10-28T08:25:10Z","group":"g1","cmd":"line 6,11 17,11 c=stone1 pp=on"}
+{"seq":6,"by":"claude","at":"2026-10-28T08:25:10Z","group":"g1","cmd":"px 4,12 4,13 9,10 10,10 c=stone4"}
+{"seq":7,"by":"claude","at":"2026-10-28T08:25:10Z","group":"g1","cmd":"px 9,20 10,20 15,20 16,20 c=stone1"}
+{"seq":8,"by":"claude","at":"2026-10-28T08:25:10Z","group":"g1","cmd":"rect 3,2 2x12 c=wood1 fill"}
+{"seq":9,"by":"claude","at":"2026-10-28T08:25:10Z","group":"g1","cmd":"rect 19,2 2x12 c=wood0 fill"}
+{"seq":10,"by":"claude","at":"2026-10-28T08:25:10Z","group":"g1","cmd":"line 3,2 20,2 c=wood2 pp=on"}
+{"seq":11,"by":"claude","at":"2026-10-28T08:25:10Z","group":"g1","cmd":"line 3,3 20,3 c=wood1 pp=on"}
+{"seq":12,"by":"claude","at":"2026-10-28T08:25:10Z","group":"g1","cmd":"line 12,4 12,8 c=soil2 pp=on"}
+{"seq":13,"by":"claude","at":"2026-10-28T08:25:10Z","group":"g1","cmd":"rect 11,9 3x3 c=wood2 fill"}
+{"seq":14,"by":"claude","at":"2026-10-28T08:25:10Z","group":"g1","cmd":"outline c=ink mode=outer corners=off"}
+{"seq":15,"by":"claude","at":"2026-10-28T08:25:10Z","group":"g1","cmd":"footprint 1x1 at=0,0 anchor=0,0 <<\n  b\n>>"}

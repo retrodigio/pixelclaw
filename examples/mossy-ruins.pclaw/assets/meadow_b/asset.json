@@ -1,0 +1,55 @@
+{
+  "name": "meadow_b",
+  "kind": "family",
+  "size": [
+    192,
+    168
+  ],
+  "cell": [
+    24,
+    24
+  ],
+  "wrap": false,
+  "palette": "ruins-shore",
+  "layers": [
+    {
+      "name": "ground",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    },
+    {
+      "name": "band",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    }
+  ],
+  "frames": 1,
+  "paletteLocked": false,
+  "stamps": [],
+  "macros": [],
+  "tags": [],
+  "views": [],
+  "links": [
+    {
+      "fork": {
+        "from": "meadow",
+        "at": 10
+      }
+    }
+  ],
+  "notes": [],
+  "tape": {
+    "lang": 2,
+    "commands": 19,
+    "groups": 2
+  },
+  "state": {
+    "sha256": "d69f6c1184a5ca278426816d3470f3e4a52d981775f4dac384bd227a068c8628"
+  },
+  "checkpoints": {
+    "every": 200,
+    "files": []
+  }
+}

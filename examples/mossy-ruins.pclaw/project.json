@@ -11,7 +11,8 @@
       "ruins-props",
       "ruins-folk",
       "ruins-water",
-      "ruins-shore"
+      "ruins-shore",
+      "ruins-village"
     ],
     "outline": [
       "ink"
@@ -20,13 +21,21 @@
     "drawScale": 2,
     "sizes": {
       "tile": "24x24",
-      "sprite": "24x24"
+      "sprite": "24x24",
+      "object": "24x24|24x48|48x48"
     },
     "assets": {
       "stone_floor": {
         "checks": {
           "repetition": {
             "off": true
+          }
+        }
+      },
+      "tree": {
+        "checks": {
+          "jaggies": {
+            "max": 12
           }
         }
       }

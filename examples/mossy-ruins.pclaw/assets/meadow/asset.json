@@ -1,0 +1,48 @@
+{
+  "name": "meadow",
+  "kind": "family",
+  "size": [
+    192,
+    168
+  ],
+  "cell": [
+    24,
+    24
+  ],
+  "wrap": false,
+  "palette": "ruins-shore",
+  "layers": [
+    {
+      "name": "ground",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    },
+    {
+      "name": "band",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    }
+  ],
+  "frames": 1,
+  "paletteLocked": false,
+  "stamps": [],
+  "macros": [],
+  "tags": [],
+  "views": [],
+  "links": [],
+  "notes": [],
+  "tape": {
+    "lang": 2,
+    "commands": 10,
+    "groups": 1
+  },
+  "state": {
+    "sha256": "9e8eac6e054f649d4133eec31d410d5ebd1807e69c07f77d93ad780731fd42bb"
+  },
+  "checkpoints": {
+    "every": 200,
+    "files": []
+  }
+}

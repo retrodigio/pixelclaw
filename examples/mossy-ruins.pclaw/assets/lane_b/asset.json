@@ -1,0 +1,55 @@
+{
+  "name": "lane_b",
+  "kind": "family",
+  "size": [
+    192,
+    72
+  ],
+  "cell": [
+    24,
+    24
+  ],
+  "wrap": false,
+  "palette": "ruins-shore",
+  "layers": [
+    {
+      "name": "ground",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    },
+    {
+      "name": "band",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    }
+  ],
+  "frames": 1,
+  "paletteLocked": false,
+  "stamps": [],
+  "macros": [],
+  "tags": [],
+  "views": [],
+  "links": [
+    {
+      "fork": {
+        "from": "lane",
+        "at": 8
+      }
+    }
+  ],
+  "notes": [],
+  "tape": {
+    "lang": 2,
+    "commands": 15,
+    "groups": 2
+  },
+  "state": {
+    "sha256": "4b8700380789adb67285be08e6b445485abd35a8b4ee7f7a15a902e0b1aa122f"
+  },
+  "checkpoints": {
+    "every": 200,
+    "files": []
+  }
+}

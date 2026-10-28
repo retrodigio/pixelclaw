@@ -110,9 +110,10 @@ applies to the asset, with its score and ✓ or ✗ against the style guide (see
 | Argument | Type | Does |
 |---|---|---|
 | `asset` | string | |
-| `mode` | `render` (default) \| `grid` \| `tile3x3` \| `diff` \| `game` \| `recolour` \| `anim` \| `map` \| `family` | See [commands.md, Views](commands.md#views). `game` shows the sprite's other directions beside it. `anim` returns the contact sheet (a row per sequence; each frame with its ticks, the frame before it tinted red underneath, the pivot and ground line in cyan, and the share of pixels changed from the frame before), the numbers as text, and saves `views/<asset>.anim.gif` (every sequence side by side at the project's tick rate) for the person. `map` puts a family on a random island (a tile: repeated; an overlay: over the first family or `ground=`) at the game's draw scale, with the seam score over the map and the variants it used as text, and saves `views/<asset>.map.gif` (at most four seconds) when its frames or overlays move. `family` shows every variant among the 3x3 neighbours that call for it, and lists where every cell is on the sheet. |
+| `mode` | `render` (default) \| `grid` \| `tile3x3` \| `diff` \| `game` \| `recolour` \| `anim` \| `map` \| `family` | See [commands.md, Views](commands.md#views). `game` shows the sprite's other directions beside it. `anim` returns the contact sheet (a row per sequence; each frame with its ticks, the frame before it tinted red underneath, the pivot and ground line in cyan, and the share of pixels changed from the frame before), the numbers as text, and saves `views/<asset>.anim.gif` (every sequence side by side at the project's tick rate) for the person. `map` puts a family on a random island (a tile: repeated; an overlay: over the first family or `ground=`) at the game's draw scale, with the seam score over the map and the variants it used as text, and saves `views/<asset>.map.gif` (at most four seconds) when its frames or overlays move. `family` shows every variant among the 3x3 neighbours that call for it, and lists where every cell is on the sheet. `map` of a **map document**: the whole map at 1x (or `region=` cells, or `camera=` the engine's screen around a cell, at the draw scale), its layers and placements and every cell as a character grid; `marks="failing"` outlines the map checks' hot spots. `map` of an **object**: it stands on its ground (`ground=`) among plain tiles at game scale, its footprint in words. `diff` of a map: before and after of the cells that changed, at game scale, and what moved, was placed or taken away, or painted. |
 | `scale` | 1..64, optional | `render` and `diff`. Default: about 192 px on the long side. |
-| `region` | string, optional | `grid` only: `"x,y WxH"`, e.g. `"8,0 12x10"`. |
+| `region` | string, optional | `grid`: `"x,y WxH"`, e.g. `"8,0 12x10"`. `map` of a map document: cells to show at game scale. |
+| `camera` | string, optional | `map` of a map document: `"x,y"`, the camera's view around that cell (project.json `style.camera`, default `384x216` art pixels), at game scale. |
 | `since` | integer, optional | `diff` only: compare with the document after this command (default: before the latest group). |
 | `frame` | integer from 1, optional | The frame to show. Default: the frame the agent draws on (`frame <n>`). |
 | `marks` | string, optional | `render`, `tile3x3`, `game`: circle the pixels checks flag in magenta: `"failing"`, or check names (`"orphans,jaggies"`). |
@@ -161,6 +162,17 @@ Write a blind review bundle under `reviews/<date>-<set>/` (see [checks.md](check
 `assets` (default all) and `name` (default `all`); for families, `size` and `seed` choose the
 island they are shown on (default 16x12, seed 1). Hand the folder to a fresh agent with no other
 context, ask it to follow `rubric.md`, and pin its findings on the pixels with `note` commands.
+
+### `export`
+
+Write an asset out (export profiles come with G9). `format`: `tmx` (a map document as a Tiled
+map: a tile layer per ground layer in CSV over one tileset image of every distinct tile the map
+draws, and an object group per objects layer of tile objects placed by their bottom-left as Tiled
+does, each with its cell, footprint, anchor and cell flags as properties; overlays are left out),
+`split` (an oversized tile or object as one-cell pieces `<name>_<cx>_<cy>.png` and
+`<name>.stamp.json`, which puts them back and carries each cell's block, roof and footprint
+flags), or `png` (a map composed at 1x, or an asset's first frame). `dest` defaults to
+`<project>/exports/<format>/`. CLI: `pixelclaw export <project> <asset> --format tmx|split|png [--out <dir>]`.
 
 ### `history`
 
@@ -351,6 +363,19 @@ family, and an overlay over the first family.
 Every row of the timeline folds (only for looking): click *frame · ticks*, *views*, *tags* or
 *layers* (folded, only the layer you draw on stays), or ▾ at the left of its bar to fold the
 whole timeline away.
+
+### Maps
+
+A map document opens in the **map editor** instead of the canvas: the map drawn from the assets
+it names, at 1x or the game's scale. *✎ paint* and *⌫ erase* drag over cells of the chosen terrain
+layer (`terrain <layer> brush …`), *▭ rect* paints a rectangle (Shift: erases it), *⊕ place* puts
+the chosen object or tile by its anchor cell (its footprint outlined under the pointer; an overlap
+is refused with the reason), *✣ move* drags something placed to another cell (`move x,y x,y`),
+*✕ remove* takes it away. Each is one line on the tape, written as you. *▣ camera* stands the
+camera on a cell (the engine's screen outlined; *camera view* shows only it, at game scale),
+and *hot spots* outlines the cells the map checks flag; the zoom, the camera and the hot spots
+are only for looking. The line under the tools names the cell under the pointer: its ground
+tile and anything placed on it.
 
 ### Security
 

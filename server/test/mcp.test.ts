@@ -30,7 +30,7 @@ afterAll(async () => {
 describe('MCP over stdio', () => {
   it('lists the tools and gives instructions', async () => {
     const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(['changes', 'check', 'history', 'project', 'review', 'run', 'view']);
+    expect(tools.map((t) => t.name).sort()).toEqual(['changes', 'check', 'export', 'history', 'project', 'review', 'run', 'view']);
     expect(client.getInstructions()).toContain('watch link');
   });
 

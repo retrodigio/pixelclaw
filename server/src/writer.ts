@@ -472,6 +472,7 @@ export class Writer {
       const dirs = [f, ...[...doc.views].sort((x, y) => VIEW_NAMES.indexOf(x.name as never) - VIEW_NAMES.indexOf(y.name as never)).flatMap((v) => (v === here ? [] : [v.from]))];
       o.game = { ground: ground?.doc ?? null, with: others.map((x) => x.doc), scale: drawScaleOf(style), frames: [...new Set(dirs)] };
     }
+    if (mode === 'diff' && doc.map) o.mapDoc = { doc, world: mapWorld(this.assetDocs()), screen: cameraOf(style), drawScale: drawScaleOf(style) };
     if (mode === 'map' && (doc.map || doc.kind === 'object' || doc.footprint)) {
       const all = this.assetDocs();
       const world = mapWorld(all);

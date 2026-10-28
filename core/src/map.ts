@@ -547,7 +547,7 @@ export function mapAscii(d: Doc, c?: ComposedMap): string {
   const tens = '     ' + Array.from({ length: W }, (_, x) => (x % 10 === 0 ? String(Math.floor(x / 10) % 10) : ' ')).join('');
   const ones = '     ' + Array.from({ length: W }, (_, x) => String(x % 10)).join('');
   const rows = Array.from({ length: H }, (_, y) => `${String(y).padStart(3)}  ${g.slice(y * W, y * W + W).join('')}`);
-  return [`cells (${[...legend, ...names, '+ footprint, . nothing'].join(', ')}):`, tens, ones, ...rows].join('\n');
+  return [`cells (${[...legend, ...names, '+ under an object, . nothing'].join(', ')}):`, tens, ones, ...rows].join('\n');
 }
 
 /** The tile at each cell, as rows of short labels (the topmost ground tile; objects' anchors marked). */
@@ -1027,3 +1027,74 @@ export function reassemble(stamp: SplitStamp, pieces: { name: string; px: Uint16
 
 /** Luma per palette entry of a composed map (for callers that score it). */
 export const mapLuma = (c: ComposedMap): number[] => c.palette.map((e) => luma601(e.hex));
+
+// --- What changed on a map (for `changes` and the diff view)
+
+export interface MapDiff {
+  /** Cells whose composed pixels differ. */
+  cells: Pt[];
+  text: string;
+  /** Before and after of the changed part (a cell's margin round it), at the scale, changed cells outlined. */
+  img: Rgba;
+}
+
+/** The difference between two states of a map: what moved, was placed or taken away, the terrain painted, and a picture. */
+export function mapDiff(before: Doc | null, after: Doc, world: MapWorld, scale = 2): MapDiff {
+  const a = composeMapDoc(after, world);
+  const b = before?.map && before.width === after.width && before.height === after.height ? composeMapDoc(before, world) : null;
+  const t = a.t, cols = a.cols, rows = a.rows;
+  const cells: Pt[] = [];
+  for (let cy = 0; cy < rows; cy++) for (let cx = 0; cx < cols; cx++) {
+    let diff = !b;
+    for (let y = 0; y < t && !diff; y++) for (let x = 0; x < t; x++) {
+      const i = (cy * t + y) * a.w + cx * t + x;
+      const pa = a.px[i]!, pb = b!.px[i]!;
+      const ca = pa === TRANSPARENT ? '' : a.palette[pa]!.hex, cb = pb === TRANSPARENT ? '' : b!.palette[pb]!.hex;
+      if (ca !== cb) { diff = true; break; }
+    }
+    if (diff) cells.push([cx, cy]);
+  }
+  const key = (d: Doc, p: Placed) => { const e = d.map!.entries[p.entry]!; return `${d.layers[p.layer]!.name}|${e.name}${e.variant ? `.${e.variant}` : ''}`; };
+  const was = before?.map ? placements(before).map((p) => ({ k: key(before, p), p })) : [];
+  const now = placements(after).map((p) => ({ k: key(after, p), p }));
+  const gone = was.filter((x) => !now.some((y) => y.k === x.k && y.p.x === x.p.x && y.p.y === x.p.y));
+  const added = now.filter((x) => !was.some((y) => y.k === x.k && y.p.x === x.p.x && y.p.y === x.p.y));
+  const lines: string[] = [];
+  for (const g of [...gone]) {
+    const j = added.findIndex((x) => x.k === g.k);
+    if (j < 0) continue;
+    const n = added[j]!;
+    lines.push(`moved: ${g.k.split('|')[1]} ${g.p.x},${g.p.y} → ${n.p.x},${n.p.y} (layer ${g.k.split('|')[0]})`);
+    added.splice(j, 1);
+    gone.splice(gone.indexOf(g), 1);
+  }
+  for (const g of gone) lines.push(`taken away: ${g.k.split('|')[1]} at ${g.p.x},${g.p.y} (layer ${g.k.split('|')[0]})`);
+  for (const n of added) lines.push(`placed: ${n.k.split('|')[1]} at ${n.p.x},${n.p.y} (layer ${n.k.split('|')[0]})`);
+  after.layers.forEach((l, li) => {
+    if (l.map?.kind !== 'terrain' || !before?.map) return;
+    const bi = before.layers.findIndex((x) => x.name === l.name);
+    if (bi < 0) { lines.push(`terrain layer ${l.name} added`); return; }
+    const ca = after.cels[li]![0]!, cb = before.cels[bi]![0]!;
+    let on = 0, off = 0;
+    for (let i = 0; i < ca.length; i++) { if (ca[i] === 1 && cb[i] !== 1) on++; else if (ca[i] !== 1 && cb[i] === 1) off++; }
+    if (on || off) lines.push(`terrain ${l.name}: ${on} cells painted, ${off} erased`);
+  });
+  const text = cells.length ? `${cells.length} cells look different${lines.length ? `; ${lines.join('; ')}` : ''}` : `no cell looks different${lines.length ? `; ${lines.join('; ')}` : ''}`;
+  const xs = cells.map((p) => p[0]), ys = cells.map((p) => p[1]);
+  const r = cells.length ? { x: Math.max(0, Math.min(...xs) - 1), y: Math.max(0, Math.min(...ys) - 1), x1: Math.min(cols - 1, Math.max(...xs) + 1), y1: Math.min(rows - 1, Math.max(...ys) + 1) } : { x: 0, y: 0, x1: Math.min(cols, 8) - 1, y1: Math.min(rows, 6) - 1 };
+  const region = { x: r.x, y: r.y, w: r.x1 - r.x + 1, h: r.y1 - r.y + 1 };
+  const right = paintComposed(a, { scale, region, marks: cells });
+  const left = b ? paintComposed(b, { scale, region, marks: cells }) : null;
+  const gap = 8;
+  const W = right.width * 2 + gap, H = right.height;
+  const data = new Uint8Array(W * H * 4);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const k = (y * W + x) * 4;
+    const src = x < right.width ? left : x >= right.width + gap ? right : null;
+    const sx = x < right.width ? x : x - right.width - gap;
+    if (!src) { data[k] = 30; data[k + 1] = 31; data[k + 2] = 36; data[k + 3] = 255; continue; }
+    const j = (y * right.width + sx) * 4;
+    data[k] = src.data[j]!; data[k + 1] = src.data[j + 1]!; data[k + 2] = src.data[j + 2]!; data[k + 3] = 255;
+  }
+  return { cells, text, img: { width: W, height: H, data } };
+}

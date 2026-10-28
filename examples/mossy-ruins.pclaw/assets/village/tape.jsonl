@@ -1,0 +1,15 @@
+{"pclaw":"tape","lang":2}
+{"seq":1,"by":"claude","at":"2026-10-28T08:25:13Z","group":"g1","cmd":"new map village 40x30 tile=24 palette=ruins-shore <<\n  k ink #17181d\n  0 stone0 #272a30\n  1 stone1 #3b4044\n  2 stone2 #535a5b\n  3 stone3 #6c7570\n  4 stone4 #8b9489\n  5 stone5 #afb6a5\n  a moss0 #1c2e21\n  b moss1 #2c4729\n  c moss2 #486a32\n  d moss3 #6c8c3a\n  e lichen #a2ab52\n  f soil0 #2a211c\n  g soil1 #44352a\n  h soil2 #65503a\n  w pool #34566a\n  m water0 #1d3446\n  n water1 #284b5e\n  o water2 #3a6578\n  p water3 #5f93a2\n  q foam #a9d0cc\n  s sand0 #6f5c42\n  t sand1 #977f5c\n  u sand2 #b39b72\n  v sand3 #cdb98c\n  ramp stone stone0 stone1 stone2 stone3 stone4 stone5\n  ramp moss moss0 moss1 moss2 moss3 lichen\n  ramp soil soil0 soil1 soil2\n  ramp water water0 water1 water2 water3 foam\n  ramp sand sand0 sand1 sand2 sand3\n>>"}
+{"seq":2,"by":"claude","at":"2026-10-28T08:25:13Z","group":"g1","cmd":"layer add sea terrain=shore outside=on above=floor"}
+{"seq":3,"by":"claude","at":"2026-10-28T08:25:13Z","group":"g1","cmd":"layer add meadow terrain=meadow outside=off above=sea"}
+{"seq":4,"by":"claude","at":"2026-10-28T08:25:13Z","group":"g1","cmd":"layer add lanes terrain=lane outside=off above=meadow"}
+{"seq":5,"by":"claude","at":"2026-10-28T08:25:13Z","group":"g1","cmd":"layer add glints overlay=glint on=sea:out above=lanes"}
+{"seq":6,"by":"claude","at":"2026-10-28T08:25:13Z","group":"g1","cmd":"layer add props objects above=glints"}
+{"seq":7,"by":"claude","at":"2026-10-28T08:25:13Z","group":"g1","cmd":"map gen village layers=sea,meadow,lanes seed=8"}
+{"seq":8,"by":"claude","at":"2026-10-28T08:25:13Z","group":"g1","cmd":"place house 15,16 layer=props cells=2x2 anchor=0,1"}
+{"seq":9,"by":"claude","at":"2026-10-28T08:25:13Z","group":"g1","cmd":"place house 22,16 layer=props cells=2x2 anchor=0,1"}
+{"seq":10,"by":"claude","at":"2026-10-28T08:25:13Z","group":"g1","cmd":"place house 15,10 layer=props cells=2x2 anchor=0,1"}
+{"seq":11,"by":"claude","at":"2026-10-28T08:25:13Z","group":"g1","cmd":"place house 23,21 layer=props cells=2x2 anchor=0,1"}
+{"seq":12,"by":"claude","at":"2026-10-28T08:25:13Z","group":"g1","cmd":"place well 20,15 layer=props cells=1x1 anchor=0,0"}
+{"seq":13,"by":"claude","at":"2026-10-28T08:25:13Z","group":"g1","cmd":"scatter tree count=22 on=meadow off=lanes minDist=2 layer=props fp=1x1:0,0 seed=31"}
+{"seq":14,"by":"human:chris","at":"2026-10-28T08:25:19Z","group":"h1","cmd":"move 20,15 20,18 layer=props"}

@@ -318,8 +318,9 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
         text(`Changes since you last looked: ${all.length} asset${all.length === 1 ? '' : 's'} (${all.map((c) => c.asset).join(', ')}).`),
       ];
       for (const c of all) {
-        content.push(text(formatChanges(c)));
         const v = w.view(c.asset, 'diff', {}, undefined, c.before);
+        // A map's diff is of the map as drawn (its cells hold names, not pixels).
+        content.push(text(c.after.map && v.kind === 'image' ? formatChanges(c).replace(/\ndiff [^\n]*$/, `\ndiff ${c.from > 0 ? `#${c.from}` : '(nothing)'} → #${c.to}: ${v.text ?? ''}`) : formatChanges(c)));
         w.showEye(c.asset, v);
         if (v.kind === 'image') {
           content.push({ type: 'image', data: Buffer.from(v.png).toString('base64'), mimeType: 'image/png' });

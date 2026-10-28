@@ -9,7 +9,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   animGifFrames, animText, diffPixels, diffText, encodeGif, encodePng, mapGifFrames, mapText, renderAnimSheet, renderDiff, renderFamilyView, renderGame, renderGrid, renderMap,
-  renderRecolour, renderScaled, renderTile3x3, layoutOf, schemeOf, cameraRegion, composeMapDoc, mapAscii, mapDocGifFrames, mapDocText, paintComposed,
+  renderRecolour, renderScaled, renderTile3x3, layoutOf, schemeOf, cameraRegion, composeMapDoc, mapAscii, mapDiff, mapDocGifFrames, mapDocText, paintComposed,
   type Doc, type MapWorld, type Pt, type Region, type Theme,
 } from '@pixelclaw/core';
 import { ProjectError } from './project.ts';
@@ -83,6 +83,13 @@ export function checkViewOptions(doc: Doc, o: ViewOptions): void {
 export function makeView(doc: Doc, mode: ViewMode, o: ViewOptions, outDir: string, before?: Doc | null): View {
   checkViewOptions(doc, o);
   mkdirSync(outDir, { recursive: true });
+  if (mode === 'diff' && doc.map && o.mapDoc) {
+    const md = mapDiff(before ?? null, doc, o.mapDoc.world, o.scale ?? o.mapDoc.drawScale);
+    const png = encodePng(md.img);
+    const path = join(outDir, `${doc.name}.diff.png`);
+    writeFileSync(path, png);
+    return { mode, kind: 'image', png, width: md.img.width, height: md.img.height, path, text: `${md.text} (before | after, the cells around them at game scale, changed cells outlined)` };
+  }
   if (mode === 'diff') {
     const img = renderDiff(before ?? null, doc, { scale: o.scale });
     const png = encodePng(img);

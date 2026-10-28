@@ -627,3 +627,92 @@ Points where the plan was unclear or silent. Each has the reading that was follo
     and overlays, only for looking); `view family` gives the agent the same picture with the
     sheet's layout in words. "Collapsible timeline rows" (§15): each timeline row and the whole
     timeline fold, only for looking.
+
+## G8
+
+96. **What a map document is.** §4.11: "a grid of cells … several layers … every cell holding a
+    tile name, not pixels, so a map redraws itself whenever a tile changes." *Reading:* `new map
+    <name> <C>x<R> tile=<T>` makes a document whose canvas is the grid of cells (one "pixel" per
+    cell, so notes and coordinates are cells, and undo, replay, time travel and the state bytes
+    work unchanged). Each layer says what it holds: `terrain=<family>` (1 where the terrain is),
+    `tiles` and `objects` (an index into the map's table of names at each thing's anchor cell),
+    `overlay=<overlay> on=<where>`. The art is read from the named assets only when the map is
+    drawn or checked, never on the tape (G7's note). Drawing commands are refused on a map.
+
+97. **Several terrains.** *Reading:* one family per terrain layer, layered bottom to top; a layer
+    with `outside=on` also draws its outside texture on the cells outside its terrain (the sea
+    under an island), the others draw only their terrain's cells. Terrains stack seamlessly when
+    the upper family's outside texture is the lower's inside texture (the meadow is grass on sand,
+    on the shore's sand). A corner scheme on a map reads each cell's top-left corner from the cell
+    (the last row and column repeated): one bit per cell, like the edge schemes.
+
+98. **Footprints, anchors, flags** (§4.10). *Reading:* `footprint <C>x<R> [at=] [anchor=] << flags
+    >>` on any asset: the footprint is a rectangle of the art grid (the canvas in cells), by
+    default its bottom-left corner; the anchor is a footprint cell (default bottom-left); the
+    flags are per art cell (`.` `b` blocks `r` roof/canopy `x` both), so a crown above a one-cell
+    footprint can be a canopy. Walkable is "in the footprint and not blocking". The pivot in
+    pixels is G6's `pivot`. An asset without a footprint stands on its whole art grid.
+
+99. **Placing without reading other assets on replay.** *Reading:* `place` writes the footprint
+    it read into its line (`cells=2x2 anchor=0,1`), `scatter` writes one per asset (`fp=`), so the
+    tape replays alone (as `family texture from=` records its pixels). If an asset's footprint
+    later changes, the `footprint` check says so ("place it again"). Footprints may not overlap
+    on any objects layer (on a tiles layer, on that layer); the batch is refused with the cell and
+    what holds it.
+
+100. **Draw order** (§4.10 "draw-order rules"). *Reading:* ground layers (terrain, tiles,
+     overlays) in layer order; then every object of every objects layer by its footprint's bottom
+     row, then layer, then column; then every roof cell again. Problems the `draworder` check
+     reports: art outside a footprint that is not a roof (an actor behind would be drawn over it),
+     and a roof hiding part of an object that stands in front. Faces (G7's note) already draw in
+     the cell below their terrain through the scheme; objects on them are not special-cased.
+
+101. **The map checks** (§4.11). *Reading:* `seam` (§13's metric over the composed ground);
+     `repetition` as two hot-spot measures: a family's edge tile, identical pixel for pixel, in
+     a straight run of more than 4 cells, and one textured tile filling more than 10 of the 16
+     cells of a 4x4 window (cells nearly one colour, and the open ground a terrain layer fills
+     the map with, are left out: the sea is judged as its own tile); `footprint` (missing, off the
+     map, overlapping, changed since placed, or on the filling layer's outside ground or edge
+     tiles: not in the sea or the surf; a house on the meadow's sandy edge is fine); `draworder`;
+     `coverage` (missing assets or variants, undrawn tiles the map needs). The assets' own checks
+     are skipped on the map. Readability of objects on each ground and consistency across the
+     screen (§4.11's last two) are left for G10's `consistency`.
+
+102. **Texture variants** (§4.1 "`variant add from=sand seed=…`"). *Reading:* a variant is an
+     asset of its own declaring `variant of=<base>` (made with `fork`, then the generator run
+     again with another seed, or the detail moved; for a family, its band drawn again and its
+     detail placed elsewhere, or another inside texture). Maps pick among an asset and its
+     variants cell by cell (a hash of the cell, moved on when it would repeat both the left and
+     upper neighbours). The pilot's acceptance rule is the `variant` check (colour-share L1 < 0.3,
+     mean ΔL* < 2); differing border pixels are reported, not failed (noise textures blend; the
+     map's seam score judges it).
+
+103. **`map gen`.** "From the manifest's terrains and objects" — there is no manifest before
+     G10. *Reading:* `map gen island|village|dungeon [layers=…] seed=` lays out only terrain
+     layers (by default the map's, in order): an island (value noise with a fall-off, smoothed by
+     a majority pass and with one-cell spits and notches removed, the G7 note's "blocky" islands);
+     a village (the island, an inner ground two cells in, two lanes crossing it a cell in from its
+     edge); a dungeon (rooms joined by corridors). Objects come from `place` and `scatter`.
+
+104. **The camera.** *Reading:* project.json `style.camera` is the engine's screen in art pixels
+     (default `384x216`, 16x9 cells of 24); `view map camera=x,y` shows it around a cell, kept on
+     the map, at the draw scale.
+
+105. **Tiled `.tmx`.** *Reading:* one tileset image of every distinct tile the map draws
+     (composed, so variants and families' edges are baked), a CSV tile layer per ground layer, an
+     object group per objects layer with tile objects from an image collection (gids from
+     100001) placed by their bottom-left as Tiled does, with cell, footprint, anchor and flags as
+     properties. Overlays are left out (an engine effect). Wang sets (`.tsx`) and Godot are G9's.
+
+106. **`split`.** *Reading:* every cell of the art grid becomes `<name>_<cx>_<cy>` (empty ones too,
+     marked `empty`, so reassembly is identity), with `<name>.stamp.json` holding each piece's
+     offset and flags, the footprint and the anchor. The naming template is G9's profile.
+
+107. **`seam` on an oversized asset's border** (§4.10). *Reading:* not a number in G8: `view map`
+     of an object stands it on its ground among plain tiles at game scale, and the `footprint`
+     check keeps bases off edges; objects are outlined sprites, so §13's metric does not apply.
+
+108. **The map in the UI.** *Reading:* a map opens in a map editor in place of the canvas (paint,
+     rectangle, erase, place, move, remove; camera, zoom and hot spots only for looking); layers
+     are added with the command line (`layer add …`), and the timeline is hidden for maps. A map's
+     `changes` diff shows the composed cells before and after and says what moved.

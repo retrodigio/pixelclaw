@@ -150,6 +150,9 @@ checked in:
 - the shore (a blob47 family of 47 variants, sand meeting the shimmering water):
   [on an island](docs/screenshots/g7-shore-map.png), [playing with glints](docs/screenshots/g7-shore-map.gif),
   [every variant among its neighbours](docs/screenshots/g7-shore-family.png)
+- the village (a 40x30 map: the shore, a meadow and lanes, four 48x48 houses, 24x48 trees and a
+  well): [whole at 1x](docs/screenshots/g8-village.png), [a screen at game scale](docs/screenshots/g8-village-camera.png),
+  [the hot spots before the variants](docs/screenshots/g8-hotspots.png), [in Tiled's format](examples/mossy-ruins.pclaw/exports/tmx/village.tmx)
 
 The G2 demo ([examples/demo-g2.md](examples/demo-g2.md)) draws the same tile through MCP while you
 watch. In the G3 demo ([examples/demo-g3.md](examples/demo-g3.md)) you fix three pixels and leave a
@@ -160,7 +163,10 @@ a blind review. The G6 demo ([examples/demo-g6.md](examples/demo-g6.md)) animate
 the water and plays them in the watch view at the game's speed. The G7 demo
 ([examples/demo-g7.md](examples/demo-g7.md)) builds a shore family of 47 variants from a band
 profile and three hand-drawn pieces, puts it on a random island with the seam score over it, and
-runs a blind review on the island.
+runs a blind review on the island. The G8 demo ([examples/demo-g8.md](examples/demo-g8.md)) builds
+a coastal village map from those families plus a house, a tree and a well bigger than a cell,
+finds where it repeats with the map checks and fixes it with texture variants; you move the well
+in the watch view and the agent reads the move; then a blind review of the village at game scale.
 
 ## Packages
 

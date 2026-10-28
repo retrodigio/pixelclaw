@@ -32,6 +32,8 @@ they always agree.
 | `revert` | with `ref=` | share of pixels unchanged from the reference | ≤ 0.15 | Pixels with the same colour as the reference asset at the same place. |
 | `repetition` | tiles | ΔL* × √width of the worst band | ≤ 3 | The most visible stripe when the tile is repeated: a band of 1 to 6 rows (or columns) lighter or darker than the rest. Flags the marks that make it. |
 | `anim` | 2 frames or more | the worst frame-to-frame change | 8–35 % (tiles 3–35 %) | Per sequence (tags, views; mirror views are their source): **frame diff** (changed pixels over the union of both silhouettes; the pilot's good pairs changed 16-19 %): too little (a held frame or one that barely moves) or too much (a jump), flagging the changed pixels; the **loop seam** of a cycle (last frame back to the first) in the same band; sprites also: **pivot drift** (the silhouette's centre column moving by more than 1 px between frames: it slides), **ground drift** (the lowest row off the ground line, or off the first frame's: it floats or sinks; 0 px), and **area jumps** (the silhouette growing or shrinking by more than 15 %). Thresholds `minDiff`, `maxDiff`, `maxPivot`, `maxGround`, `maxArea`. |
+| `fit` | objects and oversized tiles | problems | ≤ 0 | Footprint cells with nothing drawn, and art outside the footprint that is not a roof (`r`): an actor walking behind would be drawn over it. Skips one-cell assets without a footprint, families, overlays and sheets. |
+| `variant` | assets with `variant of=` | L1 of the colour shares; mean ΔL* | < 0.3; < 2 | The pilot's rule for texture variants: a variant whose colour mix strays from its base reads as a patch on a map. Flags the border pixels that differ from the base's (a seam where they meet, unless the textures blend). |
 | `views` | 2 views or more | the least difference between two views | ≥ 20 % | Directions that look too alike (the pilot's player directions did): each pair of views is compared on its first frame, by colour over both silhouettes. Mirror views count as their source, and views facing each other left to right (E and W) are not compared. |
 
 Checks that do not apply are skipped (seam on a sprite, outline on a tile, revert without a
@@ -107,3 +109,15 @@ every variant among its neighbours (`sets/<set>.png`). The rubric's seventh ques
 the edge reads as one natural edge without the tile grid showing; map findings come back as
 `<set> map <col>,<row> <x>,<y> "text"`, which the agent turns into notes on that variant's cell.
 `--size CxR --seed N` (MCP `size`, `seed`) choose the island (default 16x12, seed 1).
+
+**Maps** (G8). A map document is checked on the map composed from the assets it names (the
+assets' own checks judge their pixels; those are skipped on the map). Hot spots are cells, and
+`view map marks="failing"` outlines them.
+
+| Check | Score | Default threshold | What it flags |
+|---|---|---|---|
+| `seam` | the pilot's metric over the composed ground (terrain, tiles and overlays, before objects) | ≤ 1 | Nothing: the score says whether the tile grid shows anywhere on the map. |
+| `repetition` | the longest straight run of one edge tile; the most cells one textured tile fills in a 4x4 window | run ≤ 4 (`edgeRun`); ≤ 10 of 16 (`motif`) | **Edge runs**: a family's edge tile (not its plain inside or outside), identical pixel for pixel, in a straight line of more than 4 cells: a long shore or lane repeating one tile's detail. **Motif hot spots**: windows where one textured tile (cells nearly one colour are left out, and so is the open ground a terrain layer fills the map with, like the sea) fills more than 10 of the 16 cells. Texture variants (`variant of=`) fix both. Per map: `style.checks.repetition.map`. |
+| `footprint` | problems | ≤ 0 | An object whose asset is missing, off the map, overlapping another, placed with a footprint that has since changed (place it again), or standing on the outside ground of a terrain layer that fills the map (the sea) or on that layer's edge tiles (the surf). |
+| `draworder` | problems | ≤ 0 | Art outside an object's footprint that is not a roof (actors behind would be drawn over it), and a roof that hides part of an object standing in front of it. Objects draw in order of their footprint's bottom row; roof cells draw last. |
+| `coverage` | missing items | ≤ 0 | A missing asset or variant, and cells whose tile is not drawn (a variant the map needs that its family lacks). |

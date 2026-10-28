@@ -1,0 +1,42 @@
+{
+  "name": "house",
+  "kind": "object",
+  "size": [
+    48,
+    48
+  ],
+  "cell": [
+    24,
+    24
+  ],
+  "wrap": false,
+  "palette": "ruins-props",
+  "layers": [
+    {
+      "name": "main",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    }
+  ],
+  "frames": 1,
+  "paletteLocked": false,
+  "stamps": [],
+  "macros": [],
+  "tags": [],
+  "views": [],
+  "links": [],
+  "notes": [],
+  "tape": {
+    "lang": 2,
+    "commands": 59,
+    "groups": 1
+  },
+  "state": {
+    "sha256": "22d467f5efe4ce18e62c46d67fad43bd00c6d37a1cd8dc0790a104856f5c63d9"
+  },
+  "checkpoints": {
+    "every": 200,
+    "files": []
+  }
+}
