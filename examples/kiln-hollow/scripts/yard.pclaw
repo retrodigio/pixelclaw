@@ -1,0 +1,2 @@
+# The yard: a 6x4-tile scene (144x96) as a sheet of 24 px cells, to hold the mockup underlay and its snapped draft
+new sheet yard 144x96 cell=24x24

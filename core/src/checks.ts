@@ -131,7 +131,8 @@ const DEFAULTS: Record<CheckId, { all: Params } & Partial<Record<string, Params>
   banding: { all: { max: 0.5, minEdges: 8 }, font: { off: true } },
   outline: { all: { min: 0.85 }, font: { off: true } },
   seam: { all: { max: 1 } },
-  coverage: { all: { max: 0 } },
+  // A glyph sheet's coverage is its glyphs (the font check); cells past the last are not glyphs.
+  coverage: { all: { max: 0 }, font: { off: true } },
   readability: { all: { min: 0.8, delta: 15, maxIou: 0.9, minSpread: 25 }, font: { off: true } },
   revert: { all: { max: 0.15 } },
   // The most visible stripe when tiled: a band of rows or columns lighter or darker than the
@@ -143,7 +144,7 @@ const DEFAULTS: Record<CheckId, { all: Params } & Partial<Record<string, Params>
   // Views must differ from each other (by colour, over both silhouettes) by at least this share.
   views: { all: { min: 0.2 } },
   // Oversized assets: footprint cells drawn, overhangs marked as roofs.
-  fit: { all: { max: 0 } },
+  fit: { all: { max: 0 }, font: { off: true } },
   // A texture variant's colour mix against its base (the pilot's rule: L1 < 0.3, ΔL* < 2).
   variant: { all: { maxL1: 0.3, maxDl: 2 } },
   // Maps: footprints and draw order without problems.
@@ -1295,7 +1296,7 @@ function checkConsistency(img: Img, p: Params, ctx: CheckContext): CheckResult {
 /**
  * A glyph sheet (plan §4.6): one cap height for the capitals, one x-height for the lowercase
  * letters without ascenders, letters and digits without descenders standing on the baseline, no
- * glyph drawn past its advance (or with no advance), and the line height: no shorter than the
+ * glyph drawn past its advance (or with no advance), every glyph but spaces drawn, and the line height: no shorter than the
  * tallest glyph's rows and within the profile's limit (maxLine).
  */
 function checkFont(img: Img, p: Params): CheckResult {
@@ -1340,6 +1341,11 @@ function checkFont(img: Img, p: Params): CheckResult {
   if (clipped.length) {
     problems.push(`drawn past the advance: ${clipped.map((g) => `${charText(g.cp)} (advance ${g.advance}, ink to column ${g.box![2]})`).join(', ')}`);
     groups.push({ label: 'drawn past its advance', pts: clipped.flatMap((g) => { const out: Pt[] = []; for (let y = 0; y < d.cellH; y++) for (let x = Math.max(g.advance, 0); x < d.cellW; x++) if (img.get(g.cell[0] + x, g.cell[1] + y) !== TRANSPARENT) out.push([g.cell[0] + x, g.cell[1] + y]); return out; }) });
+  }
+  const blank = gs.filter((g) => !g.box && !/\s/u.test(String.fromCodePoint(g.cp)));
+  if (blank.length) {
+    problems.push(`not drawn: ${blank.map((g) => charText(g.cp)).join(' ')}`);
+    groups.push({ label: 'an empty glyph cell', pts: blank.map((g): Pt => [g.cell[0], g.cell[1]]) });
   }
   const inked = gs.filter((g) => g.box);
   const tall = inked.length ? Math.max(...inked.map((g) => g.box![3])) - Math.min(...inked.map((g) => g.box![1])) + 1 : 0;
@@ -1443,7 +1449,7 @@ export function runChecks(doc: Doc, ids: readonly CheckId[] = CHECK_IDS, ctx: Ch
   const img = (f: number) => imgs.get(f) ?? imgs.set(f, image(doc, f)).get(f)!;
   return ids.map((id) => {
     const p = checkParams(id, doc.kind, ctx.style, doc.name);
-    if (p.off === true) return skip(id, 'turned off in the style guide');
+    if (p.off === true) return skip(id, DEFAULTS[id][doc.kind]?.off === true ? `not checked on a ${doc.kind}` : 'turned off in the style guide');
     if (WHOLE.has(id)) return RUNNERS[id](img(frames[0]!), p, ctx);
     if (frames.length === 1 && doc.frameCount === 1) return RUNNERS[id](img(frames[0]!), p, ctx);
     if (frames.length === 1) {

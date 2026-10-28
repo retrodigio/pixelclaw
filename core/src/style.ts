@@ -128,7 +128,8 @@ export function checkContextFor(
       frame: o.frame, style, ground: ground?.doc ?? null, ref: ref?.doc ?? null,
       set: setOf(name, doc, assets, json, o.set).map((a) => ({ name: a.name, doc: a.doc })),
       ...(doc.map || doc.variantOf || doc.densityOf ? { world: mapWorld(assets) } : {}),
-      peers: (o.peers ? assets.filter((a) => o.peers!.includes(a.name)) : peersOf(name, doc, assets)).map((a) => ({ name: a.name, doc: a.doc })),
+      // A manifest set may mix kinds (tiles and families, icons and a font): only like is held to like.
+      peers: (o.peers ? assets.filter((a) => o.peers!.includes(a.name) && consistencyClass(a.doc) === consistencyClass(doc)) : peersOf(name, doc, assets)).map((a) => ({ name: a.name, doc: a.doc })),
       ...(o.expect ? { expect: o.expect } : {}),
     },
     problems,
@@ -144,15 +145,19 @@ function mergeChecks(base: Record<string, unknown>, over: Record<string, unknown
   return out;
 }
 
-const figure = (d: Doc) => !d.wrap && !d.family && !d.overlay && !d.map && d.kind !== 'icon';
+const figure = (d: Doc) => !d.wrap && !d.family && !d.overlay && !d.map && !d.font && d.kind !== 'icon';
 
 /**
  * The set an asset is held to by `consistency` when no manifest says: ground tiles with ground
  * tiles, figures and props with figures and props, icons with icons; never its own density copies.
  */
 export function peersOf(name: string, doc: Doc, assets: AssetDoc[]): AssetDoc[] {
-  const cls = (d: Doc) => (d.wrap && !d.family ? 'tile' : figure(d) ? 'figure' : d.kind === 'icon' ? 'icon' : 'other');
-  const mine = cls(doc);
+  const mine = consistencyClass(doc);
   if (mine === 'other') return [];
-  return assets.filter((a) => a.name !== name && cls(a.doc) === mine && !a.doc.densityOf && !doc.densityOf);
+  return assets.filter((a) => a.name !== name && consistencyClass(a.doc) === mine && !a.doc.densityOf && !doc.densityOf);
+}
+
+/** What an asset is compared as: a ground tile, a figure (sprites, props, objects), an icon, or nothing else. */
+export function consistencyClass(d: Doc): 'tile' | 'figure' | 'icon' | 'other' {
+  return d.wrap && !d.family ? 'tile' : figure(d) ? 'figure' : d.kind === 'icon' ? 'icon' : 'other';
 }

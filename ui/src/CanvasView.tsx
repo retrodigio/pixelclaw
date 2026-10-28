@@ -6,10 +6,24 @@
 // your selection (marching ants), other authors' selections, symmetry guides, the marquee or lasso
 // being dragged, notes, the pixels checks flagged (circled in magenta) and the hovered pixel.
 // Notes also get a label with their id and text. Role entries show in the chosen preview theme.
+// Underlays (full-colour images on reference layers, plan §6) are drawn faded under the art.
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { TRANSPARENT, flattenReference, renderFlat, rgbOf, themedPalette, type Doc, type Note, type Theme } from '@pixelclaw/core';
 import type { Pt, Rect } from './editor.ts';
+
+/** Underlay images by blob, loaded once (they are content-addressed). */
+const blobs = new Map<string, HTMLImageElement>();
+function blobImage(sha: string, onLoad: () => void): HTMLImageElement | null {
+  let img = blobs.get(sha);
+  if (!img) {
+    img = new Image();
+    img.onload = onLoad;
+    img.src = `/api/blob/${sha}.png?token=${encodeURIComponent(new URLSearchParams(location.search).get('token') ?? '')}`;
+    blobs.set(sha, img);
+  }
+  return img.complete && img.naturalWidth ? img : null;
+}
 
 export const ZOOMS = [1, 2, 3, 4, 6, 8, 12, 16, 20, 24, 32, 40, 48, 64];
 const MAX_SIDE = 16384;
@@ -162,6 +176,7 @@ export function CanvasView(p: Props) {
   const ghost = useRef<HTMLCanvasElement>(null);
   const artRef = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ w: 0, h: 0 });
+  const [, setLoaded] = useState(0);
 
   useLayoutEffect(() => {
     const el = wrap.current;
@@ -189,6 +204,18 @@ export function CanvasView(p: Props) {
     const g = c.getContext('2d')!;
     g.imageSmoothingEnabled = false;
     checker(g, z, W, H);
+    for (const l of doc.layers) {
+      if (!l.underlay || l.hidden) continue;
+      const u = l.underlay;
+      const img = blobImage(u.blob, () => setLoaded((n) => n + 1));
+      if (!img) continue;
+      // Faded half-way to the checkerboard, as reference pixels are.
+      g.imageSmoothingEnabled = true;
+      g.globalAlpha = 0.5;
+      g.drawImage(img, u.x * z, u.y * z, u.w * z, u.h * z);
+      g.globalAlpha = 1;
+      g.imageSmoothingEnabled = false;
+    }
     const one = oneX(doc, p.frame, p.theme);
     for (const [f, tint] of [[p.onion.prev, 'rgb(255,90,60)'], [p.onion.next, 'rgb(60,140,255)']] as const) {
       if (f === null || f === p.frame || f >= doc.frameCount) continue;

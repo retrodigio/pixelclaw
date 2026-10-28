@@ -1,0 +1,64 @@
+{
+  "name": "yard",
+  "kind": "sheet",
+  "size": [
+    144,
+    96
+  ],
+  "cell": [
+    24,
+    24
+  ],
+  "wrap": false,
+  "palette": "kiln-hollow",
+  "layers": [
+    {
+      "name": "underlay",
+      "hidden": false,
+      "locked": false,
+      "reference": true,
+      "underlay": {
+        "blob": "a101a7d8184e4826afa3f08f52a062f7a6900ca0b9dbc7f6fce943bc50c59d00",
+        "iw": 768,
+        "ih": 512,
+        "x": 0,
+        "y": 0,
+        "w": 144,
+        "h": 96,
+        "layout": "1bcad0dd79768675fae3faf6c1863e13b8ec637fd1b8bedfabb174878bbdf306"
+      }
+    },
+    {
+      "name": "main",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    },
+    {
+      "name": "draft",
+      "hidden": false,
+      "locked": false,
+      "reference": true
+    }
+  ],
+  "frames": 1,
+  "paletteLocked": false,
+  "stamps": [],
+  "macros": [],
+  "tags": [],
+  "views": [],
+  "links": [],
+  "notes": [],
+  "tape": {
+    "lang": 2,
+    "commands": 4,
+    "groups": 4
+  },
+  "state": {
+    "sha256": "88cdd5777752fe67334a3efd90b4e8c0bac13c68cb3d6b9131b7cc646be88999"
+  },
+  "checkpoints": {
+    "every": 200,
+    "files": []
+  }
+}

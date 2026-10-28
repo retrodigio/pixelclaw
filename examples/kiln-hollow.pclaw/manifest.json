@@ -17,6 +17,9 @@
     },
     "scenes": {
       "description": "places built from the set"
+    },
+    "hud": {
+      "description": "icons and type on the screen"
     }
   },
   "export": {
@@ -136,7 +139,7 @@
       "name": "jar_icon",
       "kind": "icon",
       "size": "16x16",
-      "set": "props",
+      "set": "hud",
       "height": 13,
       "description": "a glaze jar for the trade menu",
       "flat": "glaze1"
@@ -245,6 +248,54 @@
       ],
       "description": "the hamlet: kilns on the slope, the stream below",
       "flat": "clay2"
+    },
+    {
+      "name": "hearth_icon",
+      "kind": "icon",
+      "size": "16x16",
+      "set": "hud",
+      "description": "a bottle kiln with its fire lit, for the firing menu",
+      "flat": "clay3"
+    },
+    {
+      "name": "drop_icon",
+      "kind": "icon",
+      "size": "16x16",
+      "set": "hud",
+      "description": "a drop of stream water, for the water meter",
+      "flat": "stream2"
+    },
+    {
+      "name": "bowl_icon",
+      "kind": "icon",
+      "size": "16x16",
+      "set": "hud",
+      "description": "a clay bowl, for the food meter",
+      "flat": "clay4"
+    },
+    {
+      "name": "hollow_type",
+      "kind": "font",
+      "size": "5x7",
+      "set": "hud",
+      "chars": "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,!?:-'",
+      "description": "the HUD lettering: capitals, digits and a little punctuation"
+    },
+    {
+      "name": "yard_clay",
+      "kind": "tile",
+      "size": "24x24",
+      "set": "ground",
+      "description": "trodden yard clay, from the yard mockup",
+      "flat": "clay2"
+    },
+    {
+      "name": "shallows",
+      "kind": "tile",
+      "size": "24x24",
+      "set": "ground",
+      "description": "still silty water at the yard's edge, from the yard mockup",
+      "flat": "stream1"
     }
   ]
 }

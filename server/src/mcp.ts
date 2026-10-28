@@ -61,7 +61,7 @@ Commands (one per line, or ';' between them; '#' comments). Full reference: docs
 Underlays (an image under the art, never exported) and snap:
   underlay generate "<prompt>" [layout=templates/mockup.png|<layer>] [image=1536x1024] [provider=openai|fake] [model=] [quality=low|medium|high] [cap=<usd>] [layer=mockup]
       calls the image provider (the key is the server's OPENAI_API_KEY; a cost cap per call, logged in logs/underlay-costs.jsonl); the tape gets underlay <layer> blob=<sha256> …
-  underlay import <file.png> [layer=underlay] [at=x,y] [size=WxH]    any image (a sketch, a photo of a drawing) as an underlay
+  underlay import <file.png> [layout=<template.png|layer>] [layer=underlay] [at=x,y] [size=WxH]    any image (a sketch, a photo of a drawing) as an underlay
   snap [from=<underlay layer>] [into=draft]   fits the image's pixel grid and quantises it to the palette on a new draft layer; reports block R² and the material match against the layout (below 0.8 / 0.85: reroll)
   import <x,y> asset=<name> region=<x,y,WxH> [layer=<layer>]   copy a region of another asset (cut a tile from a snapped scene)
 Fonts and icons:

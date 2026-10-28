@@ -42,7 +42,7 @@ function serverOnly(cmd: ParsedCommand, what: string): never {
 
 const underlayCmd: CommandSpec = {
   name: 'underlay',
-  summary: 'underlay generate "<prompt>" [layer=<name>] [layout=<template.png|layer>] [size=<W>x<H>] [provider=openai|fake] [model=] [quality=] [cap=<usd>] | underlay import <file.png> [layer=<name>] | underlay <layer> blob=<sha256> image=<W>x<H> [at=<x,y>] [size=<W>x<H>] [layout=<sha256>]   (an image under the art on a reference layer, never exported; the first two forms run through the server and are written as the third)',
+  summary: 'underlay generate "<prompt>" [layer=<name>] [layout=<template.png|layer>] [size=<W>x<H>] [provider=openai|fake] [model=] [quality=] [cap=<usd>] | underlay import <file.png> [layer=<name>] [layout=<template.png|layer>] | underlay <layer> blob=<sha256> image=<W>x<H> [at=<x,y>] [size=<W>x<H>] [layout=<sha256>]   (an image under the art on a reference layer, never exported; the first two forms run through the server and are written as the third)',
   normalise(cmd, ctx) {
     const doc = needDoc(cmd, ctx);
     const first = cmd.args[0];

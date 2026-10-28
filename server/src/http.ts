@@ -167,6 +167,18 @@ export async function startWatchServer(o: WatchOptions): Promise<WatchServer> {
       res.end(readFileSync(f));
       return;
     }
+    // Underlay images (content-addressed, so they may be cached).
+    const bm = /^\/api\/blob\/([0-9a-f]{64})\.png$/.exec(url.pathname);
+    if (bm) {
+      const f = join(o.writer.project.dir, 'blobs', `${bm[1]}.png`);
+      if (!authed || !existsSync(f)) {
+        res.writeHead(authed ? 404 : 401, { ...HEADERS, 'Content-Type': 'text/plain' }).end(authed ? 'not found\n' : 'token required\n');
+        return;
+      }
+      res.writeHead(200, { ...HEADERS, 'Content-Type': 'image/png', 'Cache-Control': 'private, max-age=86400, immutable' });
+      res.end(readFileSync(f));
+      return;
+    }
     if (uiDir && url.pathname.startsWith('/assets/')) {
       const file = normalize(join(uiDir, decodeURIComponent(url.pathname)));
       if (file.startsWith(join(uiDir, 'assets') + sep) && existsSync(file) && statSync(file).isFile()) {

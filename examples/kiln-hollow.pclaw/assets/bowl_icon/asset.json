@@ -1,0 +1,42 @@
+{
+  "name": "bowl_icon",
+  "kind": "icon",
+  "size": [
+    16,
+    16
+  ],
+  "cell": [
+    16,
+    16
+  ],
+  "wrap": false,
+  "palette": "kiln-hollow",
+  "layers": [
+    {
+      "name": "main",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    }
+  ],
+  "frames": 1,
+  "paletteLocked": false,
+  "stamps": [],
+  "macros": [],
+  "tags": [],
+  "views": [],
+  "links": [],
+  "notes": [],
+  "tape": {
+    "lang": 2,
+    "commands": 5,
+    "groups": 2
+  },
+  "state": {
+    "sha256": "9416933a5ffda9d890fd8603afb91589cdc82850c6e195c7b9b2460b7777499a"
+  },
+  "checkpoints": {
+    "every": 200,
+    "files": []
+  }
+}

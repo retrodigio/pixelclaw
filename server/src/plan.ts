@@ -133,7 +133,7 @@ export function planReport(w: Writer, o: { set?: string } = {}): PlanReport {
     const st = statusOf({ exists: !!doc, checksPass: pass, marks: doc?.marks ?? [], art, exportedArt: ex?.art ?? null });
     if (doc && a.planned) {
       const want = parseSize(a.size);
-      const have = doc.map ? [doc.width, doc.height] : doc.family ? [doc.family.tile, doc.family.tile] : [doc.width, doc.height];
+      const have = doc.map ? [doc.width, doc.height] : doc.family ? [doc.family.tile, doc.family.tile] : doc.font ? [doc.cellW, doc.cellH] : [doc.width, doc.height];
       if (doc.kind !== a.kind) flags.push(`planned as a ${a.kind}, drawn as a ${doc.kind}`);
       if (want && (have[0] !== want[0] || have[1] !== want[1])) flags.push(`planned ${a.size}, drawn ${have[0]}x${have[1]}`);
     }

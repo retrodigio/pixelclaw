@@ -1,0 +1,390 @@
+# A 5x7 font for the HUD (original): smoke-coloured glyphs, drawn from each cell's left edge.
+new font hollow_type 5x7 chars="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,!?:-'" cols=16 baseline=6 line=9 spacing=1
+glyph A <<
+.ww.
+w..w
+w..w
+wwww
+w..w
+w..w
+w..w
+>>
+glyph B <<
+www.
+w..w
+w..w
+www.
+w..w
+w..w
+www.
+>>
+glyph C <<
+.www
+w...
+w...
+w...
+w...
+w...
+.www
+>>
+glyph D <<
+www.
+w..w
+w..w
+w..w
+w..w
+w..w
+www.
+>>
+glyph E <<
+wwww
+w...
+w...
+www.
+w...
+w...
+wwww
+>>
+glyph F <<
+wwww
+w...
+w...
+www.
+w...
+w...
+w...
+>>
+glyph G <<
+.www
+w...
+w...
+w.ww
+w..w
+w..w
+.www
+>>
+glyph H <<
+w..w
+w..w
+w..w
+wwww
+w..w
+w..w
+w..w
+>>
+glyph I <<
+www
+.w.
+.w.
+.w.
+.w.
+.w.
+www
+>>
+glyph J <<
+..ww
+...w
+...w
+...w
+...w
+w..w
+.ww.
+>>
+glyph K <<
+w..w
+w.w.
+ww..
+w...
+ww..
+w.w.
+w..w
+>>
+glyph L <<
+w...
+w...
+w...
+w...
+w...
+w...
+wwww
+>>
+glyph M <<
+w...w
+ww.ww
+w.w.w
+w.w.w
+w...w
+w...w
+w...w
+>>
+glyph N <<
+w..w
+ww.w
+ww.w
+w.ww
+w.ww
+w..w
+w..w
+>>
+glyph O <<
+.ww.
+w..w
+w..w
+w..w
+w..w
+w..w
+.ww.
+>>
+glyph P <<
+www.
+w..w
+w..w
+www.
+w...
+w...
+w...
+>>
+glyph Q <<
+.ww.
+w..w
+w..w
+w..w
+w.ww
+w..w
+.ww.
+>>
+glyph R <<
+www.
+w..w
+w..w
+www.
+ww..
+w.w.
+w..w
+>>
+glyph S <<
+.www
+w...
+w...
+.ww.
+...w
+...w
+www.
+>>
+glyph T <<
+wwwww
+..w..
+..w..
+..w..
+..w..
+..w..
+..w..
+>>
+glyph U <<
+w..w
+w..w
+w..w
+w..w
+w..w
+w..w
+.ww.
+>>
+glyph V <<
+w...w
+w...w
+w...w
+.w.w.
+.w.w.
+.w.w.
+..w..
+>>
+glyph W <<
+w...w
+w...w
+w...w
+w.w.w
+w.w.w
+ww.ww
+w...w
+>>
+glyph X <<
+w..w
+w..w
+.ww.
+.ww.
+.ww.
+w..w
+w..w
+>>
+glyph Y <<
+w...w
+w...w
+.w.w.
+..w..
+..w..
+..w..
+..w..
+>>
+glyph Z <<
+wwww
+...w
+..w.
+.w..
+w...
+w...
+wwww
+>>
+glyph 0 <<
+.ww.
+w..w
+w.ww
+ww.w
+w..w
+w..w
+.ww.
+>>
+glyph 1 <<
+.w.
+ww.
+.w.
+.w.
+.w.
+.w.
+www
+>>
+glyph 2 <<
+.ww.
+w..w
+...w
+..w.
+.w..
+w...
+wwww
+>>
+glyph 3 <<
+www.
+...w
+...w
+.ww.
+...w
+...w
+www.
+>>
+glyph 4 <<
+w..w
+w..w
+w..w
+wwww
+...w
+...w
+...w
+>>
+glyph 5 <<
+wwww
+w...
+w...
+www.
+...w
+...w
+www.
+>>
+glyph 6 <<
+.ww.
+w...
+w...
+www.
+w..w
+w..w
+.ww.
+>>
+glyph 7 <<
+wwww
+...w
+...w
+..w.
+..w.
+.w..
+.w..
+>>
+glyph 8 <<
+.ww.
+w..w
+w..w
+.ww.
+w..w
+w..w
+.ww.
+>>
+glyph 9 <<
+.ww.
+w..w
+w..w
+.www
+...w
+...w
+.ww.
+>>
+glyph U+0020 advance=3
+glyph U+002E <<
+.
+.
+.
+.
+.
+.
+w
+>>
+glyph U+002C <<
+.
+.
+.
+.
+.
+w
+w
+>>
+glyph U+0021 <<
+w
+w
+w
+w
+w
+.
+w
+>>
+glyph U+003F <<
+.ww.
+w..w
+...w
+..w.
+.w..
+....
+.w..
+>>
+glyph U+003A <<
+.
+.
+w
+.
+.
+w
+.
+>>
+glyph U+002D <<
+...
+...
+...
+www
+...
+...
+...
+>>
+glyph U+0027 <<
+w
+w
+.
+.
+.
+.
+.
+>>

@@ -1,0 +1,3 @@
+# shallows: the stream (cell 1,3) cut from the snapped yard's draft layer; the size comes from the manifest
+new tile shallows
+import 0,0 asset=yard region=24,72,24x24 layer=draft

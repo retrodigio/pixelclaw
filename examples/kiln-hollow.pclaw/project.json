@@ -21,7 +21,16 @@
       "object": "24x48|48x24|48x48",
       "icon": "16x16"
     },
-    "camera": "384x216"
+    "camera": "384x216",
+    "assets": {
+      "yard": {
+        "checks": {
+          "coverage": {
+            "off": true
+          }
+        }
+      }
+    }
   },
   "profiles": []
 }

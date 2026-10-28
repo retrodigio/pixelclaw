@@ -1,0 +1,3 @@
+# sage: the sage bank (cell 5,0) cut from the snapped yard's draft layer; the size comes from the manifest
+new tile sage
+import 0,0 asset=yard region=120,0,24x24 layer=draft

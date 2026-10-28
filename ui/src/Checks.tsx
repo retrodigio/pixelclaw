@@ -6,7 +6,7 @@
 
 import { useLayoutEffect, useRef, useState } from 'react';
 import {
-  renderMap, drawScaleOf, groundOf, hasRoles, quote, renderDensity, renderGame, renderRecolour, renderTile3x3, setOf, type CheckId, type CheckResult, type Doc, type Pt,
+  renderMap, setText, themedPalette, drawScaleOf, groundOf, hasRoles, quote, renderDensity, renderGame, renderRecolour, renderTile3x3, setOf, type CheckId, type CheckResult, type Doc, type Pt,
   type Rgba,
 } from '@pixelclaw/core';
 import type { Editor } from './editor.ts';
@@ -109,10 +109,32 @@ function RgbaCanvas({ img, testid }: { img: Rgba; testid: string }) {
   return <canvas ref={ref} data-testid={testid} style={{ width: img.width, height: img.height }} />;
 }
 
-type Tab = '3x3' | 'game' | 'themes' | 'map' | 'density';
+type Tab = '3x3' | 'game' | 'themes' | 'map' | 'density' | 'text';
+
+/** A font's sample: a pangram's letters it has (upper or lower case), its digits, else every glyph in rows. */
+function fontSample(doc: Doc): string {
+  const has = new Set(doc.font!.chars.map((c) => String.fromCodePoint(c)));
+  const pick = (s: string) => [...s].filter((ch) => ch === ' ' || has.has(ch)).join('').trim();
+  const lines = ['THE QUICK BROWN FOX', 'JUMPS OVER THE LAZY DOG', 'the quick brown fox', '0123456789 !?.,:'].map(pick).filter((l) => l.replace(/ /g, '').length >= 4);
+  if (lines.length) return lines.join('\n');
+  const all = doc.font!.chars.map((c) => String.fromCodePoint(c));
+  return Array.from({ length: Math.ceil(all.length / 16) }, (_, i) => all.slice(i * 16, i * 16 + 16).join('')).join('\n');
+}
+
+/** An image k times larger on a background colour (the font sample). */
+function onGround(img: Rgba, k: number, bg: [number, number, number], pad = 2): Rgba {
+  const W = (img.width + pad * 2) * k, H = (img.height + pad * 2) * k;
+  const out = { width: W, height: H, data: new Uint8Array(W * H * 4) };
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const sx = Math.floor(x / k) - pad, sy = Math.floor(y / k) - pad;
+    const o = sx >= 0 && sy >= 0 && sx < img.width && sy < img.height ? (sy * img.width + sx) * 4 : -1;
+    out.data.set(o >= 0 && img.data[o + 3]! ? [img.data[o]!, img.data[o + 1]!, img.data[o + 2]!, 255] : [...bg, 255], (y * W + x) * 4);
+  }
+  return out;
+}
 
 export function PreviewPanel({ doc, frame, store, marks }: { doc: Doc; frame: number; store: Store; marks: readonly Pt[] }) {
-  const base: Tab[] = doc.family || doc.overlay ? ['map', 'themes'] : doc.wrap ? ['3x3', 'themes'] : ['game', 'themes'];
+  const base: Tab[] = doc.font ? ['text'] : doc.family || doc.overlay ? ['map', 'themes'] : doc.wrap ? ['3x3', 'themes'] : ['game', 'themes'];
   // An asset with higher-density copies (or a copy): its densities side by side and the reduction.
   const all0 = store.assetDocs();
   const densityBase = doc.densityOf?.of ?? (all0.some((a) => a.doc.densityOf?.of === (store.current?.name ?? doc.name)) ? store.current?.name ?? doc.name : null);
@@ -124,7 +146,15 @@ export function PreviewPanel({ doc, frame, store, marks }: { doc: Doc; frame: nu
   let img: Rgba | null = null;
   let note = '';
   if (open) {
-    if (tab === 'map') {
+    if (tab === 'text') {
+      // The font set as text, at 2x on a dark and a light ground (glyphs are often white or ink).
+      const sample = fontSample(doc);
+      const t = setText(doc, sample, themedPalette(doc.palette, store.themeObj()).entries.map((e) => e.hex));
+      const k = t.width * 2 > 300 ? 1 : 2;
+      const dark = onGround(t, k, [24, 26, 32]), light = onGround(t, k, [232, 230, 222]);
+      img = { width: dark.width, height: dark.height * 2, data: new Uint8Array([...dark.data, ...light.data]) };
+      note = `line ${doc.font!.line} px, baseline row ${doc.font!.baseline}, spacing ${doc.font!.spacing}; ${doc.font!.chars.length} glyphs`;
+    } else if (tab === 'map') {
       // A family on a small random island; an overlay over the first family (or the ground tile).
       const all = store.assetDocs();
       const under = doc.overlay ? (all.find((a) => a.doc.family) ?? groundOf(name, all, store.style)) : null;

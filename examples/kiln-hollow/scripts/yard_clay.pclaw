@@ -1,0 +1,3 @@
+# yard_clay: the trodden clay (cell 0,0) cut from the snapped yard's draft layer; the size comes from the manifest
+new tile yard_clay
+import 0,0 asset=yard region=0,0,24x24 layer=draft

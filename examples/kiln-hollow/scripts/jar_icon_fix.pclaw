@@ -1,0 +1,3 @@
+# jar_icon: the rim's corners were spikes over notches (jaggies), and two light pixels a diagonal pair (orphans)
+px 4,4 11,4 c=ink
+px 4,7 c=glaze3

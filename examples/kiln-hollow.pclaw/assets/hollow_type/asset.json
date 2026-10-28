@@ -1,0 +1,42 @@
+{
+  "name": "hollow_type",
+  "kind": "font",
+  "size": [
+    80,
+    21
+  ],
+  "cell": [
+    5,
+    7
+  ],
+  "wrap": false,
+  "palette": "kiln-hollow",
+  "layers": [
+    {
+      "name": "main",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    }
+  ],
+  "frames": 1,
+  "paletteLocked": false,
+  "stamps": [],
+  "macros": [],
+  "tags": [],
+  "views": [],
+  "links": [],
+  "notes": [],
+  "tape": {
+    "lang": 2,
+    "commands": 45,
+    "groups": 1
+  },
+  "state": {
+    "sha256": "4bc74d60f3afb41f1b21b62419a598fd551de200625a79ec57fc053c10061b5a"
+  },
+  "checkpoints": {
+    "every": 200,
+    "files": []
+  }
+}

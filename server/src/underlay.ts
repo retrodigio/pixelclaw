@@ -142,6 +142,19 @@ export function fakeDraft(req: ImageRequest): Rgba {
   const pal = (req.palette?.entries ?? []).map((e) => rgbOf(e.hex));
   // The art: the layout's colour per art pixel, moved to a nearby palette colour in clusters.
   const art = new Uint8Array(cols * rows * 4);
+  // A coarse value-noise field (0..1) on a lattice, smoothly interpolated.
+  const lattice = new Map<string, number>();
+  const at = (x: number, y: number) => {
+    const k = `${x},${y}`;
+    if (!lattice.has(k)) lattice.set(k, g.nextInt(1000) / 1000);
+    return lattice.get(k)!;
+  };
+  const field = (x: number, y: number) => {
+    const x0 = Math.floor(x), y0 = Math.floor(y), tx = x - x0, ty = y - y0;
+    const sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
+    const top = at(x0, y0) * (1 - sx) + at(x0 + 1, y0) * sx, bottom = at(x0, y0 + 1) * (1 - sx) + at(x0 + 1, y0 + 1) * sx;
+    return top * (1 - sy) + bottom * sy;
+  };
   for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
     let c: [number, number, number];
     if (lay) {
@@ -151,15 +164,17 @@ export function fakeDraft(req: ImageRequest): Rgba {
     if (pal.length) {
       const dist = (k: number) => (pal[k]![0] - c[0]) ** 2 + (pal[k]![1] - c[1]) ** 2 + (pal[k]![2] - c[2]) ** 2;
       const best = pal.reduce((b, _, k) => (dist(k) < dist(b) ? k : b), 0);
-      // The texture colour: the nearest other step of the same ramp (a material keeps its colours).
+      // Texture: the neighbouring steps of the same ramp (a material keeps its colours), in
+      // patches: lighter where a coarse noise field is high, darker where it is low.
       const name = req.palette!.entries[best]!.name;
-      const mates = Object.values(req.palette!.ramps).filter((r) => r.includes(name)).flat()
-        .map((n) => req.palette!.entries.findIndex((e) => e.name === n)).filter((k) => k >= 0 && k !== best);
-      const alt = mates.length ? mates.reduce((b, k) => (dist(k) < dist(b) ? k : b)) : -1;
-      // Mostly the nearest; sometimes the texture colour, more often beside a pixel that already is.
-      const prev = i > 0 ? art.subarray((j * cols + i - 1) * 4, (j * cols + i - 1) * 4 + 3) : null;
-      const prevAlt = alt >= 0 && prev !== null && prev[0] === pal[alt]![0] && prev[1] === pal[alt]![1] && prev[2] === pal[alt]![2];
-      c = pal[alt >= 0 && (g.nextInt(100) < 18 || (prevAlt && g.nextInt(100) < 45)) ? alt : best]!;
+      const ramp = Object.values(req.palette!.ramps).find((r) => r.includes(name));
+      const step = (d: number) => {
+        const n = ramp?.[ramp.indexOf(name) + d];
+        const k = n ? req.palette!.entries.findIndex((e) => e.name === n) : -1;
+        return k >= 0 ? k : best;
+      };
+      const v = field(i / 2, j / 2) * 0.5 + (g.nextInt(1000) / 1000) * 0.5;
+      c = pal[v > 0.66 ? step(1) : v < 0.3 ? step(-1) : best]!;
     }
     art.set([c[0], c[1], c[2], 255], (j * cols + i) * 4);
   }
@@ -181,7 +196,7 @@ export function fakeDraft(req: ImageRequest): Rgba {
         if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
         s += raw[(yy * W + xx) * 3 + c]!; n++;
       }
-      out.data[(y * W + x) * 4 + c] = Math.max(0, Math.min(255, Math.round(s / n + g.nextInt(13) - 6)));
+      out.data[(y * W + x) * 4 + c] = Math.max(0, Math.min(255, Math.round(s / n + g.nextInt(7) - 3)));
     }
     out.data[(y * W + x) * 4 + 3] = 255;
   }
@@ -358,10 +373,25 @@ export async function resolveUnderlays(p: Project, text: string, o: ResolveOptio
       else throw new ProjectError(`${where}: underlay: unexpected '${t.t}'`);
     }
     const sub = pos.shift()!;
-    const allowed = sub === 'generate' ? ['layer', 'layout', 'image', 'provider', 'model', 'quality', 'cap', 'at', 'size'] : ['layer', 'at', 'size'];
+    const allowed = sub === 'generate' ? ['layer', 'layout', 'image', 'provider', 'model', 'quality', 'cap', 'at', 'size'] : ['layer', 'layout', 'at', 'size'];
     for (const k of opts.keys()) if (!allowed.includes(k)) throw new ProjectError(`${where}: underlay ${sub} has no option '${k}' (options: ${allowed.join(', ')})`);
     const layer = opts.get('layer') ?? (sub === 'generate' ? 'mockup' : 'underlay');
     const place = `${opts.has('at') ? ` at=${opts.get('at')}` : ''}${opts.has('size') ? ` size=${opts.get('size')}` : ''}`;
+    // The layout: a PNG file (a flat template) or a layer of the document.
+    let layoutImg: Rgba | null = null, layoutBlob: string | null = null;
+    const layoutRef = opts.get('layout');
+    if (layoutRef && layoutRef !== 'none') {
+      const path = isAbsolute(layoutRef) ? layoutRef : resolve(p.dir, layoutRef);
+      if (/\.png$/i.test(layoutRef) && existsSync(path)) {
+        const bytes = readFileSync(path);
+        layoutImg = decodePng(bytes);
+        layoutBlob = saveBlob(p, bytes, '.png');
+      } else {
+        layoutImg = o.doc ? layerImage(o.doc, layoutRef) : null;
+        if (!layoutImg) throw new ProjectError(`${where}: layout=${layoutRef} is neither a PNG file in the project nor a layer of the asset`);
+        layoutBlob = saveBlob(p, encodePng(layoutImg), '.png');
+      }
+    }
     if (sub === 'import') {
       const file = pos[0];
       if (!file || pos.length > 1) throw new ProjectError(`${where}: underlay import <file.png>`);
@@ -371,7 +401,7 @@ export async function resolveUnderlays(p: Project, text: string, o: ResolveOptio
       let img: Rgba;
       try { img = decodePng(bytes); } catch (e) { throw new ProjectError(`${where}: underlay import: ${basename(file)}: ${(e as Error).message}`); }
       const blob = saveBlob(p, bytes, '.png');
-      lines[li] = `underlay ${layer} blob=${blob} image=${img.width}x${img.height}${place} from=${quote(basename(file))}`;
+      lines[li] = `underlay ${layer} blob=${blob} image=${img.width}x${img.height}${place}${layoutBlob ? ` layout=${layoutBlob}` : ''} from=${quote(basename(file))}`;
       continue;
     }
     // generate
@@ -391,21 +421,6 @@ export async function resolveUnderlays(p: Project, text: string, o: ResolveOptio
     const capRaw = opts.get('cap') ?? process.env.PIXELCLAW_UNDERLAY_CAP ?? (cfg.cap !== undefined ? String(cfg.cap) : undefined);
     const cap = capRaw !== undefined ? Number(capRaw) : DEFAULT_CAP;
     if (!Number.isFinite(cap) || cap < 0) throw new ProjectError(`${where}: cap= is US dollars, like 0.25`);
-    // The layout: a PNG file (a flat template) or a layer of the document.
-    let layoutImg: Rgba | null = null, layoutBlob: string | null = null;
-    const layoutRef = opts.get('layout');
-    if (layoutRef && layoutRef !== 'none') {
-      const path = isAbsolute(layoutRef) ? layoutRef : resolve(p.dir, layoutRef);
-      if (/\.png$/i.test(layoutRef) && existsSync(path)) {
-        const bytes = readFileSync(path);
-        layoutImg = decodePng(bytes);
-        layoutBlob = saveBlob(p, bytes, '.png');
-      } else {
-        layoutImg = o.doc ? layerImage(o.doc, layoutRef) : null;
-        if (!layoutImg) throw new ProjectError(`${where}: layout=${layoutRef} is neither a PNG file in the project nor a layer of the asset`);
-        layoutBlob = saveBlob(p, encodePng(layoutImg), '.png');
-      }
-    }
     const sizeKey = `${size[0]}x${size[1]}`;
     const estimate = estimateCost(providerName, model, quality, sizeKey, prices);
     const base = { at: o.now, provider: providerName, model, quality, size: sizeKey, layout: layoutBlob, prompt, estimate, cap };
