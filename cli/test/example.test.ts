@@ -69,6 +69,6 @@ describe('examples/mossy-ruins.pclaw', () => {
   it('every check passes on every asset, with the style guide in project.json', () => {
     const r = cli(['check', PROJECT]);
     expect(r.code).toBe(0);
-    for (const a of ASSETS) expect(r.out).toMatch(new RegExp(`^${a}: all \\d checks pass$`, 'm'));
+    for (const a of ASSETS) expect(r.out).toMatch(new RegExp(`^${a}: all \\d+ checks pass$`, 'm'));
   });
 });

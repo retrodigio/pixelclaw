@@ -12,8 +12,10 @@ import { DEFAULT_MAP, composeMap, islandTerrain, layoutOf, mapSeam, schemeOf } f
 import { artGrid, cellFlag, composeMapDoc, inFootprint, mapChecks, variantMatch, type MapWorld } from './map.ts';
 import { rampsOf } from './values.ts';
 import { densityDiff, type ReducerOptions } from './density.ts';
+import { consistencyOf, isRecolour } from './consistency.ts';
+import { placements } from './map.ts';
 
-export const CHECK_IDS = ['palette', 'orphans', 'jaggies', 'banding', 'outline', 'seam', 'coverage', 'readability', 'revert', 'repetition', 'anim', 'views', 'fit', 'variant', 'footprint', 'draworder', 'density'] as const;
+export const CHECK_IDS = ['palette', 'orphans', 'jaggies', 'banding', 'outline', 'seam', 'coverage', 'readability', 'revert', 'repetition', 'anim', 'views', 'fit', 'variant', 'footprint', 'draworder', 'density', 'consistency'] as const;
 export type CheckId = (typeof CHECK_IDS)[number];
 
 export function isCheckId(s: string): s is CheckId {
@@ -84,6 +86,8 @@ export interface CheckStyle {
   assets?: Record<string, { checks?: Record<string, unknown> }>;
   /** density: the reducer (default ink-vote) and its options. */
   density?: { reducer?: string } & ReducerOptions;
+  /** consistency: the light direction (n, ne, … nw). */
+  light?: string;
 }
 
 export interface CheckContext {
@@ -105,6 +109,10 @@ export interface CheckContext {
   ref?: Doc | null;
   /** Maps and variants: the project's other assets, as a map reads them. */
   world?: MapWorld;
+  /** consistency: the rest of the asset's set (the manifest's, else its kind). */
+  peers?: { name: string; doc: Doc }[];
+  /** consistency: what the manifest expects of the asset (the drawn shape's height). */
+  expect?: { height?: number };
 }
 
 type Params = Record<string, number | boolean>;
@@ -142,6 +150,8 @@ const DEFAULTS: Record<CheckId, { all: Params } & Partial<Record<string, Params>
   // A higher-density copy reduced to its base: the share of the base's pixels that differ (a lower
   // copy is authored, so some difference is expected; the report says where).
   density: { all: { max: 0.25 } },
+  // Outlier measures against the set (each measure's limit), and the drawn height against the manifest's.
+  consistency: { all: { max: 0, maxL: 18, maxOutline: 0.3, maxAngle: 90, maxCluster: 3, maxSteps: 1.5, heightTol: 2 }, family: { off: true }, overlay: { off: true } },
 };
 
 /** A check's thresholds for a document kind: defaults, then the style guide's. */
@@ -877,7 +887,9 @@ function checkReadability(img: Img, p: Params, ctx: CheckContext): CheckResult {
   } else {
     parts.push({ name: 'edge contrast', value: null, limit: '', pass: null, detail: 'no ground tile to judge against' });
   }
-  const others = (ctx.set ?? []).filter((o) => !o.doc.wrap && o.doc.width === img.w && o.doc.height === img.h && o.doc.name !== img.doc.name);
+  // A palette-swap recolour has its source's silhouette by design: it is not compared with it.
+  const all = (ctx.set ?? []).filter((o) => !o.doc.wrap && o.doc.width === img.w && o.doc.height === img.h && o.doc.name !== img.doc.name);
+  const others = all.filter((o) => !isRecolour(o.doc, img.doc) && !isRecolour(img.doc, o.doc));
   if (others.length) {
     const mine = img.px.map((v) => (v === TRANSPARENT ? 0 : 1));
     let worst = { name: '', iou: 0 };
@@ -893,7 +905,9 @@ function checkReadability(img: Img, p: Params, ctx: CheckContext): CheckResult {
       if (iou > worst.iou || !worst.name) worst = { name: o.name, iou };
     }
     const maxIou = Number(p.maxIou);
-    parts.push({ name: 'distinct silhouette', value: worst.iou, limit: `≤ ${maxIou}`, pass: worst.iou <= maxIou, detail: `most like '${worst.name}' (IoU ${fmt(worst.iou)})` });
+    parts.push({ name: 'distinct silhouette', value: worst.iou, limit: `≤ ${maxIou}`, pass: worst.iou <= maxIou, detail: `most like '${worst.name}' (IoU ${fmt(worst.iou)})${others.length < all.length ? `; recolours not compared: ${all.filter((o) => !others.includes(o)).map((o) => o.name).join(', ')}` : ''}` });
+  } else if (all.length) {
+    parts.push({ name: 'distinct silhouette', value: null, limit: '', pass: null, detail: `only recolours to compare with (${all.map((o) => o.name).join(', ')})` });
   }
   const sorted = opaque.map((i) => Ls[img.px[i]!]!).sort((a, b) => a - b);
   const q = (f: number) => sorted[Math.min(sorted.length - 1, Math.floor(f * sorted.length))]!;
@@ -1199,16 +1213,67 @@ function checkDensity(img: Img, p: Params, ctx: CheckContext): CheckResult {
 
 const notMap = (id: CheckId) => (): CheckResult => skip(id, 'a map check (on map documents)');
 
+function checkConsistency(img: Img, p: Params, ctx: CheckContext): CheckResult {
+  const d = img.doc;
+  if (d.family || d.overlay) return skip('consistency', 'judged on its maps');
+  const peers = (ctx.peers ?? []).filter((x) => x.doc !== d && x.name !== d.name);
+  if (!peers.length && ctx.expect?.height === undefined) return skip('consistency', 'no set to compare with (plan it in the manifest)');
+  const r = consistencyOf(d, peers, {
+    ink: ctx.style?.outline ?? ['ink', 'outline', 'black'], light: ctx.style?.light, height: ctx.expect?.height,
+    maxL: Number(p.maxL), maxOutline: Number(p.maxOutline), maxAngle: Number(p.maxAngle), maxCluster: Number(p.maxCluster), maxSteps: Number(p.maxSteps), heightTol: Number(p.heightTol),
+  });
+  const bad = r.parts.filter((x) => x.pass === false);
+  const groups: FlagGroup[] = [];
+  if (r.box && bad.some((x) => x.name === 'height')) {
+    const pts: Pt[] = [];
+    for (let x = r.box.x; x < r.box.x + r.box.w; x++) pts.push([x, r.box.y], [x, r.box.y + r.box.h - 1]);
+    groups.push({ label: 'the drawn shape\'s top and bottom rows (its height is off the plan)', pts });
+  }
+  const max = Number(p.max);
+  const with_ = r.peers.length ? `against ${r.peers.length} in its set (${r.peers.slice(0, 6).join(', ')}${r.peers.length > 6 ? ', …' : ''})` : 'against the plan';
+  return result('consistency', {
+    status: bad.length <= max ? 'pass' : 'fail', score: bad.length, shown: String(bad.length), limit: `≤ ${max}`, groups,
+    parts: r.parts.map((x) => ({ ...x })),
+    detail: `${bad.length ? `outliers: ${bad.map((x) => `${x.name} ${x.detail}`).join('; ')}` : 'no outliers'} ${with_}${r.recolours.length ? `; recolours of each other, not compared: ${r.recolours.join(', ')}` : ''}`,
+  });
+}
+
 const RUNNERS: Record<CheckId, (img: Img, p: Params, ctx: CheckContext) => CheckResult> = {
   palette: checkPalette, orphans: checkOrphans, jaggies: checkJaggies, banding: checkBanding, outline: checkOutline,
   seam: checkSeam, coverage: checkCoverage, readability: checkReadability, revert: checkRevert, repetition: checkRepetition,
   anim: checkAnim, views: checkViews, fit: checkFit, variant: checkVariant, footprint: notMap('footprint'), draworder: notMap('draworder'), density: checkDensity,
+  consistency: checkConsistency,
 };
 
 /** Checks of the whole document (every frame at once); the others read one frame's image. */
-const WHOLE = new Set<CheckId>(['coverage', 'anim', 'views', 'footprint', 'draworder']);
+const WHOLE = new Set<CheckId>(['consistency', 'coverage', 'anim', 'views', 'footprint', 'draworder']);
 
 /** The checks of a map document (plan §4.11), over the map composed from the assets it names. */
+/** A map's consistency: everything standing on it on one screen (§4.11): each object against the others. */
+function mapConsistency(doc: Doc, p: Params, ctx: CheckContext): CheckResult {
+  const placed = placements(doc, ['objects']);
+  const names = [...new Set(placed.map((x) => doc.map!.entries[x.entry]!.name))];
+  const objs = names.flatMap((n) => { const d = ctx.world!.get(n); return d && !d.family && !d.wrap ? [{ name: n, doc: d }] : []; });
+  if (objs.length < 3) return skip('consistency', `fewer than three kinds of object on the map (${objs.length})`);
+  const groups: FlagGroup[] = [];
+  const lines: string[] = [];
+  for (const o of objs) {
+    const r = consistencyOf(o.doc, objs.filter((x) => x !== o), {
+      ink: ctx.style?.outline ?? ['ink', 'outline', 'black'], light: ctx.style?.light,
+      maxL: Number(p.maxL), maxOutline: Number(p.maxOutline), maxAngle: Number(p.maxAngle), maxCluster: Number(p.maxCluster), maxSteps: Number(p.maxSteps), heightTol: Number(p.heightTol),
+    });
+    const bad = r.parts.filter((x) => x.pass === false);
+    if (!bad.length) continue;
+    lines.push(`${o.name}: ${bad.map((x) => `${x.name} ${x.detail}`).join('; ')}`);
+    groups.push({ label: `${o.name} stands out (${bad.map((x) => x.name).join(', ')})`, pts: placed.filter((x) => doc.map!.entries[x.entry]!.name === o.name).map((x) => [x.x, x.y] as Pt) });
+  }
+  const max = Number(p.max);
+  return result('consistency', {
+    status: groups.length <= max ? 'pass' : 'fail', score: groups.length, shown: String(groups.length), limit: `≤ ${max}`, groups,
+    detail: lines.length ? lines.join(' | ') : `${objs.length} kinds of object on the map, none out of step with the rest`,
+  });
+}
+
 function runMapChecks(doc: Doc, ids: readonly CheckId[], ctx: CheckContext): CheckResult[] {
   if (!ctx.world) return ids.map((id) => skip(id, 'a map is checked with the project\'s assets'));
   const rep = checkParams('repetition', 'map', ctx.style, doc.name);
@@ -1218,6 +1283,7 @@ function runMapChecks(doc: Doc, ids: readonly CheckId[], ctx: CheckContext): Che
   return ids.map((id) => {
     const p = checkParams(id, 'map', ctx.style, doc.name);
     if (p.off === true) return skip(id, 'turned off in the style guide');
+    if (id === 'consistency') return mapConsistency(doc, p, ctx);
     const m = ms.find((x) => x.id === id);
     if (!m) return skip(id, 'checked on the assets the map names, not on the map');
     return result(id, {

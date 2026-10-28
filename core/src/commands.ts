@@ -44,6 +44,23 @@ export interface NormaliseContext {
   asset?(name: string): Doc | undefined;
   /** A project scheme by name (a `new family` line copies it into the tape). */
   scheme?(name: string): SchemeJson | undefined;
+  /** The style guide's and the manifest's defaults (plan §7.3): filled in and written into the line, so replay never reads them. */
+  defaults?: StyleDefaults;
+}
+
+/** An option a command was not given, filled in from a default (placed at the command for error messages). */
+export function synthOpt(key: string, value: string, cmd: ParsedCommand): Extract<Token, { t: 'kv' }> {
+  return { t: 'kv', key, value, quoted: false, vcol: cmd.col, line: cmd.line, col: cmd.col };
+}
+
+/** Defaults a project gives commands that leave an option out. */
+export interface StyleDefaults {
+  /** `new <kind> <name>` with no size, palette or scheme: the manifest's entry for the name, else the style guide's for the kind. */
+  asset?(kind: string, name: string): { size?: [number, number]; palette?: string; scheme?: string; cell?: [number, number] } | undefined;
+  /** `shade` with no light=: the style guide's light direction. */
+  light?: string;
+  /** `outline` with no c=: the style guide's outline colours (the first the palette has). */
+  outline?: string[];
 }
 
 export type Op =
@@ -247,13 +264,16 @@ const newCmd: CommandSpec = {
     const kind = kindTok.v as DocKind;
     const nameTok = a.take('word', 'a document name');
     if (!/^[a-z][a-z0-9_-]*$/.test(nameTok.v)) throw new DiagError(nameTok.line, nameTok.col, `document names use a-z, 0-9, _ and -, starting with a letter`);
-    const size = a.take('size', 'a size like 24x24');
+    const dflt = ctx.defaults?.asset?.(kind, nameTok.v);
+    const size = a.peek()?.t !== 'size' && dflt?.size
+      ? { t: 'size' as const, w: dflt.size[0], h: dflt.size[1], line: nameTok.line, col: nameTok.col }
+      : a.take('size', 'a size like 24x24 (or plan the asset in the manifest)');
     const block = a.peek()?.t === 'block' ? a.take('block', 'palette rows') : null;
     a.done();
     if (size.w < 1 || size.h < 1 || size.w > 4096 || size.h > 4096) throw new DiagError(size.line, size.col, `size must be 1..4096 on each side`);
     const lang = ctx.lang ?? LANG_VERSION;
     const palOpt = a.opts.get('palette');
-    const palName = palOpt?.value ?? ctx.defaultPalette;
+    const palName = palOpt?.value ?? dflt?.palette ?? ctx.defaultPalette;
     let palette: Palette;
     if (block) {
       // The palette written into the line (language 2): the project's palette files are not read.
@@ -274,7 +294,7 @@ const newCmd: CommandSpec = {
     const wrap = a.choice('wrap', ['on', 'off'], kind === 'tile' ? 'on' : 'off') === 'on';
     let cellW = size.w;
     let cellH = size.h;
-    const cellOpt = a.opts.get('cell');
+    const cellOpt = a.opts.get('cell') ?? (dflt?.cell && kind !== 'family' && kind !== 'map' ? synthOpt('cell', `${dflt.cell[0]}x${dflt.cell[1]}`, cmd) : undefined);
     if (cellOpt) {
       const m = /^(\d+)x(\d+)$/.exec(cellOpt.value);
       if (!m || Number(m[1]) < 1 || Number(m[2]) < 1) throw new DiagError(cellOpt.line, cellOpt.vcol, `cell= must be a size like 24x24`);
@@ -283,7 +303,7 @@ const newCmd: CommandSpec = {
     }
     const bgOpt = a.opts.get('bg');
     const bg = bgOpt ? resolveColour(bgOpt.value, palette, bgOpt.line, bgOpt.vcol) : { index: TRANSPARENT, name: 'none' };
-    const schemeOpt = a.opts.get('scheme');
+    const schemeOpt = a.opts.get('scheme') ?? (kind === 'family' && dflt?.scheme ? synthOpt('scheme', dflt.scheme, cmd) : undefined);
     const mapOpt = a.opts.get('map');
     let family: FamilyState | undefined;
     let map: MapState | undefined;

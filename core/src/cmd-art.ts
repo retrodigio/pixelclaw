@@ -3,7 +3,7 @@
 // step darker) and `clean` (remove lone pixels and tiny clusters). Each works on the author's
 // layer, inside their selection, and reads neighbours across the edges of wrap documents.
 
-import { Args, drawable, fn, registerCommand, resolveColour, type CommandSpec } from './commands.ts';
+import { Args, drawable, fn, registerCommand, resolveColour, synthOpt, type CommandSpec } from './commands.ts';
 import { TRANSPARENT, ctxOf, type Doc } from './doc.ts';
 import { targetOf } from './draw.ts';
 import { DiagError } from './parser.ts';
@@ -26,8 +26,9 @@ const outlineCmd: CommandSpec = {
     const doc = drawable(cmd, ctx);
     const a = new Args(cmd, ['c', 'mode', 'corners', 'from']);
     a.done();
-    const co = a.opts.get('c');
-    if (!co) throw new DiagError(cmd.line, cmd.col, `outline: missing c=<colour>`);
+    const ink = ctx.defaults?.outline?.find((n) => doc.palette.entries.some((e) => e.name === n));
+    const co = a.opts.get('c') ?? (ink ? synthOpt('c', ink, cmd) : undefined);
+    if (!co) throw new DiagError(cmd.line, cmd.col, `outline: missing c=<colour> (or give the style guide an outline colour)`);
     const c = resolveColour(co.value, doc.palette, co.line, co.vcol);
     const mode = a.choice('mode', ['outer', 'inner'], 'outer');
     const corners = a.choice('corners', ['on', 'off'], 'off');
@@ -65,8 +66,9 @@ const shadeCmd: CommandSpec = {
     const doc = drawable(cmd, ctx);
     const a = new Args(cmd, ['light', 'ramp', 'edge']);
     a.done();
-    if (!a.opts.has('light')) throw new DiagError(cmd.line, cmd.col, `shade: missing light=<direction> (n, ne, e, se, s, sw, w, nw)`);
-    const light = a.choice('light', Object.keys(LIGHTS), 'nw');
+    const styleLight = ctx.defaults?.light && ctx.defaults.light in LIGHTS ? ctx.defaults.light : undefined;
+    if (!a.opts.has('light') && !styleLight) throw new DiagError(cmd.line, cmd.col, `shade: missing light=<direction> (n, ne, e, se, s, sw, w, nw), or a light in the style guide`);
+    const light = a.choice('light', Object.keys(LIGHTS), styleLight ?? 'nw');
     const ro = a.opts.get('ramp');
     const ramp = ro && ro.value !== 'all' ? rampOpt(ro, doc.palette) : null;
     const eo = a.opts.get('edge');

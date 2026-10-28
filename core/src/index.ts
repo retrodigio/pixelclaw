@@ -28,3 +28,7 @@ export * from './aseprite.ts';
 export * from './density.ts';
 export { importRows } from './cmd-io.ts';
 export * from './profile.ts';
+export * from './manifest.ts';
+export { STATUS_MARKS } from './cmd-plan.ts';
+export * from './templates.ts';
+export * from './consistency.ts';

@@ -77,6 +77,12 @@ function text(img: Rgba, x: number, y: number, s: string, c: RGB, scale: number)
 
 const textWidth = (s: string, scale: number): number => s.length * 4 * scale - scale;
 
+/** A label in the renders' 3x5 letters (for templates); returns its width. */
+export function drawLabel(img: Rgba, x: number, y: number, s: string, c: [number, number, number], scale = 1): number {
+  text(img, x, y, s, c, scale);
+  return textWidth(s, scale);
+}
+
 function colourTable(doc: Doc, theme?: Theme | null): RGB[] {
   return themedPalette(doc.palette, theme).entries.map((e) => rgbOf(e.hex));
 }

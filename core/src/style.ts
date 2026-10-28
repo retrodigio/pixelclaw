@@ -30,6 +30,10 @@ export interface StyleJson {
   density?: { reducer?: string; ink?: string[]; share?: [number, number] };
   checks?: Record<string, unknown>;
   assets?: Record<string, { checks?: Record<string, unknown>; ground?: string; set?: string[] }>;
+  /** The light direction (n, ne, … nw): `shade`'s default and what `consistency` holds the art to. */
+  light?: string;
+  /** Per manifest set: check thresholds (`{ "props": { "checks": { "orphans": { "max": 2 } } } }`). */
+  sets?: Record<string, { checks?: Record<string, unknown> }>;
 }
 
 /** The check settings from the style guide; unknown palette names are reported, not fatal. */
@@ -45,7 +49,7 @@ export function checkStyleOf(json: StyleJson | undefined, palette: (name: string
     style: {
       ...(palettes.length ? { palettes } : {}), ...(s.outline ? { outline: s.outline } : {}), ...(s.sizes ? { sizes: s.sizes } : {}),
       ...(s.checks ? { checks: s.checks } : {}), ...(s.assets ? { assets: s.assets } : {}),
-      ...(s.density ? { density: s.density } : {}),
+      ...(s.density ? { density: s.density } : {}), ...(s.light ? { light: s.light } : {}),
     },
     problems,
   };
@@ -110,9 +114,11 @@ export function setOf(name: string, doc: Doc, assets: AssetDoc[], json: StyleJso
 /** Everything a check run needs for one asset of a project. */
 export function checkContextFor(
   name: string, doc: Doc, assets: AssetDoc[], json: StyleJson | undefined, palette: (n: string) => Palette | undefined,
-  o: { frame?: number; ground?: string; ref?: string; set?: string[] } = {},
+  o: { frame?: number; ground?: string; ref?: string; set?: string[]; peers?: string[]; expect?: { height?: number }; setChecks?: Record<string, unknown> } = {},
 ): { ctx: CheckContext; problems: string[] } {
   const { style, problems } = checkStyleOf(json, palette);
+  // A manifest set's thresholds sit between the style guide's and the asset's own.
+  if (o.setChecks) style.checks = mergeChecks(style.checks ?? {}, o.setChecks);
   const ground = groundOf(name, assets, json, o.ground);
   if (o.ground && !ground) problems.push(`no asset '${o.ground}' to use as ground`);
   const ref = o.ref ? assets.find((a) => a.name === o.ref) ?? null : null;
@@ -122,7 +128,31 @@ export function checkContextFor(
       frame: o.frame, style, ground: ground?.doc ?? null, ref: ref?.doc ?? null,
       set: setOf(name, doc, assets, json, o.set).map((a) => ({ name: a.name, doc: a.doc })),
       ...(doc.map || doc.variantOf || doc.densityOf ? { world: mapWorld(assets) } : {}),
+      peers: (o.peers ? assets.filter((a) => o.peers!.includes(a.name)) : peersOf(name, doc, assets)).map((a) => ({ name: a.name, doc: a.doc })),
+      ...(o.expect ? { expect: o.expect } : {}),
     },
     problems,
   };
+}
+
+function mergeChecks(base: Record<string, unknown>, over: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...base };
+  for (const [k, v] of Object.entries(over)) {
+    const b = out[k];
+    out[k] = b && typeof b === 'object' && v && typeof v === 'object' ? { ...(b as object), ...(v as object) } : v;
+  }
+  return out;
+}
+
+const figure = (d: Doc) => !d.wrap && !d.family && !d.overlay && !d.map && d.kind !== 'icon';
+
+/**
+ * The set an asset is held to by `consistency` when no manifest says: ground tiles with ground
+ * tiles, figures and props with figures and props, icons with icons; never its own density copies.
+ */
+export function peersOf(name: string, doc: Doc, assets: AssetDoc[]): AssetDoc[] {
+  const cls = (d: Doc) => (d.wrap && !d.family ? 'tile' : figure(d) ? 'figure' : d.kind === 'icon' ? 'icon' : 'other');
+  const mine = cls(doc);
+  if (mine === 'other') return [];
+  return assets.filter((a) => a.name !== name && cls(a.doc) === mine && !a.doc.densityOf && !doc.densityOf);
 }

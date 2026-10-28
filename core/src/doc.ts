@@ -216,6 +216,18 @@ export interface Doc {
   /** The asset this one is a higher-density copy of, and how many times its size (plan §4.7). */
   densityOf: { of: string; d: number } | null;
   map: MapState | null;
+  /** Named points on the tape (plan §7.2 marks); `reviewed`, `approved` and `rejected` set the asset's status (plan §7.3). */
+  marks: Mark[];
+}
+
+/** A mark: a name on the tape at a command, with what the art was then (its art hash). */
+export interface Mark {
+  name: string;
+  seq: number;
+  by: string;
+  text: string;
+  /** artHash of the document when the mark was written: a later change to the art makes it stale. */
+  art: string;
 }
 
 export function cloneFootprint(f: Footprint): Footprint {
@@ -246,7 +258,7 @@ export function createDoc(o: {
     ctx: {}, home: { layer: o.family ? 1 : 0, frame: 0 }, notes: [], stamps: {}, macros: {},
     ticks: [DEFAULT_TICKS], tags: [], views: [], pivot: null, ground: null,
     family: o.family ? cloneFamily(o.family) : null, overlay: o.overlay ? cloneOverlay(o.overlay) : null,
-    footprint: null, variantOf: null, densityOf: null, map: o.map ? cloneMap(o.map) : null,
+    footprint: null, variantOf: null, densityOf: null, map: o.map ? cloneMap(o.map) : null, marks: [],
   };
 }
 
@@ -297,7 +309,7 @@ export function cloneDoc(d: Doc): Doc {
     home: { ...d.home },
     family: d.family ? cloneFamily(d.family) : null, overlay: d.overlay ? cloneOverlay(d.overlay) : null,
     footprint: d.footprint ? cloneFootprint(d.footprint) : null, map: d.map ? cloneMap(d.map) : null,
-    notes: d.notes.map((n) => ({ ...n })),
+    notes: d.notes.map((n) => ({ ...n })), marks: d.marks.map((m) => ({ ...m })),
     stamps: Object.fromEntries(Object.entries(d.stamps).map(([k, s]) => [k, { ...s, px: s.px.slice() }])),
     macros: Object.fromEntries(Object.entries(d.macros).map(([k, m]) => [k, { params: [...m.params], body: m.body }])),
   };
@@ -435,6 +447,7 @@ export function serializeDoc(d: Doc): Uint8Array {
     ...(d.variantOf ? { variantOf: d.variantOf } : {}),
     ...(d.densityOf ? { densityOf: [d.densityOf.of, d.densityOf.d] } : {}),
     ...(d.map ? { map: { tile: d.map.tile, entries: d.map.entries.map((e) => [e.name, e.variant, e.cols, e.rows, e.anchor]) } } : {}),
+    ...(d.marks.length ? { marks: d.marks.map((m) => [m.name, m.seq, m.by, m.text, m.art]) } : {}),
   });
   const head = utf8('PCLAWDOC 2\n' + header + '\n');
   const n = d.width * d.height;
@@ -474,6 +487,7 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
     variantOf?: string;
     densityOf?: [string, number];
     map?: { tile: number; entries: [string, string | null, number, number, [number, number]][] };
+    marks?: [string, number, string, string, string][];
   };
   const h = JSON.parse(utf8Decode(bytes.subarray(magic.length, nl))) as Header;
   let o = nl + 1;
@@ -521,6 +535,7 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
     variantOf: h.variantOf ?? null,
     densityOf: h.densityOf ? { of: h.densityOf[0], d: h.densityOf[1] } : null,
     map: h.map ? { tile: h.map.tile, entries: h.map.entries.map(([name, variant, cols, rows, anchor]) => ({ name, variant, cols, rows, anchor })) } : null,
+    marks: (h.marks ?? []).map(([name, seq, by, text, art]) => ({ name, seq, by, text, art })),
   };
 }
 
@@ -545,7 +560,7 @@ function mapLayerFromJson(a: string[]): MapLayerInfo {
  */
 export function serializeDocV1(d: Doc): Uint8Array | null {
   const authors = Object.keys(d.ctx);
-  if (hasAnim(d) || d.family || d.overlay || d.footprint || d.variantOf || d.densityOf || d.map || d.paletteLocked || d.home.layer || d.home.frame || d.frameCount !== 1 || d.layers.length !== 1 || Object.keys(d.stamps).length || Object.keys(d.macros).length) return null;
+  if (hasAnim(d) || d.marks.length || d.family || d.overlay || d.footprint || d.variantOf || d.densityOf || d.map || d.paletteLocked || d.home.layer || d.home.frame || d.frameCount !== 1 || d.layers.length !== 1 || Object.keys(d.stamps).length || Object.keys(d.macros).length) return null;
   const l = d.layers[0]!;
   if (l.hidden || l.locked || l.reference) return null;
   if (authors.length > 1 || authors.some((a) => d.ctx[a]!.mirror || d.ctx[a]!.brush || d.ctx[a]!.layer || d.ctx[a]!.frame)) return null;
@@ -566,4 +581,25 @@ export function serializeDocV1(d: Doc): Uint8Array | null {
   for (let i = 0; i < n; i++) { out[o++] = cel[i]! & 255; out[o++] = cel[i]! >> 8; }
   if (sel) out.set(sel, o);
   return out;
+}
+
+/**
+ * A hash of what the document looks like: its size, frames and ticks, every frame's flat art and,
+ * for a map, what stands on it. Notes, marks, selections and hidden or reference layers leave it
+ * alone, so a mark goes stale only when the art changes. 64 bits as hex (two FNV-1a passes).
+ */
+export function artHash(d: Doc): string {
+  let a = 0x811c9dc5, b = 0x01000193 ^ 0x5bd1e995;
+  const mix = (v: number) => {
+    a = Math.imul(a ^ (v & 0xffff), 0x01000193) >>> 0;
+    b = Math.imul(b ^ ((v * 31 + 7) & 0xffff), 0x5bd1e995) >>> 0;
+    b = (b ^ (b >>> 15)) >>> 0;
+  };
+  for (const v of [d.width, d.height, d.frameCount, ...d.ticks]) mix(v);
+  for (let f = 0; f < d.frameCount; f++) for (const v of flatten(d, f)) mix(v);
+  if (d.map) {
+    for (const ch of JSON.stringify([d.map.entries, d.layers.map((l) => l.map ?? null)])) mix(ch.charCodeAt(0));
+    for (const fr of d.cels) for (const cel of fr) for (const v of cel) mix(v);
+  }
+  return a.toString(16).padStart(8, '0') + b.toString(16).padStart(8, '0');
 }

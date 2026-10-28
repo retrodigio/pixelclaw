@@ -17,6 +17,7 @@
     "outline": [
       "ink"
     ],
+    "light": "nw",
     "ground": "grass",
     "drawScale": 2,
     "sizes": {
