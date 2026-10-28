@@ -5,12 +5,12 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import {
-  LANG_VERSION, encodePng, importPalette, paletteToJson, parseTape, renderFlat, serializeDoc, tapeToJsonl,
-  type AssetState, type Doc, type Note, type Palette, type PaletteSource, type TapeEntry,
+  LANG_VERSION, deserializeDoc, encodePng, entryToJson, importPalette, paletteToJson, parseTape, renderFlat, serializeDoc, tapeToJsonl,
+  type AssetState, type Doc, type Layer, type Note, type Palette, type PaletteSource, type TapeEntry,
 } from '@pixelclaw/core';
 
 export const PROJECT_FORMAT = 'pixelclaw-project';
-/** Checkpoints will be written every this many commands (from a later step; G1 writes none). */
+/** A checkpoint (the document's state bytes) is written every this many commands. */
 export const CHECKPOINT_EVERY = 200;
 
 export interface ProjectJson {
@@ -31,8 +31,11 @@ export interface AssetJson {
   cell: [number, number];
   wrap: boolean;
   palette: string;
-  layers: { name: string }[];
+  layers: Layer[];
   frames: number;
+  paletteLocked: boolean;
+  stamps: string[];
+  macros: string[];
   tags: unknown[];
   views: unknown[];
   /** `{ "fork": { "from": <asset>, "at": <seq> } }` for a branch. */
@@ -140,11 +143,12 @@ export function assetJsonFor(doc: Doc, entries: TapeEntry[]): AssetJson {
   const fork = forkOf(entries);
   return {
     name: doc.name, kind: doc.kind, size: [doc.width, doc.height], cell: [doc.cellW, doc.cellH], wrap: doc.wrap,
-    palette: doc.palette.name, layers: doc.layers.map((l) => ({ name: l.name })), frames: doc.frameCount,
+    palette: doc.palette.name, layers: doc.layers.map((l) => ({ ...l })), frames: doc.frameCount, paletteLocked: doc.paletteLocked,
+    stamps: Object.keys(doc.stamps).sort(), macros: Object.keys(doc.macros).sort(),
     tags: [], views: [], links: fork ? [{ fork }] : [], notes: doc.notes,
     tape: { lang: LANG_VERSION, commands: entries.length, groups: new Set(entries.map((e) => e.group)).size },
     state: { sha256: sha256(serializeDoc(doc)) },
-    checkpoints: { every: CHECKPOINT_EVERY, files: [] },
+    checkpoints: { every: CHECKPOINT_EVERY, files: checkpointNames(entries.length) },
   };
 }
 
@@ -177,15 +181,90 @@ export function previewPng(doc: Doc): Uint8Array {
   return encodePng(renderFlat(doc));
 }
 
-/** Write an asset's tape, asset.json and preview.png. */
-export function saveAsset(p: Project, state: AssetState): string {
+// Checkpoints (plan §7.1): checkpoints/NNNNNN.gwc holds the document after the first N commands
+// (N a multiple of CHECKPOINT_EVERY): a header line naming N and the SHA-256 of those N tape lines,
+// then the state bytes (serializeDoc). Loading starts from the newest one whose tape prefix still
+// matches; `pixelclaw verify` replays and compares every one byte for byte.
+
+const CKPT_MAGIC = 'PCLAWCKPT 1';
+
+/** The file names of the checkpoints a tape of n commands has. */
+export function checkpointNames(n: number): string[] {
+  const out: string[] = [];
+  for (let k = CHECKPOINT_EVERY; k <= n; k += CHECKPOINT_EVERY) out.push(`${String(k).padStart(6, '0')}.gwc`);
+  return out;
+}
+
+/** SHA-256 of the first n tape lines, as they are written in tape.jsonl. */
+export function prefixHash(entries: TapeEntry[], n: number): string {
+  return sha256(Buffer.from(entries.slice(0, n).map(entryToJson).join('\n'), 'utf8'));
+}
+
+export function checkpointBytes(entries: TapeEntry[], n: number, doc: Doc | null): Uint8Array {
+  const head = Buffer.from(`${CKPT_MAGIC} ${n} ${prefixHash(entries, n)}\n`, 'utf8');
+  const body = doc ? serializeDoc(doc) : new Uint8Array(0);
+  return Buffer.concat([head, body]);
+}
+
+export interface Checkpoint {
+  file: string;
+  n: number;
+  hash: string;
+  body: Uint8Array;
+}
+
+export function readCheckpoints(p: Project, name: string): Checkpoint[] {
+  const dir = join(assetDir(p, name), 'checkpoints');
+  if (!existsSync(dir)) return [];
+  const out: Checkpoint[] = [];
+  for (const f of readdirSync(dir).filter((x) => x.endsWith('.gwc')).sort()) {
+    const b = readFileSync(join(dir, f));
+    const nl = b.indexOf(10);
+    const m = nl > 0 ? /^PCLAWCKPT 1 (\d+) ([0-9a-f]{64})$/.exec(b.subarray(0, nl).toString('utf8')) : null;
+    out.push(m ? { file: f, n: Number(m[1]), hash: m[2]!, body: b.subarray(nl + 1) } : { file: f, n: -1, hash: '', body: new Uint8Array(0) });
+  }
+  return out;
+}
+
+/** The newest checkpoint that matches the tape: the document after its first n commands. */
+export function latestCheckpoint(p: Project, name: string, entries: TapeEntry[]): { n: number; doc: Doc } | null {
+  const cps = readCheckpoints(p, name).filter((c) => c.n > 0 && c.n <= entries.length).sort((a, b) => b.n - a.n);
+  for (const c of cps) {
+    if (c.hash !== prefixHash(entries, c.n) || c.body.length === 0) continue;
+    try {
+      return { n: c.n, doc: deserializeDoc(c.body) };
+    } catch {
+      // unreadable: try an older one
+    }
+  }
+  return null;
+}
+
+/**
+ * Write an asset's tape, asset.json and preview.png, and its checkpoints: missing ones are written
+ * with `docAt(n)`. A tape only grows, except when it is started again (`fresh`): then the old
+ * checkpoints go.
+ */
+export function saveAsset(p: Project, state: AssetState, docAt?: (n: number) => Doc | null, fresh = false): string {
   const doc = state.doc;
   if (!doc) throw new ProjectError('nothing to save: the tape has no document');
   const dir = assetDir(p, doc.name);
-  mkdirSync(join(dir, 'checkpoints'), { recursive: true });
+  const cdir = join(dir, 'checkpoints');
+  mkdirSync(cdir, { recursive: true });
   writeFileSync(join(dir, 'tape.jsonl'), tapeToJsonl(state.entries));
   writeJson(join(dir, 'asset.json'), assetJsonFor(doc, state.entries));
   writeFileSync(join(dir, 'preview.png'), previewPng(doc));
+  const want = new Set(checkpointNames(state.entries.length));
+  for (const f of readdirSync(cdir)) {
+    if (f.endsWith('.gwc') && (fresh || !want.has(f))) rmSync(join(cdir, f), { force: true });
+  }
+  if (docAt) {
+    for (const f of want) {
+      if (existsSync(join(cdir, f))) continue;
+      const n = Number(f.slice(0, 6));
+      writeFileSync(join(cdir, f), checkpointBytes(state.entries, n, docAt(n)));
+    }
+  }
   return dir;
 }
 

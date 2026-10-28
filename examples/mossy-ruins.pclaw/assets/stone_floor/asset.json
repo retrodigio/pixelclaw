@@ -13,20 +13,27 @@
   "palette": "mossy-ruins",
   "layers": [
     {
-      "name": "main"
+      "name": "main",
+      "hidden": false,
+      "locked": false,
+      "reference": false
     }
   ],
   "frames": 1,
+  "paletteLocked": false,
+  "stamps": [],
+  "macros": [],
   "tags": [],
   "views": [],
   "links": [],
+  "notes": [],
   "tape": {
     "lang": 1,
     "commands": 71,
     "groups": 1
   },
   "state": {
-    "sha256": "73ff03a3627b43f84ff44f6f434266abf518e661f848e432636f1b26b82055af"
+    "sha256": "cad178f3ed2e5930f6d422cd540fb2abbb39c24309590f98c2f23150db7ac005"
   },
   "checkpoints": {
     "every": 200,

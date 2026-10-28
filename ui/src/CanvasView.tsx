@@ -149,10 +149,11 @@ export function CanvasView(p: Props) {
     const g = c.getContext('2d')!;
     g.clearRect(0, 0, W, H);
     const o = p.overlay;
-    if (doc.sel) {
-      // A selection the agent left on the document: its pixels tinted.
+    for (const c of Object.values(doc.ctx)) {
+      // Selections authors left on the document: their pixels tinted.
+      if (!c.sel) continue;
       g.fillStyle = 'rgba(108,196,255,0.22)';
-      for (let i = 0; i < doc.sel.length; i++) if (doc.sel[i]) g.fillRect((i % doc.width) * z, Math.floor(i / doc.width) * z, z, z);
+      for (let i = 0; i < c.sel.length; i++) if (c.sel[i]) g.fillRect((i % doc.width) * z, Math.floor(i / doc.width) * z, z, z);
     }
     for (const n of o.notes) {
       const on = n.id === o.activeNote;

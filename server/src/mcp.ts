@@ -3,7 +3,7 @@
 
 import { McpServer, type CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { diffPixels, diffText, type Note, type TapeEntry } from '@pixelclaw/core';
+import { ctxOf, diffPixels, diffText, type Note, type TapeEntry } from '@pixelclaw/core';
 import { ProjectError, listAssets, readPaletteFile } from './project.ts';
 import { VIEW_MODES, parseRegion, type View, type ViewMode } from './views.ts';
 import type { AssetChanges, Writer } from './writer.ts';
@@ -21,24 +21,36 @@ Draw with \`run\` (one batch = one undo group; any error applies nothing). Look 
 
 People edit in the watch view too. Their edits are commands on the same tape, written by human:<name>. Call \`changes\` at the start of each turn while someone is watching, and whenever they say they changed something: it returns their commands and notes since you last looked, with a before/after diff image. Carry on from what they did; never silently redo their pixels. Close a note you have dealt with: note done <id>.
 
-Commands (one per line, or ';' between them; '#' comments):
+Commands (one per line, or ';' between them; '#' comments). Full reference: docs/commands.md in the PixelClaw repo.
   new tile|sprite|sheet|icon <name> <W>x<H> [palette=<p>] [wrap=on|off] [cell=WxH] [bg=<colour>]
   px <x,y> [<x,y>...] c=<colour>
   line <x,y> <x,y> [<x,y>...] c=<colour> [pp=on|off]      pixel-perfect lines and polylines
-  rect <x,y> <W>x<H> c=<colour> [outline|fill]
-  ellipse <cx,cy> r=<RX>x<RY> c=<colour> [outline|fill]    or: ellipse <x,y> <W>x<H> ...
+  curve <x,y> <ctrl> [<ctrl>] <x,y> c=<colour>           quadratic or cubic Bezier, pixel-perfect
+  rect <x,y> <W>x<H> c=<colour> [outline|fill]   ellipse <cx,cy> r=<RX>x<RY> ...   polygon <x,y> <x,y> <x,y>... c= [outline|fill]
   fill <x,y> c=<colour> [mode=contiguous|global] [conn=4|8]
   paint <x,y> <<            rows of palette keys; '.' leaves a pixel, a space clears it
     ..kk..
   >>
   stroke pencil c=<colour> [pp=on|off] <x,y> <x,y>...    a freehand drag; stroke eraser <x,y>...
-  select rect <x,y> <W>x<H> | select all | deselect      the selection clips drawing
-  shift <dx,dy>             moves the selected pixels (or the whole canvas)
+  layer add <name> [above=|below=<layer>] [reference] | layer <name> (draw on it) | layer set <name> hidden=|locked=|reference=on|off | layer move|merge|rename|remove
+  frame add [<n>] [copy=<m>|empty] | frame <n> (draw on it, from 1) | frame remove|move
+  select rect|ellipse|lasso|wand|colour|layer|all|none|invert ... [add|sub|and]; deselect   your selection clips your drawing
+  clear | shift <dx,dy> [wrap] | flip h|v | rotate 90|180|270       the selection, or your whole layer
+  mirror x=11.5 [y=..] live (later strokes mirrored) | mirror off | mirror x=11.5 from=left (copy once)
+  dither <x,y> <W>x<H> a= b= [pattern=checker|bayer2|bayer4|bayer8|hlines|vlines] [level=0.25]
+  gradient <x,y> <W>x<H> ramp=<ramp> [dir=down|up|right|left|radial] [steps=n] [pattern=none|checker|bayer4..]
+  ramp <name> = <darkest> ... <lightest>   |   palette lock|unlock   |   palette save as=<new palette>
+  outline c=<colour> [mode=outer|inner] [corners=on|off] [from=<layer>]    shade light=nw [ramp=<r>|all] [edge=1]    clean orphans [size=1] [keep=texture]
+  noise [<x,y> <W>x<H>] ramp=<r> [weights=6,2,1] [cluster=1..3] [density=0.15] [base=<c>|keep] [seed=n]
+  scatter [box] stamp=<s>[,<s>]|c=<colour> count=<n> [minDist=<n>] [flip=on] [seed=n]
+  voronoi [box] cells=<n> ramp=<r> [gap=<colour>] [relax=1] [seed=n]     bricks [box] size=8x4 ramp=<r> [gap=<colour>] [seed=n]
+  stamp save <name> <x,y> <W>x<H> (or a << block >>) | stamp <name> <x,y> [flip=h|v|hv]    brush square|circle <n> | brush stamp <name> | brush off
+  def tuft(x,y) { px $x,$y $x+1,$y-1 c=moss2 }   call tuft 5,18
   palette set <entry> hex=#rrggbb | palette add [<name>] hex=#rrggbb [key=<k>]   this asset's palette
   note <x,y> [<W>x<H>] "text"   |   note done <id>
   undo [group=<g>] [by=<author>]   |   redo [group=<undo group>]
   fork <from> <to> [at=<n>]  (as the first command of a run on a new asset: a branch of <from>)
-Colours: an entry name (c=stone3), its key (c=3), its exact hex, or none. Coordinates wrap on wrap=on documents (tiles by default). @cell(cx,cy) after a command name offsets it to a cell of the cell grid.
+Colours: an entry name (c=stone3), its key (c=3), its exact hex, or none. Coordinates wrap on wrap=on documents (tiles by default). @cell(cx,cy) after a command name offsets it to a cell of the cell grid. Generators write their seed into the tape line; give seed= to choose one (another seed is another variant). Your layer, frame, selection, symmetry and brush are yours alone: people in the watch view have their own.
 
 Habits: after each meaningful batch, look once at an image (render or tile3x3), and use the grid to check exact pixels. Never judge a tile alone when it will be seen tiled.`;
 
@@ -82,7 +94,14 @@ export function projectSummary(w: Writer, url: string): string {
       const { doc, entries } = w.state(a);
       const groups = new Set(entries.map((e) => e.group)).size;
       const notes = doc?.notes.length ? `; open notes: ${doc.notes.map((n) => n.id).join(', ')}` : '';
-      lines.push(`  ${a}: ${doc ? `${doc.kind} ${doc.width}x${doc.height}${doc.wrap ? ' wrap' : ''}${doc.cellW < doc.width || doc.cellH < doc.height ? ` cell ${doc.cellW}x${doc.cellH}` : ''}, palette ${doc.palette.name}, ` : ''}${entries.length} commands in ${groups} groups${notes}`);
+      const extra = doc ? [
+        doc.layers.length > 1 ? `layers ${doc.layers.map((l) => l.name + (l.reference ? ' (ref)' : '') + (l.hidden ? ' (hidden)' : '') + (l.locked ? ' (locked)' : '')).join(', ')}` : '',
+        doc.frameCount > 1 ? `${doc.frameCount} frames` : '',
+        doc.paletteLocked ? 'palette locked' : '',
+        Object.keys(doc.stamps).length ? `stamps ${Object.keys(doc.stamps).sort().join(', ')}` : '',
+        Object.keys(doc.macros).length ? `macros ${Object.keys(doc.macros).sort().join(', ')}` : '',
+      ].filter(Boolean).map((x) => `; ${x}`).join('') : '';
+      lines.push(`  ${a}: ${doc ? `${doc.kind} ${doc.width}x${doc.height}${doc.wrap ? ' wrap' : ''}${doc.cellW < doc.width || doc.cellH < doc.height ? ` cell ${doc.cellW}x${doc.cellH}` : ''}, palette ${doc.palette.name}, ` : ''}${entries.length} commands in ${groups} groups${extra}${notes}`);
     } catch (e) {
       lines.push(`  ${a}: cannot load: ${(e as Error).message}`);
     }
@@ -170,7 +189,7 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
       out.push(r.warnings.length ? `warnings: ${r.warnings.join('; ')}` : 'warnings: none');
       const content: CallToolResult['content'] = [text(out.join('\n'))];
       if (a.view && r.doc) {
-        const v = w.view(r.asset, a.view);
+        const v = w.view(r.asset, a.view, { frame: ctxOf(r.doc, AGENT).frame });
         w.showEye(r.asset, v);
         content.push(...viewContent(v));
       }
@@ -193,12 +212,14 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
       scale: z.number().int().min(1).max(64).optional().describe('render only: pixels per pixel'),
       region: z.string().optional().describe('grid only: part of the canvas, "x,y WxH" (e.g. "8,0 12x10")'),
       since: z.number().int().min(0).optional().describe('diff only: compare with the document after this command number (default: before the latest group)'),
+      frame: z.number().int().min(1).optional().describe('render, grid, tile3x3: the frame to show (default: the frame you are drawing on)'),
     }),
   }, (a) => w.enqueue(() => {
     try {
       const region = a.region ? parseRegion(a.region) : undefined;
       if (region === null) return fail(`error: region must look like "8,0 12x10"`);
-      const v = w.view(a.asset, a.mode as ViewMode, { scale: a.scale, region, since: a.since });
+      const frame = a.frame !== undefined ? a.frame - 1 : ctxOf(w.doc(a.asset), AGENT).frame;
+      const v = w.view(a.asset, a.mode as ViewMode, { scale: a.scale, region, since: a.since, frame });
       w.showEye(a.asset, v);
       return { content: viewContent(v) };
     } catch (e) {

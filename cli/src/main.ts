@@ -2,11 +2,11 @@
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { replay, serializeDoc, type AssetState, type Doc } from '@pixelclaw/core';
+import { TapeCursor, serializeDoc, serializeDocV1, type AssetState, type Doc } from '@pixelclaw/core';
 import {
-  AssetExistsError, NoAssetError, ProjectError, VIEW_MODES, Writer, assetDir, createProject, isViewMode, listAssets,
-  loadProject, lockHolder, makeView, paletteSource, parseRegion, previewPng, readAssetJson, readPaletteFile, readTape, sha256,
-  type Project, type ViewMode,
+  AssetExistsError, NoAssetError, ProjectError, VIEW_MODES, Writer, assetDir, checkpointNames, createProject, isViewMode, listAssets,
+  loadProject, lockHolder, makeView, paletteSource, parseRegion, prefixHash, previewPng, readAssetJson, readCheckpoints, readPaletteFile,
+  readTape, sha256, type Project, type ViewMode,
 } from '@pixelclaw/server';
 
 export interface Io {
@@ -32,7 +32,7 @@ export const USAGE = `pixelclaw: a pixel art editor driven by commands
   pixelclaw run <project> (<script.pclaw> | - | -e "<commands>") [--asset <name>] [--replace] [--by <author>] [--view <mode>]
       Apply commands as one undo group. Any error applies nothing.
       A script that starts with 'new' creates the asset (--replace starts its tape again).
-  pixelclaw view <project> <asset> [render|grid|tile3x3|diff|all]... [--scale N] [--region x,y,WxH] [--out <dir>]
+  pixelclaw view <project> <asset> [render|grid|tile3x3|diff|all]... [--scale N] [--region x,y,WxH] [--frame N] [--out <dir>]
       Write views (default: <project>/views/<asset>.<mode>.png|txt). The grid is also printed.
       diff shows what the latest group changed; all is render, grid and tile3x3.
   pixelclaw verify <project> [<asset>...]
@@ -158,10 +158,13 @@ function writeViews(io: Io, proj: Project, doc: Doc, modesIn: string[], p: Parse
   if (region && !doc.wrap && (region.x + region.w > doc.width || region.y + region.h > doc.height)) {
     throw new UsageError(`--region runs past the ${doc.width}x${doc.height} canvas`);
   }
+  const frameS = one(p, 'frame');
+  const frame = frameS === undefined ? undefined : Number(frameS) - 1;
+  if (frame !== undefined && (!Number.isInteger(frame) || frame < 0 || frame >= doc.frameCount)) throw new UsageError(`--frame must be 1..${doc.frameCount}`);
   for (const m of modes as ViewMode[]) {
     const out = one(p, 'out') ?? join(proj.dir, 'views');
     // The diff needs the tape (what came before the latest group), so the writer renders it.
-    const v = m === 'diff' ? new Writer(proj).view(doc.name, 'diff', { scale }, out) : makeView(doc, m, { scale, region }, out);
+    const v = m === 'diff' ? new Writer(proj).view(doc.name, 'diff', { scale }, out) : makeView(doc, m, { scale, region, frame }, out);
     if (v.kind === 'text') {
       io.out(v.text);
       io.out(`wrote ${v.path}\n`);
@@ -195,8 +198,26 @@ function cmdVerify(io: Io, p: Parsed): number {
       failed++;
       continue;
     }
-    const a = replay(entries, paletteSource(proj));
-    const b = replay(entries, paletteSource(proj));
+    // One pass replays the tape and checks each checkpoint as its point goes by; a second checks determinism.
+    const cps = readCheckpoints(proj, name);
+    const at = new Map(cps.filter((c) => c.n > 0).map((c) => [c.n, c]));
+    const run = () => {
+      const cur = new TapeCursor(paletteSource(proj));
+      for (const e of entries) {
+        const message = cur.step(e);
+        if (message !== null) return { doc: cur.doc, problems: [{ seq: e.seq, message }] };
+        const c = at.get(cur.done.length);
+        if (c && checking) {
+          if (c.hash !== prefixHash(entries, c.n)) problems.push(`checkpoint ${c.file} was made from another tape`);
+          else if (!cur.doc || Buffer.compare(Buffer.from(serializeDoc(cur.doc)), Buffer.from(c.body)) !== 0) problems.push(`checkpoint ${c.file} differs from the replay`);
+        }
+      }
+      return { doc: cur.doc, problems: [] as { seq: number; message: string }[] };
+    };
+    let checking = true;
+    const a = run();
+    checking = false;
+    const b = run();
     for (const pr of a.problems) problems.push(`tape seq ${pr.seq}: ${pr.message}`);
     let summary = '';
     if (!a.problems.length && a.doc && b.doc) {
@@ -204,16 +225,21 @@ function cmdVerify(io: Io, p: Parsed): number {
       if (sha256(bytes) !== sha256(serializeDoc(b.doc))) problems.push('two replays differ');
       const hash = sha256(bytes);
       const aj = readAssetJson(proj, name);
-      if (aj.state.sha256 !== hash) problems.push(`replayed state ${hash.slice(0, 12)} differs from asset.json ${aj.state.sha256.slice(0, 12)}`);
+      const v1 = serializeDocV1(a.doc);
+      const legacy = aj.state.sha256 !== hash && v1 !== null && aj.state.sha256 === sha256(v1);
+      if (aj.state.sha256 !== hash && !legacy) problems.push(`replayed state ${hash.slice(0, 12)} differs from asset.json ${aj.state.sha256.slice(0, 12)}`);
       if (aj.tape.commands !== entries.length) problems.push(`asset.json counts ${aj.tape.commands} commands, the tape has ${entries.length}`);
       const pf = join(assetDir(proj, name), 'preview.png');
       if (!existsSync(pf)) problems.push('preview.png is missing');
       else if (Buffer.compare(Buffer.from(previewPng(a.doc)), readFileSync(pf)) !== 0) problems.push('preview.png differs from the replayed document');
-      const cdir = join(assetDir(proj, name), 'checkpoints');
-      const cps = existsSync(cdir) ? readdirSync(cdir).filter((f) => f.endsWith('.gwc')) : [];
-      // Checkpoints are written from a later step; when present they must match a replay prefix.
-      if (cps.length) problems.push(`${cps.length} checkpoint file(s) found, but this build cannot check them yet`);
-      summary = `${entries.length} commands, ${new Set(entries.map((e) => e.group)).size} groups, state ${hash.slice(0, 12)}, ${cps.length ? cps.length + ' checkpoints' : 'no checkpoints'}`;
+      for (const c of cps) {
+        if (c.n < 0) problems.push(`checkpoint ${c.file} is not a checkpoint file`);
+        else if (c.n > entries.length) problems.push(`checkpoint ${c.file} is past the end of the tape`);
+        else if (c.file !== `${String(c.n).padStart(6, '0')}.gwc`) problems.push(`checkpoint ${c.file} holds command ${c.n}`);
+      }
+      const missing = checkpointNames(entries.length).filter((f) => !cps.some((c) => c.file === f));
+      if (missing.length) problems.push(`checkpoint${missing.length === 1 ? '' : 's'} missing: ${missing.join(', ')}`);
+      summary = `${entries.length} commands, ${new Set(entries.map((e) => e.group)).size} groups, state ${hash.slice(0, 12)}${legacy ? ' (asset.json has the G1-G3 state hash; it is updated on the next save)' : ''}, ${cps.length ? cps.length + ' checkpoint' + (cps.length === 1 ? '' : 's') + ' checked' : 'no checkpoints'}`;
     } else if (!a.doc && !a.problems.length) problems.push('the tape has no document');
     if (problems.length) {
       failed++;
@@ -234,9 +260,9 @@ export function main(argv: string[], io: Io = nodeIo): number {
         return p.pos.length === 1 ? cmdNewProject(io, p.pos[0], p) : cmdNewAsset(io, p.pos[0], p);
       }
       case 'run':
-        return cmdRun(io, parseArgs(rest, ['asset', 'by', 'e', 'view', 'scale', 'region', 'out'], ['replace']));
+        return cmdRun(io, parseArgs(rest, ['asset', 'by', 'e', 'view', 'scale', 'region', 'out', 'frame'], ['replace']));
       case 'view':
-        return cmdView(io, parseArgs(rest, ['scale', 'region', 'out'], []));
+        return cmdView(io, parseArgs(rest, ['scale', 'region', 'out', 'frame'], []));
       case 'verify':
         return cmdVerify(io, parseArgs(rest, [], []));
       case undefined: case 'help': case '-h': case '--help':

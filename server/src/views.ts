@@ -17,6 +17,8 @@ export interface ViewOptions {
   region?: Region;
   /** diff only: compare with the document after this command (default: before the last group). */
   since?: number;
+  /** The frame to show, 0-based (default the first). */
+  frame?: number;
 }
 
 export type View =
@@ -39,6 +41,9 @@ export function parseRegion(s: string): Region | null {
 export function checkViewOptions(doc: Doc, o: ViewOptions): void {
   if (o.scale !== undefined && (!Number.isInteger(o.scale) || o.scale < 1 || o.scale > 64)) {
     throw new ProjectError('scale must be an integer 1..64');
+  }
+  if (o.frame !== undefined && (!Number.isInteger(o.frame) || o.frame < 0 || o.frame >= doc.frameCount)) {
+    throw new ProjectError(`frame ${o.frame + 1} does not exist (frames 1..${doc.frameCount})`);
   }
   const r = o.region;
   if (r) {
@@ -66,12 +71,12 @@ export function makeView(doc: Doc, mode: ViewMode, o: ViewOptions, outDir: strin
   }
   if (mode === 'grid') {
     const r = o.region;
-    const text = renderGrid(doc, r);
+    const text = renderGrid(doc, r, o.frame);
     const path = join(outDir, `${doc.name}.grid${r ? `.${r.x}-${r.y}-${r.w}x${r.h}` : ''}.txt`);
     writeFileSync(path, text);
     return { mode, kind: 'text', text, path };
   }
-  const img = mode === 'render' ? renderScaled(doc, { scale: o.scale }) : renderTile3x3(doc);
+  const img = mode === 'render' ? renderScaled(doc, { scale: o.scale, frame: o.frame }) : renderTile3x3(doc, o.frame);
   const png = encodePng(img);
   const path = join(outDir, `${doc.name}.${mode}.png`);
   writeFileSync(path, png);

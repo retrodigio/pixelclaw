@@ -5,10 +5,11 @@
 
 import { join } from 'node:path';
 import {
-  Timeline, activeGroups, parse, replay, runBatch, type AssetState, type Diag, type Doc, type Note, type TapeEntry, type Token,
+  TapeCursor, Timeline, activeGroups, paletteToJson, parse, replay, runBatch, type AssetState, type Diag, type Doc, type Note, type Palette,
+  type TapeEntry, type Token,
 } from '@pixelclaw/core';
 import {
-  ProjectError, addPalettes, assetExists, forkOf, listAssets, paletteSource, readReads, readTape, saveAsset, writeReads,
+  ProjectError, addPalettes, assetExists, forkOf, latestCheckpoint, listAssets, paletteSource, readReads, readTape, saveAsset, writeReads,
   type Project,
 } from './project.ts';
 import type { Eye, ServerMessage, Snapshot } from './protocol.ts';
@@ -89,7 +90,7 @@ export interface AssetChanges {
 export type Listener = (m: ServerMessage) => void;
 
 /** Commands that write pixels: a batch of these that changes nothing gets a warning. */
-const DRAWING_RE = /^(px|line|rect|ellipse|fill|paint|stroke|shift) /;
+const DRAWING_RE = /^(px|line|rect|ellipse|fill|paint|stroke|shift|flip|rotate|clear|curve|polygon|dither|gradient|outline|shade|clean|noise|scatter|voronoi|bricks|stamp|call)\b/;
 const words = (args: Token[]): string[] => args.flatMap((t) => (t.t === 'word' ? [t.v] : []));
 
 export interface WriterOptions {
@@ -152,18 +153,39 @@ export class Writer {
     this.emit({ type: 'palettes', palettes: [...this.project.palettes.values()], defaultPalette: this.project.json.defaultPalette });
   }
 
-  /** The asset's state, replayed from its tape on first use and kept in memory after that. */
+  /**
+   * The asset's state, replayed from its tape on first use (from its newest matching checkpoint,
+   * when there is one) and kept in memory after that.
+   */
   state(name: string): AssetState {
     const cached = this.states.get(name);
     if (cached) return cached;
     const entries = readTape(this.project, name);
-    const r = replay(entries, paletteSource(this.project));
-    if (r.problems.length) {
-      throw new ProjectError(`asset '${name}': tape seq ${r.problems[0]!.seq}: ${r.problems[0]!.message} (run 'pixelclaw verify')`);
+    const ck = latestCheckpoint(this.project, name, entries);
+    let s: AssetState;
+    if (ck) {
+      const cur = TapeCursor.resume(paletteSource(this.project), ck.doc, entries.slice(0, ck.n));
+      for (const e of entries.slice(ck.n)) {
+        const problem = cur.step(e);
+        if (problem) throw new ProjectError(`asset '${name}': tape seq ${e.seq}: ${problem} (run 'pixelclaw verify')`);
+      }
+      this.timeline(name).seed(entries, ck.n, ck.doc);
+      s = { doc: cur.doc, entries, cache: cur.cache };
+    } else {
+      const r = replay(entries, paletteSource(this.project));
+      if (r.problems.length) {
+        throw new ProjectError(`asset '${name}': tape seq ${r.problems[0]!.seq}: ${r.problems[0]!.message} (run 'pixelclaw verify')`);
+      }
+      s = { doc: r.doc, entries, cache: r.cache };
     }
-    const s = { doc: r.doc, entries };
     this.states.set(name, s);
     return s;
+  }
+
+  private timeline(name: string): Timeline {
+    let tl = this.timelines.get(name);
+    if (!tl) this.timelines.set(name, (tl = new Timeline(paletteSource(this.project))));
+    return tl;
   }
 
   doc(name: string): Doc {
@@ -174,9 +196,7 @@ export class Writer {
 
   /** The document right after command `seq` of an asset's tape (null before its first command). */
   docAt(name: string, seq: number): Doc | null {
-    let tl = this.timelines.get(name);
-    if (!tl) this.timelines.set(name, (tl = new Timeline(paletteSource(this.project))));
-    const r = tl.docAfter(this.state(name).entries, seq);
+    const r = this.timeline(name).docAfter(this.state(name).entries, seq);
     if (r.problem) throw new ProjectError(`asset '${name}': ${r.problem}`);
     return r.doc;
   }
@@ -218,7 +238,15 @@ export class Writer {
       return { ok: true, ...base, warnings: ['no commands'], ...totals(r.state), dir: null };
     }
     if (r.state.doc.name !== name) throw new ProjectError(`the commands create '${r.state.doc.name}' but the asset is '${name}'`);
-    const dir = saveAsset(this.project, r.state);
+    const saved = this.checkSaves(r.saves);
+    if (creates) this.timelines.delete(name);
+    const tl = this.timeline(name);
+    const dir = saveAsset(this.project, r.state, (n) => {
+      const at = tl.docAt(r.state.entries, n);
+      if (at.problem) throw new ProjectError(`asset '${name}': ${at.problem}`);
+      return at.doc;
+    }, creates);
+    this.writePalettes(saved);
     this.states.set(name, r.state);
     this.live = name;
     const warnings: string[] = [];
@@ -229,6 +257,27 @@ export class Writer {
       changed: r.changed, reset: creates,
     });
     return { ok: true, ...base, warnings, ...totals(r.state), dir };
+  }
+
+  /**
+   * `palette save as=<name>`: a new project palette, or one identical to it. Replacing a different
+   * palette would change how every tape made with it replays, so that is refused.
+   */
+  private checkSaves(saves: { name: string; palette: Palette }[]): Palette[] {
+    const out = new Map<string, Palette>();
+    for (const sv of saves) {
+      const pal: Palette = { ...sv.palette, name: sv.name };
+      const old = this.project.palettes.get(sv.name);
+      if (old && paletteToJson(old) !== paletteToJson(pal)) {
+        throw new ProjectError(`palette save: the project already has a different palette '${sv.name}' (tapes made with it would replay differently); save as another name`);
+      }
+      if (!old) out.set(sv.name, pal);
+    }
+    return [...out.values()];
+  }
+
+  private writePalettes(pals: Palette[]): void {
+    if (pals.length) this.addPalettes(pals);
   }
 
   /** The start of a branch: the source's tape up to the fork point, and its document there. */
