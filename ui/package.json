@@ -1,18 +1,21 @@
 {
   "name": "@pixelclaw/ui",
-  "version": "0.0.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Stub; built in G2.",
-  "exports": {
-    ".": "./src/index.ts"
-  },
+  "description": "Pixel Claw watch view: canvas, tape with live playback, Claude's eye (Vite + React + canvas 2D).",
   "dependencies": {
+    "@pixelclaw/core": "workspace:*",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
   "devDependencies": {
+    "@pixelclaw/server": "workspace:*",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0"
+  },
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc -p ."
   }
 }
