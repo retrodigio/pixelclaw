@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Pcg32, TRANSPARENT, activeCel, hashString, parse, plot, registerCommand, replay, runBatch, seedFrom, Args, resolveColour } from '../src/index.ts';
+import { Pcg32, TRANSPARENT, activeCel, drawOp, hashString, parse, plot, registerCommand, replay, runBatch, seedFrom, Args, resolveColour } from '../src/index.ts';
 import { EMPTY, palettes, run } from './helpers.ts';
 
 const base = run(EMPTY, 'new sprite s 16x16');
@@ -80,7 +80,7 @@ describe('normaliser', () => {
         const seed = a.opts.has('seed') ? Number(a.opts.get('seed')!.value) : ctx.newSeed();
         const rng = new Pcg32(seed);
         const pts: [number, number][] = Array.from({ length: n }, () => [rng.nextInt(doc.width), rng.nextInt(doc.height)]);
-        return { text: `speckle c=${c.name} n=${n} seed=${seed}`, op: { k: 'pixels', pts, c: c.index } };
+        return { text: `speckle c=${c.name} n=${n} seed=${seed}`, op: drawOp(pts, c.index) };
       },
     });
     const s1 = run(base, 'speckle c=ink n=20');

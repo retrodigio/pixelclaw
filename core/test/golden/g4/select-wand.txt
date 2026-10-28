@@ -1,0 +1,22 @@
+    0         1
+    0123456789012345
+ 0  444444440rrrrrrr
+ 1  444444440rrrrrrr
+ 2  444444440rrrrrrr
+ 3  444444440rrrrrrr
+ 4  444444440rrrrrrr
+ 5  444444440rrrrrrr
+ 6  444444440rrrrrrr
+ 7  444444440rrrrrrr
+ 8  0000000000000000
+ 9  rrrrrrrr0rrrrrrr
+10  rrrrrrrr0rrrrrrr
+11  rrrrrrrr0rrrrrrr
+12  rrrrrrrr0rrrrrrr
+13  rrrrrrrr0rrrrrrr
+14  rrrrrrrr0rrrrrrr
+15  rrrrrrrr0rrrrrrr
+
+  0  ink        #14161c  31 px
+  4  sky        #9cc7e6  64 px
+  r  rust       #a4552e  161 px

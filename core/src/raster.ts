@@ -129,6 +129,70 @@ function dedupe(path: Pt[]): Pt[] {
   return path.filter((p, i) => i === 0 || p[0] !== path[i - 1]![0] || p[1] !== path[i - 1]![1]);
 }
 
+/** floor(a / b) for integers, exact while |a| and b are below 2^53. */
+function fdiv(a: number, b: number): number {
+  let q = Math.floor(a / b);
+  if (q * b > a) q--;
+  else if ((q + 1) * b <= a) q++;
+  return q;
+}
+
+/**
+ * A quadratic (3 points) or cubic (4 points) Bezier curve from the first point to the last, the
+ * middle ones pulling it. Sampled at t = i/N in exact integer arithmetic (each sample rounded to
+ * the nearest pixel), joined by pixel-perfect segments, and with pixelPerfect, doubled L-corners
+ * dropped as on a freehand stroke.
+ */
+export function bezier(ctrl: Pt[], pixelPerfect: boolean): Pt[] {
+  const deg = ctrl.length - 1;
+  let len = 0;
+  for (let i = 1; i < ctrl.length; i++) len += Math.max(Math.abs(ctrl[i]![0] - ctrl[i - 1]![0]), Math.abs(ctrl[i]![1] - ctrl[i - 1]![1]));
+  // Enough samples for neighbouring samples to touch; capped so every product stays exact.
+  const n = Math.max(2, Math.min(deg === 3 ? 1024 : 8192, 2 * len));
+  const den = n ** deg;
+  const samples: Pt[] = [];
+  for (let i = 0; i <= n; i++) {
+    const u = n - i;
+    const w = deg === 3 ? [u * u * u, 3 * u * u * i, 3 * u * i * i, i * i * i] : [u * u, 2 * u * i, i * i];
+    let x = 0;
+    let y = 0;
+    for (let k = 0; k <= deg; k++) { x += w[k]! * ctrl[k]![0]; y += w[k]! * ctrl[k]![1]; }
+    samples.push([fdiv(2 * x + den, 2 * den), fdiv(2 * y + den, 2 * den)]);
+  }
+  return freehand(dedupe(samples), pixelPerfect);
+}
+
+/**
+ * A closed polygon through the vertices (pixel centres). The outline is the closed polyline
+ * (right angles kept); filled, it adds every pixel whose centre is inside (even-odd rule).
+ */
+export function polygonPixels(vertices: Pt[], fill: boolean, pixelPerfect: boolean): Pt[] {
+  const outline = polyline([...vertices, vertices[0]!], pixelPerfect);
+  if (!fill) return uniq(outline);
+  const out: Pt[] = [...outline];
+  const ys = vertices.map((v) => v[1]);
+  const n = vertices.length;
+  for (let y = Math.min(...ys); y <= Math.max(...ys); y++) {
+    // Crossings of the row through pixel centres, as exact fractions num/den (den > 0).
+    const xs: [number, number][] = [];
+    for (let k = 0; k < n; k++) {
+      const [x0, y0] = vertices[k]!;
+      const [x1, y1] = vertices[(k + 1) % n]!;
+      if (y0 === y1 || y < Math.min(y0, y1) || y >= Math.max(y0, y1)) continue;
+      const num = x0 * (y1 - y0) + (y - y0) * (x1 - x0);
+      const den = y1 - y0;
+      xs.push(den > 0 ? [num, den] : [-num, -den]);
+    }
+    xs.sort((a, b) => a[0] * b[1] - b[0] * a[1]);
+    for (let k = 0; k + 1 < xs.length; k += 2) {
+      const [an, ad] = xs[k]!;
+      const [bn, bd] = xs[k + 1]!;
+      for (let x = -fdiv(-an, ad); x <= fdiv(bn, bd); x++) out.push([x, y]);
+    }
+  }
+  return uniq(out);
+}
+
 export function rectPixels(x: number, y: number, w: number, h: number, fill: boolean): Pt[] {
   const out: Pt[] = [];
   for (let j = 0; j < h; j++) {

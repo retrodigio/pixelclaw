@@ -3,6 +3,7 @@
 // nothing is applied at all.
 
 import { applyOp, normaliseCommand, type NormaliseContext } from './commands.ts';
+import './registry.ts';
 import { cloneDoc, flatten, type Doc } from './doc.ts';
 import type { Palette } from './palette.ts';
 import { DiagError, parse, type Diag } from './parser.ts';
@@ -27,10 +28,16 @@ export interface PaletteSource {
 export interface AssetState {
   doc: Doc | null;
   entries: TapeEntry[];
+  /** Snapshots that make an undo replay from near the undone group instead of from the start. */
+  cache?: ReplayCache;
 }
 
 export type BatchResult =
-  | { ok: true; state: AssetState; added: TapeEntry[]; group: string | null; changed: number }
+  | {
+    ok: true; state: AssetState; added: TapeEntry[]; group: string | null; changed: number;
+    /** `palette save as=<name>` lines: the palette as it was at that line, for the writer to save. */
+    saves: { name: string; palette: Palette }[];
+  }
   | { ok: false; errors: Diag[] };
 
 interface GroupInfo {
@@ -155,10 +162,11 @@ function nextNoteId(entries: TapeEntry[]): string {
   return `n${max + 1}`;
 }
 
-function context(doc: Doc | null, entries: TapeEntry[], current: string, palettes: PaletteSource, seq: number): NormaliseContext {
+function context(doc: Doc | null, entries: TapeEntry[], current: string, palettes: PaletteSource, seq: number, by: string): NormaliseContext {
   return {
     doc,
     seq,
+    by,
     palette: (n) => palettes.get(n),
     defaultPalette: palettes.defaultName,
     newSeed: () => seedFrom(new Pcg32(seq, hashString(doc?.name ?? 'doc'))),
@@ -168,27 +176,90 @@ function context(doc: Doc | null, entries: TapeEntry[], current: string, palette
   };
 }
 
-/** The document from the drawing commands of the groups still in effect. */
-function replayEffective(entries: TapeEntry[], palettes: PaletteSource): Doc | null {
-  const active = activeGroups(entries);
-  let doc: Doc | null = null;
-  for (const e of entries) {
-    if (!active.has(e.group) || UNDO_RE.test(e.cmd)) continue;
-    const { commands, errors } = parse(e.cmd);
-    if (errors.length || commands.length !== 1) throw new Error(`tape seq ${e.seq}: '${e.cmd}' does not parse`);
-    const n = normaliseCommand(commands[0]!, context(doc, [], e.group, palettes, e.seq));
-    doc = applyOp(doc, n.op);
+/**
+ * Snapshots of the effective replay (the document from the groups still in effect), so an undo
+ * replays only from the last snapshot before the first command whose group changed state. A
+ * snapshot after n entries is reused while the same groups among those n are undone.
+ */
+export class ReplayCache {
+  private snaps: { n: number; last: TapeEntry; undone: string; doc: Doc | null }[] = [];
+  private readonly every: number;
+  constructor(every = 100) {
+    this.every = every;
   }
-  return doc;
+
+  /** The undone drawing groups among the first n entries, as a key. */
+  private static key(entries: TapeEntry[], n: number, active: Set<string>): string {
+    const out = new Set<string>();
+    for (let i = 0; i < n; i++) {
+      const e = entries[i]!;
+      if (!active.has(e.group) && !UNDO_RE.test(e.cmd)) out.add(e.group);
+    }
+    return [...out].sort().join(' ');
+  }
+
+  /**
+   * Keep the document after the first n entries (all of the tape so far) when n is a multiple of
+   * the snapshot spacing: as a tape is written, its undo snapshots come for free.
+   */
+  record(entries: TapeEntry[], doc: Doc | null): void {
+    const n = entries.length;
+    if (n === 0 || n % this.every !== 0 || this.snaps.some((s) => s.n === n && s.last === entries[n - 1])) return;
+    this.snaps = this.snaps.filter((s) => s.n !== n);
+    this.snaps.push({ n, last: entries[n - 1]!, undone: ReplayCache.key(entries, n, activeGroups(entries)), doc: doc ? cloneDoc(doc) : null });
+  }
+
+  /** How many snapshots are held (for tests). */
+  get size(): number {
+    return this.snaps.length;
+  }
+
+  /** The document from the groups still in effect. */
+  replay(entries: TapeEntry[], palettes: PaletteSource): Doc | null {
+    const active = activeGroups(entries);
+    this.snaps = this.snaps.filter((s) => s.n <= entries.length && entries[s.n - 1] === s.last);
+    let base: { n: number; doc: Doc | null } = { n: 0, doc: null };
+    for (const s of [...this.snaps].sort((a, b) => b.n - a.n)) {
+      if (ReplayCache.key(entries, s.n, active) === s.undone) {
+        base = s;
+        break;
+      }
+    }
+    let doc = base.doc ? cloneDoc(base.doc) : null;
+    for (let i = base.n; i < entries.length; i++) {
+      const e = entries[i]!;
+      if (active.has(e.group) && !UNDO_RE.test(e.cmd)) {
+        const { commands, errors } = parse(e.cmd);
+        if (errors.length || commands.length !== 1) throw new Error(`tape seq ${e.seq}: '${e.cmd}' does not parse`);
+        const n = normaliseCommand(commands[0]!, context(doc, [], e.group, palettes, e.seq, e.by));
+        doc = applyOp(doc, n.op, e.by);
+      }
+      const n = i + 1;
+      if (n % this.every === 0 && n < entries.length && !this.snaps.some((s) => s.n === n && s.last === e)) {
+        this.snaps = this.snaps.filter((s) => s.n !== n);
+        this.snaps.push({ n, last: e, undone: ReplayCache.key(entries, n, active), doc: doc ? cloneDoc(doc) : null });
+      }
+    }
+    return doc;
+  }
 }
 
+/** The document from the drawing commands of the groups still in effect (no snapshots). */
+function replayEffective(entries: TapeEntry[], palettes: PaletteSource, cache?: ReplayCache): Doc | null {
+  return (cache ?? new ReplayCache()).replay(entries, palettes);
+}
+
+/** Pixels of the flat art that differ, over every frame (a frame that is new counts whole). */
 function countChanged(before: Doc | null, after: Doc | null): number {
   if (!after) return 0;
-  const b = before && before.width === after.width && before.height === after.height ? flatten(before) : null;
-  const a = flatten(after);
-  if (!b) return a.length;
+  const same = before && before.width === after.width && before.height === after.height;
   let n = 0;
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) n++;
+  for (let f = 0; f < after.frameCount; f++) {
+    const a = flatten(after, f);
+    const b = same && f < before.frameCount ? flatten(before, f) : null;
+    if (!b) { n += a.length; continue; }
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) n++;
+  }
   return n;
 }
 
@@ -200,17 +271,22 @@ export function runBatch(state: AssetState, text: string, opts: { by: string; at
   const { commands, errors } = parse(text);
   let doc = state.doc ? cloneDoc(state.doc) : null;
   const entries = [...state.entries];
+  const cache = state.cache ?? new ReplayCache();
   const group = nextGroupId(state.entries, groupPrefix(opts.by));
   let seq = (state.entries[state.entries.length - 1]?.seq ?? 0) + 1;
   const added: TapeEntry[] = [];
+  const saves: { name: string; palette: Palette }[] = [];
   for (const cmd of commands) {
     try {
-      const n = normaliseCommand(cmd, context(doc, entries, group, opts.palettes, seq));
+      const n = normaliseCommand(cmd, context(doc, entries, group, opts.palettes, seq, opts.by));
       const entry: TapeEntry = { seq, by: opts.by, ...(opts.at ? { at: opts.at } : {}), group, cmd: n.text };
       entries.push(entry);
       added.push(entry);
       seq++;
-      doc = n.op.k === 'undo' ? replayEffective(entries, opts.palettes) : applyOp(doc, n.op);
+      doc = n.op.k === 'undo' ? replayEffective(entries, opts.palettes, cache) : applyOp(doc, n.op, opts.by);
+      cache.record(entries, doc);
+      const save = /^palette save as=(\S+)$/.exec(n.text);
+      if (save && doc) saves.push({ name: save[1]!, palette: doc.palette });
     } catch (e) {
       if (!(e instanceof DiagError)) throw e;
       errors.push({ line: e.line, col: e.col, message: e.message });
@@ -219,15 +295,18 @@ export function runBatch(state: AssetState, text: string, opts: { by: string; at
   if (errors.length) return { ok: false, errors: errors.sort((p, q) => p.line - q.line || p.col - q.col) };
   return {
     ok: true,
-    state: { doc, entries },
+    state: { doc, entries, cache },
     added,
     group: added.length ? group : null,
     changed: countChanged(state.doc, doc),
+    saves,
   };
 }
 
 export interface ReplayResult {
   doc: Doc | null;
+  /** Undo snapshots taken on the way (pass them on in the asset state). */
+  cache?: ReplayCache;
   /** Problems found: lines that no longer parse, apply or are not in normal form. */
   problems: { seq: number; message: string }[];
 }
@@ -240,6 +319,8 @@ export class TapeCursor {
   doc: Doc | null = null;
   readonly done: TapeEntry[] = [];
   private readonly palettes: PaletteSource;
+  /** Undo snapshots, kept as the cursor steps; hand them on with the state. */
+  readonly cache = new ReplayCache();
 
   constructor(palettes: PaletteSource) {
     this.palettes = palettes;
@@ -260,10 +341,11 @@ export class TapeCursor {
       return errors[0] ? `does not parse: ${errors[0].message}` : `holds ${commands.length} commands`;
     }
     try {
-      const n = normaliseCommand(commands[0]!, context(this.doc, this.done, e.group, this.palettes, e.seq));
+      const n = normaliseCommand(commands[0]!, context(this.doc, this.done, e.group, this.palettes, e.seq, e.by));
       if (n.text !== e.cmd) return `not in normal form: expected '${n.text}'`;
       this.done.push(e);
-      this.doc = n.op.k === 'undo' ? replayEffective(this.done, this.palettes) : applyOp(this.doc, n.op);
+      this.doc = n.op.k === 'undo' ? replayEffective(this.done, this.palettes, this.cache) : applyOp(this.doc, n.op, e.by);
+      this.cache.record(this.done, this.doc);
       return null;
     } catch (err) {
       if (!(err instanceof DiagError)) throw err;
@@ -311,6 +393,12 @@ export class Timeline {
     return { doc: cur.doc, problem: null };
   }
 
+  /** Keep a known state (from a checkpoint file): the document after the first n entries of `tape`. */
+  seed(tape: TapeEntry[], n: number, doc: Doc | null): void {
+    if (n < 1 || n > tape.length || this.snaps.some((s) => s.n === n)) return;
+    this.snaps.push({ n, last: tape[n - 1]!, doc: doc ? cloneDoc(doc) : null });
+  }
+
   /** The document right after the entry with this seq (or before the tape starts, for 0). */
   docAfter(tape: TapeEntry[], seq: number): { doc: Doc | null; problem: string | null } {
     let n = 0;
@@ -334,7 +422,7 @@ export function replay(entries: TapeEntry[], palettes: PaletteSource): ReplayRes
     const message = cur.step(e);
     if (message !== null) return { doc: cur.doc, problems: [{ seq: e.seq, message }] };
   }
-  return { doc: cur.doc, problems: [] };
+  return { doc: cur.doc, problems: [], cache: cur.cache };
 }
 
 export function tapeHeader(): string {

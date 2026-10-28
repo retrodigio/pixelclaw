@@ -10,3 +10,7 @@ export * from './raster.ts';
 export * from './render.ts';
 export * from './png.ts';
 export * from './pcg.ts';
+export * from './draw.ts';
+export * from './values.ts';
+export { PATTERNS, patternOn } from './cmd-shapes.ts';
+export { expandMacro } from './cmd-macros.ts';

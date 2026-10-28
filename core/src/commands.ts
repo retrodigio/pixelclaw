@@ -2,10 +2,11 @@
 // command text that goes onto the tape: defaults filled in, colours by palette name, seeds chosen
 // and written down. Normalising a normalised line gives the same line back.
 
-import { DOC_KINDS, TRANSPARENT, activeCel, createDoc, type Doc, type DocKind, type Note } from './doc.ts';
+import { DOC_KINDS, TRANSPARENT, createDoc, ctxOf, type Doc, type DocKind } from './doc.ts';
+import { drawColoured, drawPoints, mirrored, targetOf } from './draw.ts';
 import { RESERVED_KEYS, autoKeys, normaliseHex, type Palette } from './palette.ts';
 import { DiagError, quote, type BlockRow, type ParsedCommand, type Token } from './parser.ts';
-import { ellipsePixels, fill, freehand, indexOf, plot, polyline, rectPixels, shiftPixels, type Pt, type Target } from './raster.ts';
+import { ellipsePixels, fill, freehand, polyline, rectPixels, type Pt } from './raster.ts';
 
 export interface NormaliseContext {
   /** The document before this command (null before 'new'). */
@@ -22,20 +23,18 @@ export interface NormaliseContext {
   redoTarget(group: string | null, by?: string | null): { group: string } | { error: string };
   /** The id for a new note: one past the highest note id on the tape so far. */
   noteId(): string;
+  /** The author of this command: drawing uses their layer, frame, selection, symmetry and brush. */
+  by: string;
+  /** How deep in macro calls this command is (0 on the tape). */
+  depth?: number;
 }
 
 export type Op =
   | { k: 'new'; kind: DocKind; name: string; width: number; height: number; cellW: number; cellH: number; wrap: boolean; palette: Palette; bg: number }
-  | { k: 'pixels'; pts: Pt[]; c: number }
-  | { k: 'fill'; x: number; y: number; c: number; global: boolean; conn: 4 | 8 }
-  | { k: 'paint'; x: number; y: number; rows: (number | null)[][] }
-  | { k: 'select'; mask: Uint8Array | null }
-  | { k: 'shift'; dx: number; dy: number }
-  | { k: 'palette'; palette: Palette }
-  | { k: 'note'; note: Note }
-  | { k: 'unnote'; id: string }
   | { k: 'fork'; name: string }
-  | { k: 'undo'; group: string };
+  | { k: 'undo'; group: string }
+  /** Any other change, applied to the document as the command's author. */
+  | { k: 'fn'; run(doc: Doc, by: string): void };
 
 export interface Normalised {
   text: string;
@@ -133,7 +132,7 @@ export class Args {
   }
 }
 
-function tokenText(t: Token): string {
+export function tokenText(t: Token): string {
   switch (t.t) {
     case 'word': return t.v;
     case 'int': return String(t.v);
@@ -143,13 +142,28 @@ function tokenText(t: Token): string {
     case 'string': return quote(t.v);
     case 'kv': return `${t.key}=${t.quoted ? quote(t.value) : t.value}`;
     case 'block': return '<<';
+    case 'body': return '{';
   }
 }
 
-function needDoc(cmd: ParsedCommand, ctx: NormaliseContext): Doc {
+export function needDoc(cmd: ParsedCommand, ctx: NormaliseContext): Doc {
   if (!ctx.doc) throw new DiagError(cmd.line, cmd.col, `there is no document yet: start with 'new'`);
   return ctx.doc;
 }
+
+/** The document, for a command that draws on the author's layer: refused while that layer is locked. */
+export function drawable(cmd: ParsedCommand, ctx: NormaliseContext): Doc {
+  const doc = needDoc(cmd, ctx);
+  const l = doc.layers[ctxOf(doc, ctx.by).layer]!;
+  if (l.locked) throw new DiagError(cmd.line, cmd.col, `layer '${l.name}' is locked (layer set ${l.name} locked=off to draw on it)`);
+  return doc;
+}
+
+/** An operation that runs on the document as the command's author. */
+export const fn = (run: (doc: Doc, by: string) => void): Op => ({ k: 'fn', run });
+
+/** Plot a list of points in one colour as the author draws. */
+export const drawOp = (pts: Pt[], c: number, brush = true): Op => fn((d, by) => drawPoints(d, by, pts, c, { brush, mirror: true }));
 
 /** Resolve a colour: an entry name, a key, an exact #rrggbb of an entry, or 'none'. */
 export function resolveColour(value: string, palette: Palette, line: number, col: number): { index: number; name: string } {
@@ -169,13 +183,13 @@ export function resolveColour(value: string, palette: Palette, line: number, col
   return { index: i, name: palette.entries[i]!.name };
 }
 
-function colourOpt(a: Args, doc: Doc): { index: number; name: string } {
+export function colourOpt(a: Args, doc: Doc): { index: number; name: string } {
   const o = a.opts.get('c');
   if (!o) throw new DiagError(a.cmd.line, a.cmd.col, `${a.cmd.name}: missing c=<colour>`);
   return resolveColour(o.value, doc.palette, o.line, o.vcol);
 }
 
-const shiftPts = (pts: Pt[], dx: number, dy: number): Pt[] => (dx || dy ? pts.map(([x, y]) => [x + dx, y + dy]) : pts);
+export const shiftPts = (pts: Pt[], dx: number, dy: number): Pt[] => (dx || dy ? pts.map(([x, y]) => [x + dx, y + dy]) : pts);
 
 const newCmd: CommandSpec = {
   name: 'new',
@@ -219,7 +233,7 @@ const pxCmd: CommandSpec = {
   name: 'px',
   summary: 'px <x,y> [<x,y> ...] c=<colour>',
   normalise(cmd, ctx) {
-    const doc = needDoc(cmd, ctx);
+    const doc = drawable(cmd, ctx);
     const a = new Args(cmd, ['c']);
     const cell = a.cellOrigin(doc);
     const pts: Pt[] = [];
@@ -229,7 +243,7 @@ const pxCmd: CommandSpec = {
       pts.push(pt(t));
     }
     const c = colourOpt(a, doc);
-    return { text: `px${cell.text} ${pts.map(ptText).join(' ')} c=${c.name}`, op: { k: 'pixels', pts: shiftPts(pts, cell.dx, cell.dy), c: c.index } };
+    return { text: `px${cell.text} ${pts.map(ptText).join(' ')} c=${c.name}`, op: drawOp(shiftPts(pts, cell.dx, cell.dy), c.index) };
   },
 };
 
@@ -237,7 +251,7 @@ const lineCmd: CommandSpec = {
   name: 'line',
   summary: 'line <x,y> <x,y> [<x,y> ...] c=<colour> [pp=on|off]',
   normalise(cmd, ctx) {
-    const doc = needDoc(cmd, ctx);
+    const doc = drawable(cmd, ctx);
     const a = new Args(cmd, ['c', 'pp']);
     const cell = a.cellOrigin(doc);
     const pts: Pt[] = [pt(a.take('point', 'a start point x,y')), pt(a.take('point', 'an end point x,y'))];
@@ -249,7 +263,7 @@ const lineCmd: CommandSpec = {
     const pp = a.choice('pp', ['on', 'off'], 'on');
     return {
       text: `line${cell.text} ${pts.map(ptText).join(' ')} c=${c.name} pp=${pp}`,
-      op: { k: 'pixels', pts: polyline(shiftPts(pts, cell.dx, cell.dy), pp === 'on'), c: c.index },
+      op: drawOp(polyline(shiftPts(pts, cell.dx, cell.dy), pp === 'on'), c.index),
     };
   },
 };
@@ -258,7 +272,7 @@ const rectCmd: CommandSpec = {
   name: 'rect',
   summary: 'rect <x,y> <W>x<H> c=<colour> [outline|fill]',
   normalise(cmd, ctx) {
-    const doc = needDoc(cmd, ctx);
+    const doc = drawable(cmd, ctx);
     const a = new Args(cmd, ['c'], ['outline', 'fill']);
     const cell = a.cellOrigin(doc);
     const p = a.take('point', 'a corner x,y');
@@ -269,7 +283,7 @@ const rectCmd: CommandSpec = {
     const mode = a.flag(['outline', 'fill'], 'outline');
     return {
       text: `rect${cell.text} ${p.x},${p.y} ${s.w}x${s.h} c=${c.name} ${mode}`,
-      op: { k: 'pixels', pts: rectPixels(p.x + cell.dx, p.y + cell.dy, s.w, s.h, mode === 'fill'), c: c.index },
+      op: drawOp(rectPixels(p.x + cell.dx, p.y + cell.dy, s.w, s.h, mode === 'fill'), c.index, mode === 'outline'),
     };
   },
 };
@@ -278,7 +292,7 @@ const ellipseCmd: CommandSpec = {
   name: 'ellipse',
   summary: 'ellipse <cx,cy> r=<RX>x<RY>|r=<R> c=<colour> [outline|fill]   or   ellipse <x,y> <W>x<H> c=<colour> [outline|fill]',
   normalise(cmd, ctx) {
-    const doc = needDoc(cmd, ctx);
+    const doc = drawable(cmd, ctx);
     const a = new Args(cmd, ['c', 'r'], ['outline', 'fill']);
     const cell = a.cellOrigin(doc);
     const p = a.take('point', 'a centre x,y (with r=) or a corner x,y (with a size)');
@@ -303,7 +317,7 @@ const ellipseCmd: CommandSpec = {
     const c = colourOpt(a, doc);
     const mode = a.flag(['outline', 'fill'], 'outline');
     const pts = ellipsePixels(box[0] + cell.dx, box[1] + cell.dy, box[2] + cell.dx, box[3] + cell.dy, mode === 'fill');
-    return { text: `ellipse${cell.text} ${shape} c=${c.name} ${mode}`, op: { k: 'pixels', pts, c: c.index } };
+    return { text: `ellipse${cell.text} ${shape} c=${c.name} ${mode}`, op: drawOp(pts, c.index, mode === 'outline') };
   },
 };
 
@@ -311,7 +325,7 @@ const fillCmd: CommandSpec = {
   name: 'fill',
   summary: 'fill <x,y> c=<colour> [mode=contiguous|global] [conn=4|8]',
   normalise(cmd, ctx) {
-    const doc = needDoc(cmd, ctx);
+    const doc = drawable(cmd, ctx);
     const a = new Args(cmd, ['c', 'mode', 'conn']);
     const cell = a.cellOrigin(doc);
     const p = a.take('point', 'a start point x,y');
@@ -324,7 +338,10 @@ const fillCmd: CommandSpec = {
     const conn = a.choice('conn', ['4', '8'], '4');
     return {
       text: `fill${cell.text} ${p.x},${p.y} c=${c.name} mode=${mode} conn=${conn}`,
-      op: { k: 'fill', x, y, c: c.index, global: mode === 'global', conn: conn === '8' ? 8 : 4 },
+      op: fn((d, by) => {
+        // With live symmetry the fill starts again at each mirror image of the point.
+        for (const [sx, sy] of mirrored(d, by, [[x, y] as Pt])) fill(targetOf(d, by), sx, sy, c.index, mode === 'global', conn === '8' ? 8 : 4);
+      }),
     };
   },
 };
@@ -333,7 +350,7 @@ const paintCmd: CommandSpec = {
   name: 'paint',
   summary: "paint <x,y> << rows of palette keys ('.' leaves a pixel, ' ' clears it) >>",
   normalise(cmd, ctx) {
-    const doc = needDoc(cmd, ctx);
+    const doc = drawable(cmd, ctx);
     const a = new Args(cmd, []);
     const cell = a.cellOrigin(doc);
     const p = a.take('point', 'a top-left corner x,y');
@@ -349,12 +366,16 @@ const paintCmd: CommandSpec = {
         return idx;
       }),
     );
-    return { text: `paint${cell.text} ${p.x},${p.y} <<\n${blockText(block.rows.map((r) => r.text))}>>`, op: { k: 'paint', x: p.x + cell.dx, y: p.y + cell.dy, rows } };
+    const x0 = p.x + cell.dx;
+    const y0 = p.y + cell.dy;
+    const pts: [number, number, number][] = [];
+    rows.forEach((row, j) => row.forEach((c, i) => { if (c !== null) pts.push([x0 + i, y0 + j, c]); }));
+    return { text: `paint${cell.text} ${p.x},${p.y} <<\n${blockText(block.rows.map((r) => r.text))}>>`, op: fn((d, by) => drawColoured(d, by, pts, true)) };
   },
 };
 
 /** Canonical block rows: two-space indent, or '|' margins when spaces at a row's ends would be ambiguous. */
-function blockText(rows: string[]): string {
+export function blockText(rows: string[]): string {
   const margins = rows.some((r) => r.startsWith(' ') || r.endsWith(' ') || r.trim() === '>>');
   return rows.map((r) => (margins ? `  |${r}|\n` : r === '' ? '\n' : `  ${r}\n`)).join('');
 }
@@ -399,7 +420,7 @@ const strokeCmd: CommandSpec = {
   name: 'stroke',
   summary: 'stroke pencil c=<colour> [pp=on|off] <x,y> [<x,y> ...]   or   stroke eraser <x,y> [<x,y> ...]   (one drag of a tool)',
   normalise(cmd, ctx) {
-    const doc = needDoc(cmd, ctx);
+    const doc = drawable(cmd, ctx);
     const a = new Args(cmd, ['c', 'pp']);
     const cell = a.cellOrigin(doc);
     const tool = a.take('word', `a tool (${STROKE_TOOLS.join(', ')})`);
@@ -417,73 +438,43 @@ const strokeCmd: CommandSpec = {
         const o = a.opts.get(k);
         if (o) throw new DiagError(o.line, o.col, `stroke eraser takes no ${k}=`);
       }
-      return { text: `stroke${cell.text} eraser ${pts.map(ptText).join(' ')}`, op: { k: 'pixels', pts: freehand(shifted, false), c: TRANSPARENT } };
+      return { text: `stroke${cell.text} eraser ${pts.map(ptText).join(' ')}`, op: drawOp(freehand(shifted, false), TRANSPARENT) };
     }
     const c = colourOpt(a, doc);
     const pp = a.choice('pp', ['on', 'off'], 'on');
     return {
       text: `stroke${cell.text} pencil c=${c.name} pp=${pp} ${pts.map(ptText).join(' ')}`,
-      op: { k: 'pixels', pts: freehand(shifted, pp === 'on'), c: c.index },
+      op: drawOp(freehand(shifted, pp === 'on'), c.index),
     };
-  },
-};
-
-const selectCmd: CommandSpec = {
-  name: 'select',
-  summary: 'select rect <x,y> <W>x<H>   or   select all   or   select none   (the selection clips every drawing command)',
-  normalise(cmd, ctx) {
-    const doc = needDoc(cmd, ctx);
-    const a = new Args(cmd, []);
-    const cell = a.cellOrigin(doc);
-    const how = a.take('word', 'rect, all or none');
-    if (how.v === 'none' || how.v === 'all') {
-      a.done();
-      return { text: `select${cell.text} ${how.v}`, op: { k: 'select', mask: how.v === 'none' ? null : new Uint8Array(doc.width * doc.height).fill(1) } };
-    }
-    if (how.v !== 'rect') throw new DiagError(how.line, how.col, `select: '${how.v}' is not a selection (rect, all, none; more come later)`);
-    const p = a.take('point', 'a corner x,y');
-    const sz = a.take('size', 'a size WxH');
-    a.done();
-    if (sz.w < 1 || sz.h < 1) throw new DiagError(sz.line, sz.col, `select: size must be at least 1x1`);
-    const t: Target = { width: doc.width, height: doc.height, wrap: doc.wrap, pixels: activeCel(doc) };
-    const mask = new Uint8Array(doc.width * doc.height);
-    for (const [x, y] of rectPixels(p.x + cell.dx, p.y + cell.dy, sz.w, sz.h, true)) {
-      const i = indexOf(t, x, y);
-      if (i >= 0) mask[i] = 1;
-    }
-    return { text: `select${cell.text} rect ${p.x},${p.y} ${sz.w}x${sz.h}`, op: { k: 'select', mask } };
-  },
-};
-
-const deselectCmd: CommandSpec = {
-  name: 'deselect',
-  summary: 'deselect   (the same as select none)',
-  normalise(cmd, ctx) {
-    needDoc(cmd, ctx);
-    new Args(cmd, []).done();
-    return { text: 'deselect', op: { k: 'select', mask: null } };
-  },
-};
-
-const shiftCmd: CommandSpec = {
-  name: 'shift',
-  summary: 'shift <dx,dy>   (moves the selected pixels, or the whole canvas, leaving transparent pixels behind)',
-  normalise(cmd, ctx) {
-    needDoc(cmd, ctx);
-    const a = new Args(cmd, []);
-    const d = a.take('point', 'an offset dx,dy');
-    a.done();
-    return { text: `shift ${d.x},${d.y}`, op: { k: 'shift', dx: d.x, dy: d.y } };
   },
 };
 
 const paletteCmd: CommandSpec = {
   name: 'palette',
-  summary: 'palette set <entry> hex=#rrggbb   or   palette add [<name>] hex=#rrggbb [key=<k>]   (edits this document\'s palette)',
+  summary: 'palette set <entry> hex=#rrggbb | palette add [<name>] hex=#rrggbb [key=<k>] | palette lock | palette unlock | palette save as=<name>',
   normalise(cmd, ctx) {
     const doc = needDoc(cmd, ctx);
-    const a = new Args(cmd, ['hex', 'key']);
-    const how = a.take('word', 'set or add');
+    const a = new Args(cmd, ['hex', 'key', 'as']);
+    const how = a.take('word', 'set, add, lock, unlock or save');
+    if (how.v === 'lock' || how.v === 'unlock') {
+      a.done();
+      for (const o of a.opts.values()) throw new DiagError(o.line, o.col, `palette ${how.v} takes no options`);
+      const locked = how.v === 'lock';
+      return { text: `palette ${how.v}`, op: fn((d) => { d.paletteLocked = locked; }) };
+    }
+    if (how.v === 'save') {
+      a.done();
+      const as = a.opts.get('as');
+      if (!as) throw new DiagError(cmd.line, cmd.col, `palette save: missing as=<palette name> (the project palette to write)`);
+      if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(as.value)) throw new DiagError(as.line, as.vcol, `as= must be a palette name (letters, digits, _ and -)`);
+      for (const k of ['hex', 'key']) { const o = a.opts.get(k); if (o) throw new DiagError(o.line, o.col, `palette save takes no ${k}=`); }
+      // Writing the file is the writer's job (it is not document state); the line records when it happened.
+      return { text: `palette save as=${as.value}`, op: fn(() => {}) };
+    }
+    if (how.v !== 'set' && how.v !== 'add') throw new DiagError(how.line, how.col, `palette: expected set, add, lock, unlock or save`);
+    if (doc.paletteLocked) throw new DiagError(how.line, how.col, `palette '${doc.palette.name}' is locked (palette unlock to change it)`);
+    const asOpt = a.opts.get('as');
+    if (asOpt) throw new DiagError(asOpt.line, asOpt.col, `palette ${how.v} takes no as=`);
     const hexOpt = a.opts.get('hex');
     if (!hexOpt) throw new DiagError(cmd.line, cmd.col, `palette ${how.v}: missing hex=#rrggbb`);
     const hex = normaliseHex(hexOpt.value);
@@ -498,7 +489,7 @@ const paletteCmd: CommandSpec = {
       const i = pal.entries.findIndex((x) => x.name === e.v || ([...e.v].length === 1 && x.key === e.v));
       if (i < 0) throw new DiagError(e.line, e.col, `palette '${pal.name}' has no entry '${e.v}'`);
       const entries = pal.entries.map((x, j) => (j === i ? { ...x, hex } : x));
-      return { text: `palette set ${pal.entries[i]!.name} hex=${hex}`, op: { k: 'palette', palette: { ...pal, entries } } };
+      return { text: `palette set ${pal.entries[i]!.name} hex=${hex}`, op: fn((d) => { d.palette = { ...pal, entries }; }) };
     }
     if (how.v !== 'add') throw new DiagError(how.line, how.col, `palette: expected set or add`);
     if (pal.entries.length >= 256) throw new DiagError(how.line, how.col, `palette '${pal.name}' is full (256 entries)`);
@@ -526,7 +517,7 @@ const paletteCmd: CommandSpec = {
       key = autoKeys(512).find((k) => !keys.has(k) && k !== '"' && k !== ';')!;
     }
     const entries = [...pal.entries, { key, name, hex }];
-    return { text: `palette add ${name} hex=${hex} key=${key}`, op: { k: 'palette', palette: { ...pal, entries } } };
+    return { text: `palette add ${name} hex=${hex} key=${key}`, op: fn((d) => { d.palette = { ...pal, entries }; }) };
   },
 };
 
@@ -544,7 +535,7 @@ const noteCmd: CommandSpec = {
       const id = a.take('word', 'a note id like n1');
       a.done();
       if (!doc.notes.some((n) => n.id === id.v)) throw new DiagError(id.line, id.col, `no open note '${id.v}'${doc.notes.length ? ` (open: ${doc.notes.map((n) => n.id).join(', ')})` : ''}`);
-      return { text: `note done ${id.v}`, op: { k: 'unnote', id: id.v } };
+      return { text: `note done ${id.v}`, op: fn((d) => { d.notes = d.notes.filter((n) => n.id !== id.v); }) };
     }
     const p = a.take('point', 'a point x,y (or done <id>)');
     const sz = a.peek()?.t === 'size' ? a.take('size', 'a size WxH') : null;
@@ -563,7 +554,7 @@ const noteCmd: CommandSpec = {
     if (doc.notes.some((n) => n.id === id)) throw new DiagError(idOpt?.line ?? cmd.line, idOpt?.vcol ?? cmd.col, `note '${id}' is already open`);
     return {
       text: `note ${p.x},${p.y}${sz ? ` ${w}x${h}` : ''} ${quote(text)} id=${id}`,
-      op: { k: 'note', note: { id, x: p.x, y: p.y, w, h, text } },
+      op: fn((d) => { d.notes = [...d.notes, { id, x: p.x, y: p.y, w, h, text }]; }),
     };
   },
 };
@@ -589,10 +580,10 @@ const forkCmd: CommandSpec = {
   },
 };
 
-function pt(t: Extract<Token, { t: 'point' }>): Pt {
+export function pt(t: Extract<Token, { t: 'point' }>): Pt {
   return [t.x, t.y];
 }
-function ptText(p: Pt): string {
+export function ptText(p: Pt): string {
   return `${p[0]},${p[1]}`;
 }
 
@@ -601,7 +592,7 @@ export function registerCommand(spec: CommandSpec): void {
   COMMANDS.set(spec.name, spec);
 }
 for (const c of [
-  newCmd, pxCmd, lineCmd, rectCmd, ellipseCmd, fillCmd, paintCmd, strokeCmd, selectCmd, deselectCmd, shiftCmd,
+  newCmd, pxCmd, lineCmd, rectCmd, ellipseCmd, fillCmd, paintCmd, strokeCmd,
   paletteCmd, noteCmd, forkCmd, undoCmd, redoCmd,
 ]) registerCommand(c);
 
@@ -611,45 +602,12 @@ export function normaliseCommand(cmd: ParsedCommand, ctx: NormaliseContext): Nor
   return spec.normalise(cmd, ctx);
 }
 
-function target(doc: Doc): Target {
-  return { width: doc.width, height: doc.height, wrap: doc.wrap, pixels: activeCel(doc), mask: doc.sel };
-}
-
-/** Apply an operation. 'new' returns a fresh document; 'undo' is handled by the engine. */
-export function applyOp(doc: Doc | null, op: Op): Doc {
+/** Apply an operation as its author. 'new' returns a fresh document; 'undo' is handled by the engine. */
+export function applyOp(doc: Doc | null, op: Op, by = ''): Doc {
   if (op.k === 'new') return createDoc(op);
   if (!doc) throw new Error('applyOp: no document');
-  const t = target(doc);
-  switch (op.k) {
-    case 'select':
-      doc.sel = op.mask;
-      break;
-    case 'shift':
-      doc.sel = shiftPixels(t, op.dx, op.dy);
-      break;
-    case 'palette':
-      doc.palette = op.palette;
-      break;
-    case 'note':
-      doc.notes = [...doc.notes, op.note];
-      break;
-    case 'unnote':
-      doc.notes = doc.notes.filter((n) => n.id !== op.id);
-      break;
-    case 'fork':
-      doc.name = op.name;
-      break;
-    case 'pixels':
-      for (const [x, y] of op.pts) plot(t, x, y, op.c);
-      break;
-    case 'fill':
-      fill(t, op.x, op.y, op.c, op.global, op.conn);
-      break;
-    case 'paint':
-      op.rows.forEach((row, j) => row.forEach((c, i) => { if (c !== null) plot(t, op.x + i, op.y + j, c); }));
-      break;
-    case 'undo':
-      throw new Error('applyOp: undo is applied by replay');
-  }
+  if (op.k === 'fork') doc.name = op.name;
+  else if (op.k === 'fn') op.run(doc, by);
+  else throw new Error('applyOp: undo is applied by replay');
   return doc;
 }

@@ -35,7 +35,9 @@ export type Token =
   | (Pos & { t: 'cell'; cx: number; cy: number })
   | (Pos & { t: 'string'; v: string })
   | (Pos & { t: 'kv'; key: string; value: string; quoted: boolean; vcol: number })
-  | (Pos & { t: 'block'; rows: BlockRow[] });
+  | (Pos & { t: 'block'; rows: BlockRow[] })
+  /** A `{ ... }` body (a macro's commands), raw: it may span lines and hold ';'. */
+  | (Pos & { t: 'body'; text: string; bodyLine: number; bodyCol: number });
 
 export interface BlockRow {
   text: string;
@@ -123,8 +125,8 @@ export function parse(text: string): ParseResult {
   };
 
   for (let li = 0; li < lines.length; li++) {
-    const src = lines[li]!;
-    const line = li + 1;
+    let src = lines[li]!;
+    let line = li + 1;
     let i = 0;
     let lineFailed = false;
     while (i < src.length) {
@@ -135,6 +137,15 @@ export function parse(text: string): ParseResult {
       const start = i;
       let quoted: string | null = null;
       try {
+        if (ch === '{') {
+          const b = scanBody(lines, li, i);
+          cur.push({ t: 'body', text: b.text, bodyLine: line, bodyCol: i + 2, line, col: i + 1 });
+          li = b.endLine;
+          src = lines[li]!;
+          line = li + 1;
+          i = b.endCol + 1;
+          continue;
+        }
         while (i < src.length && src[i] !== ' ' && src[i] !== '\t' && src[i] !== ';') {
           if (src[i] === '"') {
             if (quoted !== null) throw new DiagError(line, i + 1, `a token may hold only one quoted string`);
@@ -172,7 +183,7 @@ export function parse(text: string): ParseResult {
         // Drop the rest of this command so one mistake gives one error.
         cur = [];
         lineFailed = true;
-        if (e.message.startsWith('block opened')) li = lines.length;
+        if (e.message.startsWith('block opened') || e.message.startsWith(`'{' opened`)) li = lines.length;
         break;
       }
     }
@@ -180,6 +191,44 @@ export function parse(text: string): ParseResult {
   }
   finish();
   return { commands, errors };
+}
+
+/**
+ * A `{` at lines[li][col] opens a body; find its matching `}` (nested braces count; quoted strings
+ * and paint blocks inside are skipped). Returns the text between the braces and where `}` is.
+ */
+function scanBody(lines: string[], li: number, col: number): { text: string; endLine: number; endCol: number } {
+  let depth = 0;
+  let text = '';
+  for (let l = li; l < lines.length; l++) {
+    const src = lines[l]!;
+    let c = l === li ? col : 0;
+    // A paint block's rows are taken whole: a key may be a brace.
+    if (l > li && /<<\s*(#.*)?$/.test(lines[l - 1]!) ) {
+      let k = l;
+      while (k < lines.length && lines[k]!.trim() !== '>>') { text += lines[k] + '\n'; k++; }
+      if (k >= lines.length) break;
+      l = k;
+      text += lines[k] + '\n';
+      continue;
+    }
+    for (; c < src.length; c++) {
+      const ch = src[c]!;
+      if (ch === '"') {
+        let j = c + 1;
+        while (j < src.length && src[j] !== '"') j += src[j] === '\\' ? 2 : 1;
+        text += src.slice(c, j + 1);
+        c = j;
+        continue;
+      }
+      if (ch === '#' && (c === 0 || src[c - 1] === ' ' || src[c - 1] === '\t')) break;
+      if (ch === '{') { depth++; if (depth === 1) continue; }
+      if (ch === '}') { depth--; if (depth === 0) return { text, endLine: l, endCol: c }; }
+      text += ch;
+    }
+    text += '\n';
+  }
+  throw new DiagError(li + 1, col + 1, `'{' opened here is never closed with '}'`);
 }
 
 /** Quote a string token for normalised output. */

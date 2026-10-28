@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
-  TRANSPARENT, activeCel, freehand, renderGrid, replay, runBatch, serializeDoc, type AssetState, type Pt,
+  TRANSPARENT, activeCel, ctxOf, serializeDocV1, freehand, renderGrid, replay, runBatch, serializeDoc, type AssetState, type Pt,
 } from '../src/index.ts';
 import { EMPTY, palettes, run } from './helpers.ts';
 
@@ -65,7 +65,7 @@ describe('select and shift', () => {
   it('a rectangle selection clips drawing until deselect', () => {
     const s = run(art, 'select rect 0,0 2x6\nrect 0,0 8x6 c=ink fill\ndeselect\npx 7,5 c=leaf');
     expect(rows(s)).toEqual(['00......', '00rr....', '00rr....', '00......', '00......', '00.....2']);
-    expect(s.doc!.sel).toBeNull();
+    expect(ctxOf(s.doc!, 'test').sel).toBeNull();
     replays(s);
   });
 
@@ -80,7 +80,7 @@ describe('select and shift', () => {
     expect(s.entries.slice(-3).map((e) => e.cmd)).toEqual(['select rect 1,1 3x2', 'shift 3,2', 'deselect']);
     expect(rows(s)).toEqual(['........', '........', '........', '....rrr.', '....rrr.', '........']);
     const kept = run(art, 'select rect 1,1 3x2 ; shift 1,0');
-    expect([...kept.doc!.sel!].map((v, i) => (v ? i : -1)).filter((i) => i >= 0)).toEqual([10, 11, 12, 18, 19, 20]);
+    expect([...ctxOf(kept.doc!, 'test').sel!].map((v, i) => (v ? i : -1)).filter((i) => i >= 0)).toEqual([10, 11, 12, 18, 19, 20]);
     replays(kept);
   });
 
@@ -93,9 +93,9 @@ describe('select and shift', () => {
 
   it('select all and select none', () => {
     const s = run(art, 'select all');
-    expect(s.doc!.sel!.every((v) => v === 1)).toBe(true);
-    expect(run(s, 'select none').doc!.sel).toBeNull();
-    expect(errorOf(art, 'select wand 1,1')).toContain("'wand' is not a selection");
+    expect(ctxOf(s.doc!, 'test').sel!.every((v) => v === 1)).toBe(true);
+    expect(ctxOf(run(s, 'select none').doc!, 'test').sel).toBeNull();
+    expect(errorOf(art, 'select blob 1,1')).toContain("'blob' is not a selection");
   });
 });
 
@@ -148,11 +148,14 @@ describe('notes', () => {
     expect(errorOf(base, 'note 1,1 ""')).toContain('the text is empty');
   });
 
-  it('notes and selections change the state bytes; documents without them keep their G1 bytes', () => {
+  it('notes and selections change the state bytes; documents without them keep their G1-G3 bytes too', () => {
     const plain = serializeDoc(base.doc!);
-    expect(new TextDecoder().decode(plain)).not.toContain('notes');
     expect(serializeDoc(run(base, 'note 1,1 "a"').doc!)).not.toEqual(plain);
-    expect(serializeDoc(run(base, 'select all').doc!).length).toBe(plain.length + 48 + ',"sel":true'.length);
+    expect(serializeDoc(run(base, 'select all').doc!).length).toBe(plain.length + 48 + '["test",0,0,true,null,null]'.length);
+    const v1 = new TextDecoder().decode(serializeDocV1(base.doc!)!);
+    expect(v1).toContain('PCLAWDOC 1');
+    expect(v1).not.toContain('notes');
+    expect(serializeDocV1(run(base, 'layer add top').doc!)).toBeNull();
   });
 });
 

@@ -1,0 +1,192 @@
+// Helpers that apply house rules exactly (plan §3.4): `outline` (a 1-px outline around the shapes
+// on your layer), `shade` (light the lit side of each shape a ramp step lighter and the far side a
+// step darker) and `clean` (remove lone pixels and tiny clusters). Each works on the author's
+// layer, inside their selection, and reads neighbours across the edges of wrap documents.
+
+import { Args, drawable, fn, registerCommand, resolveColour, type CommandSpec } from './commands.ts';
+import { TRANSPARENT, ctxOf, type Doc } from './doc.ts';
+import { targetOf } from './draw.ts';
+import { DiagError } from './parser.ts';
+import { indexOf, type Target } from './raster.ts';
+import { intOpt, rampOpt, rampsOf } from './values.ts';
+
+const N4: [number, number][] = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+const N8: [number, number][] = [...N4, [1, -1], [1, 1], [-1, 1], [-1, -1]];
+
+/** A neighbour's value: off the canvas (not wrapping) counts as transparent. */
+function at(t: Target, src: Uint16Array, x: number, y: number): number {
+  const i = indexOf(t, x, y);
+  return i < 0 ? TRANSPARENT : src[i]!;
+}
+
+const outlineCmd: CommandSpec = {
+  name: 'outline',
+  summary: 'outline c=<colour> [mode=outer|inner] [corners=on|off] [from=<layer>]   (around the shapes on your layer, or on another layer)',
+  normalise(cmd, ctx) {
+    const doc = drawable(cmd, ctx);
+    const a = new Args(cmd, ['c', 'mode', 'corners', 'from']);
+    a.done();
+    const co = a.opts.get('c');
+    if (!co) throw new DiagError(cmd.line, cmd.col, `outline: missing c=<colour>`);
+    const c = resolveColour(co.value, doc.palette, co.line, co.vcol);
+    const mode = a.choice('mode', ['outer', 'inner'], 'outer');
+    const corners = a.choice('corners', ['on', 'off'], 'off');
+    const fo = a.opts.get('from');
+    const from = fo ? doc.layers.findIndex((l) => l.name === fo.value) : -1;
+    if (fo && from < 0) throw new DiagError(fo.line, fo.vcol, `no layer '${fo.value}'`);
+    if (fo && mode === 'inner') throw new DiagError(fo.line, fo.col, `outline: from= goes with mode=outer (an inner outline is drawn on the shape itself)`);
+    const nb = corners === 'on' ? N8 : N4;
+    return {
+      text: `outline c=${c.name} mode=${mode} corners=${corners}${fo ? ` from=${fo.value}` : ''}`,
+      op: fn((d, by) => {
+        const t = targetOf(d, by);
+        const src = from >= 0 ? d.cels[from]![ctxOf(d, by).frame]! : t.pixels.slice();
+        const own = t.pixels.slice();
+        for (let i = 0; i < src.length; i++) {
+          if (t.mask && !t.mask[i]) continue;
+          const x = i % d.width;
+          const y = (i - x) / d.width;
+          const solid = src[i] !== TRANSPARENT;
+          if (mode === 'outer' ? solid || own[i] !== TRANSPARENT : !solid) continue;
+          const hit = nb.some(([dx, dy]) => (at(t, src, x + dx, y + dy) !== TRANSPARENT) === (mode === 'outer'));
+          if (hit) t.pixels[i] = c.index;
+        }
+      }),
+    };
+  },
+};
+
+const LIGHTS: Record<string, [number, number]> = { n: [0, -1], ne: [1, -1], e: [1, 0], se: [1, 1], s: [0, 1], sw: [-1, 1], w: [-1, 0], nw: [-1, -1] };
+
+const shadeCmd: CommandSpec = {
+  name: 'shade',
+  summary: 'shade light=n|ne|e|se|s|sw|w|nw [ramp=<ramp>|all] [edge=<n>]   (each shape\'s lit edge a ramp step lighter, its far edge a step darker)',
+  normalise(cmd, ctx) {
+    const doc = drawable(cmd, ctx);
+    const a = new Args(cmd, ['light', 'ramp', 'edge']);
+    a.done();
+    if (!a.opts.has('light')) throw new DiagError(cmd.line, cmd.col, `shade: missing light=<direction> (n, ne, e, se, s, sw, w, nw)`);
+    const light = a.choice('light', Object.keys(LIGHTS), 'nw');
+    const ro = a.opts.get('ramp');
+    const ramp = ro && ro.value !== 'all' ? rampOpt(ro, doc.palette) : null;
+    const eo = a.opts.get('edge');
+    const edge = eo ? intOpt(eo, 1, 8) : 1;
+    const [lx, ly] = LIGHTS[light]!;
+    return {
+      text: `shade light=${light} ramp=${ramp ? ramp.text : 'all'} edge=${edge}`,
+      op: fn((d, by) => {
+        const t = targetOf(d, by);
+        const src = t.pixels.slice();
+        // The ramp each colour shades along (the given one, or the first ramp it is in).
+        const rampFor = new Map<number, { ramp: number[]; at: number }>();
+        const look = (v: number) => {
+          if (!rampFor.has(v)) {
+            const r = ramp ? (ramp.idx.includes(v) ? { ramp: ramp.idx, at: ramp.idx.indexOf(v) } : null) : rampsOf(d.palette, v)[0] ?? null;
+            rampFor.set(v, r!);
+          }
+          return rampFor.get(v);
+        };
+        for (let i = 0; i < src.length; i++) {
+          const v = src[i]!;
+          if (v === TRANSPARENT || (t.mask && !t.mask[i])) continue;
+          const r = look(v);
+          if (!r) continue;
+          const x = i % d.width;
+          const y = (i - x) / d.width;
+          // The shape is the run of pixels of the same ramp; anything else is its boundary.
+          const outside = (sx: number, sy: number) => {
+            for (let k = 1; k <= edge; k++) {
+              const u = at(t, src, x + sx * k, y + sy * k);
+              if (u === TRANSPARENT || !r.ramp.includes(u)) return true;
+            }
+            return false;
+          };
+          const toward = (dx: number, dy: number) => (dx !== 0 && outside(dx, 0)) || (dy !== 0 && outside(0, dy));
+          const lit = toward(lx, ly);
+          const dark = toward(-lx, -ly);
+          if (lit === dark) continue;
+          const to = r.at + (lit ? 1 : -1);
+          if (to >= 0 && to < r.ramp.length) t.pixels[i] = r.ramp[to]!;
+        }
+      }),
+    };
+  },
+};
+
+const cleanCmd: CommandSpec = {
+  name: 'clean',
+  summary: 'clean orphans [size=<n>] [keep=none|texture]   (pixels or clusters of up to n that share no 4-neighbour\'s colour take the colour around them)',
+  normalise(cmd, ctx) {
+    const doc = drawable(cmd, ctx);
+    const a = new Args(cmd, ['size', 'keep']);
+    const what = a.take('word', 'orphans');
+    if (what.v !== 'orphans') throw new DiagError(what.line, what.col, `clean: expected orphans`);
+    a.done();
+    const so = a.opts.get('size');
+    const size = so ? intOpt(so, 1, 64) : 1;
+    const keep = a.choice('keep', ['none', 'texture'], 'none');
+    return {
+      text: `clean orphans size=${size} keep=${keep}`,
+      op: fn((d, by) => cleanOrphans(d, targetOf(d, by), size, keep === 'texture')),
+    };
+  },
+};
+
+/**
+ * Replace every 4-connected cluster of one colour (transparent counts as a colour) of at most
+ * `size` pixels with the colour most common around it (ties: the lowest palette index). With
+ * keepTexture, a cluster one ramp step from that colour stays: it is texture, not a stray.
+ */
+function cleanOrphans(d: Doc, t: Target, size: number, keepTexture: boolean): void {
+  const src = t.pixels.slice();
+  const seen = new Uint8Array(src.length);
+  for (let s = 0; s < src.length; s++) {
+    if (seen[s]) continue;
+    const v = src[s]!;
+    const comp = [s];
+    seen[s] = 1;
+    for (let k = 0; k < comp.length && comp.length <= size; k++) {
+      const i = comp[k]!;
+      const x = i % d.width;
+      const y = (i - x) / d.width;
+      for (const [dx, dy] of N4) {
+        const j = indexOf(t, x + dx, y + dy);
+        if (j >= 0 && !seen[j] && src[j] === v) { seen[j] = 1; comp.push(j); }
+      }
+    }
+    if (comp.length > size) {
+      // Too big: mark the rest of it seen so it is not looked at again piece by piece.
+      for (let k = 0; k < comp.length; k++) {
+        const i = comp[k]!;
+        const x = i % d.width;
+        const y = (i - x) / d.width;
+        for (const [dx, dy] of N4) {
+          const j = indexOf(t, x + dx, y + dy);
+          if (j >= 0 && !seen[j] && src[j] === v) { seen[j] = 1; comp.push(j); }
+        }
+      }
+      continue;
+    }
+    const inComp = new Set(comp);
+    const count = new Map<number, number>();
+    for (const i of comp) {
+      const x = i % d.width;
+      const y = (i - x) / d.width;
+      for (const [dx, dy] of N4) {
+        const j = indexOf(t, x + dx, y + dy);
+        if (j < 0 || inComp.has(j)) continue;
+        count.set(src[j]!, (count.get(src[j]!) ?? 0) + 1);
+      }
+    }
+    let best = -1;
+    let bestN = 0;
+    for (const [c, n] of [...count.entries()].sort((p, q) => p[0] - q[0])) if (n > bestN) { best = c; bestN = n; }
+    if (best < 0 || best === v) continue;
+    if (keepTexture && v !== TRANSPARENT && best !== TRANSPARENT && rampsOf(d.palette, v).some((r) => Math.abs(r.ramp.indexOf(best) - r.at) === 1 && r.ramp.includes(best))) continue;
+    for (const i of comp) if (!t.mask || t.mask[i]) t.pixels[i] = best;
+  }
+}
+
+registerCommand(outlineCmd);
+registerCommand(shadeCmd);
+registerCommand(cleanCmd);

@@ -1,0 +1,11 @@
+// Every command beyond the G1-G3 set registers itself when its module loads; importing this makes
+// sure they are all in COMMANDS before anything is normalised.
+
+import './cmd-layers.ts';
+import './cmd-select.ts';
+import './cmd-transform.ts';
+import './cmd-shapes.ts';
+import './cmd-art.ts';
+import './cmd-gen.ts';
+import './cmd-stamps.ts';
+import './cmd-macros.ts';

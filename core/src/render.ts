@@ -1,7 +1,7 @@
 // Renders of a document: the flat image at 1x, the scaled view with pixel grid and rulers, the
 // text index grid, and the tile 3x3 preview. All RGBA images go through encodePng.
 
-import { TRANSPARENT, flatten, type Doc } from './doc.ts';
+import { TRANSPARENT, flatten, flattenReference, type Doc } from './doc.ts';
 import { rgbOf } from './palette.ts';
 import { createRgba, type Rgba } from './png.ts';
 import { indexOf } from './raster.ts';
@@ -85,6 +85,13 @@ export interface ScaledOptions {
   scale?: number;
   grid?: boolean;
   rulers?: boolean;
+  /** The frame to show (0-based; default the first). */
+  frame?: number;
+}
+
+/** A reference pixel shown under transparent art: its colour half-way to the checkerboard's. */
+function faded(c: RGB, under: RGB): RGB {
+  return [(c[0] + under[0]) >> 1, (c[1] + under[1]) >> 1, (c[2] + under[2]) >> 1];
 }
 
 /**
@@ -104,13 +111,20 @@ export function renderScaled(doc: Doc, o: ScaledOptions = {}): Rgba {
   const H = doc.height * s;
   const img = createRgba(left + W + 1, top + H + 1);
   rect(img, 0, 0, img.width, img.height, RULER_BG);
-  const px = flatten(doc);
+  const px = flatten(doc, o.frame ?? 0);
+  const ref = flattenReference(doc, o.frame ?? 0);
   const pal = colourTable(doc);
   const chk = Math.max(2, s >> 1);
   for (let y = 0; y < doc.height; y++) for (let x = 0; x < doc.width; x++) {
     const v = px[y * doc.width + x]!;
+    const r = ref ? ref[y * doc.width + x]! : TRANSPARENT;
     for (let j = 0; j < s; j++) for (let i = 0; i < s; i++) {
-      const c = v === TRANSPARENT ? (((x * s + i) / chk | 0) + ((y * s + j) / chk | 0)) % 2 ? CHECK_A : CHECK_B : pal[v]!;
+      let c: RGB;
+      if (v !== TRANSPARENT) c = pal[v]!;
+      else {
+        c = (((x * s + i) / chk | 0) + ((y * s + j) / chk | 0)) % 2 ? CHECK_A : CHECK_B;
+        if (r !== TRANSPARENT) c = faded(pal[r]!, c);
+      }
       put(img, left + x * s + i, top + y * s + j, c);
     }
   }
@@ -150,13 +164,13 @@ export function renderScaled(doc: Doc, o: ScaledOptions = {}): Rgba {
 }
 
 /** The tile repeated 3x3, at 1x and at 4x side by side, to show seams and repetition. */
-export function renderTile3x3(doc: Doc): Rgba {
+export function renderTile3x3(doc: Doc, frame = 0): Rgba {
   const pad = 8;
   const w = doc.width;
   const h = doc.height;
   const img = createRgba(pad + 3 * w + pad + 12 * w + pad, pad + 12 * h + pad);
   rect(img, 0, 0, img.width, img.height, RULER_BG);
-  const px = flatten(doc);
+  const px = flatten(doc, frame);
   const pal = colourTable(doc);
   const draw = (ox: number, oy: number, s: number): void => {
     for (let ty = 0; ty < 3; ty++) for (let tx = 0; tx < 3; tx++) for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
@@ -185,9 +199,9 @@ export interface Region {
  * The text index grid: one character per pixel (the palette key; '.' for transparent), column
  * numbers above, row numbers at the left, and a legend of the keys used with pixel counts.
  */
-export function renderGrid(doc: Doc, region?: Region): string {
+export function renderGrid(doc: Doc, region?: Region, frame = 0): string {
   const r = region ?? { x: 0, y: 0, w: doc.width, h: doc.height };
-  const px = flatten(doc);
+  const px = flatten(doc, frame);
   const t = { width: doc.width, height: doc.height, wrap: doc.wrap, pixels: px };
   const lastY = r.y + r.h - 1;
   const lastX = r.x + r.w - 1;
