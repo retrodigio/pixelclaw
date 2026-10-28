@@ -15,7 +15,7 @@ import type { Store } from './store.ts';
 
 export type ToolId =
   | 'pencil' | 'eraser' | 'line' | 'rect' | 'ellipse' | 'fill' | 'gradient' | 'dither' | 'picker'
-  | 'select' | 'select-ellipse' | 'lasso' | 'wand' | 'move' | 'stamp' | 'note';
+  | 'select' | 'select-ellipse' | 'lasso' | 'wand' | 'move' | 'stamp' | 'note' | 'pivot';
 
 export interface ToolInfo {
   id: ToolId;
@@ -44,11 +44,12 @@ export const TOOLS: ToolInfo[] = [
   { id: 'move', label: 'Move', key: 'V', icon: '✣', hint: 'drag to move the selection (or your whole layer); arrow keys nudge' },
   { id: 'stamp', label: 'Stamp', key: 'S', icon: '❖', hint: 'click to place the chosen stamp (see Stamps); save one from a selection' },
   { id: 'note', label: 'Note', key: 'N', icon: '✍︎', hint: 'click a pixel or drag a region, then write a note for the agent' },
+  { id: 'pivot', label: 'Pivot and ground', key: 'P', icon: '⌖', hint: 'click the pixel the sprite stands on (pivot); Shift+click a row to set the ground line' },
 ];
 
 const KEYS: Record<string, ToolId> = {
   b: 'pencil', e: 'eraser', l: 'line', u: 'rect', U: 'ellipse', g: 'fill', G: 'gradient', d: 'dither', i: 'picker',
-  m: 'select', M: 'select-ellipse', q: 'lasso', w: 'wand', v: 'move', s: 'stamp', n: 'note',
+  m: 'select', M: 'select-ellipse', q: 'lasso', w: 'wand', v: 'move', s: 'stamp', n: 'note', p: 'pivot',
 };
 
 const SELECT_TOOLS: ToolId[] = ['select', 'select-ellipse', 'lasso', 'wand'];
@@ -116,6 +117,17 @@ export class Editor {
   /** The layer (by name) and frame (0-based) you draw on and see; null follows yours in the document. */
   layerName: string | null = null;
   frame: number | null = null;
+  /** Frames chosen in the timeline (0-based, inclusive) for ticks, tags, views and links; null: your frame. */
+  frameSel: { from: number; to: number } | null = null;
+  /** Onion skin: the frame before and the frame after, tinted under yours. Only for looking. */
+  onionPrev = false;
+  onionNext = false;
+  /** Show the pivot and the ground line on the canvas. */
+  guides = true;
+  /** Playback: the sequence playing (by name) and when it started (performance.now()). Only for looking. */
+  playing: { seq: string; start: number } | null = null;
+  /** The sequence the play button plays. */
+  playSeq: string | null = null;
   drag: Drag | null = null;
   /** Shift or Alt held when a selection gesture started: add to or subtract from the selection. */
   private combine = '';
@@ -277,6 +289,10 @@ export class Editor {
       case 'fill':
         if (!doc.wrap && (p[0] < 0 || p[1] < 0 || p[0] >= doc.width || p[1] >= doc.height)) return;
         void this.commit(`fill ${p[0]},${p[1]} c=${this.colourName(doc)}`);
+        return;
+      case 'pivot':
+        if (p[0] < 0 || p[1] < 0 || p[0] >= doc.width || p[1] >= doc.height) return;
+        void this.commit(o.shift ? `ground ${p[1]}` : `pivot ${p[0]},${p[1]}`, { context: false });
         return;
       case 'stamp': {
         const s = this.stamp ? doc.stamps[this.stamp] : undefined;
@@ -575,6 +591,62 @@ export class Editor {
     void this.commit(`frame remove ${f + 1}`, { context: false }).then((ok) => ok && this.setFrame(Math.max(0, f - 1)));
   }
 
+  // --- animation (plan §4.4)
+
+  /** The chosen frames (0-based, inclusive): the timeline's choice, else your frame. */
+  frames(doc: Doc): { from: number; to: number } {
+    const s = this.frameSel;
+    if (s && s.to < doc.frameCount) return s;
+    const f = this.frameIndex(doc);
+    return { from: f, to: f };
+  }
+
+  /** Click a frame: draw on it (outside the chosen frames, the choice ends); Shift+click: choose the frames from yours to it. */
+  pickFrame(doc: Doc, f: number, extend: boolean): void {
+    if (extend) {
+      const a = this.frameSel?.from ?? this.frameIndex(doc);
+      this.frameSel = { from: Math.min(a, f), to: Math.max(a, f) };
+      this.changed();
+      return;
+    }
+    // A click inside the chosen frames keeps them (a double-click to set their ticks starts with one).
+    if (!this.frameSel || f < this.frameSel.from || f > this.frameSel.to) this.frameSel = null;
+    this.setFrame(f);
+  }
+
+  static rangeText(r: { from: number; to: number }): string {
+    return r.from === r.to ? String(r.from + 1) : `${r.from + 1}-${r.to + 1}`;
+  }
+
+  setTicks(doc: Doc, ticks: number): void {
+    this.act(`frame set ${Editor.rangeText(this.frames(doc))} ticks=${ticks}`, { context: false });
+  }
+
+  addTag(doc: Doc, name: string, loop: 'cycle' | 'pingpong'): void {
+    this.act(`tag add ${name} ${Editor.rangeText(this.frames(doc))} loop=${loop}`, { context: false });
+  }
+
+  setView(doc: Doc, name: string): void {
+    const r = this.frames(doc);
+    this.act(`view ${name} frames=${r.from + 1}-${r.to + 1}`, { context: false });
+  }
+
+  link(doc: Doc, on: boolean): void {
+    const r = this.frames(doc);
+    const layer = doc.layers[this.layerIndex(doc)]!.name;
+    this.act(`cel ${on ? 'link' : 'unlink'} ${r.from + 1}-${r.to + 1} layer=${layer}`, { context: false });
+  }
+
+  toggle(k: 'onionPrev' | 'onionNext' | 'guides'): void {
+    this[k] = !this[k];
+    this.changed();
+  }
+
+  play(seq: string | null): void {
+    this.playing = seq === null ? null : { seq, start: performance.now() };
+    this.changed();
+  }
+
   stepFrame(d: 1 | -1): void {
     const doc = this.store.shownDoc().doc;
     if (!doc) return;
@@ -629,6 +701,10 @@ export class Editor {
     }
     if (e.shiftKey && k === 'R') {
       this.act('rotate 90');
+      return true;
+    }
+    if (k === 'Enter' && this.playSeq) {
+      this.play(this.playing ? null : this.playSeq);
       return true;
     }
     if (k === '[' || k === ']') {

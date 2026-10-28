@@ -48,6 +48,9 @@ export interface Overlay {
   hover: Pt | null;
   /** A note's place waiting for its text. */
   draft: Rect | null;
+  /** The pivot pixel and the ground row, when shown. */
+  pivot: Pt | null;
+  ground: number | null;
   /** Pixels checks flagged, circled in magenta. */
   marks: readonly Pt[];
 }
@@ -61,6 +64,8 @@ export interface PointerHandlers {
 interface Props {
   doc: Doc | null;
   frame: number;
+  /** Onion skin: frames drawn tinted under this one (the one before red, the one after blue). */
+  onion: { prev: number | null; next: number | null };
   /** A number, or 'fit' to fill the space available. */
   zoom: number | 'fit';
   pixelGrid: boolean;
@@ -185,6 +190,19 @@ export function CanvasView(p: Props) {
     g.imageSmoothingEnabled = false;
     checker(g, z, W, H);
     const one = oneX(doc, p.frame, p.theme);
+    for (const [f, tint] of [[p.onion.prev, 'rgb(255,90,60)'], [p.onion.next, 'rgb(60,140,255)']] as const) {
+      if (f === null || f === p.frame || f >= doc.frameCount) continue;
+      // The other frame's pixels, tinted and faint; this frame's own pixels cover them.
+      const t = oneX(doc, f, p.theme);
+      const tg = t.getContext('2d')!;
+      tg.globalCompositeOperation = 'source-atop';
+      tg.fillStyle = tint;
+      tg.globalAlpha = 0.55;
+      tg.fillRect(0, 0, t.width, t.height);
+      g.globalAlpha = 0.45;
+      g.drawImage(t, 0, 0, W, H);
+      g.globalAlpha = 1;
+    }
     g.drawImage(one, 0, 0, W, H);
     if (p.pixelGrid && z >= 4) {
       for (let x = 1; x < doc.width; x++) {
@@ -236,6 +254,17 @@ export function CanvasView(p: Props) {
       for (let i = 0; i < m.length; i++) if (m[i]) g.fillRect((i % doc.width) * z, Math.floor(i / doc.width) * z, z, z);
     }
     if (o.mySel) maskAnts(g, doc, o.mySel, z, o.selOffset ?? [0, 0]);
+    // The ground line (along the bottom of its row) and the pivot pixel, in cyan.
+    g.fillStyle = 'rgba(64,220,230,0.95)';
+    if (o.ground !== null) for (let x = 0; x < W; x += 6) g.fillRect(x, (o.ground + 1) * z - 1, 4, Math.max(1, z >> 3));
+    if (o.pivot) {
+      const [px, py] = o.pivot;
+      g.strokeStyle = 'rgba(64,220,230,0.95)';
+      g.lineWidth = Math.max(1, z >> 3);
+      g.strokeRect(px * z + 0.5, py * z + 0.5, z - 1, z - 1);
+      g.fillRect(px * z + (z >> 1) - 1, py * z - z, 2, z * 3);
+      g.fillRect(px * z - z, py * z + (z >> 1) - 1, z * 3, 2);
+    }
     if (o.mirror) {
       g.strokeStyle = 'rgba(80,220,255,0.9)';
       g.lineWidth = 1;

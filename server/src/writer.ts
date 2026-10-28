@@ -500,7 +500,7 @@ export class Writer {
     this.freshStyle();
     const assets = this.assets().map((name) => ({ name, entries: this.states.get(name)?.entries ?? readTape(this.project, name) }));
     return {
-      project: { name: this.project.json.name, dir: this.project.dir },
+      project: { name: this.project.json.name, dir: this.project.dir, tickRate: this.project.json.tickRate ?? 60 },
       palettes: [...this.project.palettes.values()],
       defaultPalette: this.project.json.defaultPalette,
       style: this.project.json.style ?? {},

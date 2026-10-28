@@ -3,7 +3,7 @@
 // here: every action becomes a command on the tape with their name (plan §1.3).
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { ctxOf, flaggedOn } from '@pixelclaw/core';
+import { ctxOf, flaggedOn, frameAtTick, sequences } from '@pixelclaw/core';
 import { CanvasView, ZOOMS } from './CanvasView.tsx';
 import { Editor, PATTERN_NAMES } from './editor.ts';
 import { CheckChips, CheckDetails, PreviewPanel } from './Checks.tsx';
@@ -64,11 +64,27 @@ export function App({ store }: { store: Store }) {
   const lastBy = a?.tape.at(-1)?.by;
   const editable = ed.editable;
   const frame = doc ? ed.frameIndex(doc) : 0;
+  // Playback at the game's speed: the frame shown follows the clock (your frame stays where it is).
+  const [playTick, setPlayTick] = useState(0);
+  const playing = doc && ed.playing ? sequences(doc).find((s) => s.name === ed.playing!.seq) ?? null : null;
+  const tickRate = store.project?.tickRate ?? 60;
+  useEffect(() => {
+    if (!ed.playing) return;
+    let raf = 0;
+    const loop = () => {
+      setPlayTick(Math.floor(((performance.now() - ed.playing!.start) * tickRate) / 1000));
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [ed.playing, ed, tickRate]);
+  const frameShown = doc && playing ? frameAtTick(doc, playing, playTick) : frame;
+  const onion = { prev: doc && ed.onionPrev && !playing && frame > 0 ? frame - 1 : null, next: doc && ed.onionNext && !playing && frame + 1 < doc.frameCount ? frame + 1 : null };
   const mine = doc ? ctxOf(doc, store.me) : null;
   const mirrorShown = doc && (ed.mirrorX || ed.mirrorY) ? { x2: ed.mirrorX ? doc.width - 1 : null, y2: ed.mirrorY ? doc.height - 1 : null } : null;
   // Checks run on the document as shown (not on a drag's preview), with the project's style guide.
   const checks = shown ? store.checksFor(shown, frame) : [];
-  const marks = checks.filter((r) => store.marked.has(r.id)).flatMap((r) => flaggedOn(r, frame));
+  const marks = checks.filter((r) => store.marked.has(r.id)).flatMap((r) => flaggedOn(r, frameShown));
   const openCheck = checks.find((r) => r.id === store.openCheck && store.marked.has(r.id));
   const toggle = (f: () => void) => {
     f();
@@ -302,7 +318,8 @@ export function App({ store }: { store: Store }) {
         {a?.problem && <div className="banner error">This tape does not replay: {a.problem}</div>}
         <CanvasView
           doc={doc}
-          frame={frame}
+          frame={frameShown}
+          onion={onion}
           zoom={zoom}
           pixelGrid={pixelGrid}
           cellGrid={cellGrid}
@@ -316,6 +333,7 @@ export function App({ store }: { store: Store }) {
             otherSels: doc ? Object.entries(doc.ctx).flatMap(([who, c]) => (who !== store.me && c.sel ? [c.sel] : [])) : [],
             marquee: ed.marquee, marqueeEllipse: ed.tool === 'select-ellipse', lasso: ed.lassoPath, mirror: editable ? mirrorShown : null,
             notes: doc?.notes ?? [], activeNote: ed.activeNote, hover: ed.hover, draft, marks,
+            pivot: doc && ed.guides && !doc.wrap ? doc.pivot : null, ground: doc && ed.guides && !doc.wrap ? doc.ground : null,
           }}
           pointer={editable ? { down: (p, e) => ed.down(p, e), move: (p) => ed.move(p), up: (p) => ed.up(p) } : null}
           cursor={ed.tool === 'move' ? 'move' : ed.tool === 'picker' ? 'copy' : 'crosshair'}
@@ -323,7 +341,7 @@ export function App({ store }: { store: Store }) {
           onZoom={setZoom}
           onEffectiveZoom={setEffZoom}
         />
-        {doc && <TimelinePanel doc={doc} ed={ed} editable={editable} />}
+        {doc && <TimelinePanel doc={doc} ed={ed} editable={editable} frameShown={frameShown} />}
       </main>
 
       <aside className="right">
