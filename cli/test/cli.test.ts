@@ -45,9 +45,12 @@ describe('pixelclaw CLI', () => {
     expect(r.code).toBe(0);
     expect(r.out).toContain('floor: applied 1 command as group g1');
     for (const f of ['asset.json', 'tape.jsonl', 'preview.png', 'checkpoints']) expect(existsSync(join(proj, 'assets', 'floor', f))).toBe(true);
-    expect(read('assets', 'floor', 'tape.jsonl')).toBe(
-      '{"pclaw":"tape","lang":1}\n{"seq":1,"by":"claude","at":"2026-10-27T12:00:00Z","group":"g1","cmd":"new tile floor 8x8 palette=dusk-moss wrap=on cell=8x8 bg=moss"}\n',
-    );
+    const tape = read('assets', 'floor', 'tape.jsonl').split('\n');
+    expect(tape[0]).toBe('{"pclaw":"tape","lang":2}');
+    const first = JSON.parse(tape[1]!);
+    expect(first).toMatchObject({ seq: 1, by: 'claude', at: '2026-10-27T12:00:00Z', group: 'g1' });
+    // Language 2: the palette is written into the new line.
+    expect(first.cmd).toMatch(/^new tile floor 8x8 palette=dusk-moss wrap=on cell=8x8 bg=moss <<\n {2}\S \S+ #[0-9a-f]{6}\n[^]*>>$/);
     const aj = JSON.parse(read('assets', 'floor', 'asset.json'));
     expect(aj).toMatchObject({ name: 'floor', kind: 'tile', size: [8, 8], wrap: true, palette: 'dusk-moss', frames: 1, tape: { commands: 1, groups: 1 } });
     expect(aj.state.sha256).toMatch(/^[0-9a-f]{64}$/);

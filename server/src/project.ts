@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import {
-  LANG_VERSION, deserializeDoc, encodePng, entryToJson, importPalette, paletteToJson, parseTape, renderFlat, serializeDoc, tapeToJsonl,
+  deserializeDoc, tapeLang, encodePng, entryToJson, importPalette, paletteToJson, parseTape, renderFlat, serializeDoc, tapeToJsonl,
   type AssetState, type Doc, type Layer, type Note, type Palette, type PaletteSource, type TapeEntry,
 } from '@pixelclaw/core';
 
@@ -146,7 +146,7 @@ export function assetJsonFor(doc: Doc, entries: TapeEntry[]): AssetJson {
     palette: doc.palette.name, layers: doc.layers.map((l) => ({ ...l })), frames: doc.frameCount, paletteLocked: doc.paletteLocked,
     stamps: Object.keys(doc.stamps).sort(), macros: Object.keys(doc.macros).sort(),
     tags: [], views: [], links: fork ? [{ fork }] : [], notes: doc.notes,
-    tape: { lang: LANG_VERSION, commands: entries.length, groups: new Set(entries.map((e) => e.group)).size },
+    tape: { lang: tapeLang(entries), commands: entries.length, groups: new Set(entries.map((e) => e.group)).size },
     state: { sha256: sha256(serializeDoc(doc)) },
     checkpoints: { every: CHECKPOINT_EVERY, files: checkpointNames(entries.length) },
   };

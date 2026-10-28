@@ -2,7 +2,7 @@
 // wrap flag, the document's own palette (lockable), open notes, stamps, macros, and each author's
 // editing context (the layer and frame they draw on, their selection, symmetry and brush).
 
-import type { Palette } from './palette.ts';
+import type { Palette, Role } from './palette.ts';
 
 /** The pixel value for "no colour". Palette entry i is stored as i. */
 export const TRANSPARENT = 0xffff;
@@ -214,7 +214,7 @@ export function serializeDoc(d: Doc): Uint8Array {
   const header = JSON.stringify({
     kind: d.kind, name: d.name, width: d.width, height: d.height, cellW: d.cellW, cellH: d.cellH, wrap: d.wrap,
     palette: {
-      name: d.palette.name, entries: d.palette.entries.map((e) => [e.key, e.name, e.hex]),
+      name: d.palette.name, entries: d.palette.entries.map((e) => (e.role ? [e.key, e.name, e.hex, e.role] : [e.key, e.name, e.hex])),
       ramps: sortedKeys(d.palette.ramps).map((k) => [k, d.palette.ramps[k]]), locked: d.paletteLocked,
     },
     layers: d.layers.map((l) => [l.name, l.hidden, l.locked, l.reference]), frameCount: d.frameCount,
@@ -252,7 +252,7 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
   while (nl < bytes.length && bytes[nl] !== 10) nl++;
   type Header = {
     kind: DocKind; name: string; width: number; height: number; cellW: number; cellH: number; wrap: boolean;
-    palette: { name: string; entries: [string, string, string][]; ramps: [string, string[]][]; locked: boolean };
+    palette: { name: string; entries: ([string, string, string] | [string, string, string, Role])[]; ramps: [string, string[]][]; locked: boolean };
     layers: [string, boolean, boolean, boolean][]; frameCount: number; home: [number, number]; notes: [string, number, number, number, number, string][];
     ctx: [string, number, number, boolean, [number | null, number | null] | null, [string, string | number] | null][];
     stamps: [string, number, number][]; macros: [string, string[], string][];
@@ -280,7 +280,7 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
   return {
     kind: h.kind, name: h.name, width: h.width, height: h.height, cellW: h.cellW, cellH: h.cellH, wrap: h.wrap,
     palette: {
-      name: h.palette.name, entries: h.palette.entries.map(([key, name, hex]) => ({ key, name, hex })),
+      name: h.palette.name, entries: h.palette.entries.map(([key, name, hex, role]) => (role ? { key, name, hex, role } : { key, name, hex })),
       ramps: Object.fromEntries(h.palette.ramps),
     },
     paletteLocked: h.palette.locked,

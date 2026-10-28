@@ -20,7 +20,7 @@ describe('replay', () => {
   it('is byte-identical to the live document, through JSONL and back', () => {
     const live = build();
     const text = tapeToJsonl(live.entries);
-    expect(text.split('\n')[0]).toBe('{"pclaw":"tape","lang":1}');
+    expect(text.split('\n')[0]).toBe('{"pclaw":"tape","lang":2}');
     const entries = parseTape(text);
     expect(entries).toEqual(live.entries);
     const r = replay(entries, palettes);

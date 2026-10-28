@@ -14,3 +14,5 @@ export * from './draw.ts';
 export * from './values.ts';
 export { PATTERNS, patternOn } from './cmd-shapes.ts';
 export { expandMacro } from './cmd-macros.ts';
+export * from './checks.ts';
+export * from './themes.ts';

@@ -1,7 +1,7 @@
-{"pclaw":"tape","lang":1}
-{"seq":1,"by":"claude","at":"2026-10-28T04:42:42Z","group":"g1","cmd":"new tile grass 24x24 palette=mossy-ruins wrap=on cell=24x24 bg=none"}
-{"seq":2,"by":"claude","at":"2026-10-28T04:42:42Z","group":"g1","cmd":"stamp save blade <<\n  .d\n  d.\n  b.\n>>"}
-{"seq":3,"by":"claude","at":"2026-10-28T04:42:42Z","group":"g1","cmd":"stamp save tuft <<\n  d...d\n  .d.d.\n  .cdc.\n  .bbb.\n>>"}
-{"seq":4,"by":"claude","at":"2026-10-28T04:42:42Z","group":"g1","cmd":"def grass() {\n  noise ramp=moss weights=0,3,12,1,0 cluster=1..2 density=0.07 base=moss2\n  noise ramp=moss weights=0,4,10,0,0 cluster=3..6 density=0.07 base=keep\n  scatter stamp=blade count=12 minDist=5 flip=on\n  scatter stamp=tuft count=3 minDist=10 flip=on\n  scatter c=lichen count=2 minDist=10\n}"}
-{"seq":5,"by":"claude","at":"2026-10-28T04:42:43Z","group":"g2","cmd":"fork grass grass_c at=4"}
-{"seq":6,"by":"claude","at":"2026-10-28T04:42:43Z","group":"g2","cmd":"call grass seed=37"}
+{"pclaw":"tape","lang":2}
+{"seq":1,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"new tile grass 24x24 palette=mossy-ruins wrap=on cell=24x24 bg=none <<\n  k ink #17181d\n  0 stone0 #272a30\n  1 stone1 #3b4044\n  2 stone2 #535a5b\n  3 stone3 #6c7570\n  4 stone4 #8b9489\n  5 stone5 #afb6a5\n  a moss0 #1c2e21\n  b moss1 #2c4729\n  c moss2 #486a32\n  d moss3 #6c8c3a\n  e lichen #a2ab52\n  f soil0 #2a211c\n  g soil1 #44352a\n  h soil2 #65503a\n  w pool #34566a\n  ramp stone stone0 stone1 stone2 stone3 stone4 stone5\n  ramp moss moss0 moss1 moss2 moss3 lichen\n  ramp soil soil0 soil1 soil2\n>>"}
+{"seq":2,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"stamp save blade <<\n  .d\n  d.\n  b.\n>>"}
+{"seq":3,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"stamp save tuft <<\n  d...d\n  .d.d.\n  .cdc.\n  .bbb.\n>>"}
+{"seq":4,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"def grass() {\n  noise ramp=moss weights=0,3,12,1,0 cluster=1..2 density=0.07 base=moss2\n  noise ramp=moss weights=0,4,10,0,0 cluster=3..6 density=0.07 base=keep\n  scatter stamp=blade count=12 minDist=5 flip=on\n  scatter stamp=tuft count=3 minDist=10 flip=on\n  scatter c=lichen count=2 minDist=10\n}"}
+{"seq":5,"by":"claude","at":"2026-10-28T05:03:59Z","group":"g2","cmd":"fork grass grass_c at=4"}
+{"seq":6,"by":"claude","at":"2026-10-28T05:03:59Z","group":"g2","cmd":"call grass seed=37"}

@@ -1,0 +1,10 @@
+{
+  "format": "pixelclaw-project",
+  "version": 1,
+  "name": "mossy-ruins",
+  "tickRate": 60,
+  "defaultPalette": "mossy-ruins",
+  "grid": 24,
+  "style": {},
+  "profiles": []
+}

@@ -2,10 +2,23 @@
 // blocks), a name and a colour; plus ramps (ordered runs of entry names). Import from the JSON
 // format, Lospec JSON, .hex and .gpl.
 
+/**
+ * Colour roles for recolourable art (plan §3.1): an entry may stand for a role instead of a fixed
+ * colour. A role entry is shown through a preview theme; its hex is only its colour under the
+ * default theme, never an encoded export colour.
+ */
+export const ROLES = ['black', 'white', 'light', 'dark', 'darkest'] as const;
+export type Role = (typeof ROLES)[number];
+
+export function isRole(s: string): s is Role {
+  return (ROLES as readonly string[]).includes(s);
+}
+
 export interface PaletteEntry {
   key: string;
   name: string;
   hex: string; // #rrggbb, lower case
+  role?: Role;
 }
 
 export interface Palette {
@@ -51,6 +64,7 @@ export function validatePalette(p: Palette): Palette {
     if (e.name === 'none') throw new PaletteError(`'none' is reserved (it means transparent)`);
     if (names.has(e.name)) throw new PaletteError(`duplicate entry name '${e.name}'`);
     if (!/^#[0-9a-f]{6}$/.test(e.hex)) throw new PaletteError(`entry '${e.name}': colour '${e.hex}' must be #rrggbb`);
+    if (e.role !== undefined && !isRole(e.role)) throw new PaletteError(`entry '${e.name}': role '${e.role}' must be one of ${ROLES.join(', ')}`);
     keys.add(e.key);
     names.add(e.name);
   }
@@ -110,10 +124,13 @@ export function parsePaletteJson(text: string, fallbackName?: string): Palette {
   if (!Array.isArray(o.entries)) throw new PaletteError(`palette JSON needs an 'entries' array (or Lospec 'colors')`);
   const entries = o.entries.map((raw, i): PaletteEntry => {
     const e = raw as Record<string, unknown>;
-    const hex = typeof e.hex === 'string' ? normaliseHex(e.hex) : null;
+    if (e.role !== undefined && (typeof e.role !== 'string' || !isRole(e.role))) throw new PaletteError(`entries[${i}]: role must be one of ${ROLES.join(', ')}`);
+    const role = e.role as Role | undefined;
+    // A role entry may leave out its colour: it is shown through a theme (the default theme's colour here).
+    const hex = typeof e.hex === 'string' ? normaliseHex(e.hex) : role ? DEFAULT_ROLE_HEX[role] : null;
     if (!hex) throw new PaletteError(`entries[${i}]: missing or bad 'hex'`);
     if (typeof e.key !== 'string' || typeof e.name !== 'string') throw new PaletteError(`entries[${i}]: needs 'key' and 'name' strings`);
-    return { key: e.key, name: e.name, hex };
+    return role ? { key: e.key, name: e.name, hex, role } : { key: e.key, name: e.name, hex };
   });
   const ramps: Record<string, string[]> = {};
   if (o.ramps !== undefined) {
@@ -179,7 +196,61 @@ export function importPalette(fileName: string, text: string): Palette {
 
 /** The palette JSON format, with stable key order and one entry per line. */
 export function paletteToJson(p: Palette): string {
-  const entries = p.entries.map((e) => '    ' + JSON.stringify({ key: e.key, name: e.name, hex: e.hex })).join(',\n');
+  const entries = p.entries.map((e) => '    ' + JSON.stringify({ key: e.key, name: e.name, hex: e.hex, ...(e.role ? { role: e.role } : {}) })).join(',\n');
   const ramps = Object.entries(p.ramps).map(([k, v]) => `    ${JSON.stringify(k)}: ${JSON.stringify(v)}`).join(',\n');
   return `{\n  "name": ${JSON.stringify(p.name)},\n  "entries": [\n${entries}\n  ],\n  "ramps": {${ramps ? '\n' + ramps + '\n  ' : ''}}\n}\n`;
+}
+
+/** Role colours under the default (grey) theme. */
+export const DEFAULT_ROLE_HEX: Record<Role, string> = {
+  black: '#000000', white: '#ffffff', light: '#cccccc', dark: '#6e6e6e', darkest: '#282828',
+};
+
+/**
+ * The palette as block rows, for the `new` line of a tape (language 2): one entry per row
+ * (`<key> <name> <hex>[ role=<role>]`), then one row per ramp (`ramp <name> <entries...>`). A tape
+ * holding its palette replays the same whatever happens to the project's palette files.
+ */
+export function paletteRows(p: Palette): string[] {
+  return [
+    ...p.entries.map((e) => `${e.key} ${e.name} ${e.hex}${e.role ? ` role=${e.role}` : ''}`),
+    ...Object.entries(p.ramps).map(([k, v]) => `ramp ${k} ${v.join(' ')}`),
+  ];
+}
+
+/** The palette from `paletteRows` rows; errors name the row (0-based) they come from. */
+export function parsePaletteRows(name: string, rows: string[]): { palette: Palette } | { row: number; col: number; message: string } {
+  const entries: PaletteEntry[] = [];
+  const ramps: Record<string, string[]> = {};
+  for (let i = 0; i < rows.length; i++) {
+    const text = rows[i]!;
+    if (text.trim() === '') continue;
+    const parts = text.split(' ').filter((x) => x !== '');
+    if (parts[0] === 'ramp') {
+      if (parts.length < 3) return { row: i, col: 0, message: `palette row: 'ramp <name> <entry> ...' needs a name and entries` };
+      if (ramps[parts[1]!]) return { row: i, col: 5, message: `palette row: ramp '${parts[1]}' given twice` };
+      ramps[parts[1]!] = parts.slice(2);
+      continue;
+    }
+    // The key is the row's first character (it may be any character but '.', '|' or a space).
+    const key = [...text][0]!;
+    const rest = text.slice(key.length).split(' ').filter((x) => x !== '');
+    if (text[key.length] !== ' ' || rest.length < 2 || rest.length > 3) {
+      return { row: i, col: 0, message: `palette row: expected '<key> <name> #rrggbb [role=<role>]' or 'ramp <name> <entries...>'` };
+    }
+    const hex = normaliseHex(rest[1]!);
+    if (!hex || !rest[1]!.startsWith('#')) return { row: i, col: text.indexOf(rest[1]!), message: `palette row: '${rest[1]}' is not a colour like #a4552e` };
+    let role: Role | undefined;
+    if (rest[2] !== undefined) {
+      const m = /^role=(.*)$/.exec(rest[2]);
+      if (!m || !isRole(m[1]!)) return { row: i, col: text.indexOf(rest[2]), message: `palette row: '${rest[2]}' should be role=${ROLES.join('|')}` };
+      role = m[1] as Role;
+    }
+    entries.push(role ? { key, name: rest[0]!, hex, role } : { key, name: rest[0]!, hex });
+  }
+  try {
+    return { palette: validatePalette({ name, entries, ramps }) };
+  } catch (e) {
+    return { row: 0, col: 0, message: (e as Error).message };
+  }
 }

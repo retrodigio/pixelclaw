@@ -12,8 +12,9 @@ function normal(text: string, state = base): string[] {
 
 describe('normaliser', () => {
   it('fills in defaults and canonical forms', () => {
-    expect(normal('new tile floor 24x24', EMPTY)).toEqual(['new tile floor 24x24 palette=test wrap=on cell=24x24 bg=none']);
-    expect(normal('new sheet set 48x24 cell=24x24 bg=sky wrap=off', EMPTY)).toEqual(['new sheet set 48x24 palette=test wrap=off cell=24x24 bg=sky']);
+    const rows = '<<\n  0 ink #14161c\n  1 moss #3f6b3a\n  2 leaf #7fae4c\n  3 stone #8a8d84\n  4 sky #9cc7e6\n  r rust #a4552e\n  ramp green moss leaf\n>>';
+    expect(normal('new tile floor 24x24', EMPTY)).toEqual([`new tile floor 24x24 palette=test wrap=on cell=24x24 bg=none ${rows}`]);
+    expect(normal('new sheet set 48x24 cell=24x24 bg=sky wrap=off', EMPTY)).toEqual([`new sheet set 48x24 palette=test wrap=off cell=24x24 bg=sky ${rows}`]);
     expect(normal([
       'px 3,4 4,4 c=0', 'line 0,0 5,2 c=#7FAE4C', 'rect 1,1 3x3 c=moss', 'rect fill 1,1 3x3 c=moss',
       'ellipse 8,8 r=3 c=ink', 'ellipse 2,2 6x4 fill c=leaf', 'fill 0,0 c=sky', 'fill 0,0 c=none mode=global conn=8',

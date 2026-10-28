@@ -2,15 +2,13 @@
 // commands is normalised, applied to a copy and logged as one undo group, or (on any error)
 // nothing is applied at all.
 
-import { applyOp, normaliseCommand, type NormaliseContext } from './commands.ts';
+import { LANG_VERSION, applyOp, normaliseCommand, type NormaliseContext } from './commands.ts';
 import './registry.ts';
 import { cloneDoc, flatten, type Doc } from './doc.ts';
 import type { Palette } from './palette.ts';
 import { DiagError, parse, type Diag } from './parser.ts';
 import { Pcg32, hashString, seedFrom } from './pcg.ts';
 
-/** The command-language version, recorded on the first line of every tape. */
-export const LANG_VERSION = 1;
 
 export interface TapeEntry {
   seq: number;
@@ -341,7 +339,10 @@ export class TapeCursor {
       return errors[0] ? `does not parse: ${errors[0].message}` : `holds ${commands.length} commands`;
     }
     try {
-      const n = normaliseCommand(commands[0]!, context(this.doc, this.done, e.group, this.palettes, e.seq, e.by));
+      const ctx = context(this.doc, this.done, e.group, this.palettes, e.seq, e.by);
+      let n = normaliseCommand(commands[0]!, ctx);
+      // A language 1 tape: its `new` line has no palette block and reads the project's palette.
+      if (n.text !== e.cmd && isLang1New(e.cmd)) n = normaliseCommand(commands[0]!, { ...ctx, lang: 1 });
       if (n.text !== e.cmd) return `not in normal form: expected '${n.text}'`;
       this.done.push(e);
       this.doc = n.op.k === 'undo' ? replayEffective(this.done, this.palettes, this.cache) : applyOp(this.doc, n.op, e.by);
@@ -425,8 +426,18 @@ export function replay(entries: TapeEntry[], palettes: PaletteSource): ReplayRes
   return { doc: cur.doc, problems: [], cache: cur.cache };
 }
 
-export function tapeHeader(): string {
-  return JSON.stringify({ pclaw: 'tape', lang: LANG_VERSION });
+const isLang1New = (cmd: string): boolean => cmd.startsWith('new ') && !cmd.includes('\n');
+
+/**
+ * The language a tape is written in: 1 when its first line is a `new` without a palette block
+ * (or a fork of such a tape), else the current version. A branch keeps its source's language.
+ */
+export function tapeLang(entries: TapeEntry[]): number {
+  return entries[0] && isLang1New(entries[0].cmd) ? 1 : LANG_VERSION;
+}
+
+export function tapeHeader(lang = LANG_VERSION): string {
+  return JSON.stringify({ pclaw: 'tape', lang });
 }
 
 export function entryToJson(e: TapeEntry): string {
@@ -435,20 +446,25 @@ export function entryToJson(e: TapeEntry): string {
 
 /** tape.jsonl text: the version header, then one entry per line. */
 export function tapeToJsonl(entries: TapeEntry[]): string {
-  return [tapeHeader(), ...entries.map(entryToJson)].join('\n') + '\n';
+  return [tapeHeader(tapeLang(entries)), ...entries.map(entryToJson)].join('\n') + '\n';
 }
 
+/** The tape's entries; the header's language must be one this build reads (1 or 2) and match the tape. */
 export function parseTape(text: string): TapeEntry[] {
   const lines = text.split('\n').filter((l) => l.trim() !== '');
   if (lines.length === 0) throw new Error('tape is empty (no header line)');
   const head = JSON.parse(lines[0]!) as { pclaw?: string; lang?: number };
   if (head.pclaw !== 'tape') throw new Error(`tape line 1 is not a tape header`);
-  if (head.lang !== LANG_VERSION) throw new Error(`tape language version ${head.lang} is not supported (this build reads ${LANG_VERSION})`);
-  return lines.slice(1).map((l, i) => {
+  if (head.lang !== 1 && head.lang !== LANG_VERSION) throw new Error(`tape language version ${head.lang} is not supported (this build reads 1 and ${LANG_VERSION})`);
+  const entries = lines.slice(1).map((l, i) => {
     const o = JSON.parse(l) as TapeEntry;
     if (typeof o.seq !== 'number' || typeof o.cmd !== 'string' || typeof o.group !== 'string' || typeof o.by !== 'string') {
       throw new Error(`tape line ${i + 2}: needs seq, by, group and cmd`);
     }
     return o;
   });
+  if (entries.length && tapeLang(entries) !== head.lang) {
+    throw new Error(`tape header says language ${head.lang} but its first line is written in language ${tapeLang(entries)}`);
+  }
+  return entries;
 }

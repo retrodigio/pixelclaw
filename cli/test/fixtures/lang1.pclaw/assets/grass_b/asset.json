@@ -1,0 +1,54 @@
+{
+  "name": "grass_b",
+  "kind": "tile",
+  "size": [
+    24,
+    24
+  ],
+  "cell": [
+    24,
+    24
+  ],
+  "wrap": true,
+  "palette": "mossy-ruins",
+  "layers": [
+    {
+      "name": "main",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    }
+  ],
+  "frames": 1,
+  "paletteLocked": false,
+  "stamps": [
+    "blade",
+    "tuft"
+  ],
+  "macros": [
+    "grass"
+  ],
+  "tags": [],
+  "views": [],
+  "links": [
+    {
+      "fork": {
+        "from": "grass",
+        "at": 4
+      }
+    }
+  ],
+  "notes": [],
+  "tape": {
+    "lang": 1,
+    "commands": 6,
+    "groups": 2
+  },
+  "state": {
+    "sha256": "58ea8f1a8bbff4a48af68154bdd2323117ee798600e6dd490c958b8a2fad1cad"
+  },
+  "checkpoints": {
+    "every": 200,
+    "files": []
+  }
+}

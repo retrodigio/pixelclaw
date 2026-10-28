@@ -1,72 +1,72 @@
-{"pclaw":"tape","lang":1}
-{"seq":1,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"new tile stone_floor 24x24 palette=mossy-ruins wrap=on cell=24x24 bg=stone1"}
-{"seq":2,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"rect 6,1 10x7 c=stone3 fill"}
-{"seq":3,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"rect 17,1 12x7 c=stone3 fill"}
-{"seq":4,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"rect 3,9 9x6 c=stone3 fill"}
-{"seq":5,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"rect 13,9 13x6 c=stone3 fill"}
-{"seq":6,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"rect 9,16 11x8 c=stone3 fill"}
-{"seq":7,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"rect 21,16 11x8 c=stone3 fill"}
-{"seq":8,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"line 6,1 15,1 c=stone4 pp=on"}
-{"seq":9,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"line 6,2 6,6 c=stone4 pp=on"}
-{"seq":10,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"line 17,1 28,1 c=stone4 pp=on"}
-{"seq":11,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"line 17,2 17,6 c=stone4 pp=on"}
-{"seq":12,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"line 3,9 11,9 c=stone4 pp=on"}
-{"seq":13,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"line 3,10 3,13 c=stone4 pp=on"}
-{"seq":14,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"line 13,9 25,9 c=stone4 pp=on"}
-{"seq":15,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"line 13,10 13,13 c=stone4 pp=on"}
-{"seq":16,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"line 9,16 19,16 c=stone4 pp=on"}
-{"seq":17,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"line 9,17 9,22 c=stone4 pp=on"}
-{"seq":18,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"line 21,16 31,16 c=stone4 pp=on"}
-{"seq":19,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"line 21,17 21,22 c=stone4 pp=on"}
-{"seq":20,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"line 7,7 15,7 c=stone2 pp=on"}
-{"seq":21,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"line 15,2 15,6 c=stone2 pp=on"}
-{"seq":22,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"line 18,7 28,7 c=stone2 pp=on"}
-{"seq":23,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"line 28,2 28,6 c=stone2 pp=on"}
-{"seq":24,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"line 4,14 11,14 c=stone2 pp=on"}
-{"seq":25,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"line 11,10 11,13 c=stone2 pp=on"}
-{"seq":26,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"line 14,14 25,14 c=stone2 pp=on"}
-{"seq":27,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"line 25,10 25,13 c=stone2 pp=on"}
-{"seq":28,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"line 10,23 19,23 c=stone2 pp=on"}
-{"seq":29,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"line 19,17 19,22 c=stone2 pp=on"}
-{"seq":30,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"line 22,23 31,23 c=stone2 pp=on"}
-{"seq":31,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"line 31,17 31,22 c=stone2 pp=on"}
-{"seq":32,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"px 6,1 15,1 6,7 15,7 c=stone1"}
-{"seq":33,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"px 17,1 28,1 17,7 28,7 c=stone1"}
-{"seq":34,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"px 3,9 11,9 3,14 11,14 c=stone1"}
-{"seq":35,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"px 13,9 25,9 13,14 25,14 c=stone1"}
-{"seq":36,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"px 9,16 19,16 9,23 19,23 c=stone1"}
-{"seq":37,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"px 21,16 31,16 21,23 31,23 c=stone1"}
-{"seq":38,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"px 8,4 c=stone2"}
-{"seq":39,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"px 9,5 c=stone4"}
-{"seq":40,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"line 11,1 12,3 13,6 c=stone1 pp=on"}
-{"seq":41,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"px 13,3 14,6 c=stone4"}
-{"seq":42,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"px 20,3 c=stone2"}
-{"seq":43,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"px 21,4 c=stone4"}
-{"seq":44,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"px 1,5 c=stone2"}
-{"seq":45,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"px 2,6 c=stone4"}
-{"seq":46,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"px 25,1 26,1 c=stone3"}
-{"seq":47,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"px 6,11 c=stone2"}
-{"seq":48,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"px 7,12 c=stone4"}
-{"seq":49,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"line 18,9 19,12 c=stone1 pp=on"}
-{"seq":50,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"px 19,10 20,12 c=stone4"}
-{"seq":51,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"px 23,11 c=stone2"}
-{"seq":52,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"px 24,12 c=stone4"}
-{"seq":53,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"px 12,19 c=stone2"}
-{"seq":54,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"px 13,20 c=stone4"}
-{"seq":55,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"px 16,21 c=stone2"}
-{"seq":56,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"px 17,22 c=stone4"}
-{"seq":57,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"px 24,19 c=stone2"}
-{"seq":58,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"px 25,20 c=stone4"}
-{"seq":59,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"px 31,18 31,19 c=stone1"}
-{"seq":60,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"paint 14,6 <<\n  ..dc.\n  .cbb.\n  .bbab\n>>"}
-{"seq":61,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"paint 19,18 <<\n  .d\n  cb\n  bb\n  .a\n>>"}
-{"seq":62,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"paint 3,14 <<\n  .dc..\n  cbbcb\n  .baa.\n>>"}
-{"seq":63,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"paint 7,23 <<\n  .cc\n  bba\n>>"}
-{"seq":64,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"px 15,6 c=lichen"}
-{"seq":65,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"px 4,15 c=lichen"}
-{"seq":66,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"line 16,2 16,5 c=stone0 pp=on"}
-{"seq":67,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"line 5,2 5,6 c=stone0 pp=on"}
-{"seq":68,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"line 12,10 12,13 c=stone0 pp=on"}
-{"seq":69,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"line 2,10 2,13 c=stone0 pp=on"}
-{"seq":70,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"line 20,17 20,17 c=stone0 pp=on"}
-{"seq":71,"by":"claude","at":"2026-10-28T00:44:29Z","group":"g1","cmd":"line 8,17 8,21 c=stone0 pp=on"}
+{"pclaw":"tape","lang":2}
+{"seq":1,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"new tile stone_floor 24x24 palette=mossy-ruins wrap=on cell=24x24 bg=stone1 <<\n  k ink #17181d\n  0 stone0 #272a30\n  1 stone1 #3b4044\n  2 stone2 #535a5b\n  3 stone3 #6c7570\n  4 stone4 #8b9489\n  5 stone5 #afb6a5\n  a moss0 #1c2e21\n  b moss1 #2c4729\n  c moss2 #486a32\n  d moss3 #6c8c3a\n  e lichen #a2ab52\n  f soil0 #2a211c\n  g soil1 #44352a\n  h soil2 #65503a\n  w pool #34566a\n  ramp stone stone0 stone1 stone2 stone3 stone4 stone5\n  ramp moss moss0 moss1 moss2 moss3 lichen\n  ramp soil soil0 soil1 soil2\n>>"}
+{"seq":2,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"rect 6,1 10x7 c=stone3 fill"}
+{"seq":3,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"rect 17,1 12x7 c=stone3 fill"}
+{"seq":4,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"rect 3,9 9x6 c=stone3 fill"}
+{"seq":5,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"rect 13,9 13x6 c=stone3 fill"}
+{"seq":6,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"rect 9,16 11x8 c=stone3 fill"}
+{"seq":7,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"rect 21,16 11x8 c=stone3 fill"}
+{"seq":8,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"line 6,1 15,1 c=stone4 pp=on"}
+{"seq":9,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"line 6,2 6,6 c=stone4 pp=on"}
+{"seq":10,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"line 17,1 28,1 c=stone4 pp=on"}
+{"seq":11,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"line 17,2 17,6 c=stone4 pp=on"}
+{"seq":12,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"line 3,9 11,9 c=stone4 pp=on"}
+{"seq":13,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"line 3,10 3,13 c=stone4 pp=on"}
+{"seq":14,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"line 13,9 25,9 c=stone4 pp=on"}
+{"seq":15,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"line 13,10 13,13 c=stone4 pp=on"}
+{"seq":16,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"line 9,16 19,16 c=stone4 pp=on"}
+{"seq":17,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"line 9,17 9,22 c=stone4 pp=on"}
+{"seq":18,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"line 21,16 31,16 c=stone4 pp=on"}
+{"seq":19,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"line 21,17 21,22 c=stone4 pp=on"}
+{"seq":20,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"line 7,7 15,7 c=stone2 pp=on"}
+{"seq":21,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"line 15,2 15,6 c=stone2 pp=on"}
+{"seq":22,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"line 18,7 28,7 c=stone2 pp=on"}
+{"seq":23,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"line 28,2 28,6 c=stone2 pp=on"}
+{"seq":24,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"line 4,14 11,14 c=stone2 pp=on"}
+{"seq":25,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"line 11,10 11,13 c=stone2 pp=on"}
+{"seq":26,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"line 14,14 25,14 c=stone2 pp=on"}
+{"seq":27,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"line 25,10 25,13 c=stone2 pp=on"}
+{"seq":28,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"line 10,23 19,23 c=stone2 pp=on"}
+{"seq":29,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"line 19,17 19,22 c=stone2 pp=on"}
+{"seq":30,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"line 22,23 31,23 c=stone2 pp=on"}
+{"seq":31,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"line 31,17 31,22 c=stone2 pp=on"}
+{"seq":32,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"px 6,1 15,1 6,7 15,7 c=stone1"}
+{"seq":33,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"px 17,1 28,1 17,7 28,7 c=stone1"}
+{"seq":34,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"px 3,9 11,9 3,14 11,14 c=stone1"}
+{"seq":35,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"px 13,9 25,9 13,14 25,14 c=stone1"}
+{"seq":36,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"px 9,16 19,16 9,23 19,23 c=stone1"}
+{"seq":37,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"px 21,16 31,16 21,23 31,23 c=stone1"}
+{"seq":38,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"px 8,4 c=stone2"}
+{"seq":39,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"px 9,5 c=stone4"}
+{"seq":40,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"line 11,1 12,3 13,6 c=stone1 pp=on"}
+{"seq":41,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"px 13,3 14,6 c=stone4"}
+{"seq":42,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"px 20,3 c=stone2"}
+{"seq":43,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"px 21,4 c=stone4"}
+{"seq":44,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"px 1,5 c=stone2"}
+{"seq":45,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"px 2,6 c=stone4"}
+{"seq":46,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"px 25,1 26,1 c=stone3"}
+{"seq":47,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"px 6,11 c=stone2"}
+{"seq":48,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"px 7,12 c=stone4"}
+{"seq":49,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"line 18,9 19,12 c=stone1 pp=on"}
+{"seq":50,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"px 19,10 20,12 c=stone4"}
+{"seq":51,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"px 23,11 c=stone2"}
+{"seq":52,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"px 24,12 c=stone4"}
+{"seq":53,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"px 12,19 c=stone2"}
+{"seq":54,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"px 13,20 c=stone4"}
+{"seq":55,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"px 16,21 c=stone2"}
+{"seq":56,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"px 17,22 c=stone4"}
+{"seq":57,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"px 24,19 c=stone2"}
+{"seq":58,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"px 25,20 c=stone4"}
+{"seq":59,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"px 31,18 31,19 c=stone1"}
+{"seq":60,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"paint 14,6 <<\n  ..dc.\n  .cbb.\n  .bbab\n>>"}
+{"seq":61,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"paint 19,18 <<\n  .d\n  cb\n  bb\n  .a\n>>"}
+{"seq":62,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"paint 3,14 <<\n  .dc..\n  cbbcb\n  .baa.\n>>"}
+{"seq":63,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"paint 7,23 <<\n  .cc\n  bba\n>>"}
+{"seq":64,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"px 15,6 c=lichen"}
+{"seq":65,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"px 4,15 c=lichen"}
+{"seq":66,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"line 16,2 16,5 c=stone0 pp=on"}
+{"seq":67,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"line 5,2 5,6 c=stone0 pp=on"}
+{"seq":68,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"line 12,10 12,13 c=stone0 pp=on"}
+{"seq":69,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"line 2,10 2,13 c=stone0 pp=on"}
+{"seq":70,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"line 20,17 20,17 c=stone0 pp=on"}
+{"seq":71,"by":"claude","at":"2026-10-28T05:03:58Z","group":"g1","cmd":"line 8,17 8,21 c=stone0 pp=on"}

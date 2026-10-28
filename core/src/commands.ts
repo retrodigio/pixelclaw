@@ -4,11 +4,21 @@
 
 import { DOC_KINDS, TRANSPARENT, createDoc, ctxOf, type Doc, type DocKind } from './doc.ts';
 import { drawColoured, drawPoints, mirrored, targetOf } from './draw.ts';
-import { RESERVED_KEYS, autoKeys, normaliseHex, type Palette } from './palette.ts';
+import { DEFAULT_ROLE_HEX, RESERVED_KEYS, ROLES, autoKeys, isRole, normaliseHex, paletteRows, parsePaletteRows, type Palette, type PaletteEntry } from './palette.ts';
 import { DiagError, quote, type BlockRow, type ParsedCommand, type Token } from './parser.ts';
 import { ellipsePixels, fill, freehand, polyline, rectPixels, type Pt } from './raster.ts';
 
+/**
+ * The command-language version, recorded on the first line of every tape. Version 2 writes the
+ * whole palette into the tape's `new` line, so a tape no longer depends on the project's palette
+ * files; version 1 tapes (a `new` line without a palette block) still replay, reading the
+ * project palette.
+ */
+export const LANG_VERSION = 2;
+
 export interface NormaliseContext {
+  /** The tape language the line is written in (default LANG_VERSION). */
+  lang?: number;
   /** The document before this command (null before 'new'). */
   doc: Doc | null;
   palette(name: string): Palette | undefined;
@@ -193,7 +203,7 @@ export const shiftPts = (pts: Pt[], dx: number, dy: number): Pt[] => (dx || dy ?
 
 const newCmd: CommandSpec = {
   name: 'new',
-  summary: 'new <kind> <name> <W>x<H> [palette=<name>] [wrap=on|off] [cell=<W>x<H>] [bg=<colour>|none]',
+  summary: 'new <kind> <name> <W>x<H> [palette=<name>] [wrap=on|off] [cell=<W>x<H>] [bg=<colour>|none] [<< palette rows >>]',
   normalise(cmd, ctx) {
     if (ctx.doc) throw new DiagError(cmd.line, cmd.col, `new must be the first command of a tape (this document already exists)`);
     const a = new Args(cmd, ['palette', 'wrap', 'cell', 'bg']);
@@ -203,13 +213,29 @@ const newCmd: CommandSpec = {
     const nameTok = a.take('word', 'a document name');
     if (!/^[a-z][a-z0-9_-]*$/.test(nameTok.v)) throw new DiagError(nameTok.line, nameTok.col, `document names use a-z, 0-9, _ and -, starting with a letter`);
     const size = a.take('size', 'a size like 24x24');
+    const block = a.peek()?.t === 'block' ? a.take('block', 'palette rows') : null;
     a.done();
     if (size.w < 1 || size.h < 1 || size.w > 4096 || size.h > 4096) throw new DiagError(size.line, size.col, `size must be 1..4096 on each side`);
+    const lang = ctx.lang ?? LANG_VERSION;
     const palOpt = a.opts.get('palette');
     const palName = palOpt?.value ?? ctx.defaultPalette;
-    if (!palName) throw new DiagError(cmd.line, cmd.col, `new: no palette= given and the project has no default palette`);
-    const palette = ctx.palette(palName);
-    if (!palette) throw new DiagError(palOpt?.line ?? cmd.line, palOpt?.vcol ?? cmd.col, `unknown palette '${palName}'`);
+    let palette: Palette;
+    if (block) {
+      // The palette written into the line (language 2): the project's palette files are not read.
+      if (lang < 2) throw new DiagError(block.line, block.col, `a palette block needs tape language 2`);
+      if (!palName || !/^[A-Za-z][A-Za-z0-9_-]*$/.test(palName)) throw new DiagError(palOpt?.line ?? cmd.line, palOpt?.vcol ?? cmd.col, `new: a palette block needs palette=<name>`);
+      const r = parsePaletteRows(palName, block.rows.map((x) => x.text));
+      if ('message' in r) {
+        const row = block.rows[r.row];
+        throw new DiagError(row?.line ?? block.line, (row?.col ?? block.col) + r.col, r.message);
+      }
+      palette = r.palette;
+    } else {
+      if (!palName) throw new DiagError(cmd.line, cmd.col, `new: no palette= given and the project has no default palette`);
+      const p = ctx.palette(palName);
+      if (!p) throw new DiagError(palOpt?.line ?? cmd.line, palOpt?.vcol ?? cmd.col, `unknown palette '${palName}'`);
+      palette = p;
+    }
     const wrap = a.choice('wrap', ['on', 'off'], kind === 'tile' ? 'on' : 'off') === 'on';
     let cellW = size.w;
     let cellH = size.h;
@@ -222,8 +248,9 @@ const newCmd: CommandSpec = {
     }
     const bgOpt = a.opts.get('bg');
     const bg = bgOpt ? resolveColour(bgOpt.value, palette, bgOpt.line, bgOpt.vcol) : { index: TRANSPARENT, name: 'none' };
+    const head = `new ${kind} ${nameTok.v} ${size.w}x${size.h} palette=${palette.name} wrap=${wrap ? 'on' : 'off'} cell=${cellW}x${cellH} bg=${bg.name}`;
     return {
-      text: `new ${kind} ${nameTok.v} ${size.w}x${size.h} palette=${palette.name} wrap=${wrap ? 'on' : 'off'} cell=${cellW}x${cellH} bg=${bg.name}`,
+      text: lang >= 2 ? `${head} <<\n${blockText(paletteRows(palette))}>>` : head,
       op: { k: 'new', kind, name: nameTok.v, width: size.w, height: size.h, cellW, cellH, wrap, palette, bg: bg.index },
     };
   },
@@ -451,10 +478,10 @@ const strokeCmd: CommandSpec = {
 
 const paletteCmd: CommandSpec = {
   name: 'palette',
-  summary: 'palette set <entry> hex=#rrggbb | palette add [<name>] hex=#rrggbb [key=<k>] | palette lock | palette unlock | palette save as=<name>',
+  summary: 'palette set <entry> [hex=#rrggbb] [role=<role>|none] | palette add [<name>] hex=#rrggbb|role=<role> [key=<k>] | palette lock | palette unlock | palette save as=<name>',
   normalise(cmd, ctx) {
     const doc = needDoc(cmd, ctx);
-    const a = new Args(cmd, ['hex', 'key', 'as']);
+    const a = new Args(cmd, ['hex', 'key', 'as', 'role']);
     const how = a.take('word', 'set, add, lock, unlock or save');
     if (how.v === 'lock' || how.v === 'unlock') {
       a.done();
@@ -467,7 +494,7 @@ const paletteCmd: CommandSpec = {
       const as = a.opts.get('as');
       if (!as) throw new DiagError(cmd.line, cmd.col, `palette save: missing as=<palette name> (the project palette to write)`);
       if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(as.value)) throw new DiagError(as.line, as.vcol, `as= must be a palette name (letters, digits, _ and -)`);
-      for (const k of ['hex', 'key']) { const o = a.opts.get(k); if (o) throw new DiagError(o.line, o.col, `palette save takes no ${k}=`); }
+      for (const k of ['hex', 'key', 'role']) { const o = a.opts.get(k); if (o) throw new DiagError(o.line, o.col, `palette save takes no ${k}=`); }
       // Writing the file is the writer's job (it is not document state); the line records when it happened.
       return { text: `palette save as=${as.value}`, op: fn(() => {}) };
     }
@@ -476,11 +503,19 @@ const paletteCmd: CommandSpec = {
     const asOpt = a.opts.get('as');
     if (asOpt) throw new DiagError(asOpt.line, asOpt.col, `palette ${how.v} takes no as=`);
     const hexOpt = a.opts.get('hex');
-    if (!hexOpt) throw new DiagError(cmd.line, cmd.col, `palette ${how.v}: missing hex=#rrggbb`);
-    const hex = normaliseHex(hexOpt.value);
-    if (!hex || !hexOpt.value.startsWith('#')) throw new DiagError(hexOpt.line, hexOpt.vcol, `hex= must be a colour like #a4552e`);
+    const roleOpt = a.opts.get('role');
+    let hex: string | null = null;
+    if (hexOpt) {
+      hex = normaliseHex(hexOpt.value);
+      if (!hex || !hexOpt.value.startsWith('#')) throw new DiagError(hexOpt.line, hexOpt.vcol, `hex= must be a colour like #a4552e`);
+    }
+    // role=<role> makes the entry stand for a colour role (plan §3.1); role=none makes it a plain colour again.
+    if (roleOpt && !isRole(roleOpt.value) && !(how.v === 'set' && roleOpt.value === 'none')) {
+      throw new DiagError(roleOpt.line, roleOpt.vcol, `role= must be one of ${ROLES.join(', ')}${how.v === 'set' ? ' or none' : ''}`);
+    }
     const pal = doc.palette;
     if (how.v === 'set') {
+      if (!hexOpt && !roleOpt) throw new DiagError(cmd.line, cmd.col, `palette set: missing hex=#rrggbb (or role=)`);
       // A digit key parses as a number.
       const e = a.peek()?.t === 'int' ? ((i) => ({ ...i, v: String(i.v) }))(a.take('int', 'an entry')) : a.take('word', 'an entry name or key');
       a.done();
@@ -488,11 +523,19 @@ const paletteCmd: CommandSpec = {
       if (key) throw new DiagError(key.line, key.col, `palette set changes a colour only; keys stay`);
       const i = pal.entries.findIndex((x) => x.name === e.v || ([...e.v].length === 1 && x.key === e.v));
       if (i < 0) throw new DiagError(e.line, e.col, `palette '${pal.name}' has no entry '${e.v}'`);
-      const entries = pal.entries.map((x, j) => (j === i ? { ...x, hex } : x));
-      return { text: `palette set ${pal.entries[i]!.name} hex=${hex}`, op: fn((d) => { d.palette = { ...pal, entries }; }) };
+      const entries = pal.entries.map((x, j): PaletteEntry => {
+        if (j !== i) return x;
+        const y: PaletteEntry = { key: x.key, name: x.name, hex: hex ?? x.hex };
+        const role = roleOpt ? roleOpt.value : x.role;
+        return role && role !== 'none' ? { ...y, role: role as PaletteEntry['role'] } : y;
+      });
+      const text = `palette set ${pal.entries[i]!.name}${hex ? ` hex=${hex}` : ''}${roleOpt ? ` role=${roleOpt.value}` : ''}`;
+      return { text, op: fn((d) => { d.palette = { ...pal, entries }; }) };
     }
-    if (how.v !== 'add') throw new DiagError(how.line, how.col, `palette: expected set or add`);
     if (pal.entries.length >= 256) throw new DiagError(how.line, how.col, `palette '${pal.name}' is full (256 entries)`);
+    if (!hex && !roleOpt) throw new DiagError(cmd.line, cmd.col, `palette add: missing hex=#rrggbb (or role=)`);
+    const role = roleOpt ? (roleOpt.value as PaletteEntry['role'] & string) : undefined;
+    hex ??= DEFAULT_ROLE_HEX[role!];
     const names = new Set(pal.entries.map((x) => x.name));
     const keys = new Set(pal.entries.map((x) => x.key));
     const nameTok = a.peek()?.t === 'word' ? a.take('word', 'a name') : null;
@@ -516,8 +559,8 @@ const paletteCmd: CommandSpec = {
     } else {
       key = autoKeys(512).find((k) => !keys.has(k) && k !== '"' && k !== ';')!;
     }
-    const entries = [...pal.entries, { key, name, hex }];
-    return { text: `palette add ${name} hex=${hex} key=${key}`, op: fn((d) => { d.palette = { ...pal, entries }; }) };
+    const entries = [...pal.entries, role ? { key, name, hex, role } : { key, name, hex }];
+    return { text: `palette add ${name} hex=${hex} key=${key}${role ? ` role=${role}` : ''}`, op: fn((d) => { d.palette = { ...pal, entries }; }) };
   },
 };
 

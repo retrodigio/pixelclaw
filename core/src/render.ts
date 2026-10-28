@@ -2,9 +2,10 @@
 // text index grid, and the tile 3x3 preview. All RGBA images go through encodePng.
 
 import { TRANSPARENT, flatten, flattenReference, type Doc } from './doc.ts';
-import { rgbOf } from './palette.ts';
+import { ROLES, rgbOf } from './palette.ts';
 import { createRgba, type Rgba } from './png.ts';
-import { indexOf } from './raster.ts';
+import { indexOf, type Pt } from './raster.ts';
+import { themedPalette, type Theme } from './themes.ts';
 
 type RGB = [number, number, number];
 
@@ -14,6 +15,7 @@ const RULER_TEXT: RGB = [216, 219, 224];
 const CHECK_A: RGB = [204, 204, 204];
 const CHECK_B: RGB = [238, 238, 238];
 const CELL_LINE: RGB = [255, 79, 216];
+const MARK: RGB = [255, 0, 200];
 
 // 3x5 digits, rows top to bottom, 3 bits each (MSB = left).
 const DIGITS: number[][] = [
@@ -59,14 +61,41 @@ function text(img: Rgba, x: number, y: number, s: string, c: RGB, scale: number)
 
 const textWidth = (s: string, scale: number): number => s.length * 4 * scale - scale;
 
-function colourTable(doc: Doc): RGB[] {
-  return doc.palette.entries.map((e) => rgbOf(e.hex));
+function colourTable(doc: Doc, theme?: Theme | null): RGB[] {
+  return themedPalette(doc.palette, theme).entries.map((e) => rgbOf(e.hex));
 }
 
-/** The flat document at 1x: palette colours, transparent pixels with alpha 0. */
-export function renderFlat(doc: Doc, frame = 0): Rgba {
+
+/**
+ * Circle flagged pixels in magenta (plan §2): a ring around each pixel of an image drawn at
+ * `s` px per pixel with its top-left pixel at ox,oy. Below 4x the pixel is filled instead.
+ */
+export function drawMarks(img: Rgba, ox: number, oy: number, s: number, marks: readonly Pt[], w: number, h: number): void {
+  for (const [x, y] of marks) {
+    if (x < 0 || y < 0 || x >= w || y >= h) continue;
+    const x0 = ox + x * s;
+    const y0 = oy + y * s;
+    if (s < 4) {
+      for (let j = 0; j < s; j++) for (let i = 0; i < s; i++) put(img, x0 + i, y0 + j, MARK);
+      continue;
+    }
+    // In doubled coordinates around the pixel's centre: a ring just outside the pixel.
+    const r = s + Math.max(2, s >> 1);
+    const t = s >= 8 ? 4 : 2;
+    const reach = (r >> 1) + 1;
+    for (let j = -reach; j < s + reach; j++) for (let i = -reach; i < s + reach; i++) {
+      const dx = 2 * i + 1 - s;
+      const dy = 2 * j + 1 - s;
+      const d2 = dx * dx + dy * dy;
+      if (d2 <= r * r && d2 > (r - t) * (r - t)) put(img, x0 + i, y0 + j, MARK);
+    }
+  }
+}
+
+/** The flat document at 1x: palette colours (role entries as the theme shows them), transparent pixels with alpha 0. */
+export function renderFlat(doc: Doc, frame = 0, theme?: Theme | null): Rgba {
   const px = flatten(doc, frame);
-  const pal = colourTable(doc);
+  const pal = colourTable(doc, theme);
   const img = createRgba(doc.width, doc.height);
   for (let i = 0; i < px.length; i++) {
     if (px[i] === TRANSPARENT) continue;
@@ -87,6 +116,10 @@ export interface ScaledOptions {
   rulers?: boolean;
   /** The frame to show (0-based; default the first). */
   frame?: number;
+  /** Pixels a check flagged: circled in magenta. */
+  marks?: readonly Pt[];
+  /** The preview theme for role entries. */
+  theme?: Theme | null;
 }
 
 /** A reference pixel shown under transparent art: its colour half-way to the checkerboard's. */
@@ -113,7 +146,7 @@ export function renderScaled(doc: Doc, o: ScaledOptions = {}): Rgba {
   rect(img, 0, 0, img.width, img.height, RULER_BG);
   const px = flatten(doc, o.frame ?? 0);
   const ref = flattenReference(doc, o.frame ?? 0);
-  const pal = colourTable(doc);
+  const pal = colourTable(doc, o.theme);
   const chk = Math.max(2, s >> 1);
   for (let y = 0; y < doc.height; y++) for (let x = 0; x < doc.width; x++) {
     const v = px[y * doc.width + x]!;
@@ -143,6 +176,7 @@ export function renderScaled(doc: Doc, o: ScaledOptions = {}): Rgba {
     for (let x = doc.cellW; x < doc.width; x += doc.cellW) for (let y = 0; y < H; y++) tint(img, left + x * s, top + y, CELL_LINE, 180);
     for (let y = doc.cellH; y < doc.height; y += doc.cellH) for (let x = 0; x < W; x++) tint(img, left + x, top + y * s, CELL_LINE, 180);
   }
+  if (o.marks?.length) drawMarks(img, left, top, s, o.marks, doc.width, doc.height);
   if (rulers) {
     for (let x = 0; x <= doc.width; x++) {
       const major = x % 8 === 0;
@@ -163,15 +197,15 @@ export function renderScaled(doc: Doc, o: ScaledOptions = {}): Rgba {
   return img;
 }
 
-/** The tile repeated 3x3, at 1x and at 4x side by side, to show seams and repetition. */
-export function renderTile3x3(doc: Doc, frame = 0): Rgba {
+/** The tile repeated 3x3, at 1x and at 4x side by side, to show seams and repetition. Marks go on the middle copy at 4x. */
+export function renderTile3x3(doc: Doc, frame = 0, o: { marks?: readonly Pt[]; theme?: Theme | null } = {}): Rgba {
   const pad = 8;
   const w = doc.width;
   const h = doc.height;
   const img = createRgba(pad + 3 * w + pad + 12 * w + pad, pad + 12 * h + pad);
   rect(img, 0, 0, img.width, img.height, RULER_BG);
   const px = flatten(doc, frame);
-  const pal = colourTable(doc);
+  const pal = colourTable(doc, o.theme);
   const draw = (ox: number, oy: number, s: number): void => {
     for (let ty = 0; ty < 3; ty++) for (let tx = 0; tx < 3; tx++) for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       const v = px[y * w + x]!;
@@ -185,6 +219,7 @@ export function renderTile3x3(doc: Doc, frame = 0): Rgba {
   };
   draw(pad, pad, 1);
   draw(pad + 3 * w + pad, pad, 4);
+  if (o.marks?.length) drawMarks(img, pad + 3 * w + pad + 4 * w, pad + 4 * h, 4, o.marks, w, h);
   return img;
 }
 
@@ -243,44 +278,53 @@ export function renderGrid(doc: Doc, region?: Region, frame = 0): string {
   return lines.join('\n') + '\n';
 }
 
-/** One pixel that differs between two documents (palette indices; TRANSPARENT for none). */
+/** One pixel that differs between two documents (palette indices; TRANSPARENT for none), in frame `f` (0-based). */
 export interface PixelChange {
   x: number;
   y: number;
   from: number;
   to: number;
+  f: number;
 }
 
-/** The pixels of the flat image that differ. A missing or differently sized `before` counts as all changed. */
+/**
+ * The pixels of the flat image that differ, in every frame of `after`. A missing or differently
+ * sized `before` counts as all changed, and so does a frame `before` does not have.
+ */
 export function diffPixels(before: Doc | null, after: Doc): PixelChange[] {
-  const a = flatten(after);
   const same = before && before.width === after.width && before.height === after.height;
-  const b = same ? flatten(before) : null;
   const out: PixelChange[] = [];
-  for (let i = 0; i < a.length; i++) {
-    const from = b ? b[i]! : TRANSPARENT;
-    if (b && from === a[i]) continue;
-    out.push({ x: i % after.width, y: Math.floor(i / after.width), from, to: a[i]! });
+  for (let f = 0; f < after.frameCount; f++) {
+    const a = flatten(after, f);
+    const b = same && f < before.frameCount ? flatten(before, f) : null;
+    for (let i = 0; i < a.length; i++) {
+      const from = b ? b[i]! : TRANSPARENT;
+      if (b && from === a[i]) continue;
+      if (!b && a[i] === TRANSPARENT && same) continue; // a new empty frame changes nothing visible
+      out.push({ x: i % after.width, y: Math.floor(i / after.width), from, to: a[i]!, f });
+    }
   }
   return out;
 }
 
-const MARK: RGB = [255, 0, 200];
 const NOTE: RGB = [255, 214, 10];
 
-/** The changes as text: one `x,y from→to` per pixel (by entry name), up to `limit` of them. */
+/** The changes as text: one `x,y from→to` per pixel (by entry name; `f2 x,y …` on documents with frames), up to `limit` of them. */
 export function diffText(before: Doc | null, after: Doc, changes: PixelChange[], limit = 60): string {
   const name = (d: Doc | null, v: number) => (v === TRANSPARENT ? 'none' : d?.palette.entries[v]?.name ?? `#${v}`);
   if (changes.length === 0) return 'no pixels changed';
-  const head = `${changes.length} px changed`;
+  const frames = after.frameCount > 1 || (before?.frameCount ?? 1) > 1;
+  const per = [...new Set(changes.map((c) => c.f))].map((f) => `frame ${f + 1}: ${changes.filter((c) => c.f === f).length}`);
+  const head = `${changes.length} px changed${frames ? ` (${per.join(', ')})` : ''}`;
   if (changes.length > limit) return `${head} (more than ${limit}: see the image)`;
-  return [head + ':', ...changes.map((c) => `  ${c.x},${c.y} ${name(before, c.from)}→${name(after, c.to)}`)].join('\n');
+  return [head + ':', ...changes.map((c) => `  ${frames ? `f${c.f + 1} ` : ''}${c.x},${c.y} ${name(before, c.from)}→${name(after, c.to)}`)].join('\n');
 }
 
 /**
  * Before and after side by side at the render scale, each changed pixel outlined in magenta on
  * both, and the after document's open notes outlined in yellow dashes. With more than `limit`
  * changes a third panel shows them as a map: the after image dimmed, changed pixels solid magenta.
+ * On documents with frames there is one row per frame that changed, numbered at the left.
  */
 export function renderDiff(before: Doc | null, after: Doc, o: { scale?: number; limit?: number } = {}): Rgba {
   const changes = diffPixels(before, after);
@@ -291,26 +335,31 @@ export function renderDiff(before: Doc | null, after: Doc, o: { scale?: number; 
   const bw = before ? before.width * s : W;
   const bh = before ? before.height * s : H;
   const panels = changes.length > (o.limit ?? 60) ? 3 : 2;
-  const img = createRgba(pad + bw + pad + (W + pad) * (panels - 1), pad + Math.max(bh, H) + pad);
+  const multi = after.frameCount > 1 || (before?.frameCount ?? 1) > 1;
+  const changed = [...new Set(changes.map((c) => c.f))].sort((a, b) => a - b);
+  const rows = multi && changed.length ? changed : [0];
+  const label = multi ? textWidth(String(after.frameCount), 2) + pad : 0;
+  const rowH = Math.max(bh, H) + pad;
+  const img = createRgba(label + pad + bw + pad + (W + pad) * (panels - 1), pad + rowH * rows.length);
   rect(img, 0, 0, img.width, img.height, RULER_BG);
-  const draw = (d: Doc, ox: number, dim: boolean): void => {
-    const px = flatten(d);
+  const draw = (d: Doc, f: number, ox: number, oy: number, dim: boolean): void => {
+    const px = f < d.frameCount ? flatten(d, f) : new Uint16Array(d.width * d.height).fill(TRANSPARENT);
     const pal = colourTable(d);
     const chk = Math.max(2, s >> 1);
     for (let y = 0; y < d.height; y++) for (let x = 0; x < d.width; x++) {
       const v = px[y * d.width + x]!;
       for (let j = 0; j < s; j++) for (let i = 0; i < s; i++) {
         const c = v === TRANSPARENT ? (((x * s + i) / chk | 0) + ((y * s + j) / chk | 0)) % 2 ? CHECK_A : CHECK_B : pal[v]!;
-        put(img, ox + x * s + i, pad + y * s + j, c);
-        if (dim) tint(img, ox + x * s + i, pad + y * s + j, RULER_BG, 190);
+        put(img, ox + x * s + i, oy + y * s + j, c);
+        if (dim) tint(img, ox + x * s + i, oy + y * s + j, RULER_BG, 190);
       }
     }
   };
-  const mark = (ox: number, w: number, h: number, solid: boolean): void => {
+  const mark = (f: number, ox: number, oy: number, w: number, h: number, solid: boolean): void => {
     for (const c of changes) {
-      if (c.x >= w || c.y >= h) continue;
+      if (c.f !== f || c.x >= w || c.y >= h) continue;
       const x0 = ox + c.x * s;
-      const y0 = pad + c.y * s;
+      const y0 = oy + c.y * s;
       if (solid || s < 4) {
         for (let j = 0; j < s; j++) for (let i = 0; i < s; i++) {
           if (solid) put(img, x0 + i, y0 + j, MARK);
@@ -326,26 +375,108 @@ export function renderDiff(before: Doc | null, after: Doc, o: { scale?: number; 
       }
     }
   };
-  if (before) {
-    draw(before, pad, false);
-    mark(pad, before.width, before.height, false);
+  rows.forEach((f, r) => {
+    const oy = pad + r * rowH;
+    if (multi) text(img, pad, oy + 2, String(f + 1), RULER_TEXT, 2);
+    const bx = label + pad;
+    if (before) {
+      draw(before, f, bx, oy, false);
+      mark(f, bx, oy, before.width, before.height, false);
+    }
+    const ax = bx + bw + pad;
+    draw(after, f, ax, oy, false);
+    mark(f, ax, oy, after.width, after.height, false);
+    for (const n of after.notes) {
+      // A dashed box just outside the note's pixels (on the panel's border it sits inside).
+      const x0 = Math.max(ax, ax + n.x * s - 1);
+      const y0 = Math.max(oy, oy + n.y * s - 1);
+      const x1 = Math.min(ax + W - 1, ax + (n.x + n.w) * s);
+      const y1 = Math.min(oy + H - 1, oy + (n.y + n.h) * s);
+      for (let x = x0; x <= x1; x++) if (((x - x0) >> 1) % 2 === 0) { put(img, x, y0, NOTE); put(img, x, y1, NOTE); }
+      for (let y = y0; y <= y1; y++) if (((y - y0) >> 1) % 2 === 0) { put(img, x0, y, NOTE); put(img, x1, y, NOTE); }
+    }
+    if (panels === 3) {
+      const mx = ax + W + pad;
+      draw(after, f, mx, oy, true);
+      mark(f, mx, oy, after.width, after.height, true);
+    }
+  });
+  return img;
+}
+
+/** A neutral ground for previews when there is no ground tile. */
+const PLAIN_GROUND: RGB = [88, 94, 102];
+
+/**
+ * The game preview (plan §2): sprites side by side on their ground tile (repeated), at 1x (real
+ * size) and again at the engine's draw scale. Sprites stand on a common baseline. The first item
+ * is the asset being judged; the rest are its neighbours in the set.
+ */
+export function renderGame(items: { doc: Doc; frame?: number }[], o: { ground?: Doc | null; scale?: number; theme?: Theme | null; marks?: readonly Pt[] } = {}): Rgba {
+  const k = Math.max(1, o.scale ?? 2);
+  const gap = 8;
+  const margin = 8;
+  const maxH = Math.max(1, ...items.map((i) => i.doc.height));
+  const sceneW = margin * 2 + items.reduce((n, i) => n + i.doc.width, 0) + gap * Math.max(0, items.length - 1);
+  const sceneH = margin * 2 + maxH;
+  // The scene at 1x, as colours (null: not yet drawn).
+  const scene: RGB[] = [];
+  const g = o.ground ? flatten(o.ground, 0) : null;
+  const gpal = o.ground ? colourTable(o.ground, o.theme) : [];
+  for (let y = 0; y < sceneH; y++) for (let x = 0; x < sceneW; x++) {
+    const v = g ? g[(y % o.ground!.height) * o.ground!.width + (x % o.ground!.width)]! : TRANSPARENT;
+    scene.push(v === TRANSPARENT ? PLAIN_GROUND : gpal[v]!);
   }
-  const ax = pad + bw + pad;
-  draw(after, ax, false);
-  mark(ax, after.width, after.height, false);
-  for (const n of after.notes) {
-    // A dashed box just outside the note's pixels (on the panel's border it sits inside).
-    const x0 = Math.max(ax, ax + n.x * s - 1);
-    const y0 = Math.max(pad, pad + n.y * s - 1);
-    const x1 = Math.min(ax + W - 1, ax + (n.x + n.w) * s);
-    const y1 = Math.min(pad + H - 1, pad + (n.y + n.h) * s);
-    for (let x = x0; x <= x1; x++) if (((x - x0) >> 1) % 2 === 0) { put(img, x, y0, NOTE); put(img, x, y1, NOTE); }
-    for (let y = y0; y <= y1; y++) if (((y - y0) >> 1) % 2 === 0) { put(img, x0, y, NOTE); put(img, x1, y, NOTE); }
+  let ox = margin;
+  const firstAt: Pt = [margin, margin + maxH - (items[0]?.doc.height ?? 0)];
+  for (const it of items) {
+    const px = flatten(it.doc, it.frame ?? 0);
+    const pal = colourTable(it.doc, o.theme);
+    const oy = margin + maxH - it.doc.height;
+    for (let y = 0; y < it.doc.height; y++) for (let x = 0; x < it.doc.width; x++) {
+      const v = px[y * it.doc.width + x]!;
+      if (v !== TRANSPARENT) scene[(oy + y) * sceneW + ox + x] = pal[v]!;
+    }
+    ox += it.doc.width + gap;
   }
-  if (panels === 3) {
-    const mx = ax + W + pad;
-    draw(after, mx, true);
-    mark(mx, after.width, after.height, true);
+  const pad = 8;
+  const img = createRgba(pad + Math.max(sceneW, sceneW * k) + pad, pad + sceneH + pad + sceneH * k + pad);
+  rect(img, 0, 0, img.width, img.height, RULER_BG);
+  for (let y = 0; y < sceneH; y++) for (let x = 0; x < sceneW; x++) {
+    const c = scene[y * sceneW + x]!;
+    put(img, pad + x, pad + y, c);
+    for (let j = 0; j < k; j++) for (let i = 0; i < k; i++) put(img, pad + x * k + i, pad + sceneH + pad + y * k + j, c);
   }
+  if (o.marks?.length && items[0]) drawMarks(img, pad + firstAt[0] * k, pad + sceneH + pad + firstAt[1] * k, k, o.marks, items[0].doc.width, items[0].doc.height);
+  return img;
+}
+
+/**
+ * The recolour preview (plan §2, §4.8): the art under several preview themes side by side, each
+ * with a strip of its role colours (black, white, light, dark, darkest) underneath.
+ */
+export function renderRecolour(doc: Doc, themes: Theme[], o: { scale?: number; frame?: number } = {}): Rgba {
+  const s = o.scale ?? Math.max(1, Math.min(4, Math.floor(96 / Math.max(doc.width, doc.height))));
+  const pad = 8;
+  const W = doc.width * s;
+  const H = doc.height * s;
+  const sw = Math.max(4, Math.floor(W / ROLES.length));
+  const n = Math.max(1, themes.length);
+  const img = createRgba(pad + n * (W + pad), pad + H + 4 + 6 + pad);
+  rect(img, 0, 0, img.width, img.height, RULER_BG);
+  const px = flatten(doc, o.frame ?? 0);
+  const chk = Math.max(2, s >> 1);
+  themes.forEach((t, k) => {
+    const ox = pad + k * (W + pad);
+    const pal = colourTable(doc, t);
+    for (let y = 0; y < doc.height; y++) for (let x = 0; x < doc.width; x++) {
+      const v = px[y * doc.width + x]!;
+      for (let j = 0; j < s; j++) for (let i = 0; i < s; i++) {
+        const c = v === TRANSPARENT ? (((x * s + i) / chk | 0) + ((y * s + j) / chk | 0)) % 2 ? CHECK_A : CHECK_B : pal[v]!;
+        put(img, ox + x * s + i, pad + y * s + j, c);
+      }
+    }
+    ROLES.forEach((r, i) => rect(img, ox + i * sw, pad + H + 4, sw, 6, rgbOf(t.colours[r])));
+  });
   return img;
 }
