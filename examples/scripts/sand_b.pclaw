@@ -1,0 +1,6 @@
+# A variant of the sand (plan §4.1, §17): identical sand cells in a column lined the sand's marks
+# up into stripes along the beach. The same sand moved round the tile, so cells beside each other
+# differ while the colour mix stays the same.
+fork sand sand_b
+variant of=sand
+shift 9,14 wrap

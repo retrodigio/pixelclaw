@@ -139,7 +139,7 @@ so notes and coordinates are cells), and its layers say what they hold:
 Drawing commands (`px`, `rect`, …) are refused on a map. `view map` shows a map whole at 1x, a
 region of cells (`region=`) or the camera (`camera=x,y`: the engine's screen, project.json
 `style.camera`, default `384x216`, around that cell) at the game's draw scale, with the cells as
-text; `export` writes a map for Tiled and splits an oversized asset (see docs/mcp.md).
+text; `export` writes a map for Tiled (the `tiled` profile) and splits an oversized asset (see docs/mcp.md and docs/profiles.md).
 
 ## Commands
 
@@ -654,6 +654,19 @@ document's state bytes (the same bytes the state hash in `asset.json` is taken o
 frames, every cel, each author's context, notes, stamps and macros). Loading an asset starts from
 the newest checkpoint whose tape lines still match and replays only the rest. Starting a tape
 again removes its checkpoints.
+
+### Import and densities
+
+| Command | Normal form | Notes |
+|---|---|---|
+| `import <x,y> [from="<file>"] [blob=<sha256>] << rows >>` | `import 0,0 from="sheet.png" blob=3f… <<` rows `>>` | An imported image's pixels on your layer and frame: each row is palette keys, `.` transparent; the rectangle is replaced. `pixelclaw import` and MCP `import` write these (see [profiles.md](profiles.md#import)); the line carries the pixels, so the tape replays without the file. |
+| `scale <n>` | `scale 2` | The whole document n times larger (2..8), nearest neighbour: every layer, frame and stamp, the cell grid (a footprint keeps its cells), the pivot, the ground line and notes. Selections and symmetry are dropped. Not on families or maps. A higher density starts this way. |
+| `density of=<asset> d=<n>` / `density off` | `density of=house d=2` | This asset is `<asset>` at n times its size: the `density` check reduces it and compares, the density view shows the levels, and exports write it as that level. |
+
+`new family <name> <T>x<T> scheme=<s>` with a scheme of the project's own (`schemes/*.json`)
+writes it into the line as `def="<its JSON>"`, like the palette, so the tape replays without the
+file. A fillet scheme (`blob47-round`) takes `family band … fillet=<px>`: how much wider every
+inner corner turns (kept by later `family band` lines unless given again).
 
 ## Seeds
 

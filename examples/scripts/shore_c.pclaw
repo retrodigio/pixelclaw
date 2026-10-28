@@ -1,0 +1,16 @@
+# A third look for the shore (plan §4.1, §17): shore_b's band with the third water and the third sand.
+fork shore_b shore_c
+variant of=shore
+frame 1
+family texture inside from=sand_c frame=1
+family texture outside from=water_c frame=1
+frame 2
+family texture inside from=sand_c frame=1
+family texture outside from=water_c frame=2
+frame 3
+family texture inside from=sand_c frame=1
+family texture outside from=water_c frame=3
+frame 4
+family texture inside from=sand_c frame=1
+family texture outside from=water_c frame=4
+frame 1

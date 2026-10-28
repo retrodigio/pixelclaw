@@ -11,7 +11,7 @@
 //
 //   node examples/demo-g7-agent.ts [--project <dir>] [--pause <ms>] [--linger <seconds>]
 
-import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import type { PassThrough } from 'node:stream';
 import { Client } from '@modelcontextprotocol/client';
@@ -32,6 +32,8 @@ mkdirSync(join(project, 'palettes'), { recursive: true });
 mkdirSync(join(project, 'assets'), { recursive: true });
 copyFileSync(join(EXAMPLE, 'project.json'), join(project, 'project.json'));
 copyFileSync(join(EXAMPLE, 'style.md'), join(project, 'style.md'));
+// The shore and the meadow use the project's own scheme blob47-round (since G9).
+cpSync(join(EXAMPLE, 'schemes'), join(project, 'schemes'), { recursive: true });
 copyFileSync(join(EXAMPLE, 'palettes', 'mossy-ruins.json'), join(project, 'palettes', 'mossy-ruins.json'));
 copyFileSync(join(EXAMPLE, 'palettes', 'ruins-water.json'), join(project, 'palettes', 'ruins-water.json'));
 

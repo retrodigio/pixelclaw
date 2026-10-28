@@ -3,7 +3,9 @@
 // walking figure and water tile, and the stone floor redrawn as flagstones; G7's sand tile, the
 // shore family built from it and the water, and the glint overlay; G8's house, tree and well, the
 // meadow and lane families, the village map, the variants that fixed its repetition, and the
-// person's move of the well. Every
+// person's move of the well; G9's waters, sands and shores for the open sea and the beach, the
+// house at 2x, the shore and meadow on the project's own scheme blob47-round, and the village's
+// notes closed. Every
 // tape must replay to the committed state and preview, running the scripts from scratch must give
 // the same tape commands and pixels, and every check passes.
 import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -24,7 +26,8 @@ function cli(args: string[]): { code: number; out: string; err: string } {
 
 // In order: the shore copies its textures from the sand and the water.
 const ASSETS = ['stone_floor', 'grass', 'grass_b', 'grass_c', 'chest', 'glowcap', 'walker', 'water', 'sand', 'glint', 'shore',
-  'house', 'tree', 'well', 'meadow', 'lane', 'village', 'lane_b', 'lane_c', 'meadow_b', 'meadow_c', 'shore_b', 'tree_b'];
+  'house', 'tree', 'well', 'meadow', 'lane', 'village', 'lane_b', 'lane_c', 'meadow_b', 'meadow_c', 'water_b', 'water_c', 'water_d', 'sand_b', 'sand_c',
+  'shore_b', 'tree_b', 'shore_c', 'shore_d', 'house_2x'];
 const SAVED = ['ruins-props', 'ruins-folk', 'ruins-water', 'ruins-shore', 'ruins-village'];
 
 const cmds = (tape: string) => tape.trim().split('\n').slice(1).map((l) => JSON.parse(l).cmd as string);
@@ -46,7 +49,7 @@ describe('examples/mossy-ruins.pclaw', () => {
       for (const name of ASSETS) {
         const r = cli(['run', copy, join(ROOT, 'scripts', `${name}.pclaw`), '--replace']);
         expect(r.err).toBe('');
-        for (const step of ['fix', 'well', 'review', 'redraw', 'g6review']) {
+        for (const step of ['fix', 'well', 'review', 'redraw', 'g6review', 'g9']) {
           const f = join(ROOT, 'scripts', `${name}_${step}.pclaw`);
           // The well was moved by a person in the watch view (the G8 demo).
           if (existsSync(f)) expect(cli(['run', copy, f, '--asset', name, ...(step === 'well' ? ['--by', 'human:chris'] : [])]).err).toBe('');
@@ -61,7 +64,7 @@ describe('examples/mossy-ruins.pclaw', () => {
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }
-  }, 90_000);
+  }, 240_000);
 
   it('every check passes on every asset, with the style guide in project.json', () => {
     const r = cli(['check', PROJECT]);

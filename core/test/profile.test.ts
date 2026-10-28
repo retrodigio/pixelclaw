@@ -218,7 +218,7 @@ describe('project schemes and fillets (plan §17)', () => {
     const again = replay(r.state.entries, palettes);
     expect(again.problems).toEqual([]);
     expect(Buffer.compare(serializeDoc(again.doc!), serializeDoc(r.state.doc!))).toBe(0);
-    expect(schemeOf(deserializeDoc(serializeDoc(r.state.doc!)).family!).variants.length).toBe(62);
+    expect(schemeOf(deserializeDoc(serializeDoc(r.state.doc!)).family!).variants.length).toBe(176);
     expect(runBatch(EMPTY, fam, { by: 't', palettes }).ok).toBe(false);
   });
   it('fillets: an outside cell gets one in each inner corner of the terrain around it', () => {

@@ -778,12 +778,18 @@ function familyCoverage(d: Doc, p: Params): CheckResult {
   const missing: string[] = [];
   const groups: FlagGroup[] = [];
   const cells: [string, [number, number]][] = [['inside', L.inside], ['outside', L.outside], ...s.variants.map((v, i): [string, [number, number]] => [v.name, L.cells[i]!])];
+  const isEmpty = (px: Uint16Array, cx: number, cy: number) => {
+    for (let y = 0; y < t; y++) for (let x = 0; x < t; x++) if (px[(cy * t + y) * d.width + cx * t + x] !== TRANSPARENT) return false;
+    return true;
+  };
+  // An outside left empty on purpose (a lane over whatever ground is under it): the outside and
+  // the cells drawn only outside the terrain may be empty.
+  const bare = Array.from({ length: d.frameCount }, (_, fr) => fr).every((fr) => isEmpty(flatten(d, fr), L.outside[0], L.outside[1]) && !isEmpty(flatten(d, fr), L.inside[0], L.inside[1]));
   for (let fr = 0; fr < d.frameCount; fr++) {
     const px = flatten(d, fr);
     for (const [name, [cx, cy]] of cells) {
-      let empty = true;
-      for (let y = 0; y < t && empty; y++) for (let x = 0; x < t; x++) if (px[(cy * t + y) * d.width + cx * t + x] !== TRANSPARENT) { empty = false; break; }
-      if (!empty) continue;
+      if (bare && (name === 'outside' || s.variants[s.byName.get(name) ?? -1]?.on)) continue;
+      if (!isEmpty(px, cx, cy)) continue;
       missing.push(`${name}${d.frameCount > 1 ? ` (frame ${fr + 1})` : ''} is empty`);
       const pts: Pt[] = [];
       for (let i = 0; i < t; i++) pts.push([cx * t + i, cy * t], [cx * t + i, cy * t + t - 1]);
@@ -793,7 +799,7 @@ function familyCoverage(d: Doc, p: Params): CheckResult {
   const max = Number(p.max);
   return result('coverage', {
     status: missing.length <= max ? 'pass' : 'fail', score: missing.length, shown: String(missing.length), limit: `≤ ${max}`, groups,
-    detail: missing.length ? missing.join('; ') : `${s.name}: all ${s.variants.length} variants and both textures drawn${d.frameCount > 1 ? ` on ${d.frameCount} frames` : ''}${f.detached.length ? ` (${f.detached.length} detached)` : ''}`,
+    detail: missing.length ? missing.join('; ') : `${s.name}: all ${s.variants.length} variants and ${bare ? 'the inside texture drawn (the outside left empty: the ground below shows)' : 'both textures drawn'}${d.frameCount > 1 ? ` on ${d.frameCount} frames` : ''}${f.detached.length ? ` (${f.detached.length} detached)` : ''}`,
   });
 }
 
@@ -802,8 +808,10 @@ function checkCoverage(img: Img, p: Params, ctx: CheckContext): CheckResult {
   if (d.family) return familyCoverage(d, p);
   const missing: string[] = [];
   const groups: FlagGroup[] = [];
-  const want = ctx.style?.sizes?.[d.kind];
-  if (want && !want.split('|').map((s) => s.trim()).includes(`${d.width}x${d.height}`)) missing.push(`size ${d.width}x${d.height} is not the style's ${want} for a ${d.kind}`);
+  // A density copy is held to its level's sizes: d times the style's.
+  const k = d.densityOf?.d ?? 1;
+  const want = ctx.style?.sizes?.[d.kind]?.split('|').map((s) => s.trim()).map((s) => (k === 1 ? s : s.replace(/^(\d+)x(\d+)$/, (_, w: string, h: string) => `${Number(w) * k}x${Number(h) * k}`))).join('|');
+  if (want && !want.split('|').includes(`${d.width}x${d.height}`)) missing.push(`size ${d.width}x${d.height} is not the style's ${want} for a ${d.kind}${k > 1 ? ` at ${k}x` : ''}`);
   if (d.width % d.cellW || d.height % d.cellH) missing.push(`size ${d.width}x${d.height} is not a whole number of ${d.cellW}x${d.cellH} cells`);
   for (let f = 0; f < d.frameCount; f++) {
     const px = flatten(d, f);

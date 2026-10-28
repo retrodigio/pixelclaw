@@ -1,0 +1,16 @@
+# A fourth look for the shore: its own band and sand with the fourth water.
+fork shore shore_d
+variant of=shore
+frame 1
+family texture inside from=sand frame=1
+family texture outside from=water_d frame=1
+frame 2
+family texture inside from=sand frame=1
+family texture outside from=water_d frame=2
+frame 3
+family texture inside from=sand frame=1
+family texture outside from=water_d frame=3
+frame 4
+family texture inside from=sand frame=1
+family texture outside from=water_d frame=4
+frame 1

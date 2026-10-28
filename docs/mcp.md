@@ -165,14 +165,29 @@ context, ask it to follow `rubric.md`, and pin its findings on the pixels with `
 
 ### `export`
 
-Write an asset out (export profiles come with G9). `format`: `tmx` (a map document as a Tiled
-map: a tile layer per ground layer in CSV over one tileset image of every distinct tile the map
-draws, and an object group per objects layer of tile objects placed by their bottom-left as Tiled
-does, each with its cell, footprint, anchor and cell flags as properties; overlays are left out),
-`split` (an oversized tile or object as one-cell pieces `<name>_<cx>_<cy>.png` and
-`<name>.stamp.json`, which puts them back and carries each cell's block, roof and footprint
-flags), or `png` (a map composed at 1x, or an asset's first frame). `dest` defaults to
-`<project>/exports/<format>/`. CLI: `pixelclaw export <project> <asset> --format tmx|split|png [--out <dir>]`.
+Write assets through an export profile (see [profiles.md](profiles.md)): `profile` is a built-in
+(`png`, `atlas`, `tiled`, `godot`, `aseprite-json`, `aseprite`), one of the project's
+(`profiles/*.json`) or a profile file's path (default `png`); `assets` (default all; a map brings
+the families, tiles and objects it draws, and every asset its texture variants and density
+copies); `dest` (a game folder; default `<project>/exports/<profile>/`). The result lists the
+files and notes (levels scaled or reduced for want of an authored copy, two entries written as one
+colour). `format=split|png` with `asset` writes one asset G8's way instead: `split`, an oversized
+tile or object as one-cell pieces `<name>_<cx>_<cy>.png` plus `<name>.stamp.json` (each cell's
+block, roof and footprint flags); `png`, a map composed at 1x or an asset's first frame. CLI:
+`pixelclaw export <project> [<asset>...] [--profile <name>] [--out <dir>]`, or
+`pixelclaw export <project> <asset> --format split|png`.
+
+### `import`
+
+Bring art in (see [profiles.md](profiles.md#import)). `path` is a PNG (a new asset quantised to
+`palette`, default the project's; `build: true` makes a palette from the image; `grid: "24x24"`
+slices a sheet into frames, `cells: true` keeps it one image with that cell grid), an `.aseprite`
+file (layers, frames, durations, tags, views), or with `profile` a folder an export wrote: each
+image read back by name into the asset it came from, and the result says which assets read back
+exactly and which differ; images no asset exports become new assets. `as` names a new asset
+(default the file's name), `kind` sets its kind (default `sprite`), `replace` starts an existing
+asset's tape again. A new asset's tape starts with `import` commands; the file is kept under
+`blobs/`. CLI: `pixelclaw import <project> <path> [--profile] [--as] [--kind] [--palette|--build] [--grid WxH [--cells]] [--replace]`.
 
 ### `history`
 

@@ -17,7 +17,7 @@ const DIAGS: [number, string][] = [[NE, 'ne'], [SE, 'se'], [SW, 'sw'], [NW, 'nw'
 
 interface Variant { name: string; key: number | null; quads: string[]; on?: 'face' | 'fillet' }
 interface Scheme {
-  name: string; description: string; neighbours: '8' | '4' | 'axis' | 'corners' | 'none'; cornerRule?: boolean;
+  name: string; description: string; neighbours: '8' | '4' | 'axis' | 'corners' | 'none'; cornerRule?: boolean | 'either';
   inset?: [number, number]; kinds?: Record<string, string>; faces?: boolean; fillets?: boolean; columns: number; pieces: string[]; variants: Variant[];
 }
 
@@ -131,26 +131,43 @@ function single(): Scheme {
 }
 
 /**
- * blob47 with rounder inner corners (a scheme option, plan §17): every cell outside the terrain
- * that the terrain turns an inner corner around (both sides and the diagonal between them) gets a
- * fillet in that corner, so the edge curves through the outside cell instead of meeting at a
- * right angle. 15 fillet variants keyed by those corners; the piece with all four supplies them.
- * The example project ships it as one of its own schemes (schemes/*.json), which a family's tape copies.
+ * blob47 with rounder inner corners (a scheme option, plan §17). A diagonal counts when either side
+ * next to it is the terrain, so an edge knows when the terrain turns an inner corner at its end:
+ * there its quadrant bends into the corner (vround, hround), the inner corner's arc widens, and
+ * the cell outside the corner gets the rounding's tip (15 fillet variants keyed by the corners the
+ * terrain turns around). The band's `fillet=` says how much wider. 161 + 15 variants; pieces are
+ * chosen so every quadrant kind at every corner has one. The example project ships it as one of
+ * its own schemes (schemes/*.json), which a family's tape copies.
  */
 function blob47Round(): Scheme {
-  const b = blob47();
-  const fillets: Variant[] = [];
+  const keys = new Set<number>();
+  for (let raw = 0; raw < 256; raw++) {
+    let k = raw & (N | E | S | W);
+    for (const [v, h, d] of CORNERS) if ((raw & d) && (raw & (v | h))) k |= d;
+    keys.add(k);
+  }
+  const qr = (v: boolean, h: boolean, d: boolean) => (v && h ? (d ? 'in' : 'inner') : !v && !h ? 'outer' : v ? (d ? 'vround' : 'vert') : d ? 'hround' : 'horiz');
+  const variants: Variant[] = [...keys].sort((a, c) => a - c).map((k) => ({ name: blobName(k), key: k, quads: CORNERS.map(([v, h, d]) => qr(!!(k & v), !!(k & h), !!(k & d))) }));
+  // Pieces: blob47's, then greedily whichever variant supplies the most quadrants still missing.
+  const pieces = ['o', 'nesw', 'ew', 'ns', 'nesw_ne_se_sw_nw'];
+  const have = (n: string) => variants.find((v) => v.name === n)!.quads.map((q, i) => `${q}@${i}`);
+  const need = new Set(variants.flatMap((v) => v.quads.map((q, i) => `${q}@${i}`)));
+  for (const p of pieces) for (const q of have(p)) need.delete(q);
+  while (need.size) {
+    const best = variants.reduce((a, c) => (c.quads.filter((q, i) => need.has(`${q}@${i}`)).length > a.quads.filter((q, i) => need.has(`${q}@${i}`)).length ? c : a));
+    pieces.push(best.name);
+    best.quads.forEach((q, i) => need.delete(`${q}@${i}`));
+  }
   for (let m = 1; m < 16; m++) {
     const k = (m & 1 ? NE : 0) | (m & 2 ? SE : 0) | (m & 4 ? SW : 0) | (m & 8 ? NW : 0);
     const corners = DIAGS.filter(([bit]) => k & bit).map(([, n]) => n);
-    // Quadrants NW NE SW SE: a fillet in each corner the terrain turns around.
-    fillets.push({ name: `f_${corners.join('_')}`, key: k, quads: [NW, NE, SW, SE].map((bit) => (k & bit ? 'fillet' : 'out')), on: 'fillet' });
+    // Quadrants NW NE SW SE: the tip of the rounding in each corner the terrain turns around.
+    variants.push({ name: `f_${corners.join('_')}`, key: k, quads: [NW, NE, SW, SE].map((bit) => (k & bit ? 'fillet' : 'out')), on: 'fillet' });
   }
-  fillets.sort((a, c) => a.key! - c.key!);
+  pieces.push('f_ne_se_sw_nw');
   return {
-    ...b, name: 'blob47-round', fillets: true,
-    description: 'blob47 with rounder inner corners: outside cells round off each inner corner of the terrain around them (47 + 15 fillet variants)',
-    pieces: [...b.pieces, 'f_ne_se_sw_nw'], variants: [...b.variants, ...fillets],
+    name: 'blob47-round', description: 'blob47 with rounder inner corners: edges bend into each inner corner and the cell outside it rounds it off (161 variants + 15 fillets; family band fillet=<px>)',
+    neighbours: '8', cornerRule: 'either', fillets: true, columns: 8, pieces, variants,
   };
 }
 

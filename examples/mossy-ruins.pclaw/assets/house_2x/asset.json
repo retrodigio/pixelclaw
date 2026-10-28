@@ -1,0 +1,49 @@
+{
+  "name": "house_2x",
+  "kind": "object",
+  "size": [
+    96,
+    96
+  ],
+  "cell": [
+    48,
+    48
+  ],
+  "wrap": false,
+  "palette": "ruins-props",
+  "layers": [
+    {
+      "name": "main",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    }
+  ],
+  "frames": 1,
+  "paletteLocked": false,
+  "stamps": [],
+  "macros": [],
+  "tags": [],
+  "views": [],
+  "links": [
+    {
+      "fork": {
+        "from": "house",
+        "at": 78
+      }
+    }
+  ],
+  "notes": [],
+  "tape": {
+    "lang": 2,
+    "commands": 94,
+    "groups": 3
+  },
+  "state": {
+    "sha256": "b7afc14a7184fa04ad921f817647a6acfa32dce33fff9e9f89a75cfbb44bb93f"
+  },
+  "checkpoints": {
+    "every": 200,
+    "files": []
+  }
+}

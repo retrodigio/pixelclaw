@@ -18,8 +18,8 @@ export const NB_DIRS: [number, number, number][] = [[1, 0, -1], [2, 1, -1], [4, 
 
 export type Neighbours = '8' | '4' | 'axis' | 'corners' | 'none';
 /** The geometry a quadrant kind is drawn with. */
-export type BaseKind = 'in' | 'out' | 'outer' | 'inner' | 'horiz' | 'vert' | 'fillet';
-const BASE: readonly string[] = ['in', 'out', 'outer', 'inner', 'horiz', 'vert', 'fillet'];
+export type BaseKind = 'in' | 'out' | 'outer' | 'inner' | 'horiz' | 'vert' | 'vround' | 'hround' | 'fillet';
+const BASE: readonly string[] = ['in', 'out', 'outer', 'inner', 'horiz', 'vert', 'vround', 'hround', 'fillet'];
 /** A quadrant (or the corner a kind faces): 0 NW, 1 NE, 2 SW, 3 SE. */
 export type Quad = 0 | 1 | 2 | 3;
 const QUAD_NAMES = ['nw', 'ne', 'sw', 'se'];
@@ -41,7 +41,8 @@ export interface SchemeJson {
   name: string;
   description: string;
   neighbours: Neighbours;
-  cornerRule?: boolean;
+  /** true: a diagonal counts when both sides next to it are the terrain; 'either': when either is (rounder inner corners need to see them). */
+  cornerRule?: boolean | 'either';
   /** The strip's inset from the tile's edges as a fraction of the tile (path, bridge8). */
   inset?: [number, number];
   /** Extra kinds and the geometry each is drawn with. */
@@ -139,6 +140,10 @@ export function reduceKey(s: SchemeJson, bits: number): number {
     case '8': {
       let k = bits & (N | E | S | W);
       if (!s.cornerRule) return bits & 255;
+      if (s.cornerRule === 'either') {
+        for (const [d, a, b] of [[NE, N, E], [SE, S, E], [SW, S, W], [NW, N, W]] as const) if ((bits & d) && (bits & (a | b))) k |= d;
+        return k;
+      }
       if ((bits & N) && (bits & E) && (bits & NE)) k |= NE;
       if ((bits & S) && (bits & E) && (bits & SE)) k |= SE;
       if ((bits & S) && (bits & W) && (bits & SW)) k |= SW;
@@ -218,7 +223,10 @@ export interface Geometry {
   inset: number;
   /** The radius of the band's inner edge at outer corners (0: square). */
   radius: number;
-  /** Fillet schemes: the radius of the rounding in the outside cell at an inner corner (unset: the band's width). */
+  /**
+   * Rounder inner corners (fillet schemes): how far the corner's centre moves out into the outside
+   * cell, in pixels; every contour round an inner corner is then an arc this much wider (unset: 0).
+   */
   fillet?: number;
   bands: Band[];
 }
@@ -250,18 +258,13 @@ function below(base: BaseKind, U: number, V: number, K: number, C: number): bool
   switch (base) {
     case 'in': return false;
     case 'out': return true;
-    case 'horiz': return V < K;
-    case 'vert': return U < K;
+    case 'horiz': case 'hround': return V < K;
+    case 'vert': case 'vround': return U < K;
+    case 'fillet': return true;
     case 'outer': {
       if (U >= C || V >= C) return Math.min(U, V) < K;
       // d = C - sqrt((C-U)^2 + (C-V)^2) < K  <=>  sqrt(..) > C - K
       return C - K < 0 || isq(C - U) + isq(C - V) > isq(C - K);
-    }
-    case 'fillet': {
-      // C is the fillet's doubled radius here: terrain in the corner outside the disc about (C, C),
-      // as deep as its distance from that disc.
-      if (U >= C || V >= C) return true;
-      return isq(U - C) + isq(V - C) < isq(C + K);
     }
     case 'inner': {
       if (U > 0 && V > 0) return K > 0 && isq(U) + isq(V) < isq(K);
@@ -273,12 +276,41 @@ function below(base: BaseKind, U: number, V: number, K: number, C: number): bool
 }
 
 /**
+ * Round an inner corner (a fillet scheme): the corner's centre moved F (doubled) out into the
+ * outside cell, so every contour about it is an arc F wider. The edges beside the corner (vround,
+ * hround: a straight edge with the terrain on its diagonal) bend into it within F of the corner,
+ * and the outside cell gets the rounding's tip (fillet). Depth into the terrain below K?
+ */
+function belowRound(base: BaseKind, U: number, V: number, K: number, F: number): boolean {
+  const r = isq(K + F);
+  switch (base) {
+    case 'inner': return isq(U + F) + isq(V + F) < r;
+    case 'vround': return V <= F ? isq(U + F) + isq(V - F) < r : U < K;
+    case 'hround': return U <= F ? isq(U - F) + isq(V + F) < r : V < K;
+    case 'fillet': return U <= F && V <= F ? isq(U - F) + isq(V - F) < r : true;
+    default: return below(base, U, V, K, 0);
+  }
+}
+
+/**
  * Which band a pixel of a quadrant lies in: -1 outside the terrain, 0..n-1 a band, n inside past
  * the band (n = the number of bands).
  */
 export function bandAt(spec: QuadSpec, t: number, q: Quad, x: number, y: number, g: Geometry): number {
   const [U, V] = uv(t, q, spec.face, x, y, g.inset);
-  const C = spec.base === 'fillet' ? 2 * (g.fillet ?? bandWidth(g)) : 2 * (bandWidth(g) + g.radius);
+  const F = 2 * (g.fillet ?? 0);
+  if (F > 0 || spec.base === 'vround' || spec.base === 'hround' || spec.base === 'fillet') {
+    if (spec.base !== 'outer' && spec.base !== 'in' && spec.base !== 'out' && spec.base !== 'vert' && spec.base !== 'horiz') {
+      if (belowRound(spec.base, U, V, 0, F)) return -1;
+      let k = 0;
+      for (let i = 0; i < g.bands.length; i++) {
+        k += 2 * g.bands[i]!.w;
+        if (belowRound(spec.base, U, V, k, F)) return i;
+      }
+      return g.bands.length;
+    }
+  }
+  const C = 2 * (bandWidth(g) + g.radius);
   if (below(spec.base, U, V, 0, C)) return -1;
   let k = 0;
   for (let i = 0; i < g.bands.length; i++) {

@@ -46,6 +46,16 @@
           }
         }
       }
+    },
+    "density": {
+      "reducer": "ink-vote",
+      "ink": [
+        "ink"
+      ],
+      "share": [
+        1,
+        4
+      ]
     }
   },
   "profiles": [],

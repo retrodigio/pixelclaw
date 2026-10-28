@@ -13,3 +13,18 @@ px @cell(ns) 6,9 6,10 6,20 17,3 17,14 17,15 c=sand0
 px @cell(ns) 5,2 18,9 c=sand1
 px @cell(o) 4,2 19,3 3,19 20,21 c=foam
 px @cell(o) 6,6 16,7 7,17 17,17 c=sand0
+# --- G9 (plan §17): the second water and the second sand as its textures, so the open sea and the
+# beach mix four waters and three sands cell by cell with shore_c and shore_d.
+frame 1
+family texture inside from=sand_b frame=1
+family texture outside from=water_b frame=1
+frame 2
+family texture inside from=sand_b frame=1
+family texture outside from=water_b frame=2
+frame 3
+family texture inside from=sand_b frame=1
+family texture outside from=water_b frame=3
+frame 4
+family texture inside from=sand_b frame=1
+family texture outside from=water_b frame=4
+frame 1

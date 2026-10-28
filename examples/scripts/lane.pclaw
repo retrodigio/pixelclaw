@@ -11,3 +11,8 @@ px @cell(ew) 3,9 4,9 5,9 9,9 10,9 15,14 16,14 17,14 20,14 21,14 c=sand1
 px @cell(ns) 9,3 9,4 9,5 9,10 9,11 14,15 14,16 14,17 14,20 14,21 c=sand1
 px @cell(ew) 13,8 c=stone3
 px @cell(ns) 15,7 c=stone3
+# --- G9: the lane's outside is left empty, so the lane runs over whatever ground is under it: the
+# meadow's grass, or the beach's sand where the lanes now reach the shore.
+layer ground
+rect @cell(outside) 0,0 24x24 c=none fill
+layer band

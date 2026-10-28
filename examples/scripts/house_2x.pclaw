@@ -1,0 +1,24 @@
+# The house at twice the density (plan §4.7, §10 G9): 96x96 on a 48 px grid, the same 2x2-cell
+# footprint. Started as a nearest-neighbour scale-up of the 1x house, then detailed where 2x has
+# room the 1x copy has not: courses of roof tiles, the plaster's texture, the door's planks and
+# the window glazing bars. The density check reduces it back and compares it with the 1x house.
+fork house house_2x
+scale 2
+density of=house d=2
+
+# --- courses of roof tiles: a darker line every fourth row on the roof's middle tones
+select colour c=roof2
+select colour c=roof1 add
+line 0,10 95,10 c=roof1
+line 0,18 95,18 c=roof1
+line 0,26 95,26 c=roof1
+line 0,34 95,34 c=roof1
+line 0,42 95,42 c=roof1
+deselect
+# --- plaster texture: a few flecks of the wall's shade
+select colour c=wall1
+px 15,57 16,57 33,60 58,56 59,56 70,61 77,58 13,79 30,82 31,82 62,80 75,84 76,84 c=wall0
+deselect
+# --- the door's planks split again, the glazing bars thinner
+line 47,66 47,87 c=wood1
+line 53,66 53,87 c=wood1

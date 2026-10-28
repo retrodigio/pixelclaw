@@ -84,7 +84,7 @@ const masks = new Map<string, Int8Array[]>();
 
 /** Every variant's band map (cached: they depend only on the scheme, the tile size and the geometry). */
 export function bandMaps(s: Scheme, t: number, g: Geometry): Int8Array[] {
-  const key = `${s.name}|${t}|${g.inset}|${g.radius}|${g.bands.map((b) => `${b.w}:${b.fill}`).join(',')}`;
+  const key = `${s.name}|${t}|${g.inset}|${g.radius}|${g.fillet ?? ''}|${g.bands.map((b) => `${b.w}:${b.fill}`).join(',')}`;
   let m = masks.get(key);
   if (!m) {
     m = s.variants.map((_, v) => bandMap(s, v, t, g));
@@ -95,7 +95,7 @@ export function bandMaps(s: Scheme, t: number, g: Geometry): Int8Array[] {
 }
 
 /** Does a band index show the outside texture underneath (-1 is outside the terrain)? */
-function showsOutside(g: Geometry, b: number): boolean {
+export function showsOutside(g: Geometry, b: number): boolean {
   return b < 0 || (b < g.bands.length && g.bands[b]!.fill === 'outside');
 }
 
@@ -107,6 +107,32 @@ function copyBlock(cel: Uint16Array, W: number, sx: number, sy: number, dx: numb
     const s = (sy + y) * W + sx;
     cel.copyWithin((dy + y) * W + dx, s, s + w);
   }
+}
+
+/** A tile-sized block of a frame's flat art (the art layers composited), without flattening the whole sheet. */
+function artBlock(d: Doc, fr: number, cx: number, cy: number, t: number): Uint16Array {
+  const out = new Uint16Array(t * t).fill(TRANSPARENT);
+  d.layers.forEach((l, li) => {
+    if (l.hidden || l.reference) return;
+    const cel = d.cels[li]![fr]!;
+    for (let y = 0; y < t; y++) for (let x = 0; x < t; x++) {
+      const v = cel[(cy * t + y) * d.width + cx * t + x]!;
+      if (v !== TRANSPARENT) out[y * t + x] = v;
+    }
+  });
+  return out;
+}
+
+const outMasks = new WeakMap<Int8Array[], Uint8Array[]>();
+/** Per variant, the pixels that show the outside texture (cached with the band maps). */
+function outsideMasks(s: Scheme, t: number, g: Geometry, maps: Int8Array[]): Uint8Array[] {
+  let m = outMasks.get(maps);
+  if (!m) {
+    m = maps.map((b) => Uint8Array.from(b, (x) => (showsOutside(g, x) ? 1 : 0)));
+    outMasks.set(maps, m);
+  }
+  void s; void t;
+  return m;
 }
 
 /**
@@ -133,14 +159,14 @@ export function syncFamily(d: Doc): void {
       const cel = d.cels[gl]![fr]!;
       done.add(cel);
       // The textures as they look (every art layer), so they can be drawn on any layer.
-      const flat = flatten(d, fr);
-      const [ix, iy] = L.inside, [ox, oy] = L.outside;
+      const inside = artBlock(d, fr, L.inside[0], L.inside[1], t), outside = artBlock(d, fr, L.outside[0], L.outside[1], t);
+      const outs = outsideMasks(s, t, f.geometry, maps);
       for (let v = 0; v < s.variants.length; v++) {
         const [cx, cy] = L.cells[v]!;
-        const m = maps[v]!;
-        for (let y = 0; y < t; y++) for (let x = 0; x < t; x++) {
-          const out = showsOutside(f.geometry, m[y * t + x]!);
-          cel[(cy * t + y) * W + cx * t + x] = flat[((out ? oy : iy) * t + y) * W + (out ? ox : ix) * t + x]!;
+        const o = outs[v]!;
+        for (let y = 0; y < t; y++) {
+          const row = (cy * t + y) * W + cx * t;
+          for (let x = 0; x < t; x++) { const k = y * t + x; cel[row + x] = o[k] ? outside[k]! : inside[k]!; }
         }
       }
     }

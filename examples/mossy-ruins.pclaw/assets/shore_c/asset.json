@@ -1,0 +1,55 @@
+{
+  "name": "shore_c",
+  "kind": "family",
+  "size": [
+    192,
+    552
+  ],
+  "cell": [
+    24,
+    24
+  ],
+  "wrap": false,
+  "palette": "ruins-shore",
+  "layers": [
+    {
+      "name": "ground",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    },
+    {
+      "name": "band",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    }
+  ],
+  "frames": 4,
+  "paletteLocked": false,
+  "stamps": [],
+  "macros": [],
+  "tags": [],
+  "views": [],
+  "links": [
+    {
+      "fork": {
+        "from": "shore",
+        "at": 61
+      }
+    }
+  ],
+  "notes": [],
+  "tape": {
+    "lang": 2,
+    "commands": 102,
+    "groups": 4
+  },
+  "state": {
+    "sha256": "e3a8d4de60df74e4e73f60342f9b0dbfdc7dda92575e37d2ad1c954e3e567635"
+  },
+  "checkpoints": {
+    "every": 200,
+    "files": []
+  }
+}

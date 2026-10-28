@@ -1,0 +1,95 @@
+{"pclaw":"tape","lang":2}
+{"seq":1,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"new object house 48x48 palette=ruins-props wrap=off cell=24x24 bg=none <<\n  k ink #17181d\n  0 stone0 #272a30\n  1 stone1 #3b4044\n  2 stone2 #535a5b\n  3 stone3 #6c7570\n  4 stone4 #8b9489\n  5 stone5 #afb6a5\n  a moss0 #1c2e21\n  b moss1 #2c4729\n  c moss2 #486a32\n  d moss3 #6c8c3a\n  e lichen #a2ab52\n  f soil0 #2a211c\n  g soil1 #44352a\n  h soil2 #65503a\n  w pool #34566a\n  W wood0 #3a2418\n  X wood1 #603c22\n  Y wood2 #8a5a30\n  Z wood3 #b58044\n  B brass0 #6a4f1f\n  C brass1 #b08a35\n  D brass2 #efd47c\n  ramp stone stone0 stone1 stone2 stone3 stone4 stone5\n  ramp moss moss0 moss1 moss2 moss3 lichen\n  ramp soil soil0 soil1 soil2\n  ramp wood wood0 wood1 wood2 wood3\n  ramp brass brass0 brass1 brass2\n>>"}
+{"seq":2,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"palette add roof0 hex=#4e2620 key=R"}
+{"seq":3,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"palette add roof1 hex=#7a3a2a key=S"}
+{"seq":4,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"palette add roof2 hex=#a5553a key=T"}
+{"seq":5,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"palette add roof3 hex=#c77a50 key=U"}
+{"seq":6,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"palette add wall0 hex=#8f7a5e key=P"}
+{"seq":7,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"palette add wall1 hex=#c2ad86 key=Q"}
+{"seq":8,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"ramp roof = roof0 roof1 roof2 roof3"}
+{"seq":9,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"palette save as=ruins-village"}
+{"seq":10,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"rect 5,26 38x21 c=wall1 fill"}
+{"seq":11,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"rect 5,43 38x4 c=stone2 fill"}
+{"seq":12,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"line 5,43 42,43 c=stone3 pp=on"}
+{"seq":13,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"rect 5,26 2x17 c=wood1 fill"}
+{"seq":14,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"rect 41,26 2x17 c=wood0 fill"}
+{"seq":15,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"rect 23,26 2x8 c=wood1 fill"}
+{"seq":16,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"line 7,27 40,27 c=wall0 pp=on"}
+{"seq":17,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"line 39,28 39,42 c=wall0 pp=on"}
+{"seq":18,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"rect 19,32 10x12 c=wood0 fill"}
+{"seq":19,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"rect 20,33 8x11 c=wood2 fill"}
+{"seq":20,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"line 22,33 22,43 c=wood1 pp=on"}
+{"seq":21,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"line 25,33 25,43 c=wood1 pp=on"}
+{"seq":22,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"px 26,38 c=brass1"}
+{"seq":23,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"rect 19,44 10x3 c=stone3 fill"}
+{"seq":24,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"rect 9,31 8x7 c=wood0 fill"}
+{"seq":25,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"rect 10,32 6x5 c=pool fill"}
+{"seq":26,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"line 13,32 13,36 c=wood1 pp=on"}
+{"seq":27,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"line 10,34 15,34 c=wood1 pp=on"}
+{"seq":28,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"px 10,32 14,32 c=stone4"}
+{"seq":29,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"line 8,38 17,38 c=wood2 pp=on"}
+{"seq":30,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"rect 31,31 8x7 c=wood0 fill"}
+{"seq":31,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"rect 32,32 6x5 c=pool fill"}
+{"seq":32,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"line 35,32 35,36 c=wood1 pp=on"}
+{"seq":33,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"line 32,34 37,34 c=wood1 pp=on"}
+{"seq":34,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"px 32,32 36,32 c=stone4"}
+{"seq":35,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"line 30,38 39,38 c=wood2 pp=on"}
+{"seq":36,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"polygon 1,26 7,4 40,4 46,26 c=roof2 fill"}
+{"seq":37,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"select lasso 1,26 7,4 40,4 46,26"}
+{"seq":38,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"rect 34,4 14x23 c=roof1 fill"}
+{"seq":39,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"line 0,8 33,8 c=roof1 pp=on"}
+{"seq":40,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"line 0,12 33,12 c=roof1 pp=on"}
+{"seq":41,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"line 0,16 33,16 c=roof1 pp=on"}
+{"seq":42,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"line 0,20 33,20 c=roof1 pp=on"}
+{"seq":43,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"line 0,24 33,24 c=roof1 pp=on"}
+{"seq":44,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"line 34,8 47,8 c=roof0 pp=on"}
+{"seq":45,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"line 34,12 47,12 c=roof0 pp=on"}
+{"seq":46,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"line 34,16 47,16 c=roof0 pp=on"}
+{"seq":47,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"line 34,20 47,20 c=roof0 pp=on"}
+{"seq":48,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"line 34,24 47,24 c=roof0 pp=on"}
+{"seq":49,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"px 11,6 19,10 8,14 26,7 15,18 23,14 6,22 29,22 12,10 c=roof3"}
+{"seq":50,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"deselect"}
+{"seq":51,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"line 7,4 40,4 c=roof3 pp=on"}
+{"seq":52,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"line 2,26 45,26 c=roof0 pp=on"}
+{"seq":53,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"line 7,28 40,28 c=wall0 pp=on"}
+{"seq":54,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"rect 32,0 6x7 c=stone2 fill"}
+{"seq":55,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"line 32,0 37,0 c=stone4 pp=on"}
+{"seq":56,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"line 32,1 32,6 c=stone3 pp=on"}
+{"seq":57,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"px 34,3 36,5 c=stone1"}
+{"seq":58,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"outline c=ink mode=outer corners=off"}
+{"seq":59,"by":"claude","at":"2026-10-28T08:43:36Z","group":"g1","cmd":"footprint 2x2 at=0,0 anchor=0,1 <<\n  rr\n  bb\n>>"}
+{"seq":60,"by":"claude","at":"2026-10-28T08:43:37Z","group":"g2","cmd":"note 6,6 24x17 \"nine lone roof3 pixels: stray single pixels on a prop; pair each into a 2 px shingle highlight\" id=n1"}
+{"seq":61,"by":"claude","at":"2026-10-28T08:43:37Z","group":"g2","cmd":"note 34,3 \"lone stone1 pixel in the chimney face; make it a mortar joint\" id=n2"}
+{"seq":62,"by":"claude","at":"2026-10-28T08:43:37Z","group":"g2","cmd":"note 34,7 1x19 \"the lit/shaded roof split is a dead-vertical line; step it out with the roof's slanted edge\" id=n3"}
+{"seq":63,"by":"claude","at":"2026-10-28T08:43:37Z","group":"g2","cmd":"note 5,44 38x3 \"the foundation is a flat stone2 band; add block joints\" id=n4"}
+{"seq":64,"by":"claude","at":"2026-10-28T08:43:37Z","group":"g2","cmd":"px 12,6 27,7 13,10 20,10 9,14 24,14 16,18 7,22 30,22 c=roof3"}
+{"seq":65,"by":"claude","at":"2026-10-28T08:43:37Z","group":"g2","cmd":"line 33,3 36,3 c=stone1 pp=on"}
+{"seq":66,"by":"claude","at":"2026-10-28T08:43:37Z","group":"g2","cmd":"px 36,5 c=stone2"}
+{"seq":67,"by":"claude","at":"2026-10-28T08:43:37Z","group":"g2","cmd":"px 33,5 33,6 33,7 33,9 33,10 33,11 c=roof1"}
+{"seq":68,"by":"claude","at":"2026-10-28T08:43:37Z","group":"g2","cmd":"px 33,8 33,12 c=roof0"}
+{"seq":69,"by":"claude","at":"2026-10-28T08:43:37Z","group":"g2","cmd":"px 34,21 35,21 34,22 35,22 34,23 35,23 34,25 35,25 c=roof2"}
+{"seq":70,"by":"claude","at":"2026-10-28T08:43:37Z","group":"g2","cmd":"px 34,20 35,20 34,24 35,24 c=roof1"}
+{"seq":71,"by":"claude","at":"2026-10-28T08:43:37Z","group":"g2","cmd":"line 11,44 11,46 c=stone1 pp=on"}
+{"seq":72,"by":"claude","at":"2026-10-28T08:43:37Z","group":"g2","cmd":"line 16,44 16,46 c=stone1 pp=on"}
+{"seq":73,"by":"claude","at":"2026-10-28T08:43:37Z","group":"g2","cmd":"line 32,44 32,46 c=stone1 pp=on"}
+{"seq":74,"by":"claude","at":"2026-10-28T08:43:37Z","group":"g2","cmd":"line 37,44 37,46 c=stone1 pp=on"}
+{"seq":75,"by":"claude","at":"2026-10-28T08:43:37Z","group":"g2","cmd":"note done n1"}
+{"seq":76,"by":"claude","at":"2026-10-28T08:43:37Z","group":"g2","cmd":"note done n2"}
+{"seq":77,"by":"claude","at":"2026-10-28T08:43:37Z","group":"g2","cmd":"note done n3"}
+{"seq":78,"by":"claude","at":"2026-10-28T08:43:37Z","group":"g2","cmd":"note done n4"}
+{"seq":79,"by":"claude","at":"2026-10-28T09:36:41Z","group":"g3","cmd":"fork house house_2x at=78"}
+{"seq":80,"by":"claude","at":"2026-10-28T09:36:41Z","group":"g3","cmd":"scale 2"}
+{"seq":81,"by":"claude","at":"2026-10-28T09:36:41Z","group":"g3","cmd":"density of=house d=2"}
+{"seq":82,"by":"claude","at":"2026-10-28T09:36:41Z","group":"g3","cmd":"select colour c=roof2"}
+{"seq":83,"by":"claude","at":"2026-10-28T09:36:41Z","group":"g3","cmd":"select colour c=roof1 add"}
+{"seq":84,"by":"claude","at":"2026-10-28T09:36:41Z","group":"g3","cmd":"line 0,10 95,10 c=roof1 pp=on"}
+{"seq":85,"by":"claude","at":"2026-10-28T09:36:41Z","group":"g3","cmd":"line 0,18 95,18 c=roof1 pp=on"}
+{"seq":86,"by":"claude","at":"2026-10-28T09:36:41Z","group":"g3","cmd":"line 0,26 95,26 c=roof1 pp=on"}
+{"seq":87,"by":"claude","at":"2026-10-28T09:36:41Z","group":"g3","cmd":"line 0,34 95,34 c=roof1 pp=on"}
+{"seq":88,"by":"claude","at":"2026-10-28T09:36:41Z","group":"g3","cmd":"line 0,42 95,42 c=roof1 pp=on"}
+{"seq":89,"by":"claude","at":"2026-10-28T09:36:41Z","group":"g3","cmd":"deselect"}
+{"seq":90,"by":"claude","at":"2026-10-28T09:36:41Z","group":"g3","cmd":"select colour c=wall1"}
+{"seq":91,"by":"claude","at":"2026-10-28T09:36:41Z","group":"g3","cmd":"px 15,57 16,57 33,60 58,56 59,56 70,61 77,58 13,79 30,82 31,82 62,80 75,84 76,84 c=wall0"}
+{"seq":92,"by":"claude","at":"2026-10-28T09:36:41Z","group":"g3","cmd":"deselect"}
+{"seq":93,"by":"claude","at":"2026-10-28T09:36:41Z","group":"g3","cmd":"line 47,66 47,87 c=wood1 pp=on"}
+{"seq":94,"by":"claude","at":"2026-10-28T09:36:41Z","group":"g3","cmd":"line 53,66 53,87 c=wood1 pp=on"}

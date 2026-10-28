@@ -1,0 +1,25 @@
+# A third variant of the water: the troughs and the crests moved by other amounts again.
+fork water water_d
+variant of=water
+layer main
+shift 6,19 wrap
+layer crest
+frame 1
+shift 19,15 wrap
+frame 2
+shift 19,15 wrap
+frame 3
+shift 19,15 wrap
+frame 4
+shift 19,15 wrap
+layer glint
+frame 1
+shift 19,15 wrap
+frame 2
+shift 19,15 wrap
+frame 3
+shift 19,15 wrap
+frame 4
+shift 19,15 wrap
+frame 1
+layer main

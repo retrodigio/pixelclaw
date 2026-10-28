@@ -1,0 +1,29 @@
+{"pclaw":"tape","lang":2}
+{"seq":1,"by":"claude","at":"2026-10-28T07:47:24Z","group":"g1","cmd":"new tile sand 24x24 palette=ruins-water wrap=on cell=24x24 bg=none <<\n  k ink #17181d\n  0 stone0 #272a30\n  1 stone1 #3b4044\n  2 stone2 #535a5b\n  3 stone3 #6c7570\n  4 stone4 #8b9489\n  5 stone5 #afb6a5\n  a moss0 #1c2e21\n  b moss1 #2c4729\n  c moss2 #486a32\n  d moss3 #6c8c3a\n  e lichen #a2ab52\n  f soil0 #2a211c\n  g soil1 #44352a\n  h soil2 #65503a\n  w pool #34566a\n  m water0 #1d3446\n  n water1 #284b5e\n  o water2 #3a6578\n  p water3 #5f93a2\n  q foam #a9d0cc\n  ramp stone stone0 stone1 stone2 stone3 stone4 stone5\n  ramp moss moss0 moss1 moss2 moss3 lichen\n  ramp soil soil0 soil1 soil2\n  ramp water water0 water1 water2 water3 foam\n>>"}
+{"seq":2,"by":"claude","at":"2026-10-28T07:47:24Z","group":"g1","cmd":"palette add sand0 hex=#6f5c42 key=s"}
+{"seq":3,"by":"claude","at":"2026-10-28T07:47:24Z","group":"g1","cmd":"palette add sand1 hex=#977f5c key=t"}
+{"seq":4,"by":"claude","at":"2026-10-28T07:47:24Z","group":"g1","cmd":"palette add sand2 hex=#b39b72 key=u"}
+{"seq":5,"by":"claude","at":"2026-10-28T07:47:24Z","group":"g1","cmd":"palette add sand3 hex=#cdb98c key=v"}
+{"seq":6,"by":"claude","at":"2026-10-28T07:47:24Z","group":"g1","cmd":"ramp sand = sand0 sand1 sand2 sand3"}
+{"seq":7,"by":"claude","at":"2026-10-28T07:47:24Z","group":"g1","cmd":"palette save as=ruins-shore"}
+{"seq":8,"by":"claude","at":"2026-10-28T07:47:24Z","group":"g1","cmd":"noise 0,0 24x24 ramp=sand weights=0,3,10,2 cluster=2..5 density=0.1 base=sand2 wrap=on seed=79"}
+{"seq":9,"by":"claude","at":"2026-10-28T07:47:24Z","group":"g1","cmd":"noise 0,0 24x24 ramp=sand weights=0,5,0,3 cluster=1..2 density=0.05 base=keep wrap=on seed=34"}
+{"seq":10,"by":"claude","at":"2026-10-28T07:47:24Z","group":"g1","cmd":"paint 4,15 <<\n  vt\n  ts\n>>"}
+{"seq":11,"by":"claude","at":"2026-10-28T07:47:24Z","group":"g1","cmd":"paint 17,5 <<\n  vt.\n  tts\n>>"}
+{"seq":12,"by":"claude","at":"2026-10-28T07:47:25Z","group":"g2","cmd":"note 6,9 11x9 \"columns 6-16 are almost plain below row 9 while the edge columns are busy: plain squares framed by marks when tiled\" id=n1"}
+{"seq":13,"by":"claude","at":"2026-10-28T07:47:25Z","group":"g2","cmd":"note 17,18 5x6 \"a 6-px vertical sand1 line beside a sand3 cross: a '|+' that repeats on every tile\" id=n2"}
+{"seq":14,"by":"claude","at":"2026-10-28T07:47:25Z","group":"g2","cmd":"note 23,10 1x7 \"marks stacked on column 23 and column 0 draw a dotted line on every vertical seam\" id=n3"}
+{"seq":15,"by":"claude","at":"2026-10-28T07:47:25Z","group":"g2","cmd":"note 19,6 \"sand0 pebble two shades from the sand2 around it\" id=n4"}
+{"seq":16,"by":"claude","at":"2026-10-28T07:47:25Z","group":"g2","cmd":"note 5,16 \"sand0 pebble two shades from the sand2 around it\" id=n5"}
+{"seq":17,"by":"claude","at":"2026-10-28T07:47:25Z","group":"g2","cmd":"px 8,11 9,11 15,12 16,12 7,16 10,17 11,17 13,15 c=sand1"}
+{"seq":18,"by":"claude","at":"2026-10-28T07:47:25Z","group":"g2","cmd":"px 11,13 c=sand3"}
+{"seq":19,"by":"claude","at":"2026-10-28T07:47:25Z","group":"g2","cmd":"px 17,20 17,22 20,21 22,21 21,22 23,11 23,14 0,13 c=sand2"}
+{"seq":20,"by":"claude","at":"2026-10-28T07:47:25Z","group":"g2","cmd":"px 20,6 19,7 6,16 5,17 c=sand1"}
+{"seq":21,"by":"claude","at":"2026-10-28T07:47:25Z","group":"g2","cmd":"note done n1"}
+{"seq":22,"by":"claude","at":"2026-10-28T07:47:25Z","group":"g2","cmd":"note done n2"}
+{"seq":23,"by":"claude","at":"2026-10-28T07:47:25Z","group":"g2","cmd":"note done n3"}
+{"seq":24,"by":"claude","at":"2026-10-28T07:47:25Z","group":"g2","cmd":"note done n4"}
+{"seq":25,"by":"claude","at":"2026-10-28T07:47:25Z","group":"g2","cmd":"note done n5"}
+{"seq":26,"by":"claude","at":"2026-10-28T09:36:29Z","group":"g3","cmd":"fork sand sand_c at=25"}
+{"seq":27,"by":"claude","at":"2026-10-28T09:36:29Z","group":"g3","cmd":"variant of=sand"}
+{"seq":28,"by":"claude","at":"2026-10-28T09:36:29Z","group":"g3","cmd":"shift 15,5 wrap"}

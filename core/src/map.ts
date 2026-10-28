@@ -9,7 +9,7 @@
 
 import { frameAtTick, loopTicks, playOrder, sequences } from './anim.ts';
 import { TRANSPARENT, flatten, type Doc, type Footprint, type MapEntry, type MapLayerInfo } from './doc.ts';
-import { drawOverlayAt, hash32, layoutOf, mapSeam, overlayFrameAt, schemeOf, type MapImage } from './family.ts';
+import { bandMaps, drawOverlayAt, hash32, layoutOf, mapSeam, overlayFrameAt, schemeOf, showsOutside, type MapImage } from './family.ts';
 import { luma601, lstar } from './checks.ts';
 import type { Rgba } from './png.ts';
 import type { Pt } from './raster.ts';
@@ -281,7 +281,17 @@ export function composeMapDoc(d: Doc, world: MapWorld, o: ComposeOptions = {}): 
         const f = pick(fam, x, y, li);
         const L = layoutOf(f.family!);
         const [cx, cy] = v === null ? L.outside : L.cells[v]!;
-        blit(flat(f), f.width, cx * t, cy * t, t, t, x * t, y * t);
+        if (v !== null && s.variants[v]!.on && !info.outside) {
+          // A fillet or a face in a cell outside the terrain, on a layer that leaves the outside
+          // to the layers below: only its terrain pixels.
+          const m = bandMaps(s, t, f.family!.geometry)[v]!;
+          const src = flat(f);
+          for (let yy = 0; yy < t; yy++) for (let xx = 0; xx < t; xx++) {
+            if (showsOutside(f.family!.geometry, m[yy * t + xx]!)) continue;
+            const c = src[(cy * t + yy) * f.width + cx * t + xx]!;
+            if (c !== TRANSPARENT) px[(y * t + yy) * W + x * t + xx] = c;
+          }
+        } else blit(flat(f), f.width, cx * t, cy * t, t, t, x * t, y * t);
         top[i] = { asset: f.name, variant: v === null ? 'outside' : s.variants[v]!.name, edge: v !== null && !fullInside(s, v), ...(info.outside ? { base: true } : {}) };
         variants[i] = v;
       });
@@ -689,8 +699,8 @@ export function mapChecks(d: Doc, world: MapWorld, limits: Partial<typeof MAP_LI
     const n = new Map<number, number>();
     for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
       const k = (y + j) * cols + x + i;
-      // The open ground a map is filled with (the sea) is a backdrop, judged as its own tile.
-      if (flat[k] || !c.top[k] || c.top[k]!.variant === 'outside') continue;
+      // The open ground a map is filled with (the sea) counts too: one tile filling it is a weave (§17).
+      if (flat[k] || !c.top[k]) continue;
       n.set(keys[k]!, (n.get(keys[k]!) ?? 0) + 1);
     }
     let best = 0, bk = -1;

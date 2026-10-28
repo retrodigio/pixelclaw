@@ -1,0 +1,28 @@
+# A variant of the water (plan §4.1, §17): the open sea was one water tile in every cell, and its
+# troughs and crests lined up into a diagonal weave across the map. The same tile with its troughs
+# and its crests moved by different amounts (on every frame alike, so it shimmers the same), so
+# neighbouring cells no longer continue each other's lines.
+fork water water_b
+variant of=water
+layer main
+shift 11,7 wrap
+layer crest
+frame 1
+shift 5,9 wrap
+frame 2
+shift 5,9 wrap
+frame 3
+shift 5,9 wrap
+frame 4
+shift 5,9 wrap
+layer glint
+frame 1
+shift 5,9 wrap
+frame 2
+shift 5,9 wrap
+frame 3
+shift 5,9 wrap
+frame 4
+shift 5,9 wrap
+frame 1
+layer main

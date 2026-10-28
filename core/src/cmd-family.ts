@@ -78,8 +78,8 @@ function bandCmd(a: Args, doc: Doc, f: FamilyState): { text: string; run: (d: Do
   if (inset + total + radius > h) {
     throw new DiagError(a.cmd.line, a.cmd.col, `family band: the inset (${inset}), the band (${total}) and the corner radius (${radius}) must fit in half a tile (${h} px)`);
   }
-  // A fillet scheme rounds inner corners into the outside cell, by the band's width unless told.
-  const fillet = fillets ? intOpt(a, 'fillet', 1, h, Math.min(h, total || 1)) : undefined;
+  // A fillet scheme rounds inner corners: by what the family had, else the band's width, unless told.
+  const fillet = fillets ? intOpt(a, 'fillet', 1, h, f.geometry.fillet ?? Math.min(h, total || 1)) : undefined;
   const geometry = { inset, radius, bands, ...(fillet !== undefined ? { fillet } : {}) };
   return {
     text: `band ${parts.join(' ')} radius=${radius} inset=${inset}${fillet !== undefined ? ` fillet=${fillet}` : ''} draw=${draw ? 'on' : 'off'}`,

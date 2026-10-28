@@ -1,0 +1,86 @@
+{
+  "name": "water_d",
+  "kind": "tile",
+  "size": [
+    24,
+    24
+  ],
+  "cell": [
+    24,
+    24
+  ],
+  "wrap": true,
+  "palette": "mossy-ruins",
+  "layers": [
+    {
+      "name": "main",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    },
+    {
+      "name": "crest",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    },
+    {
+      "name": "glint",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    }
+  ],
+  "frames": 4,
+  "paletteLocked": false,
+  "stamps": [],
+  "macros": [],
+  "tags": [],
+  "views": [],
+  "links": [
+    {
+      "fork": {
+        "from": "water",
+        "at": 47
+      }
+    }
+  ],
+  "notes": [
+    {
+      "id": "n1",
+      "x": 9,
+      "y": 4,
+      "w": 4,
+      "h": 2,
+      "text": "every crest is the same 2-px stamp, one per even row: diamonds when tiled; vary crest width, drop a few, break the rhythm"
+    },
+    {
+      "id": "n2",
+      "x": 10,
+      "y": 2,
+      "w": 1,
+      "h": 1,
+      "text": "a lone water0 pixel left from a dash the crest covered"
+    },
+    {
+      "id": "n3",
+      "x": 0,
+      "y": 0,
+      "w": 24,
+      "h": 24,
+      "text": "all crests jump 6 px right together every 15 ticks while the dashes stay still: a conveyor more than a shimmer; frames 2-4 chop the dashes into specks"
+    }
+  ],
+  "tape": {
+    "lang": 2,
+    "commands": 71,
+    "groups": 3
+  },
+  "state": {
+    "sha256": "2612b71cdc601685b6ec758a28ad449b760135de4b6776915f801922ad35342d"
+  },
+  "checkpoints": {
+    "every": 200,
+    "files": []
+  }
+}

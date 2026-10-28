@@ -1,0 +1,49 @@
+{
+  "name": "sand_c",
+  "kind": "tile",
+  "size": [
+    24,
+    24
+  ],
+  "cell": [
+    24,
+    24
+  ],
+  "wrap": true,
+  "palette": "ruins-water",
+  "layers": [
+    {
+      "name": "main",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    }
+  ],
+  "frames": 1,
+  "paletteLocked": false,
+  "stamps": [],
+  "macros": [],
+  "tags": [],
+  "views": [],
+  "links": [
+    {
+      "fork": {
+        "from": "sand",
+        "at": 25
+      }
+    }
+  ],
+  "notes": [],
+  "tape": {
+    "lang": 2,
+    "commands": 28,
+    "groups": 3
+  },
+  "state": {
+    "sha256": "b254ee79b28ce836b9a265b778ff31d05ffe50321c4d20ae5d69ae63ffb1e55d"
+  },
+  "checkpoints": {
+    "every": 200,
+    "files": []
+  }
+}

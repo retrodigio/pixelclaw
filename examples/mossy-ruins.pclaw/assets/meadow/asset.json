@@ -3,7 +3,7 @@
   "kind": "family",
   "size": [
     192,
-    168
+    552
   ],
   "cell": [
     24,
@@ -39,7 +39,7 @@
     "groups": 2
   },
   "state": {
-    "sha256": "45ce7a72a55c9eaea27c0a8776117d88a9c4a6098226ba3cceb55740164450b0"
+    "sha256": "b5dffe2c01afadcfe46214d2debda6b7fad4847b4db44dfc17116f6f0844fd17"
   },
   "checkpoints": {
     "every": 200,

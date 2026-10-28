@@ -3,7 +3,7 @@
   "kind": "family",
   "size": [
     192,
-    168
+    552
   ],
   "cell": [
     24,
@@ -42,11 +42,11 @@
   "notes": [],
   "tape": {
     "lang": 2,
-    "commands": 74,
+    "commands": 87,
     "groups": 3
   },
   "state": {
-    "sha256": "41c02f961628562a5db5582155ce6221c565a284d2b48dcfc177cdb404b2edb7"
+    "sha256": "5cc16cdee73504c6e52643fa39dbeee4b2804319895980bb387dcdda5c591089"
   },
   "checkpoints": {
     "every": 200,

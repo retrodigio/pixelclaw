@@ -1,0 +1,4 @@
+# A second variant of the sand, moved by another amount.
+fork sand sand_c
+variant of=sand
+shift 15,5 wrap
