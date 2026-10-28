@@ -1,0 +1,26 @@
+{
+  "name": "mossy-ruins",
+  "entries": [
+    {"key": "k", "name": "ink", "hex": "#17181d"},
+    {"key": "0", "name": "stone0", "hex": "#272a30"},
+    {"key": "1", "name": "stone1", "hex": "#3b4044"},
+    {"key": "2", "name": "stone2", "hex": "#535a5b"},
+    {"key": "3", "name": "stone3", "hex": "#6c7570"},
+    {"key": "4", "name": "stone4", "hex": "#8b9489"},
+    {"key": "5", "name": "stone5", "hex": "#afb6a5"},
+    {"key": "a", "name": "moss0", "hex": "#1c2e21"},
+    {"key": "b", "name": "moss1", "hex": "#2c4729"},
+    {"key": "c", "name": "moss2", "hex": "#486a32"},
+    {"key": "d", "name": "moss3", "hex": "#6c8c3a"},
+    {"key": "e", "name": "lichen", "hex": "#a2ab52"},
+    {"key": "f", "name": "soil0", "hex": "#2a211c"},
+    {"key": "g", "name": "soil1", "hex": "#44352a"},
+    {"key": "h", "name": "soil2", "hex": "#65503a"},
+    {"key": "w", "name": "pool", "hex": "#34566a"}
+  ],
+  "ramps": {
+    "stone": ["stone0", "stone1", "stone2", "stone3", "stone4", "stone5"],
+    "moss": ["moss0", "moss1", "moss2", "moss3", "lichen"],
+    "soil": ["soil0", "soil1", "soil2"]
+  }
+}

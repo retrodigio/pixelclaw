@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -25,7 +25,7 @@ beforeAll(() => {
 });
 
 afterAll(() => {
-  // temp dirs are left to the OS; nothing is running
+  rmSync(root, { recursive: true, force: true });
 });
 
 describe('pixelclaw CLI', () => {

@@ -1,0 +1,88 @@
+# Mossy ruins: a 24x24 seamless stone floor tile.
+#
+# Six flagstones in three courses with mortar (stone1) between them:
+#   course A  y 1-7   joints at x 5 and 16
+#   course B  y 9-14  joints at x 2 and 12
+#   course C  y 16-23 joints at x 8 and 20
+# The tile wraps (wrap=on), so a stone that crosses an edge is drawn past it and comes back on
+# the far side; the mortar at y=0 closes course C against course A of the next tile.
+# Light comes from the top left: top and left edges are lit (stone4), bottom and right edges are
+# in shade (stone2), and corners are chamfered (mortar colour) so the stones read as worn slabs.
+
+new tile stone_floor 24x24 palette=mossy-ruins wrap=on bg=stone1
+
+# --- stone bodies
+rect 6,1 10x7 c=stone3 fill        # A1  x 6-15
+rect 17,1 12x7 c=stone3 fill       # A2  x 17-28 (wraps to 0-4)
+rect 3,9 9x6 c=stone3 fill         # B1  x 3-11
+rect 13,9 13x6 c=stone3 fill       # B2  x 13-25 (wraps to 0-1)
+rect 9,16 11x8 c=stone3 fill       # C1  x 9-19
+rect 21,16 11x8 c=stone3 fill      # C2  x 21-31 (wraps to 0-7)
+
+# --- lit top and left edges
+line 6,1 15,1 c=stone4 ; line 6,2 6,6 c=stone4
+line 17,1 28,1 c=stone4 ; line 17,2 17,6 c=stone4
+line 3,9 11,9 c=stone4 ; line 3,10 3,13 c=stone4
+line 13,9 25,9 c=stone4 ; line 13,10 13,13 c=stone4
+line 9,16 19,16 c=stone4 ; line 9,17 9,22 c=stone4
+line 21,16 31,16 c=stone4 ; line 21,17 21,22 c=stone4
+
+# --- shaded bottom and right edges
+line 7,7 15,7 c=stone2 ; line 15,2 15,6 c=stone2
+line 18,7 28,7 c=stone2 ; line 28,2 28,6 c=stone2
+line 4,14 11,14 c=stone2 ; line 11,10 11,13 c=stone2
+line 14,14 25,14 c=stone2 ; line 25,10 25,13 c=stone2
+line 10,23 19,23 c=stone2 ; line 19,17 19,22 c=stone2
+line 22,23 31,23 c=stone2 ; line 31,17 31,22 c=stone2
+
+# --- chamfered corners
+px 6,1 15,1 6,7 15,7 c=stone1
+px 17,1 28,1 17,7 28,7 c=stone1
+px 3,9 11,9 3,14 11,14 c=stone1
+px 13,9 25,9 13,14 25,14 c=stone1
+px 9,16 19,16 9,23 19,23 c=stone1
+px 21,16 31,16 21,23 31,23 c=stone1
+
+# --- wear: pits (a dark pixel with a lit lower-right rim), cracks, chipped edges
+px 8,4 c=stone2 ; px 9,5 c=stone4
+line 11,1 12,3 13,6 c=stone1 pp=on        # crack in A1, from the top edge
+px 13,3 14,6 c=stone4
+px 20,3 c=stone2 ; px 21,4 c=stone4
+px 1,5 c=stone2 ; px 2,6 c=stone4
+px 25,1 26,1 c=stone3                      # worn top edge on A2 (x 1-2)
+px 6,11 c=stone2 ; px 7,12 c=stone4
+line 18,9 19,12 c=stone1                   # crack in B2
+px 19,10 20,12 c=stone4
+px 23,11 c=stone2 ; px 24,12 c=stone4
+px 12,19 c=stone2 ; px 13,20 c=stone4
+px 16,21 c=stone2 ; px 17,22 c=stone4
+px 24,19 c=stone2 ; px 25,20 c=stone4
+px 31,18 31,19 c=stone1                    # chipped right edge of C2 (x 7)
+
+# --- moss in the joints, spilling onto stone edges
+paint 14,6 <<
+  ..dc.
+  .cbb.
+  .bbab
+>>
+paint 19,18 <<
+  .d
+  cb
+  bb
+  .a
+>>
+paint 3,14 <<
+  .dc..
+  cbbcb
+  .baa.
+>>
+paint 7,23 <<
+  .cc
+  bba
+>>
+px 15,6 c=lichen ; px 4,15 c=lichen
+
+# --- deep mortar: the joints read deeper next to the shaded sides of the stones
+line 16,2 16,5 c=stone0 ; line 5,2 5,6 c=stone0
+line 12,10 12,13 c=stone0 ; line 2,10 2,13 c=stone0
+line 20,17 20,17 c=stone0 ; line 8,17 8,21 c=stone0

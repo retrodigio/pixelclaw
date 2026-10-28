@@ -116,11 +116,11 @@ export function renderScaled(doc: Doc, o: ScaledOptions = {}): Rgba {
   }
   if (grid) {
     for (let x = 0; x <= doc.width; x++) {
-      const a = x % 8 === 0 ? 96 : 40;
+      const a = x % 8 === 0 ? 80 : 30;
       for (let y = 0; y < H; y++) shade(img, left + x * s, top + y, a);
     }
     for (let y = 0; y <= doc.height; y++) {
-      const a = y % 8 === 0 ? 96 : 40;
+      const a = y % 8 === 0 ? 80 : 30;
       for (let x = 0; x < W + 1; x++) if ((x % s) !== 0 || x === W) shade(img, left + x, top + y * s, a);
     }
   }

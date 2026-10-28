@@ -1,0 +1,35 @@
+{
+  "name": "stone_floor",
+  "kind": "tile",
+  "size": [
+    24,
+    24
+  ],
+  "cell": [
+    24,
+    24
+  ],
+  "wrap": true,
+  "palette": "mossy-ruins",
+  "layers": [
+    {
+      "name": "main"
+    }
+  ],
+  "frames": 1,
+  "tags": [],
+  "views": [],
+  "links": [],
+  "tape": {
+    "lang": 1,
+    "commands": 71,
+    "groups": 1
+  },
+  "state": {
+    "sha256": "73ff03a3627b43f84ff44f6f434266abf518e661f848e432636f1b26b82055af"
+  },
+  "checkpoints": {
+    "every": 200,
+    "files": []
+  }
+}
