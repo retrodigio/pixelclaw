@@ -3,7 +3,9 @@
 // and written down. Normalising a normalised line gives the same line back.
 
 import { syncMirrors, viewOf } from './anim.ts';
-import { DOC_KINDS, TRANSPARENT, createDoc, ctxOf, type Doc, type DocKind } from './doc.ts';
+import { DOC_KINDS, TRANSPARENT, createDoc, ctxOf, type Doc, type DocKind, type FamilyState, type OverlayState } from './doc.ts';
+import { defaultOverlay, familyLayout, familyCell, syncFamily } from './family.ts';
+import { defaultInset, schemeNamed, BUILTIN_SCHEMES } from './schemes.ts';
 import { drawColoured, drawPoints, mirrored, targetOf } from './draw.ts';
 import { DEFAULT_ROLE_HEX, RESERVED_KEYS, ROLES, autoKeys, isRole, normaliseHex, paletteRows, parsePaletteRows, type Palette, type PaletteEntry } from './palette.ts';
 import { DiagError, quote, type BlockRow, type ParsedCommand, type Token } from './parser.ts';
@@ -38,10 +40,15 @@ export interface NormaliseContext {
   by: string;
   /** How deep in macro calls this command is (0 on the tape). */
   depth?: number;
+  /** Another asset's document, for commands that copy from one (`family texture … from=`); the line records the pixels. */
+  asset?(name: string): Doc | undefined;
 }
 
 export type Op =
-  | { k: 'new'; kind: DocKind; name: string; width: number; height: number; cellW: number; cellH: number; wrap: boolean; palette: Palette; bg: number }
+  | {
+    k: 'new'; kind: DocKind; name: string; width: number; height: number; cellW: number; cellH: number; wrap: boolean; palette: Palette; bg: number;
+    family?: FamilyState; overlay?: OverlayState;
+  }
   | { k: 'fork'; name: string }
   | { k: 'undo'; group: string }
   /** Any other change, applied to the document as the command's author. */
@@ -122,6 +129,12 @@ export class Args {
   /** The cell origin in pixels, and its normalised text. */
   cellOrigin(doc: Doc): { dx: number; dy: number; text: string } {
     if (!this.cell) return { dx: 0, dy: 0, text: '' };
+    if (this.cell.name !== undefined) {
+      // A family's cells by name: inside, outside, or a variant (@cell(nesw)).
+      const at = doc.family ? familyCell(doc.family, this.cell.name) : null;
+      if (!at) throw new DiagError(this.cell.line, this.cell.col, doc.family ? `@cell(${this.cell.name}): no such cell (inside, outside, or a variant of ${doc.family.scheme})` : `@cell(${this.cell.name}): cells by name are a family's`);
+      return { dx: at[0] * doc.cellW, dy: at[1] * doc.cellH, text: ` @cell(${this.cell.name})` };
+    }
     const { cx, cy } = this.cell;
     const cols = Math.floor(doc.width / doc.cellW);
     const rows = Math.floor(doc.height / doc.cellH);
@@ -149,7 +162,7 @@ export function tokenText(t: Token): string {
     case 'int': return String(t.v);
     case 'point': return `${t.x},${t.y}`;
     case 'size': return `${t.w}x${t.h}`;
-    case 'cell': return `@cell(${t.cx},${t.cy})`;
+    case 'cell': return t.name !== undefined ? `@cell(${t.name})` : `@cell(${t.cx},${t.cy})`;
     case 'string': return quote(t.v);
     case 'kv': return `${t.key}=${t.quoted ? quote(t.value) : t.value}`;
     case 'block': return '<<';
@@ -211,10 +224,10 @@ export const shiftPts = (pts: Pt[], dx: number, dy: number): Pt[] => (dx || dy ?
 
 const newCmd: CommandSpec = {
   name: 'new',
-  summary: 'new <kind> <name> <W>x<H> [palette=<name>] [wrap=on|off] [cell=<W>x<H>] [bg=<colour>|none] [<< palette rows >>]',
+  summary: 'new <kind> <name> <W>x<H> [palette=<name>] [wrap=on|off] [cell=<W>x<H>] [bg=<colour>|none] [<< palette rows >>]   (new family <name> <T>x<T> scheme=<scheme> [map=<C>x<R>]: an autotile family of T px tiles)',
   normalise(cmd, ctx) {
     if (ctx.doc) throw new DiagError(cmd.line, cmd.col, `new must be the first command of a tape (this document already exists)`);
-    const a = new Args(cmd, ['palette', 'wrap', 'cell', 'bg']);
+    const a = new Args(cmd, ['palette', 'wrap', 'cell', 'bg', 'scheme', 'map']);
     const kindTok = a.take('word', `a kind (${DOC_KINDS.join(', ')})`);
     if (!DOC_KINDS.includes(kindTok.v as DocKind)) throw new DiagError(kindTok.line, kindTok.col, `unknown kind '${kindTok.v}' (kinds: ${DOC_KINDS.join(', ')})`);
     const kind = kindTok.v as DocKind;
@@ -256,10 +269,41 @@ const newCmd: CommandSpec = {
     }
     const bgOpt = a.opts.get('bg');
     const bg = bgOpt ? resolveColour(bgOpt.value, palette, bgOpt.line, bgOpt.vcol) : { index: TRANSPARENT, name: 'none' };
-    const head = `new ${kind} ${nameTok.v} ${size.w}x${size.h} palette=${palette.name} wrap=${wrap ? 'on' : 'off'} cell=${cellW}x${cellH} bg=${bg.name}`;
+    const schemeOpt = a.opts.get('scheme');
+    const mapOpt = a.opts.get('map');
+    let family: FamilyState | undefined;
+    let width = size.w, height = size.h, extra = '';
+    if (kind === 'family') {
+      // The size is the tile's; the canvas is the sheet (plan §4.2).
+      if (size.w !== size.h || size.w % 2 || size.w < 4 || size.w > 256) throw new DiagError(size.line, size.col, `a family's tiles are square, even and 4..256 px (${size.w}x${size.h})`);
+      if (!schemeOpt) throw new DiagError(cmd.line, cmd.col, `new family: missing scheme=<scheme> (${[...BUILTIN_SCHEMES.keys()].join(', ')})`);
+      const scheme = schemeNamed(schemeOpt.value);
+      if (!scheme) throw new DiagError(schemeOpt.line, schemeOpt.vcol, `unknown scheme '${schemeOpt.value}' (schemes: ${[...BUILTIN_SCHEMES.keys()].join(', ')})`);
+      if (wrap) throw new DiagError(a.opts.get('wrap')!.line, a.opts.get('wrap')!.vcol, `a family sheet does not wrap (its textures are tiles that do)`);
+      if (cellOpt && (cellW !== size.w || cellH !== size.h)) throw new DiagError(cellOpt.line, cellOpt.vcol, `a family's cells are its tiles (${size.w}x${size.h})`);
+      let mc = 0, mr = 0;
+      if (mapOpt) {
+        const m = /^(\d+)x(\d+)$/.exec(mapOpt.value);
+        if (!m || Number(m[1]) < 3 || Number(m[2]) < 3 || Number(m[1]) > 64 || Number(m[2]) > 64) throw new DiagError(mapOpt.line, mapOpt.vcol, `map= must be a size in tiles like 12x10 (3..64 each way)`);
+        mc = Number(m[1]); mr = Number(m[2]);
+      }
+      const L = familyLayout(scheme, mc, mr);
+      width = L.cols * size.w; height = L.rows * size.h; cellW = size.w; cellH = size.h;
+      family = {
+        scheme: scheme.name, tile: size.w, geometry: { inset: defaultInset(scheme, size.w), radius: 0, bands: [] }, detached: [],
+        mapCols: mc, mapRows: mr, terrain: new Uint8Array(),
+      };
+      extra = ` scheme=${scheme.name}${mc ? ` map=${mc}x${mr}` : ''}`;
+    } else {
+      for (const o of [schemeOpt, mapOpt]) if (o) throw new DiagError(o.line, o.col, `${o.key}= is for new family`);
+    }
+    const head = `new ${kind} ${nameTok.v} ${size.w}x${size.h}${extra} palette=${palette.name} wrap=${wrap ? 'on' : 'off'} cell=${cellW}x${cellH} bg=${bg.name}`;
     return {
       text: lang >= 2 ? `${head} <<\n${blockText(paletteRows(palette))}>>` : head,
-      op: { k: 'new', kind, name: nameTok.v, width: size.w, height: size.h, cellW, cellH, wrap, palette, bg: bg.index },
+      op: {
+        k: 'new', kind, name: nameTok.v, width, height, cellW, cellH, wrap, palette, bg: bg.index,
+        ...(family ? { family } : {}), ...(kind === 'overlay' ? { overlay: defaultOverlay() } : {}),
+      },
     };
   },
 };
@@ -655,12 +699,17 @@ export function normaliseCommand(cmd: ParsedCommand, ctx: NormaliseContext): Nor
 
 /** Apply an operation as its author. 'new' returns a fresh document; 'undo' is handled by the engine. */
 export function applyOp(doc: Doc | null, op: Op, by = ''): Doc {
-  if (op.k === 'new') return createDoc(op);
+  if (op.k === 'new') {
+    const d = createDoc(op);
+    syncFamily(d);
+    return d;
+  }
   if (!doc) throw new Error('applyOp: no document');
   if (op.k === 'fork') doc.name = op.name;
   else if (op.k === 'fn') {
     op.run(doc, by);
     if (doc.views.length) syncMirrors(doc);
+    if (doc.family) syncFamily(doc);
   } else throw new Error('applyOp: undo is applied by replay');
   return doc;
 }

@@ -8,6 +8,7 @@ import { TRANSPARENT, flatten, type Doc } from './doc.ts';
 import { rgbOf, type Palette } from './palette.ts';
 import type { Pt } from './raster.ts';
 import { hasRoles } from './themes.ts';
+import { DEFAULT_MAP, composeMap, islandTerrain, layoutOf, mapSeam, schemeOf } from './family.ts';
 import { rampsOf } from './values.ts';
 
 export const CHECK_IDS = ['palette', 'orphans', 'jaggies', 'banding', 'outline', 'seam', 'coverage', 'readability', 'revert', 'repetition', 'anim', 'views'] as const;
@@ -107,8 +108,8 @@ const DEFAULTS: Record<CheckId, { all: Params } & Partial<Record<string, Params>
   palette: { all: { max: 0 } },
   // Stray pixels per 100 opaque pixels. Tiles are texture: a stray one ramp step from its
   // surroundings is allowed there.
-  orphans: { all: { max: 1, texture: false }, tile: { max: 2, texture: true } },
-  jaggies: { all: { max: 0 }, tile: { max: 2 } },
+  orphans: { all: { max: 1, texture: false }, tile: { max: 2, texture: true }, family: { max: 2, texture: true } },
+  jaggies: { all: { max: 0 }, tile: { max: 2 }, family: { max: 2 } },
   // The pillow share: 1 when ramp steps follow the outline on every side alike.
   banding: { all: { max: 0.5, minEdges: 8 } },
   outline: { all: { min: 0.85 } },
@@ -121,7 +122,7 @@ const DEFAULTS: Record<CheckId, { all: Params } & Partial<Record<string, Params>
   repetition: { all: { max: 3 } },
   // Frame diff share (changed pixels over the silhouette; the pilot's good pairs changed 16-19 %),
   // pivot drift and ground drift in pixels, silhouette area jumps, and the loop seam.
-  anim: { all: { minDiff: 0.08, maxDiff: 0.35, maxPivot: 1, maxGround: 0, maxArea: 0.15 }, tile: { minDiff: 0.03 } },
+  anim: { all: { minDiff: 0.08, maxDiff: 0.35, maxPivot: 1, maxGround: 0, maxArea: 0.15 }, tile: { minDiff: 0.03 }, family: { minDiff: 0.03 } },
   // Views must differ from each other (by colour, over both silhouettes) by at least this share.
   views: { all: { min: 0.2 } },
 };
@@ -207,7 +208,8 @@ function result(id: CheckId, o: Partial<CheckResult> & { status: CheckResult['st
 const skip = (id: CheckId, why: string): CheckResult => result(id, { status: 'skip', detail: why });
 
 /** Is the document a texture tile (wraps), or a sprite with a silhouette? */
-const isTile = (d: Doc): boolean => d.wrap;
+/** Tiles and families are ground, not figures. */
+const isTile = (d: Doc): boolean => d.wrap || d.kind === 'family';
 
 // --- palette
 
@@ -713,6 +715,18 @@ export function seamScore(doc: Doc, frame = 0): { score: number; jx: number; jy:
 }
 
 function checkSeam(img: Img, p: Params, ctx: CheckContext): CheckResult {
+  if (img.doc.family) {
+    // A family's seams show on a map: the score over the default island (plan §4.2 "map preview … scored for seams").
+    const d = img.doc;
+    const { cols, rows, seed } = DEFAULT_MAP;
+    const m = composeMap(d, islandTerrain(schemeOf(d.family!), cols, rows, seed), ctx.frame ?? 0);
+    const s = mapSeam(m, d);
+    const max = Number(p.max);
+    return result('seam', {
+      status: s.score <= max ? 'pass' : 'fail', score: s.score, shown: fmt(s.score), limit: `≤ ${max}`,
+      detail: `over a ${cols}x${rows} island (seed ${seed}): jump x ${fmt(s.jx)} y ${fmt(s.jy)}; line x ${fmt(s.lx)} y ${fmt(s.ly)} (view map shows it)`,
+    });
+  }
   if (!img.wrap) return skip('seam', 'not a wrap (tile) document');
   const s = seamScore(img.doc, ctx.frame ?? 0);
   const max = Number(p.max);
@@ -736,8 +750,37 @@ function checkSeam(img: Img, p: Params, ctx: CheckContext): CheckResult {
 
 // --- coverage
 
+/** A family's coverage (plan §4.2): every name the scheme can produce has its cell drawn, on every frame, and so do the textures. */
+function familyCoverage(d: Doc, p: Params): CheckResult {
+  const f = d.family!;
+  const s = schemeOf(f);
+  const L = layoutOf(f);
+  const t = f.tile;
+  const missing: string[] = [];
+  const groups: FlagGroup[] = [];
+  const cells: [string, [number, number]][] = [['inside', L.inside], ['outside', L.outside], ...s.variants.map((v, i): [string, [number, number]] => [v.name, L.cells[i]!])];
+  for (let fr = 0; fr < d.frameCount; fr++) {
+    const px = flatten(d, fr);
+    for (const [name, [cx, cy]] of cells) {
+      let empty = true;
+      for (let y = 0; y < t && empty; y++) for (let x = 0; x < t; x++) if (px[(cy * t + y) * d.width + cx * t + x] !== TRANSPARENT) { empty = false; break; }
+      if (!empty) continue;
+      missing.push(`${name}${d.frameCount > 1 ? ` (frame ${fr + 1})` : ''} is empty`);
+      const pts: Pt[] = [];
+      for (let i = 0; i < t; i++) pts.push([cx * t + i, cy * t], [cx * t + i, cy * t + t - 1]);
+      groups.push({ label: `${name} is empty`, pts, ...(d.frameCount > 1 ? { frame: fr } : {}) });
+    }
+  }
+  const max = Number(p.max);
+  return result('coverage', {
+    status: missing.length <= max ? 'pass' : 'fail', score: missing.length, shown: String(missing.length), limit: `≤ ${max}`, groups,
+    detail: missing.length ? missing.join('; ') : `${s.name}: all ${s.variants.length} variants and both textures drawn${d.frameCount > 1 ? ` on ${d.frameCount} frames` : ''}${f.detached.length ? ` (${f.detached.length} detached)` : ''}`,
+  });
+}
+
 function checkCoverage(img: Img, p: Params, ctx: CheckContext): CheckResult {
   const d = img.doc;
+  if (d.family) return familyCoverage(d, p);
   const missing: string[] = [];
   const groups: FlagGroup[] = [];
   const want = ctx.style?.sizes?.[d.kind];

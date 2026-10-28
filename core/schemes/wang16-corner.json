@@ -1,0 +1,33 @@
+{
+  "name": "wang16-corner",
+  "description": "corner Wang tiles: each of the four corners is in or out, and the edge runs through the middle of the tile: 16 variants",
+  "neighbours": "corners",
+  "columns": 8,
+  "pieces": [
+    "ne_se_sw_nw",
+    "ne_se_sw",
+    "ne_se_nw",
+    "ne_sw_nw",
+    "se_sw_nw",
+    "ne_sw",
+    "se_nw"
+  ],
+  "variants": [
+    {"name":"o","key":0,"quads":["out","out","out","out"]},
+    {"name":"ne","key":2,"quads":["out","outer@sw","out","out"]},
+    {"name":"se","key":8,"quads":["out","out","out","outer@nw"]},
+    {"name":"ne_se","key":10,"quads":["out","vert@sw","out","vert@nw"]},
+    {"name":"sw","key":32,"quads":["out","out","outer@ne","out"]},
+    {"name":"ne_sw","key":34,"quads":["out","outer@sw","outer@ne","out"]},
+    {"name":"se_sw","key":40,"quads":["out","out","horiz@ne","horiz@nw"]},
+    {"name":"ne_se_sw","key":42,"quads":["out","vert@sw","horiz@ne","inner@nw"]},
+    {"name":"nw","key":128,"quads":["outer@se","out","out","out"]},
+    {"name":"ne_nw","key":130,"quads":["horiz@se","horiz@sw","out","out"]},
+    {"name":"se_nw","key":136,"quads":["outer@se","out","out","outer@nw"]},
+    {"name":"ne_se_nw","key":138,"quads":["horiz@se","inner@sw","out","vert@nw"]},
+    {"name":"sw_nw","key":160,"quads":["vert@se","out","vert@ne","out"]},
+    {"name":"ne_sw_nw","key":162,"quads":["inner@se","horiz@sw","vert@ne","out"]},
+    {"name":"se_sw_nw","key":168,"quads":["vert@se","out","inner@ne","horiz@nw"]},
+    {"name":"ne_se_sw_nw","key":170,"quads":["in@se","in@sw","in@ne","in@nw"]}
+  ]
+}

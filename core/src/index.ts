@@ -19,3 +19,5 @@ export * from './themes.ts';
 export * from './style.ts';
 export * from './anim.ts';
 export * from './gif.ts';
+export * from './schemes.ts';
+export * from './family.ts';

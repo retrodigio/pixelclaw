@@ -23,6 +23,9 @@ export interface PaletteSource {
   defaultName?: string;
 }
 
+/** Other assets' documents, for commands that copy from one when first run (the line records what they copied). */
+export type AssetSource = (name: string) => Doc | undefined;
+
 export interface AssetState {
   doc: Doc | null;
   entries: TapeEntry[];
@@ -160,8 +163,9 @@ function nextNoteId(entries: TapeEntry[]): string {
   return `n${max + 1}`;
 }
 
-function context(doc: Doc | null, entries: TapeEntry[], current: string, palettes: PaletteSource, seq: number, by: string): NormaliseContext {
+function context(doc: Doc | null, entries: TapeEntry[], current: string, palettes: PaletteSource, seq: number, by: string, assets?: AssetSource): NormaliseContext {
   return {
+    ...(assets ? { asset: assets } : {}),
     doc,
     seq,
     by,
@@ -265,7 +269,7 @@ function countChanged(before: Doc | null, after: Doc | null): number {
  * Parse, normalise and apply a batch of command text as one undo group. On any error (parse or
  * semantic) the result lists every error with its line and column and the state is untouched.
  */
-export function runBatch(state: AssetState, text: string, opts: { by: string; at?: string; palettes: PaletteSource }): BatchResult {
+export function runBatch(state: AssetState, text: string, opts: { by: string; at?: string; palettes: PaletteSource; assets?: AssetSource }): BatchResult {
   const { commands, errors } = parse(text);
   let doc = state.doc ? cloneDoc(state.doc) : null;
   const entries = [...state.entries];
@@ -276,7 +280,7 @@ export function runBatch(state: AssetState, text: string, opts: { by: string; at
   const saves: { name: string; palette: Palette }[] = [];
   for (const cmd of commands) {
     try {
-      const n = normaliseCommand(cmd, context(doc, entries, group, opts.palettes, seq, opts.by));
+      const n = normaliseCommand(cmd, context(doc, entries, group, opts.palettes, seq, opts.by, opts.assets));
       const entry: TapeEntry = { seq, by: opts.by, ...(opts.at ? { at: opts.at } : {}), group, cmd: n.text };
       entries.push(entry);
       added.push(entry);

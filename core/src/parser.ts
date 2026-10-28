@@ -32,7 +32,8 @@ export type Token =
   | (Pos & { t: 'int'; v: number })
   | (Pos & { t: 'point'; x: number; y: number })
   | (Pos & { t: 'size'; w: number; h: number })
-  | (Pos & { t: 'cell'; cx: number; cy: number })
+  /** @cell(cx,cy), or a family's cell by name: @cell(inside), @cell(nesw). */
+  | (Pos & { t: 'cell'; cx: number; cy: number; name?: string })
   | (Pos & { t: 'string'; v: string })
   | (Pos & { t: 'kv'; key: string; value: string; quoted: boolean; vcol: number })
   | (Pos & { t: 'block'; rows: BlockRow[] })
@@ -60,6 +61,7 @@ const INT_RE = /^-?\d+$/;
 const POINT_RE = /^(-?\d+),(-?\d+)$/;
 const SIZE_RE = /^(\d+)x(\d+)$/;
 const CELL_RE = /^@cell\((\d+),(\d+)\)$/;
+const CELL_NAME_RE = /^@cell\(([a-z][a-z0-9_]*)\)$/;
 const KV_RE = /^([A-Za-z_][A-Za-z0-9_-]*)=/;
 const NAME_RE = /^[a-z][a-z0-9_-]*$/;
 const MAX_INT = 1 << 20;
@@ -85,6 +87,7 @@ function classify(raw: string, line: number, col: number, quotedValue: string | 
   if ((m = POINT_RE.exec(raw))) return { t: 'point', x: num(m[1]!, col), y: num(m[2]!, col), line, col };
   if ((m = SIZE_RE.exec(raw))) return { t: 'size', w: num(m[1]!, col), h: num(m[2]!, col), line, col };
   if ((m = CELL_RE.exec(raw))) return { t: 'cell', cx: num(m[1]!, col), cy: num(m[2]!, col), line, col };
+  if ((m = CELL_NAME_RE.exec(raw))) return { t: 'cell', cx: -1, cy: -1, name: m[1]!, line, col };
   return { t: 'word', v: raw, line, col };
 }
 

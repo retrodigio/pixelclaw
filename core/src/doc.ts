@@ -5,12 +5,55 @@
 // mirror of another), a pivot and a ground line. Linked cels are one shared pixel array.
 
 import type { Palette, Role } from './palette.ts';
+import type { Geometry } from './schemes.ts';
 
 /** The pixel value for "no colour". Palette entry i is stored as i. */
 export const TRANSPARENT = 0xffff;
 
-export type DocKind = 'tile' | 'sprite' | 'sheet' | 'icon';
-export const DOC_KINDS: readonly DocKind[] = ['tile', 'sprite', 'sheet', 'icon'];
+export type DocKind = 'tile' | 'sprite' | 'sheet' | 'icon' | 'family' | 'overlay';
+export const DOC_KINDS: readonly DocKind[] = ['tile', 'sprite', 'sheet', 'icon', 'family', 'overlay'];
+
+/**
+ * An autotile family (plan §4.2): a sheet of the scheme's variants, with the two textures the
+ * variants share and, optionally, a coverage map to paint and cut from. The `ground` layer of
+ * every variant is the textures laid by the band geometry; the `band` layer of every variant that
+ * is not a piece (and not detached) is assembled from the pieces' quadrants after every command.
+ */
+export interface FamilyState {
+  scheme: string;
+  /** The tile size (square, even). */
+  tile: number;
+  geometry: Geometry;
+  /** Variants drawn by hand (or cut from the map): their band layer is not derived. */
+  detached: string[];
+  /** The coverage map's size in tiles (0x0: none). */
+  mapCols: number;
+  mapRows: number;
+  /** The coverage map's terrain (1 = the family's terrain), once laid out; empty otherwise. */
+  terrain: Uint8Array;
+}
+
+export type OverlayMode = 'cycle' | 'pingpong' | 'wave' | 'sparkle';
+export const OVERLAY_MODES: readonly OverlayMode[] = ['cycle', 'pingpong', 'wave', 'sparkle'];
+
+/**
+ * An overlay (plan §4.3): a sub-tile sprite drawn over tiles of a map in a mode: all in step
+ * (cycle, pingpong), in a wave across the map, or as sparkles at random times.
+ */
+export interface OverlayState {
+  mode: OverlayMode;
+  /** Which tiles of a family's map it is drawn on. */
+  on: 'outside' | 'inside' | 'all';
+  /** The overlay's top-left in the tile (null: centred). */
+  anchor: [number, number] | null;
+  /** Each instance is moved by up to this many pixels either way (seeded per tile). */
+  spread: [number, number];
+  /** One tile in this many gets an instance (seeded). */
+  every: number;
+  /** Sparkle: ticks hidden between showings. */
+  rest: number;
+  seed: number;
+}
 
 /**
  * A layer. Layers are listed bottom to top; the flat image takes the topmost non-transparent pixel
@@ -116,6 +159,8 @@ export interface Doc {
   pivot: [number, number] | null;
   /** The row the feet rest on (null: not set). */
   ground: number | null;
+  family: FamilyState | null;
+  overlay: OverlayState | null;
 }
 
 export function newLayer(name: string, o: Partial<Layer> = {}): Layer {
@@ -124,15 +169,27 @@ export function newLayer(name: string, o: Partial<Layer> = {}): Layer {
 
 export function createDoc(o: {
   kind: DocKind; name: string; width: number; height: number; cellW: number; cellH: number;
-  wrap: boolean; palette: Palette; bg: number;
+  wrap: boolean; palette: Palette; bg: number; family?: FamilyState | null; overlay?: OverlayState | null;
 }): Doc {
   const pixels = new Uint16Array(o.width * o.height).fill(o.bg);
+  // A family draws its textures on 'ground' and its band on 'band' (see family.ts).
+  const layers = o.family ? [newLayer('ground'), newLayer('band')] : [newLayer('main')];
+  const cels = o.family ? [[pixels], [new Uint16Array(o.width * o.height).fill(TRANSPARENT)]] : [[pixels]];
   return {
     kind: o.kind, name: o.name, width: o.width, height: o.height, cellW: o.cellW, cellH: o.cellH,
-    wrap: o.wrap, palette: o.palette, paletteLocked: false, layers: [newLayer('main')], frameCount: 1, cels: [[pixels]],
+    wrap: o.wrap, palette: o.palette, paletteLocked: false, layers, frameCount: 1, cels,
     ctx: {}, home: { layer: 0, frame: 0 }, notes: [], stamps: {}, macros: {},
     ticks: [DEFAULT_TICKS], tags: [], views: [], pivot: null, ground: null,
+    family: o.family ? cloneFamily(o.family) : null, overlay: o.overlay ? cloneOverlay(o.overlay) : null,
   };
+}
+
+export function cloneFamily(f: FamilyState): FamilyState {
+  return { ...f, geometry: { ...f.geometry, bands: f.geometry.bands.map((b) => ({ ...b })) }, detached: [...f.detached], terrain: f.terrain.slice() };
+}
+
+export function cloneOverlay(o: OverlayState): OverlayState {
+  return { ...o, anchor: o.anchor ? [o.anchor[0], o.anchor[1]] : null, spread: [o.spread[0], o.spread[1]] };
 }
 
 /** Copy each layer's cels, keeping linked cels (one shared array) linked in the copy. */
@@ -172,6 +229,7 @@ export function cloneDoc(d: Doc): Doc {
     ticks: [...d.ticks], tags: d.tags.map((t) => ({ ...t })), views: d.views.map((v) => ({ ...v })), pivot: d.pivot ? [d.pivot[0], d.pivot[1]] : null,
     ctx: Object.fromEntries(Object.entries(d.ctx).map(([k, v]) => [k, cloneCtx(v)])),
     home: { ...d.home },
+    family: d.family ? cloneFamily(d.family) : null, overlay: d.overlay ? cloneOverlay(d.overlay) : null,
     notes: d.notes.map((n) => ({ ...n })),
     stamps: Object.fromEntries(Object.entries(d.stamps).map(([k, s]) => [k, { ...s, px: s.px.slice() }])),
     macros: Object.fromEntries(Object.entries(d.macros).map(([k, m]) => [k, { params: [...m.params], body: m.body }])),
@@ -294,6 +352,16 @@ export function serializeDoc(d: Doc): Uint8Array {
         pivot: d.pivot, ground: d.ground, links: celLinks(d),
       },
     } : {}),
+    ...(d.family ? {
+      family: {
+        scheme: d.family.scheme, tile: d.family.tile, inset: d.family.geometry.inset, radius: d.family.geometry.radius,
+        bands: d.family.geometry.bands.map((b) => [b.w, b.fill]), detached: d.family.detached, map: [d.family.mapCols, d.family.mapRows],
+        terrain: Array.from(d.family.terrain).join(''),
+      },
+    } : {}),
+    ...(d.overlay ? {
+      overlay: { mode: d.overlay.mode, on: d.overlay.on, anchor: d.overlay.anchor, spread: d.overlay.spread, every: d.overlay.every, rest: d.overlay.rest, seed: d.overlay.seed },
+    } : {}),
   });
   const head = utf8('PCLAWDOC 2\n' + header + '\n');
   const n = d.width * d.height;
@@ -327,6 +395,8 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
       ticks: number[]; tags: [string, number, number, Loop][]; views: [string, number, number, string | null][];
       pivot: [number, number] | null; ground: number | null; links: [number, number, number][];
     };
+    family?: { scheme: string; tile: number; inset: number; radius: number; bands: [number, number | 'outside' | 'inside'][]; detached: string[]; map: [number, number]; terrain: string };
+    overlay?: OverlayState;
   };
   const h = JSON.parse(utf8Decode(bytes.subarray(magic.length, nl))) as Header;
   let o = nl + 1;
@@ -364,6 +434,11 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
     tags: (h.anim?.tags ?? []).map(([name, from, to, loop]) => ({ name, from, to, loop })),
     views: (h.anim?.views ?? []).map(([name, from, to, mirror]) => ({ name, from, to, mirror })),
     pivot: h.anim?.pivot ?? null, ground: h.anim?.ground ?? null,
+    family: h.family ? {
+      scheme: h.family.scheme, tile: h.family.tile, geometry: { inset: h.family.inset, radius: h.family.radius, bands: h.family.bands.map(([w, fill]) => ({ w, fill })) },
+      detached: h.family.detached, mapCols: h.family.map[0], mapRows: h.family.map[1], terrain: Uint8Array.from([...h.family.terrain].map(Number)),
+    } : null,
+    overlay: h.overlay ?? null,
   };
 }
 
@@ -374,7 +449,7 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
  */
 export function serializeDocV1(d: Doc): Uint8Array | null {
   const authors = Object.keys(d.ctx);
-  if (hasAnim(d) || d.paletteLocked || d.home.layer || d.home.frame || d.frameCount !== 1 || d.layers.length !== 1 || Object.keys(d.stamps).length || Object.keys(d.macros).length) return null;
+  if (hasAnim(d) || d.family || d.overlay || d.paletteLocked || d.home.layer || d.home.frame || d.frameCount !== 1 || d.layers.length !== 1 || Object.keys(d.stamps).length || Object.keys(d.macros).length) return null;
   const l = d.layers[0]!;
   if (l.hidden || l.locked || l.reference) return null;
   if (authors.length > 1 || authors.some((a) => d.ctx[a]!.mirror || d.ctx[a]!.brush || d.ctx[a]!.layer || d.ctx[a]!.frame)) return null;

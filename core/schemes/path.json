@@ -1,0 +1,34 @@
+{
+  "name": "path",
+  "description": "4 neighbours: a strip through the middle of the tile toward each joined side (roads, rivers, fences): 16 variants",
+  "neighbours": "4",
+  "inset": [
+    1,
+    4
+  ],
+  "columns": 8,
+  "pieces": [
+    "o",
+    "nesw",
+    "ew",
+    "ns"
+  ],
+  "variants": [
+    {"name":"o","key":0,"quads":["outer","outer","outer","outer"]},
+    {"name":"n","key":1,"quads":["vert","vert","outer","outer"]},
+    {"name":"e","key":4,"quads":["outer","horiz","outer","horiz"]},
+    {"name":"ne","key":5,"quads":["vert","inner","outer","horiz"]},
+    {"name":"s","key":16,"quads":["outer","outer","vert","vert"]},
+    {"name":"ns","key":17,"quads":["vert","vert","vert","vert"]},
+    {"name":"es","key":20,"quads":["outer","horiz","vert","inner"]},
+    {"name":"nes","key":21,"quads":["vert","inner","vert","inner"]},
+    {"name":"w","key":64,"quads":["horiz","outer","horiz","outer"]},
+    {"name":"nw","key":65,"quads":["inner","vert","horiz","outer"]},
+    {"name":"ew","key":68,"quads":["horiz","horiz","horiz","horiz"]},
+    {"name":"new","key":69,"quads":["inner","inner","horiz","horiz"]},
+    {"name":"sw","key":80,"quads":["horiz","outer","inner","vert"]},
+    {"name":"nsw","key":81,"quads":["inner","vert","inner","vert"]},
+    {"name":"esw","key":84,"quads":["horiz","horiz","inner","inner"]},
+    {"name":"nesw","key":85,"quads":["inner","inner","inner","inner"]}
+  ]
+}

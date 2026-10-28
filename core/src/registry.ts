@@ -10,3 +10,4 @@ import './cmd-gen.ts';
 import './cmd-stamps.ts';
 import './cmd-macros.ts';
 import './cmd-anim.ts';
+import './cmd-family.ts';

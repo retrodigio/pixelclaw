@@ -8,6 +8,10 @@ import { ROLES, rgbOf } from './palette.ts';
 import { createRgba, type Rgba } from './png.ts';
 import { indexOf, type Pt } from './raster.ts';
 import { themedPalette, type Theme } from './themes.ts';
+import {
+  DEFAULT_MAP, composeMap, drawOverlays, familyFrameAt, islandTerrain, layoutOf, mapPeriod, mapSeam, neighbourhoodOf, overlayOnPalette, schemeOf, tileMap, type MapImage,
+} from './family.ts';
+import type { Terrain } from './schemes.ts';
 
 type RGB = [number, number, number];
 
@@ -662,3 +666,156 @@ export function animGifFrames(doc: Doc, o: AnimOptions = {}): GifFrame[] {
     return { img, delay: Math.max(1, cs(t1) - cs(t0)) };
   });
 }
+
+// --- Maps and families (plan §2 `map`, §4.2, §4.3)
+
+export interface MapViewOptions {
+  /** The map's size in tiles and the island's seed (a family's default: 12x10, seed 1). */
+  cols?: number;
+  rows?: number;
+  seed?: number;
+  /** A given terrain instead of a random island. */
+  terrain?: Terrain;
+  /** Pixels per art pixel (default 2, the game's draw scale). */
+  scale?: number;
+  theme?: Theme | null;
+  /** Overlay documents played over the map. */
+  overlays?: Doc[];
+  /** A tile under an overlay's map (for `view map` of an overlay). */
+  ground?: Doc | null;
+  /** The family's frame (default: its first sequence at `tick`). */
+  frame?: number;
+  tick?: number;
+  tickRate?: number;
+}
+
+interface MapScene {
+  base: Doc;
+  img: MapImage;
+  colours: RGB[];
+  overlays: Doc[];
+  terrain: Terrain | null;
+}
+
+/** The map's documents and palette: the family (or tile) underneath, overlays remapped onto its colours. */
+function mapScene(doc: Doc, o: MapViewOptions, tick: number): MapScene {
+  const base = doc.overlay ? o.ground ?? null : doc;
+  if (!base) throw new Error(`a map of an overlay needs a ground tile or family under it`);
+  const overlays = [...(doc.overlay ? [doc] : []), ...(o.overlays ?? [])];
+  const entries = themedPalette(base.palette, o.theme).entries.map((e) => ({ name: e.name, hex: e.hex }));
+  const remapped = overlays.map((x) => overlayOnPalette(x, entries));
+  let img: MapImage;
+  let terrain: Terrain | null = null;
+  if (base.family) {
+    const s = schemeOf(base.family);
+    const cols = o.cols ?? o.terrain?.cols ?? DEFAULT_MAP.cols, rows = o.rows ?? o.terrain?.rows ?? DEFAULT_MAP.rows;
+    terrain = o.terrain ?? islandTerrain(s, cols, rows, o.seed ?? DEFAULT_MAP.seed);
+    img = composeMap(base, terrain, o.frame ?? familyFrameAt(base, tick));
+  } else {
+    const t = base.width;
+    img = tileMap(base, o.cols ?? Math.max(4, Math.ceil(288 / t)), o.rows ?? Math.max(3, Math.ceil(216 / base.height)), o.frame ?? (base.frameCount > 1 ? frameAtTick(base, sequences(base)[0]!, tick) : 0));
+  }
+  drawOverlays(img, remapped, tick, base.family ? base : null);
+  return { base, img, colours: entries.map((e) => rgbOf(e.hex)), overlays: remapped, terrain };
+}
+
+function paintMap(sc: MapScene, s: number): Rgba {
+  const { img } = sc;
+  const out = createRgba(img.w * s, img.h * s);
+  for (let y = 0; y < img.h; y++) for (let x = 0; x < img.w; x++) {
+    const v = img.px[y * img.w + x]!;
+    rect(out, x * s, y * s, s, s, v === TRANSPARENT ? (((x >> 2) + (y >> 2)) % 2 ? CHECK_A : CHECK_B) : sc.colours[v]!);
+  }
+  return out;
+}
+
+/** The `map` view: a sample map built with the family's scheme (a random island, or a given terrain), at game scale. */
+export function renderMap(doc: Doc, o: MapViewOptions = {}): Rgba {
+  return paintMap(mapScene(doc, o, o.tick ?? 0), o.scale ?? 2);
+}
+
+/** What the map view shows, in words: its size, seed, the seam score over it, and the variants it used. */
+export function mapText(doc: Doc, o: MapViewOptions = {}): string {
+  const sc = mapScene(doc, o, o.tick ?? 0);
+  const { img, base } = sc;
+  const seam = mapSeam(img, base);
+  const f2 = (n: number) => String(Number(n.toFixed(2)));
+  const lines = [`${img.w / img.t}x${img.h / img.t} tiles of ${img.t} px${base.family && !o.terrain ? `, a random island (seed ${o.seed ?? DEFAULT_MAP.seed})` : ''}` +
+    `; seam ${f2(seam.score)} (jump x ${f2(seam.jx)} y ${f2(seam.jy)}, line x ${f2(seam.lx)} y ${f2(seam.ly)}; about 1 or less reads as no seam)`];
+  if (base.family) {
+    const s = schemeOf(base.family);
+    const n = new Map<number, number>();
+    for (const v of img.variants) if (v !== null) n.set(v, (n.get(v) ?? 0) + 1);
+    const used = [...n.keys()].sort((a, b) => a - b);
+    lines.push(`${used.length} of ${s.variants.length} variants on the map: ${used.map((v) => `${s.variants[v]!.name}×${n.get(v)}`).join(' ')}`);
+  }
+  if (sc.overlays.length) lines.push(`overlays: ${sc.overlays.map((x) => `${x.name} (${x.overlay!.mode} on ${x.overlay!.on}, every ${x.overlay!.every})`).join(', ')}`);
+  return lines.join('\n');
+}
+
+/** The map playing at the game's speed (family frames and overlays), as GIF frames. */
+export function mapGifFrames(doc: Doc, o: MapViewOptions = {}): GifFrame[] {
+  const rate = o.tickRate ?? 60;
+  const first = mapScene(doc, o, 0);
+  const period = mapPeriod(first.base, first.overlays, rate * 10);
+  const s = o.scale ?? 2;
+  const cs = (t: number) => Math.round((t * 100) / rate);
+  const out: GifFrame[] = [];
+  let prev: Uint16Array | null = null;
+  let start = 0;
+  for (let t = 0; t <= period; t++) {
+    const sc = t === 0 ? first : t < period ? mapScene(doc, o, t) : null;
+    const same = sc && prev && sc.img.px.every((v, i) => v === prev![i]);
+    if (same) continue;
+    if (prev && out.length) out[out.length - 1]!.delay = Math.max(1, cs(t) - cs(start));
+    if (!sc) break;
+    out.push({ img: paintMap(sc, s), delay: 1 });
+    prev = sc.img.px;
+    start = t;
+  }
+  return out;
+}
+
+/**
+ * The family view: every variant in the middle of its neighbourhood (the 3x3 map that resolves to
+ * it), labelled; pieces' labels in cyan, detached variants' in amber.
+ */
+export function renderFamilyView(doc: Doc, o: { scale?: number; frame?: number; theme?: Theme | null; cols?: number } = {}): Rgba {
+  const f = doc.family!;
+  const s = schemeOf(f);
+  const t = f.tile;
+  const k = o.scale ?? 1;
+  const pal = colourTable(doc, o.theme);
+  const cols = o.cols ?? Math.min(8, s.variants.length);
+  const pad = 6, lh = 9;
+  const cw = 3 * t * k, ch = 3 * t * k + lh;
+  const rows = Math.ceil(s.variants.length / cols);
+  const img = createRgba(pad + cols * (cw + pad), pad + rows * (ch + pad));
+  rect(img, 0, 0, img.width, img.height, ANIM_BG);
+  const pieces = new Set(s.pieces);
+  const detached = new Set(f.detached);
+  s.variants.forEach((x, v) => {
+    const ox = pad + (v % cols) * (cw + pad), oy = pad + Math.floor(v / cols) * (ch + pad);
+    text(img, ox, oy, x.name.length > cw / 4 ? x.name.slice(0, Math.floor(cw / 4)) : x.name, pieces.has(x.name) ? PIECE_LABEL : detached.has(x.name) ? DETACHED_LABEL : LABEL_DIM, 1);
+    const nb = neighbourhoodOf(s, v);
+    const m: MapImage = nb ? composeMap(doc, nb, o.frame ?? 0) : (() => {
+      const one = composeMap(doc, { cols: 3, rows: 3, cells: new Uint8Array(s.neighbours === 'corners' ? 16 : 9) }, o.frame ?? 0);
+      const L = layoutOf(f);
+      const flat = flatten(doc, o.frame ?? 0);
+      const [cx, cy] = L.cells[v]!;
+      for (let y = 0; y < t; y++) for (let xx = 0; xx < t; xx++) one.px[(t + y) * one.w + t + xx] = flat[(cy * t + y) * doc.width + cx * t + xx]!;
+      return one;
+    })();
+    for (let y = 0; y < m.h; y++) for (let xx = 0; xx < m.w; xx++) {
+      const c = m.px[y * m.w + xx]!;
+      const centre = xx >= t && xx < 2 * t && y >= t && y < 2 * t;
+      const rgb = c === TRANSPARENT ? CHECK_A : pal[c]!;
+      // The neighbours are dimmed so the variant in the middle stands out.
+      rect(img, ox + xx * k, oy + lh + y * k, k, k, centre ? rgb : [Math.round(rgb[0] * 0.55 + 20), Math.round(rgb[1] * 0.55 + 20), Math.round(rgb[2] * 0.55 + 22)]);
+    }
+  });
+  return img;
+}
+
+const PIECE_LABEL: RGB = [120, 220, 230];
+const DETACHED_LABEL: RGB = [240, 190, 90];

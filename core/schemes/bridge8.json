@@ -1,0 +1,30 @@
+{
+  "name": "bridge8",
+  "description": "a deck joined along one axis (east-west wins when both): single, the two ends and the middle of each axis: 8 variants. A tile with no bridge beside it is the east-west single; the north-south single is placed by name",
+  "neighbours": "axis",
+  "inset": [
+    1,
+    4
+  ],
+  "kinds": {
+    "endh": "horiz",
+    "endv": "vert"
+  },
+  "columns": 4,
+  "pieces": [
+    "h",
+    "h_ew",
+    "v",
+    "v_ns"
+  ],
+  "variants": [
+    {"name":"h","key":0,"quads":["endh","endh","endh","endh"]},
+    {"name":"h_e","key":4,"quads":["endh","horiz","endh","horiz"]},
+    {"name":"h_ew","key":68,"quads":["horiz","horiz","horiz","horiz"]},
+    {"name":"h_w","key":64,"quads":["horiz","endh","horiz","endh"]},
+    {"name":"v","key":null,"quads":["endv","endv","endv","endv"]},
+    {"name":"v_s","key":16,"quads":["endv","endv","vert","vert"]},
+    {"name":"v_ns","key":17,"quads":["vert","vert","vert","vert"]},
+    {"name":"v_n","key":1,"quads":["vert","vert","endv","endv"]}
+  ]
+}

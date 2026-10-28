@@ -1,0 +1,12 @@
+{
+  "name": "single",
+  "description": "one tile whatever its neighbours (plain ground, props): 1 variant",
+  "neighbours": "none",
+  "columns": 1,
+  "pieces": [
+    "o"
+  ],
+  "variants": [
+    {"name":"o","key":0,"quads":["in","in","in","in"]}
+  ]
+}
