@@ -16,6 +16,7 @@ import {
 } from './project.ts';
 import type { Eye, ServerMessage, Snapshot } from './protocol.ts';
 import { readStateCache, stateKey, writeStateCache } from './cache.ts';
+import { manifestEntry, readManifest, styleDefaults } from './plan.ts';
 import { makeView, type View, type ViewMode, type ViewOptions } from './views.ts';
 
 /** What a view asks for, by name: the writer finds the documents, themes and check marks. */
@@ -146,6 +147,10 @@ export class Writer {
   private readonly now: () => string;
   private live: string | null = null;
   private styleStamp = '';
+  /** Each asset's version (bumped when a batch changes it), and check results kept until something they read changes. */
+  private readonly versions = new Map<string, number>();
+  private clock = 0;
+  private readonly checkMemo = new Map<string, { key: string; out: { results: CheckResult[]; problems: string[] } }>();
   lastEye: Eye | null = null;
 
   constructor(project: Project, o: WriterOptions = {}) {
@@ -187,6 +192,7 @@ export class Writer {
     this.styleStamp = '';
     this.states.clear();
     this.timelines.clear();
+    this.checkMemo.clear();
     this.live = null;
     this.lastEye = null;
     this.emit({ type: 'hello', snapshot: this.snapshot() });
@@ -288,7 +294,8 @@ export class Writer {
       if (n === name || !this.assets().includes(n)) return undefined;
       try { return this.doc(n); } catch { return undefined; }
     };
-    const r = runBatch(state, req.commands, { by: req.by, at: this.now(), palettes: paletteSource(this.project), assets });
+    const defaults = styleDefaults(this.project, readManifest(this.project).manifest);
+    const r = runBatch(state, req.commands, { by: req.by, at: this.now(), palettes: paletteSource(this.project), assets, defaults });
     if (!r.ok) return { ok: false, errors: r.errors };
     const base = { asset: name, doc: r.state.doc, group: r.group, added: r.added, changed: r.changed, created: creates };
     const totals = (s: AssetState) => ({ commands: s.entries.length, groups: new Set(s.entries.map((e) => e.group)).size });
@@ -307,6 +314,7 @@ export class Writer {
     this.writePalettes(saved);
     writeStateCache(this.project, name, stateKey(this.project, Buffer.from(tapeToJsonl(r.state.entries), 'utf8'), tapeLang(r.state.entries)), serializeDoc(r.state.doc));
     this.states.set(name, r.state);
+    this.versions.set(name, ++this.clock);
     this.live = name;
     this.freshStyle();
     const warnings: string[] = [];
@@ -442,13 +450,35 @@ export class Writer {
     return t;
   }
 
-  /** Run checks on an asset with the project's style guide (all of them by default). */
+  /**
+   * Run checks on an asset with the project's style guide (all of them by default). The manifest
+   * gives `consistency` the asset's set and its planned height, and a set's thresholds. A plain
+   * run (every check, every frame) is kept until the asset, its ground, its set, the style guide
+   * or the manifest changes.
+   */
   checks(asset: string, o: CheckRequest = {}): { results: CheckResult[]; problems: string[] } {
     this.freshStyle();
     const doc = this.doc(asset);
     if (o.frame !== undefined && (o.frame < 0 || o.frame >= doc.frameCount)) throw new ProjectError(`frame ${o.frame + 1} does not exist (frames 1..${doc.frameCount})`);
-    const { ctx, problems } = checkContextFor(asset, doc, this.assetDocs(), this.project.json.style, (n) => this.project.palettes.get(n), o);
-    return { results: runChecks(doc, o.checks ?? CHECK_IDS, { ...ctx, budget: o.budget, focus: o.focus }), problems };
+    const m = readManifest(this.project).manifest;
+    const entry = manifestEntry(m, asset);
+    const set = entry ? entry.set ?? entry.kind : null;
+    const plan = entry && m ? {
+      peers: m.assets.filter((a) => (a.set ?? a.kind) === set && a.name !== asset).map((a) => a.name),
+      ...(entry.height !== undefined ? { expect: { height: entry.height } } : {}),
+      ...(set && this.project.json.style?.sets?.[set]?.checks ? { setChecks: this.project.json.style.sets[set]!.checks } : {}),
+    } : {};
+    const all = this.assetDocs();
+    const { ctx, problems } = checkContextFor(asset, doc, all, this.project.json.style, (n) => this.project.palettes.get(n), { ...o, ...plan });
+    const plain = !o.checks && o.frame === undefined && o.budget === undefined && o.ground === undefined && o.ref === undefined && o.set === undefined;
+    const v = (n: string) => `${n}:${this.versions.get(n) ?? 0}`;
+    const deps = ctx.world ? all.map((a) => a.name) : [asset, ...(ctx.ground ? [ctx.ground.name] : []), ...(ctx.set ?? []).map((x) => x.name), ...(ctx.peers ?? []).map((x) => x.name)];
+    const key = plain ? JSON.stringify([this.project.json.style, m, deps.map(v), all.length, [...this.project.palettes.keys()]]) : '';
+    const hit = plain ? this.checkMemo.get(asset) : undefined;
+    if (hit && hit.key === key) return hit.out;
+    const out = { results: runChecks(doc, o.checks ?? CHECK_IDS, { ...ctx, budget: o.budget, focus: o.focus }), problems };
+    if (plain) this.checkMemo.set(asset, { key, out });
+    return out;
   }
 
   /**
@@ -554,6 +584,11 @@ export class Writer {
       doc: r.state.doc!,
       note: `${asset} on ${g.name} at the game's scale: ${doc.width}x${doc.height} px, ${ac}x${ar} cells; footprint ${fp.cols}x${fp.rows} at art cell ${fp.at.join(',')}, anchor ${fp.anchor.join(',')} (placed at ${ax},${ay}); cell flags by art row (b blocks, r roof): ${flags}`,
     };
+  }
+
+  /** Tell the watchers the plan changed (a manifest written, an export recorded). */
+  planChanged(): void {
+    this.emit({ type: 'plan' });
   }
 
   /** Record an image view as the last one shown to the agent, and tell the watchers. */

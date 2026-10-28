@@ -50,7 +50,9 @@ export type ServerMessage =
   /** The answer to one page's `run` (only to that page; the batch itself goes to every page). */
   | { type: 'result'; id: number; ok: true; asset: string; group: string | null; seq: number | null }
   | { type: 'result'; id: number; ok: false; errors: Diag[] }
-  | { type: 'pong' };
+  | { type: 'pong' }
+  /** The plan changed outside a batch (the manifest was written, assets were exported): the dashboard reloads it. */
+  | { type: 'plan' };
 
 /** Authors a page may write as: `human:<name>`. */
 export const HUMAN_RE = /^human:[A-Za-z0-9_.-]{1,32}$/;

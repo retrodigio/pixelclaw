@@ -9,6 +9,8 @@ import { formatChecks } from './report.ts';
 import { writeReview } from './review.ts';
 import { EXPORT_FORMATS, exportAsset } from './export.ts';
 import { exportWithProfile, importSummary, planImport, projectProfiles, projectSchemes } from './io.ts';
+import { planReport, planText, writeManifest, writeTemplates } from './plan.ts';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { VIEW_MODES, parseRegion, type View, type ViewMode } from './views.ts';
 import { SUMMARY_BUDGET, type AssetChanges, type Writer } from './writer.ts';
@@ -404,7 +406,8 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
         const files = exportAsset(w.doc(a.asset), w.assetDocs(), a.format, a.dest ?? join(w.project.dir, 'exports', a.format));
         return { content: [text(`${a.format}: wrote ${files.length} files\n${files.map((f) => `  ${f}`).join('\n')}`)] };
       }
-      const r = exportWithProfile(w.project, w.assetDocs(), a.profile ?? 'png', { names: a.assets ?? (a.asset ? [a.asset] : undefined), dest: a.dest });
+      const r = exportWithProfile(w.project, w.assetDocs(), a.profile ?? 'png', { names: a.assets ?? (a.asset ? [a.asset] : undefined), dest: a.dest, at: w.stamp() });
+      w.planChanged();
       const shown = r.files.length > 24 ? [...r.files.slice(0, 24), `… ${r.files.length - 24} more`] : r.files;
       return { content: [text(`${a.profile ?? 'png'}: ${r.images} images, wrote ${r.files.length} files into ${r.dir}\n${shown.map((f) => `  ${f}`).join('\n')}${r.notes.length ? `\nnotes:\n${r.notes.map((n) => `  ${n}`).join('\n')}` : ''}`)] };
     } catch (e) {
@@ -450,16 +453,53 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
       'It names no method and no author, so the reviewer judges blind. Hand the folder to a new agent with no other context, ask it to follow rubric.md, ' +
       'then pin its findings on the pixels with note commands.',
     inputSchema: z.object({
-      assets: z.array(z.string()).optional().describe('The assets to review (default: all)'),
-      name: z.string().regex(/^[a-z0-9][a-z0-9_-]*$/).optional().describe('A name for the set, used in the folder name (default: all)'),
+      assets: z.array(z.string()).optional().describe('The assets to review (default: all, or the set\'s)'),
+      set: z.string().optional().describe('A set from the manifest: its assets (drawn so far) are reviewed'),
+      name: z.string().regex(/^[a-z0-9][a-z0-9_-]*$/).optional().describe('A name for the set, used in the folder name (default: the set, else all)'),
       size: z.string().regex(/^\d+x\d+$/).optional().describe('Families: the map\'s size in tiles (default 16x12)'),
       seed: z.number().int().min(1).optional().describe('Families: the random island\'s seed (default 1)'),
     }),
   }, (a) => w.enqueue(() => {
     try {
       const [cols, rows] = a.size ? a.size.split('x').map(Number) : [undefined, undefined];
-      const r = writeReview(w, { assets: a.assets, name: a.name, map: { cols, rows, seed: a.seed } });
+      const r = writeReview(w, { assets: a.assets, set: a.set, name: a.name, map: { cols, rows, seed: a.seed } });
       return { content: [text(`review bundle: ${r.dir}\n${r.files.length} files: ${r.files.join(', ')}\nGive the folder to a fresh agent: "Review the art in ${r.dir} by following rubric.md in it."`)] };
+    } catch (e) {
+      return errorResult(e);
+    }
+  }));
+
+  server.registerTool('plan', {
+    title: 'The plan: manifest and statuses',
+    description: 'The project\'s asset plan (plan §7.3) and where each asset stands: planned → drafted (exists) → checked (every check passes) → reviewed (`mark reviewed` after a blind review\'s findings are dealt with) → ' +
+      'approved (a person, in the dashboard) → exported (through a profile, with the art as it is now). Lists what is left and what is failing, by set. ' +
+      'manifest= writes manifest.json (checked against its schema first; nothing is written if it has problems): { "format": "pixelclaw-manifest", "version": 1, "theme": "…", "sets": {…}, "export": { "profile": "…" }, ' +
+      '"assets": [{ "name", "kind", "size", "set", "description", "palette", "scheme", "inside", "outside", "band", "frames", "ticks", "views", "mirror", "cells", "height", "variantOf", "recolourOf", "uses", "flat" }] } (docs/pipeline.md). ' +
+      'A planned asset\'s `new` line may leave out its size, palette and scheme: the manifest fills them in. templates=true draws the flat templates (a mockup screen and a coverage map per family) into templates/.',
+    inputSchema: z.object({
+      set: z.string().optional().describe('Only this set'),
+      manifest: z.record(z.string(), z.unknown()).optional().describe('Write this manifest (validated)'),
+      templates: z.boolean().optional().describe('Draw the flat templates from the manifest'),
+      seed: z.number().int().min(1).optional().describe('Templates: the layout\'s seed (default 1)'),
+    }),
+  }, (a) => w.enqueue(() => {
+    try {
+      const content: CallToolResult['content'] = [];
+      if (a.manifest) {
+        const r = writeManifest(w.project, a.manifest);
+        if (!r.manifest) return fail(`the manifest was not written; ${r.errors.length} problem${r.errors.length === 1 ? '' : 's'}:\n${r.errors.map((e) => `  ${e.path || '(top)'}: ${e.message}`).join('\n')}`);
+        content.push(text(`wrote manifest.json: ${r.manifest.assets.length} assets`));
+        w.planChanged();
+      }
+      if (a.templates) {
+        const t = writeTemplates(w, { seed: a.seed });
+        content.push(text(`templates in ${t.dir}: ${t.files.join(', ')}`));
+        content.push({ type: 'image', data: readFileSync(`${t.dir}/mockup@2x.png`).toString('base64'), mimeType: 'image/png' });
+        content.push(text(readFileSync(`${t.dir}/mockup.txt`, 'utf8')));
+      }
+      content.push(text(planText(planReport(w, { set: a.set }))));
+      content.push(text(`the dashboard (for the person): ${host.url()}&tab=dashboard`));
+      return { content };
     } catch (e) {
       return errorResult(e);
     }

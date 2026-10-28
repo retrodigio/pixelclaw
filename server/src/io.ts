@@ -8,7 +8,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { basename, extname, isAbsolute, join, relative, resolve } from 'node:path';
 import {
-  BUILTIN_PROFILES, TRANSPARENT, aseParts, autoKeys, blockText, cropRgba, decodePng, exportProfile, importProfile, importRows, loadProfile,
+  BUILTIN_PROFILES, TRANSPARENT, artHash, aseParts, autoKeys, blockText, cropRgba, decodePng, exportProfile, importProfile, importRows, loadProfile,
   mapWorld, msToTicks, paletteFromImages, paletteRows, quantise, readAseprite, roundTripDiffs, validatePalette,
   type AssetDoc, type Doc, type Palette, type ProfileJson, type Rgba, type SchemeJson,
 } from '@pixelclaw/core';
@@ -86,8 +86,39 @@ export interface ExportReport {
   notes: string[];
 }
 
-/** Export assets through a profile into a folder. */
-export function exportWithProfile(p: Project, assets: AssetDoc[], profile: string, o: { names?: string[]; dest?: string } = {}): ExportReport {
+export const EXPORTED_FILE = 'exported.json';
+
+// --- exported.json: the last export of each asset (plan §7.3 "exported")
+
+export interface ExportRecord {
+  profile: string;
+  /** The folder, relative to the project when it is inside it. */
+  dir: string;
+  at: string;
+  /** The art's hash when it was exported: a later change makes the export stale. */
+  art: string;
+}
+
+export function readExported(p: Project): Record<string, ExportRecord> {
+  try {
+    return JSON.parse(readFileSync(join(p.dir, EXPORTED_FILE), 'utf8')) as Record<string, ExportRecord>;
+  } catch {
+    return {};
+  }
+}
+
+/** Record an export of these documents (called by every profile export). */
+export function recordExport(p: Project, docs: Doc[], profile: string, dir: string, at: string): void {
+  const all = readExported(p);
+  const rel = relative(p.dir, dir);
+  const shown = rel && !rel.startsWith('..') ? rel : dir;
+  for (const d of docs) all[d.name] = { profile, dir: shown, at, art: artHash(d) };
+  const sorted = Object.fromEntries(Object.keys(all).sort().map((k) => [k, all[k]!]));
+  writeFileSync(join(p.dir, EXPORTED_FILE), JSON.stringify(sorted, null, 2) + '\n');
+}
+
+/** Export assets through a profile into a folder (and record it in exported.json when `at` is given). */
+export function exportWithProfile(p: Project, assets: AssetDoc[], profile: string, o: { names?: string[]; dest?: string; at?: string } = {}): ExportReport {
   const prof = profileNamed(p, profile);
   const docs = exportSet(assets, o.names);
   const r = exportProfile(prof, docs, { tickRate: p.json.tickRate, world: mapWorld(assets) });
@@ -99,6 +130,7 @@ export function exportWithProfile(p: Project, assets: AssetDoc[], profile: strin
     writeFileSync(path, b);
     files.push(path);
   }
+  if (o.at) recordExport(p, docs, prof.name, dir, o.at);
   return { dir, files, images: r.items.length, notes: r.notes };
 }
 

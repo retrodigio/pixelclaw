@@ -1,7 +1,9 @@
-// pixelclaw: new | run | view | check | review | export | import | verify | upgrade. A thin layer over @pixelclaw/core and the project folder.
+// pixelclaw: new | run | view | check | review | plan | export | import | verify | upgrade | skill. A thin layer over @pixelclaw/core and the project folder.
 
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { dirname, join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   CHECK_IDS, LANG_VERSION, TapeCursor, tapeLang, Timeline, checkSummary, isCheckId, replay, serializeDoc, serializeDocV1, upgradeTape, type AssetState, type CheckId, type Doc,
   type TapeEntry,
@@ -9,7 +11,7 @@ import {
 import {
   AssetExistsError, NoAssetError, ProjectError, VIEW_MODES, Writer, assetDir, checkpointNames, createProject, formatChecks, isViewMode, listAssets,
   loadProject, lockHolder, paletteSource, parseRegion, prefixHash, previewPng, readAssetJson, readCheckpoints, readPaletteFile,
-  readTape, readTapeFile, readStateCacheRaw, stateKey, saveAsset, sha256, writeReview, SUMMARY_BUDGET, EXPORT_FORMATS, exportAsset, exportWithProfile, importSummary, planImport, type ExportFormat, type Project, type ViewMode,
+  readTape, readTapeFile, readStateCacheRaw, stateKey, saveAsset, sha256, writeReview, planReport, planText, writeManifest, writeTemplates, SUMMARY_BUDGET, EXPORT_FORMATS, exportAsset, exportWithProfile, importSummary, planImport, type ExportFormat, type Project, type ViewMode,
 } from '@pixelclaw/server';
 
 export interface Io {
@@ -48,8 +50,16 @@ export const USAGE = `pixelclaw: a pixel art editor driven by commands
       Run the quality checks against the style guide (project.json style): scores, pass or fail,
       and the flagged pixels. Exits 1 if any check fails. --marks writes the render (tile3x3 for
       tiles) with the flagged pixels circled.
-  pixelclaw review <project> [<asset>...] [--name <set>] [--size CxR] [--seed N]
-      Write a blind review bundle under <project>/reviews/<date>-<set>/ (rubric.md inside).
+  pixelclaw review <project> [<asset>...] [--set <manifest set>] [--name <name>] [--size CxR] [--seed N]
+      Write a blind review bundle under <project>/reviews/<date>-<name>/ (rubric.md inside; brief.md
+      from the manifest). --set reviews a manifest set's drawn assets.
+  pixelclaw plan <project> [--set <set>] [--json] [--manifest <file.json>] [--templates [--seed N]]
+      The asset plan (manifest.json) and each asset's status: planned, drafted, checked, reviewed,
+      approved, exported; what is left and what is failing. --manifest writes a manifest (checked
+      first); --templates draws the flat templates (mockup screen, coverage maps) into templates/.
+  pixelclaw skill install [--dest <dir> | --project <dir>]
+      Install the Claude Code skill (workflows, house rules, the blind-review hand-off) into
+      ~/.claude/skills/pixelclaw (or <dir>/.claude/skills/pixelclaw). skill path prints where it is.
   pixelclaw export <project> [<asset>...] [--profile <name|file.json>] [--out <dir>]
       Write assets through an export profile (default png): built-in png, atlas, tiled, godot,
       aseprite-json, aseprite, or the project's profiles/*.json (docs/profiles.md). Without assets,
@@ -254,8 +264,61 @@ function cmdReview(io: Io, p: Parsed): number {
   const seed = one(p, 'seed') === undefined ? undefined : Number(one(p, 'seed'));
   if (seed !== undefined && (!Number.isInteger(seed) || seed < 1)) throw new UsageError('--seed must be a whole number from 1');
   const map = { ...(sm ? { cols: Number(sm[1]), rows: Number(sm[2]) } : {}), ...(seed ? { seed } : {}) };
-  const r = writeReview(new Writer(loadProject(dir), { now: io.now }), { assets: names.length ? names : undefined, name: one(p, 'name'), map });
+  const r = writeReview(new Writer(loadProject(dir), { now: io.now }), { assets: names.length ? names : undefined, set: one(p, 'set'), name: one(p, 'name'), map });
   io.out(`wrote ${r.files.length} files to ${r.dir}\n${r.files.map((f) => `  ${f}\n`).join('')}Hand the folder to a fresh reviewer: "Review the art in ${r.dir} by following rubric.md."\n`);
+  return 0;
+}
+
+function cmdPlan(io: Io, p: Parsed): number {
+  const [dir] = p.pos;
+  if (!dir) throw new UsageError('plan: give a project folder');
+  const w = new Writer(loadProject(dir), { now: io.now });
+  const manifestFile = one(p, 'manifest');
+  if (manifestFile) {
+    let json: unknown;
+    try {
+      json = JSON.parse(readFileSync(manifestFile, 'utf8'));
+    } catch (e) {
+      throw new ProjectError(`${manifestFile}: ${(e as Error).message}`);
+    }
+    const r = writeManifest(w.project, json);
+    if (!r.manifest) {
+      io.err(`error: the manifest was not written; ${r.errors.length} problem${r.errors.length === 1 ? '' : 's'}:\n${r.errors.map((e) => `  ${e.path || '(top)'}: ${e.message}\n`).join('')}`);
+      return 1;
+    }
+    io.out(`wrote ${join(w.project.dir, 'manifest.json')}: ${r.manifest.assets.length} assets\n`);
+  }
+  if (p.flags.has('templates')) {
+    const seed = one(p, 'seed') === undefined ? undefined : Number(one(p, 'seed'));
+    const t = writeTemplates(w, { seed });
+    io.out(`wrote ${t.files.length} templates to ${t.dir}\n${t.files.map((f) => `  ${f}\n`).join('')}`);
+  }
+  const r = planReport(w, { set: one(p, 'set') });
+  io.out(p.flags.has('json') ? JSON.stringify(r, null, 2) + '\n' : planText(r) + '\n');
+  return r.manifest.errors.length ? 1 : 0;
+}
+
+/** Where the shipped skill is: skill/ in the repo, or beside the bundle. */
+function skillSource(): string {
+  const here = dirname(fileURLToPath(import.meta.url));
+  for (const d of [join(here, 'skill'), join(here, '..', '..', 'skill')]) if (existsSync(join(d, 'SKILL.md'))) return d;
+  throw new ProjectError('the skill is not in this build (no skill/SKILL.md)');
+}
+
+function cmdSkill(io: Io, p: Parsed): number {
+  const [what] = p.pos;
+  if (what !== 'install' && what !== 'path') throw new UsageError('skill: install [--dest <dir> | --project <dir>], or path');
+  const src = skillSource();
+  if (what === 'path') { io.out(src + '\n'); return 0; }
+  const proj = one(p, 'project');
+  const dest = one(p, 'dest') ?? (proj ? join(proj, '.claude', 'skills', 'pixelclaw') : join(homedir(), '.claude', 'skills', 'pixelclaw'));
+  mkdirSync(dest, { recursive: true });
+  cpSync(src, dest, { recursive: true });
+  // The command reference goes beside it (the bundle carries a copy; the repo has it in docs/).
+  const ref = join(src, '..', 'docs', 'commands.md');
+  if (!existsSync(join(src, 'commands.md')) && existsSync(ref)) cpSync(ref, join(dest, 'commands.md'));
+  const files = readdirSync(dest, { recursive: true }).map(String).filter((f) => f.includes('.')).sort();
+  io.out(`installed the PixelClaw skill in ${dest} (${files.join(', ')})\nClaude Code finds it as /pixelclaw; connect the tools with:\n  claude mcp add pixelclaw -- npx pixelclaw serve --project <your project>.pclaw\n`);
   return 0;
 }
 
@@ -286,7 +349,7 @@ function cmdExportProfile(io: Io, p: Parsed): number {
   const proj = loadProject(dir);
   const w = new Writer(proj);
   const profile = one(p, 'profile') ?? 'png';
-  const r = exportWithProfile(proj, w.assetDocs(), profile, { names: names.length ? names : undefined, dest: one(p, 'out') });
+  const r = exportWithProfile(proj, w.assetDocs(), profile, { names: names.length ? names : undefined, dest: one(p, 'out'), at: io.now() });
   io.out(`${profile}: ${r.images} images, wrote ${r.files.length} files into ${r.dir}\n${r.notes.map((n) => `  note: ${n}\n`).join('')}`);
   return 0;
 }
@@ -443,7 +506,11 @@ export function main(argv: string[], io: Io = nodeIo): number {
       case 'check':
         return cmdCheck(io, parseArgs(rest, ['checks', 'frame', 'ground', 'ref'], ['marks']));
       case 'review':
-        return cmdReview(io, parseArgs(rest, ['name', 'size', 'seed'], []));
+        return cmdReview(io, parseArgs(rest, ['name', 'set', 'size', 'seed'], []));
+      case 'plan':
+        return cmdPlan(io, parseArgs(rest, ['set', 'manifest', 'seed'], ['json', 'templates']));
+      case 'skill':
+        return cmdSkill(io, parseArgs(rest, ['dest', 'project'], []));
       case 'verify':
         return cmdVerify(io, parseArgs(rest, [], []));
       case 'upgrade':

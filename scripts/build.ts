@@ -30,6 +30,9 @@ const result = await build({
   banner: { js: "import { createRequire as __pclawRequire } from 'node:module'; const require = __pclawRequire(import.meta.url);" },
 });
 cpSync(UI, join(OUT, 'ui'), { recursive: true });
+// The Claude Code skill, for `pixelclaw skill install`.
+cpSync(join(REPO, 'skill'), join(OUT, 'skill'), { recursive: true });
+cpSync(join(REPO, 'docs', 'commands.md'), join(OUT, 'skill', 'commands.md'));
 cpSync(join(REPO, 'LICENSE'), join(OUT, 'LICENSE'));
 
 // Third-party licences: every package with code in the bundle, plus the UI's runtime packages.

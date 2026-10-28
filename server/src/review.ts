@@ -8,12 +8,13 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   animGifFrames, cameraOf, cameraRegion, composeMap, composeMapDoc, mapAscii, mapWorld, paintComposed, drawScaleOf, encodeGif, encodePng, flatten, groundOf, islandTerrain, mapGifFrames, renderAnimSheet, renderFamilyView, renderGame, renderMap,
-  renderScaled, renderTile3x3, schemeOf, setOf, type AssetDoc, type Doc,
+  renderScaled, renderTile3x3, schemeOf, setName, setOf, type AssetDoc, type Doc,
 } from '@pixelclaw/core';
 import { ProjectError } from './project.ts';
+import { readManifest } from './plan.ts';
 import type { Writer } from './writer.ts';
 
-function rubric(o: { project: string; tiles: string[]; sprites: string[]; animated: string[]; families: string[]; maps: string[]; scale: number; tickRate: number; style: string | null }): string {
+function rubric(o: { brief: boolean; project: string; tiles: string[]; sprites: string[]; animated: string[]; families: string[]; maps: string[]; scale: number; tickRate: number; style: string | null }): string {
   const list = (xs: string[]) => (xs.length ? xs.map((x) => `- ${x}`).join('\n') : '- (none)');
   return `# Review: ${o.project}
 
@@ -38,7 +39,7 @@ You are reviewing pixel art for a game, with fresh eyes. Judge only what you see
   \`scenes/<map>.screen<n>.png\`: screens of it at the game's draw scale (${o.scale}x), what a player
   sees, \`scenes/<map>.screens.txt\` says which cells each shows; \`scenes/<map>.cells.txt\` maps every cell (a letter per
   ground, a capital where an object stands).
-- \`palette.md\`: the colours the art uses.${o.style ? '\n- `style.md`: the style guide.' : ''}
+- \`palette.md\`: the colours the art uses.${o.style ? '\n- `style.md`: the style guide.' : ''}${o.brief ? '\n- `brief.md`: the game\'s theme and what each piece is meant to be.' : ''}
 
 Tiles:
 ${list(o.tiles)}
@@ -61,7 +62,7 @@ Look at the game-scale images first, as a player would, then at the enlarged one
 Score each part from 1 (poor) to 5 (excellent) and say why in a sentence or two:
 
 1. **Readability.** At 1x on its ground, does each sprite read at a glance: its shape, what it
-   is, its front? Is its edge clear of the ground?
+   is${o.brief ? ' (is it what brief.md says it is?)' : ''}, its front? Is its edge clear of the ground?
 2. **Cohesion.** Do the pieces look like one set: the same light direction, outline rule,
    shading depth, level of detail and palette use?
 3. **Seams and repetition.** Do the tiles join without visible lines at their edges? Does the
@@ -110,9 +111,17 @@ Only list what you can point at. If an asset is fine, say so.
  * Write a review bundle for some assets (default: all) under reviews/<date>-<name>/ and return
  * its folder and the files written.
  */
-export function writeReview(w: Writer, o: { assets?: string[]; name?: string; map?: { cols?: number; rows?: number; seed?: number } } = {}): { dir: string; files: string[] } {
+export function writeReview(w: Writer, o: { assets?: string[]; set?: string; name?: string; map?: { cols?: number; rows?: number; seed?: number } } = {}): { dir: string; files: string[] } {
   const all = w.assetDocs();
-  const names = o.assets ?? all.map((a) => a.name);
+  const manifest = readManifest(w.project).manifest;
+  let names = o.assets ?? all.map((a) => a.name);
+  if (o.set) {
+    if (!manifest) throw new ProjectError(`set '${o.set}': the project has no valid manifest.json`);
+    const inSet = manifest.assets.filter((a) => setName(a) === o.set).map((a) => a.name);
+    if (!inSet.length) throw new ProjectError(`no set '${o.set}' in the manifest (sets: ${[...new Set(manifest.assets.map(setName))].join(', ')})`);
+    names = (o.assets ?? inSet).filter((n) => inSet.includes(n) && all.some((a) => a.name === n));
+    if (!names.length) throw new ProjectError(`nothing in set '${o.set}' is drawn yet`);
+  }
   const chosen: AssetDoc[] = names.map((n) => {
     const a = all.find((x) => x.name === n);
     if (!a) throw new ProjectError(`no asset '${n}' to review`);
@@ -120,7 +129,7 @@ export function writeReview(w: Writer, o: { assets?: string[]; name?: string; ma
   });
   if (!chosen.length) throw new ProjectError('no assets to review');
   const date = w.stamp().slice(0, 10);
-  const dir = join(w.project.dir, 'reviews', `${date}-${o.name ?? 'all'}`);
+  const dir = join(w.project.dir, 'reviews', `${date}-${o.name ?? o.set ?? 'all'}`);
   mkdirSync(join(dir, 'assets'), { recursive: true });
   const files: string[] = [];
   const save = (rel: string, data: Uint8Array | string) => {
@@ -204,10 +213,16 @@ export function writeReview(w: Writer, o: { assets?: string[]; name?: string; ma
     a.doc.palette.entries.forEach((e, i) => { if (used.has(i)) pals.set(e.name, e.hex + (e.role ? ` (role: ${e.role})` : '')); });
   }
   save('palette.md', `# Palette\n\nThe colours the art uses:\n\n${[...pals].map(([n, h]) => `- ${n}: ${h}`).join('\n')}\n`);
+  // What each piece is meant to be (the manifest's theme and descriptions), so the reviewer can say whether it reads as that.
+  const planned = manifest ? chosen.flatMap((a) => { const e = manifest.assets.find((x) => x.name === a.name); return e ? [e] : []; }) : [];
+  if (manifest && planned.length) {
+    save('brief.md', `# Brief\n\n${manifest.theme.trim()}\n\n## The pieces\n\n${planned.map((e) => `- **${e.name}** (${e.kind}, ${e.size}${e.height ? `, about ${e.height} px tall` : ''})${e.description ? `: ${e.description}` : ''}`).join('\n')}\n`);
+  }
   const styleFile = join(w.project.dir, 'style.md');
   const styleText = existsSync(styleFile) ? readFileSync(styleFile, 'utf8') : null;
   if (styleText) save('style.md', styleText);
   save('rubric.md', rubric({
+    brief: !!(manifest && planned.length),
     project: w.project.json.name, tiles: tiles.map((a) => a.name), sprites: sprites.map((a) => a.name), animated: animated.map((a) => a.name),
     families: families.map((a) => a.name), maps: maps.map((a) => a.name), scale, tickRate, style: styleText,
   }));

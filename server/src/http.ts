@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { HUMAN_RE, type ClientMessage, type ServerMessage } from './protocol.ts';
 import { ProjectError } from './project.ts';
 import type { Writer } from './writer.ts';
+import { planReport } from './plan.ts';
 import { acceptWebSocket, type WsConnection } from './ws.ts';
 
 const TYPES: Record<string, string> = {
@@ -140,6 +141,30 @@ export async function startWatchServer(o: WatchOptions): Promise<WatchServer> {
       }
       res.writeHead(200, { ...HEADERS, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
       res.end(JSON.stringify(o.writer.snapshot()));
+      return;
+    }
+    if (url.pathname === '/api/plan') {
+      if (!authed) {
+        res.writeHead(401, { ...HEADERS, 'Content-Type': 'application/json' }).end('{"error":"token required"}\n');
+        return;
+      }
+      void o.writer.enqueue(() => planReport(o.writer)).then((r) => {
+        res.writeHead(200, { ...HEADERS, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+        res.end(JSON.stringify(r));
+      }, (e: unknown) => {
+        res.writeHead(500, { ...HEADERS, 'Content-Type': 'application/json' }).end(JSON.stringify({ error: (e as Error).message }) + '\n');
+      });
+      return;
+    }
+    const pm = /^\/api\/preview\/([a-z][a-z0-9_-]*)\.png$/.exec(url.pathname);
+    if (pm) {
+      const f = join(o.writer.project.dir, 'assets', pm[1]!, 'preview.png');
+      if (!authed || !existsSync(f)) {
+        res.writeHead(authed ? 404 : 401, { ...HEADERS, 'Content-Type': 'text/plain' }).end(authed ? 'not found\n' : 'token required\n');
+        return;
+      }
+      res.writeHead(200, { ...HEADERS, 'Content-Type': 'image/png', 'Cache-Control': 'no-store' });
+      res.end(readFileSync(f));
       return;
     }
     if (uiDir && url.pathname.startsWith('/assets/')) {
