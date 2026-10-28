@@ -6,34 +6,68 @@
 // that asset at n times the size.
 
 import { Args, blockText, drawable, fn, needDoc, registerCommand, type CommandSpec } from './commands.ts';
-import { TRANSPARENT, ctxOf, type Doc } from './doc.ts';
+import { TRANSPARENT, ctxOf, flatten, type Doc } from './doc.ts';
 import { scaleIndices } from './density.ts';
 import { DiagError, quote, type BlockRow } from './parser.ts';
 import { intOpt } from './values.ts';
 
 const importCmd: CommandSpec = {
   name: 'import',
-  summary: "import <x,y> [from=\"<file>\"] [blob=<sha256>] << rows of palette keys ('.' is transparent) >>   (an imported image's pixels; replaces the rectangle on your layer and frame)",
+  summary: "import <x,y> [from=\"<file>\"] [blob=<sha256>] << rows of palette keys ('.' is transparent) >> | import <x,y> asset=<name> region=<x,y,WxH> [layer=<layer>]   (an imported image's pixels, or a region of another asset's art (one layer of it, or its flat art); replaces the rectangle on your layer and frame)",
   normalise(cmd, ctx) {
     const doc = drawable(cmd, ctx);
-    const a = new Args(cmd, ['from', 'blob']);
+    const a = new Args(cmd, ['from', 'blob', 'asset', 'region', 'layer']);
     const p = a.take('point', 'a top-left corner x,y');
-    const block = a.take('block', `the image's rows in a block`);
+    const block = a.peek()?.t === 'block' ? a.take('block', `the image's rows in a block`) : null;
     a.done();
-    const from = a.opts.get('from');
+    let from = a.opts.get('from')?.value;
     const blob = a.opts.get('blob');
     if (blob && !/^[0-9a-f]{8,64}$/.test(blob.value)) throw new DiagError(blob.line, blob.vcol, `blob= is the image's sha256 in hex`);
+    const assetOpt = a.opts.get('asset');
+    let rowText: string[];
+    let rowsAt: { line: number; col: number }[];
+    if (assetOpt) {
+      // A region of another asset (a tile cut from a snapped scene): its pixels go into the line.
+      for (const k of ['from', 'blob'] as const) if (a.opts.get(k)) throw new DiagError(a.opts.get(k)!.line, a.opts.get(k)!.col, `import: asset= takes no ${k}=`);
+      if (block) throw new DiagError(block.line, block.col, `import: asset= reads the rows from the asset`);
+      const src = ctx.asset?.(assetOpt.value);
+      if (!src) throw new DiagError(assetOpt.line, assetOpt.vcol, `import: no asset '${assetOpt.value}' to read (not this one)`);
+      const reg = a.opts.get('region');
+      const m = reg ? /^(\d+),(\d+),(\d+)x(\d+)$/.exec(reg.value) : null;
+      if (!reg || !m) throw new DiagError(reg?.line ?? cmd.line, reg?.vcol ?? cmd.col, `import: give region=<x,y,WxH> of '${assetOpt.value}'`);
+      const [rx, ry, rw, rh] = m.slice(1).map(Number) as [number, number, number, number];
+      if (rw < 1 || rh < 1 || rx + rw > src.width || ry + rh > src.height) throw new DiagError(reg.line, reg.vcol, `import: region ${reg.value} is outside '${src.name}' (${src.width}x${src.height})`);
+      const layerOpt = a.opts.get('layer');
+      const li = layerOpt ? src.layers.findIndex((l) => l.name === layerOpt.value) : -1;
+      if (layerOpt && li < 0) throw new DiagError(layerOpt.line, layerOpt.vcol, `import: '${src.name}' has no layer '${layerOpt.value}'`);
+      const px = li >= 0 ? src.cels[li]![0]! : flatten(src, 0);
+      rowText = Array.from({ length: rh }, (_, j) => Array.from({ length: rw }, (_, i) => {
+        const v = px[(ry + j) * src.width + rx + i]!;
+        if (v === TRANSPARENT) return '.';
+        const name = src.palette.entries[v]!.name;
+        const k = doc.palette.entries.findIndex((e) => e.name === name);
+        if (k < 0) throw new DiagError(assetOpt.line, assetOpt.vcol, `import: '${src.name}' uses ${name}, which palette '${doc.palette.name}' does not have`);
+        return doc.palette.entries[k]!.key;
+      }).join(''));
+      rowsAt = rowText.map(() => ({ line: cmd.line, col: cmd.col }));
+      from = `${src.name}${li >= 0 ? `:${src.layers[li]!.name}` : ''} ${rx},${ry},${rw}x${rh}`;
+    } else {
+      for (const k of ['region', 'layer'] as const) if (a.opts.get(k)) throw new DiagError(a.opts.get(k)!.line, a.opts.get(k)!.col, `import: ${k}= goes with asset=`);
+      if (!block) throw new DiagError(cmd.line, cmd.col, `import: expected the image's rows in a block (or asset= region=)`);
+      rowText = block.rows.map((r: BlockRow) => r.text);
+      rowsAt = block.rows;
+    }
     const keyIndex = new Map(doc.palette.entries.map((e, i) => [e.key, i]));
-    const rows = block.rows.map((r: BlockRow) => [...r.text].map((ch, i) => {
+    const rows = rowText.map((t, j) => [...t].map((ch, i) => {
       if (ch === '.') return TRANSPARENT;
       const idx = keyIndex.get(ch);
-      if (idx === undefined) throw new DiagError(r.line, r.col + i, `import: '${ch}' is not a key in palette '${doc.palette.name}'`);
+      if (idx === undefined) throw new DiagError(rowsAt[j]!.line, rowsAt[j]!.col + i, `import: '${ch}' is not a key in palette '${doc.palette.name}'`);
       return idx;
     }));
     const w = Math.max(0, ...rows.map((r) => r.length));
-    const opts = `${from ? ` from=${quote(from.value)}` : ''}${blob ? ` blob=${blob.value}` : ''}`;
+    const opts = `${from ? ` from=${quote(from)}` : ''}${blob ? ` blob=${blob.value}` : ''}`;
     return {
-      text: `import ${p.x},${p.y}${opts} <<\n${blockText(block.rows.map((r) => r.text))}>>`,
+      text: `import ${p.x},${p.y}${opts} <<\n${blockText(rowText)}>>`,
       op: fn((d, by) => {
         const c = ctxOf(d, by);
         const cel = d.cels[c.layer]![c.frame]!;

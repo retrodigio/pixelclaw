@@ -11,7 +11,7 @@ import {
 import {
   AssetExistsError, NoAssetError, ProjectError, VIEW_MODES, Writer, assetDir, checkpointNames, createProject, formatChecks, isViewMode, listAssets,
   loadProject, lockHolder, paletteSource, parseRegion, prefixHash, previewPng, readAssetJson, readCheckpoints, readPaletteFile,
-  readTape, readTapeFile, readStateCacheRaw, stateKey, saveAsset, sha256, writeReview, planReport, planText, writeManifest, writeTemplates, SUMMARY_BUDGET, EXPORT_FORMATS, exportAsset, exportWithProfile, importSummary, planImport, type ExportFormat, type Project, type ViewMode,
+  needsUnderlay, resolveUnderlays, readTape, readTapeFile, readStateCacheRaw, stateKey, saveAsset, sha256, writeReview, planReport, planText, writeManifest, writeTemplates, SUMMARY_BUDGET, EXPORT_FORMATS, exportAsset, exportWithProfile, importSummary, planImport, type ExportFormat, type Project, type ViewMode,
 } from '@pixelclaw/server';
 
 export interface Io {
@@ -184,6 +184,41 @@ function cmdRun(io: Io, p: Parsed): number {
   const r = apply(io, proj, text, source, { asset: one(p, 'asset'), replace: p.flags.has('replace'), by: one(p, 'by') ?? 'claude' });
   if (r.code === 0 && r.doc && p.flags.has('view')) return writeViews(io, proj, r.doc, p.flags.get('view')!, p);
   return r.code;
+}
+
+const RUN_OPTS = ['asset', 'by', 'e', 'view', 'scale', 'region', 'out', 'frame', 'marks', 'theme', 'themes', 'ground', 'with', 'size', 'seed', 'camera'];
+
+/**
+ * `run` with `underlay generate` or `underlay import` lines: those call an image provider or read
+ * a file, so they are resolved (asynchronously) before the batch runs; the run then takes the
+ * rewritten text as -e. Returns argv unchanged when there is nothing to resolve.
+ */
+export async function resolveRunArgv(argv: string[], io: Io = nodeIo): Promise<string[]> {
+  if (argv[0] !== 'run') return argv;
+  let p: Parsed;
+  try { p = parseArgs(argv.slice(1), RUN_OPTS, ['replace']); } catch { return argv; }
+  const [dir, script] = p.pos;
+  if (!dir) return argv;
+  const inline = p.flags.get('e');
+  const text = inline ? inline.join('\n') : script === '-' ? io.stdin() : script && existsSync(script) ? readFileSync(script, 'utf8') : null;
+  if (text === null || (!needsUnderlay(text) && script !== '-')) return argv;
+  const proj = loadProject(dir);
+  assertNoServer(proj);
+  let resolved = text;
+  if (needsUnderlay(text)) {
+    const w = new Writer(proj, { now: io.now });
+    const asset = one(p, 'asset');
+    let doc: Doc | null = null;
+    if (asset && listAssets(proj).includes(asset)) { try { doc = w.doc(asset); } catch { doc = null; } }
+    resolved = await resolveUnderlays(proj, text, { doc, now: w.stamp() });
+  }
+  const out = ['run', dir, '-e', resolved];
+  for (const [k, vs] of p.flags) {
+    if (k === 'e') continue;
+    if (vs.length === 0) out.push(`--${k}`);
+    for (const v of vs) out.push(`--${k}`, v);
+  }
+  return out;
 }
 
 function writeViews(io: Io, proj: Project, doc: Doc, modesIn: string[], p: Parsed): number {
@@ -495,7 +530,7 @@ export function main(argv: string[], io: Io = nodeIo): number {
         return p.pos.length === 1 ? cmdNewProject(io, p.pos[0], p) : cmdNewAsset(io, p.pos[0], p);
       }
       case 'run':
-        return cmdRun(io, parseArgs(rest, ['asset', 'by', 'e', 'view', 'scale', 'region', 'out', 'frame', 'marks', 'theme', 'themes', 'ground', 'with', 'size', 'seed', 'camera'], ['replace']));
+        return cmdRun(io, parseArgs(rest, RUN_OPTS, ['replace']));
       case 'view':
         return cmdView(io, parseArgs(rest, ['scale', 'region', 'out', 'frame', 'marks', 'theme', 'themes', 'ground', 'with', 'size', 'seed', 'camera'], []));
       case 'export': {

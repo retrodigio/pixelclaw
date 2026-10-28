@@ -7,6 +7,7 @@ import './registry.ts';
 import { cloneDoc, flatten, type Doc } from './doc.ts';
 import type { Palette } from './palette.ts';
 import type { SchemeJson } from './schemes.ts';
+import type { Rgba } from './png.ts';
 import { DiagError, parse, type Diag } from './parser.ts';
 import { Pcg32, hashString, seedFrom } from './pcg.ts';
 
@@ -166,8 +167,9 @@ function nextNoteId(entries: TapeEntry[]): string {
   return `n${max + 1}`;
 }
 
-function context(doc: Doc | null, entries: TapeEntry[], current: string, palettes: PaletteSource, seq: number, by: string, assets?: AssetSource, defaults?: StyleDefaults): NormaliseContext {
+function context(doc: Doc | null, entries: TapeEntry[], current: string, palettes: PaletteSource, seq: number, by: string, assets?: AssetSource, defaults?: StyleDefaults, images?: (blob: string) => Rgba | undefined): NormaliseContext {
   return {
+    ...(images ? { image: images } : {}),
     ...(assets ? { asset: assets } : {}),
     ...(defaults ? { defaults } : {}),
     doc,
@@ -274,7 +276,7 @@ function countChanged(before: Doc | null, after: Doc | null): number {
  * Parse, normalise and apply a batch of command text as one undo group. On any error (parse or
  * semantic) the result lists every error with its line and column and the state is untouched.
  */
-export function runBatch(state: AssetState, text: string, opts: { by: string; at?: string; palettes: PaletteSource; assets?: AssetSource; defaults?: StyleDefaults }): BatchResult {
+export function runBatch(state: AssetState, text: string, opts: { by: string; at?: string; palettes: PaletteSource; assets?: AssetSource; defaults?: StyleDefaults; images?: (blob: string) => Rgba | undefined }): BatchResult {
   const { commands, errors } = parse(text);
   let doc = state.doc ? cloneDoc(state.doc) : null;
   const entries = [...state.entries];
@@ -285,7 +287,7 @@ export function runBatch(state: AssetState, text: string, opts: { by: string; at
   const saves: { name: string; palette: Palette }[] = [];
   for (const cmd of commands) {
     try {
-      const n = normaliseCommand(cmd, context(doc, entries, group, opts.palettes, seq, opts.by, opts.assets, opts.defaults));
+      const n = normaliseCommand(cmd, context(doc, entries, group, opts.palettes, seq, opts.by, opts.assets, opts.defaults, opts.images));
       const entry: TapeEntry = { seq, by: opts.by, ...(opts.at ? { at: opts.at } : {}), group, cmd: n.text };
       entries.push(entry);
       added.push(entry);

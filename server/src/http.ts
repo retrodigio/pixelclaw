@@ -64,9 +64,9 @@ export async function runFromPage(w: Writer, m: Extract<ClientMessage, { type: '
   if (typeof m.by !== 'string' || !HUMAN_RE.test(m.by)) return fail(`a page writes as human:<name> (letters, digits, . _ -)`);
   if (typeof m.asset !== 'string' || typeof m.commands !== 'string') return fail('run needs an asset and commands');
   if (m.commands.length > MAX_COMMANDS) return fail('too many commands in one message');
-  return w.enqueue((): ServerMessage => {
+  return w.enqueue(async (): Promise<ServerMessage> => {
     try {
-      const r = w.run({ asset: m.asset || undefined, commands: m.commands, by: m.by });
+      const r = await w.runAsync({ asset: m.asset || undefined, commands: m.commands, by: m.by });
       if (!r.ok) return { type: 'result', id: m.id, ok: false, errors: r.errors };
       return { type: 'result', id: m.id, ok: true, asset: r.asset, group: r.group, seq: r.added.at(-1)?.seq ?? null };
     } catch (e) {

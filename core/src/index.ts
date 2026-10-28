@@ -33,3 +33,4 @@ export { STATUS_MARKS } from './cmd-plan.ts';
 export * from './templates.ts';
 export * from './consistency.ts';
 export * from './font.ts';
+export * from './snap.ts';

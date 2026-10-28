@@ -6,7 +6,7 @@
 import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  CHECK_IDS, ReplayCache, TapeCursor, Timeline, serializeDoc, tapeLang, tapeToJsonl, activeGroups, checkContextFor, drawScaleOf, groundOf, paletteToJson, parse, projectThemes, replay, runBatch,
+  CHECK_IDS, SNAP_MIN_MATERIAL, SNAP_MIN_R2, ReplayCache, composeUnderlay, TapeCursor, Timeline, serializeDoc, tapeLang, tapeToJsonl, activeGroups, checkContextFor, drawScaleOf, groundOf, paletteToJson, parse, projectThemes, replay, runBatch,
   VIEW_NAMES, cameraOf, flaggedOn, footprintOf, mapWorld, runChecks, setOf, type AssetDoc, type AssetState, type CheckId, type CheckResult, type Diag, type Doc, type Note, type Palette, type Pt,
   type TapeEntry, type Theme, type Token,
 } from '@pixelclaw/core';
@@ -18,6 +18,7 @@ import type { Eye, ServerMessage, Snapshot } from './protocol.ts';
 import { readStateCache, stateKey, writeStateCache } from './cache.ts';
 import { manifestEntry, readManifest, styleDefaults } from './plan.ts';
 import { makeView, type View, type ViewMode, type ViewOptions } from './views.ts';
+import { blobImage, needsUnderlay, resolveUnderlays, type ProviderEnv } from './underlay.ts';
 
 /** What a view asks for, by name: the writer finds the documents, themes and check marks. */
 export interface ViewRequest extends Omit<ViewOptions, 'marks' | 'theme' | 'themes' | 'game'> {
@@ -180,7 +181,7 @@ export class Writer {
   }
 
   /** Run `fn` after everything queued before it: the order commands arrive is the order applied. */
-  enqueue<T>(fn: () => T): Promise<T> {
+  enqueue<T>(fn: () => T | Promise<T>): Promise<T> {
     const p = this.queue.then(fn);
     this.queue = p.catch(() => undefined);
     return p;
@@ -262,6 +263,21 @@ export class Writer {
   }
 
   /**
+   * `run`, after resolving the batch's `underlay generate` and `underlay import` lines (which call
+   * an image provider or read a file, so they cannot run inside the synchronous batch).
+   */
+  async runAsync(req: RunRequest, env: ProviderEnv = {}): Promise<RunOutcome> {
+    if (!needsUnderlay(req.commands)) return this.run(req);
+    let doc: Doc | null = null;
+    const name = req.asset;
+    if (name && assetExists(this.project, name)) {
+      try { doc = this.doc(name); } catch { doc = null; }
+    }
+    const commands = await resolveUnderlays(this.project, req.commands, { ...env, doc, now: this.now() });
+    return this.run({ ...req, commands });
+  }
+
+  /**
    * Parse, apply and save one batch as one undo group. Any error applies nothing. A batch that
    * starts with `new` creates an asset; one that starts with `fork <from> <to>` creates asset
    * <to> from a copy of <from>'s tape up to the fork point.
@@ -295,7 +311,7 @@ export class Writer {
       try { return this.doc(n); } catch { return undefined; }
     };
     const defaults = styleDefaults(this.project, readManifest(this.project).manifest);
-    const r = runBatch(state, req.commands, { by: req.by, at: this.now(), palettes: paletteSource(this.project), assets, defaults });
+    const r = runBatch(state, req.commands, { by: req.by, at: this.now(), palettes: paletteSource(this.project), assets, defaults, images: (b) => blobImage(this.project, b) });
     if (!r.ok) return { ok: false, errors: r.errors };
     const base = { asset: name, doc: r.state.doc, group: r.group, added: r.added, changed: r.changed, created: creates };
     const totals = (s: AssetState) => ({ commands: s.entries.length, groups: new Set(s.entries.map((e) => e.group)).size });
@@ -320,6 +336,12 @@ export class Writer {
     const warnings: string[] = [];
     const drew = r.added.some((e) => DRAWING_RE.test(e.cmd));
     if (drew && r.changed === 0) warnings.push('the batch changed no pixels');
+    for (const e of r.added) {
+      const m = /^snap .* r2=([\d.]+) material=([\d.]+|none)/.exec(e.cmd);
+      if (!m) continue;
+      const low = [Number(m[1]) < SNAP_MIN_R2 ? `block R² ${m[1]} < ${SNAP_MIN_R2}` : '', m[2] !== 'none' && Number(m[2]) < SNAP_MIN_MATERIAL ? `material match ${m[2]} < ${SNAP_MIN_MATERIAL}` : ''].filter(Boolean);
+      if (low.length) warnings.push(`snap: ${low.join(', ')}; the draft is unreliable: reroll the underlay (a new prompt or seed) or trace over it instead`);
+    }
     this.emit({
       type: 'batch', asset: name, by: req.by, group: r.group!, entries: creates ? r.state.entries : r.added,
       changed: r.changed, reset: creates,
@@ -491,6 +513,7 @@ export class Writer {
     const doc = this.doc(asset);
     const style = this.project.json.style;
     const o: ViewOptions = { scale: req.scale, region: req.region, since: req.since, frame: req.frame, tickRate: this.project.json.tickRate ?? 60 };
+    if (mode === 'render' && doc.layers.some((l) => l.underlay)) o.underlay = composeUnderlay(doc, (b) => blobImage(this.project, b));
     if (req.theme) o.theme = this.themeNamed(req.theme);
     if (req.marks) {
       const ids = req.marks === 'failing' ? undefined : req.marks;

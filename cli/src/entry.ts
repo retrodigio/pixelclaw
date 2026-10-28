@@ -3,7 +3,7 @@
 
 import { DEFAULT_PORT, serve } from '@pixelclaw/server/serve';
 import { ProjectError } from '@pixelclaw/server';
-import { USAGE, UsageError, main, one, parseArgs } from './main.ts';
+import { USAGE, UsageError, main, one, parseArgs, resolveRunArgv } from './main.ts';
 
 async function serveMain(argv: string[]): Promise<number> {
   try {
@@ -35,6 +35,17 @@ export async function cli(argv: string[]): Promise<number> {
     const code = await serveMain(argv.slice(1));
     // Nothing else should keep the process alive once the server has stopped.
     process.exit(code);
+  }
+  if (argv[0] === 'run') {
+    try {
+      return main(await resolveRunArgv(argv));
+    } catch (e) {
+      if (e instanceof ProjectError) {
+        process.stderr.write(`error: ${e.message}\n`);
+        return 1;
+      }
+      throw e;
+    }
   }
   return main(argv);
 }

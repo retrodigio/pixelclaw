@@ -29,7 +29,7 @@ Draw with \`run\` (one batch = one undo group; any error applies nothing); every
 People edit in the watch view too. Their edits are commands on the same tape, written by human:<name>. Call \`changes\` at the start of each turn while someone is watching, and whenever they say they changed something: it returns their commands and notes since you last looked, with a before/after diff image. Carry on from what they did; never silently redo their pixels. Close a note you have dealt with: note done <id>.
 
 Commands (one per line, or ';' between them; '#' comments). Full reference: docs/commands.md in the PixelClaw repo.
-  new tile|sprite|sheet|icon <name> <W>x<H> [palette=<p>] [wrap=on|off] [cell=WxH] [bg=<colour>]
+  new tile|sprite|sheet|icon|object|font <name> <W>x<H> [palette=<p>] [wrap=on|off] [cell=WxH] [bg=<colour>]
   px <x,y> [<x,y>...] c=<colour>
   line <x,y> <x,y> [<x,y>...] c=<colour> [pp=on|off]      pixel-perfect lines and polylines
   curve <x,y> <ctrl> [<ctrl>] <x,y> c=<colour>           quadratic or cubic Bezier, pixel-perfect
@@ -58,6 +58,16 @@ Commands (one per line, or ';' between them; '#' comments). Full reference: docs
   note <x,y> [<W>x<H>] "text"   |   note done <id>
   undo [group=<g>] [by=<author>]   |   redo [group=<undo group>]
   fork <from> <to> [at=<n>]  (as the first command of a run on a new asset: a branch of <from>)
+Underlays (an image under the art, never exported) and snap:
+  underlay generate "<prompt>" [layout=templates/mockup.png|<layer>] [image=1536x1024] [provider=openai|fake] [model=] [quality=low|medium|high] [cap=<usd>] [layer=mockup]
+      calls the image provider (the key is the server's OPENAI_API_KEY; a cost cap per call, logged in logs/underlay-costs.jsonl); the tape gets underlay <layer> blob=<sha256> …
+  underlay import <file.png> [layer=underlay] [at=x,y] [size=WxH]    any image (a sketch, a photo of a drawing) as an underlay
+  snap [from=<underlay layer>] [into=draft]   fits the image's pixel grid and quantises it to the palette on a new draft layer; reports block R² and the material match against the layout (below 0.8 / 0.85: reroll)
+  import <x,y> asset=<name> region=<x,y,WxH> [layer=<layer>]   copy a region of another asset (cut a tile from a snapped scene)
+Fonts and icons:
+  new font <name> <W>x<H> chars="ABC…"|32-126 [cols=16] [baseline=<row>] [line=<px>] [spacing=1]   a glyph sheet: one W x H cell per character
+  glyph A [advance=<n>|auto] <<  rows  >>    (letters and digits as themselves; other characters as U+0021 or "!")   font set baseline= line= spacing=
+  icon mode=tone|full|channel   how an icon is exported (tone: roles recoloured by the game; full: as drawn; channel: pure-RGB masks)
 Autotile families (a sheet of every variant of a scheme: blob47, wang16-corner, path, bridge8, single, face):
   new family <name> <T>x<T> scheme=<scheme> [map=<C>x<R>]   layers ground (the textures, laid by the band) and band (the band's art)
   family texture inside|outside from=<tile asset> [frame=<n>]    copy a seamless tile into the inside or outside texture
@@ -81,7 +91,7 @@ Habits: after each meaningful batch, look once at an image (render or tile3x3), 
 
 Map checks: seam (over the composed ground), repetition (hot spots: the same edge tile in a long straight run, one textured tile filling a 4x4 window; fix with texture variants), footprint (overlaps, off the map, standing on an edge or the outside ground), draworder (overhangs not marked roof, roofs hiding what stands in front), coverage (missing assets or undrawn variants). Assets: fit (footprint cells drawn, overhangs are roofs), variant (colour mix against the base).
 
-Checks: palette (colours in the style palettes; role art uses only roles), orphans (stray pixels per 100), jaggies (doubled L-corners, irregular step runs, spikes, notches), banding (pillow shading), outline (share of the silhouette edge in ink), seam (tiles: the border vs the interior; families: over a random island map; about 1 or less reads as no seam), coverage (sizes, empty frames or cells; families: every variant and texture drawn), readability (edge contrast against the ground in ΔL*, silhouette distinct from the set, lightness spread), revert (share copied from a reference: ref=), repetition (tiles: the most visible stripe when tiled, ΔL*·√width). Thresholds come from project.json style.checks.`;
+Checks: palette (colours in the style palettes; role art uses only roles), orphans (stray pixels per 100), jaggies (doubled L-corners, irregular step runs, spikes, notches on outlines and one-colour lines; steps between neighbouring entries of one ramp are shading), banding (pillow shading), outline (share of the silhouette edge in ink), seam (tiles: the border vs the interior; families: over a random island map; about 1 or less reads as no seam), coverage (sizes, empty frames or cells; families: every variant and texture drawn), readability (edge contrast against the ground in ΔL*, silhouette distinct from the set, lightness spread), revert (share copied from a reference: ref=), repetition (tiles: the most visible stripe when tiled, ΔL*·√width), consistency (against the set; icons: stroke weight, box fill, optical centre), font (cap height, x-height, baseline, advances, line height). Thresholds come from project.json style.checks.`;
 
 const text = (t: string) => ({ type: 'text' as const, text: t });
 const fail = (t: string): CallToolResult => ({ content: [text(t)], isError: true });
@@ -211,9 +221,9 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
       view: z.enum(VIEW_MODES).optional().describe('Also return this view of the result'),
       replace: z.boolean().optional().describe('With a leading `new` for an existing asset: start its tape again'),
     }),
-  }, (a) => w.enqueue(() => {
+  }, (a) => w.enqueue(async () => {
     try {
-      const r = w.run({ asset: a.asset, commands: a.commands, by: AGENT, replace: a.replace });
+      const r = await w.runAsync({ asset: a.asset, commands: a.commands, by: AGENT, replace: a.replace });
       if (!r.ok) {
         return fail(r.errors.map((e) => `${e.line}:${e.col}: error: ${e.message}`).join('\n') +
           `\n${r.errors.length} error${r.errors.length === 1 ? '' : 's'}; nothing was applied.`);

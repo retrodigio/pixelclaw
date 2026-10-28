@@ -142,6 +142,34 @@ export interface ScaledOptions {
   marks?: readonly Pt[];
   /** The preview theme for role entries. */
   theme?: Theme | null;
+  /** The document's underlays composed over it (`composeUnderlay`), shown faded under transparent art. */
+  underlay?: Rgba | null;
+}
+
+/**
+ * The visible underlays of a document (plan §6) composed into one image over the document, at k
+ * image pixels per document pixel (enough to show the images' detail, at most 8): each image
+ * stretched over its rectangle, nearest neighbour, top layers over lower ones. Null when there is
+ * none or no image is available.
+ */
+export function composeUnderlay(doc: Doc, image: (blob: string) => Rgba | undefined): Rgba | null {
+  const us = doc.layers.filter((l) => l.underlay && !l.hidden).map((l) => l.underlay!);
+  const imgs = us.map((u) => ({ u, img: image(u.blob) })).filter((x): x is { u: typeof x.u; img: Rgba } => !!x.img);
+  if (!imgs.length) return null;
+  const k = Math.max(1, Math.min(8, Math.round(Math.max(...imgs.map(({ u }) => Math.max(u.iw / u.w, u.ih / u.h))))));
+  const out = createRgba(doc.width * k, doc.height * k);
+  for (const { u, img } of imgs) {
+    for (let Y = Math.max(0, u.y * k); Y < Math.min(out.height, (u.y + u.h) * k); Y++) {
+      const sy = Math.min(img.height - 1, Math.floor(((Y - u.y * k + 0.5) * img.height) / (u.h * k)));
+      for (let X = Math.max(0, u.x * k); X < Math.min(out.width, (u.x + u.w) * k); X++) {
+        const sx = Math.min(img.width - 1, Math.floor(((X - u.x * k + 0.5) * img.width) / (u.w * k)));
+        const o = (sy * img.width + sx) * 4;
+        if (img.data[o + 3]! < 128) continue;
+        out.data.set([img.data[o]!, img.data[o + 1]!, img.data[o + 2]!, 255], (Y * out.width + X) * 4);
+      }
+    }
+  }
+  return out;
 }
 
 /** A reference pixel shown under transparent art: its colour half-way to the checkerboard's. */
@@ -168,6 +196,7 @@ export function renderScaled(doc: Doc, o: ScaledOptions = {}): Rgba {
   rect(img, 0, 0, img.width, img.height, RULER_BG);
   const px = flatten(doc, o.frame ?? 0);
   const ref = flattenReference(doc, o.frame ?? 0);
+  const u = o.underlay ?? null;
   const pal = colourTable(doc, o.theme);
   const chk = Math.max(2, s >> 1);
   for (let y = 0; y < doc.height; y++) for (let x = 0; x < doc.width; x++) {
@@ -179,6 +208,10 @@ export function renderScaled(doc: Doc, o: ScaledOptions = {}): Rgba {
       else {
         c = (((x * s + i) / chk | 0) + ((y * s + j) / chk | 0)) % 2 ? CHECK_A : CHECK_B;
         if (r !== TRANSPARENT) c = faded(pal[r]!, c);
+        else if (u) {
+          const o = (Math.floor(((y * s + j) * u.height) / H) * u.width + Math.floor(((x * s + i) * u.width) / W)) * 4;
+          if (u.data[o + 3]! >= 128) c = faded([u.data[o]!, u.data[o + 1]!, u.data[o + 2]!], c);
+        }
       }
       put(img, left + x * s + i, top + y * s + j, c);
     }

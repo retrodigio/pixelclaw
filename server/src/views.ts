@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import {
   animGifFrames, animText, diffPixels, diffText, encodeGif, encodePng, mapGifFrames, mapText, renderAnimSheet, renderDiff, renderFamilyView, renderGame, renderGrid, renderMap,
   renderRecolour, renderDensity, renderScaled, renderTile3x3, layoutOf, schemeOf, cameraRegion, composeMapDoc, mapAscii, mapDiff, mapDocGifFrames, mapDocText, paintComposed,
-  type Doc, type MapWorld, type Pt, type Region, type Theme,
+  type Doc, type MapWorld, type Pt, type Region, type Rgba, type Theme,
 } from '@pixelclaw/core';
 import { ProjectError } from './project.ts';
 
@@ -30,6 +30,8 @@ export interface ViewOptions {
   theme?: Theme | null;
   /** game: the ground tile, the neighbours shown beside the asset, and the draw scale. */
   game?: { ground: Doc | null; with: Doc[]; scale: number; frames?: number[] };
+  /** render: the document's underlays composed over it (shown faded under transparent art). */
+  underlay?: Rgba | null;
   /** anim: game ticks per second (the project's tick rate). */
   tickRate?: number;
   /** recolour: the themes to show. */
@@ -151,7 +153,7 @@ export function makeView(doc: Doc, mode: ViewMode, o: ViewOptions, outDir: strin
     const text = `${animText(doc, { tickRate: o.tickRate })}\nanimated GIF (every sequence side by side, at game speed): ${gif}`;
     return { mode, kind: 'image', png, width: img.width, height: img.height, path, text, gif };
   }
-  const img = mode === 'render' ? renderScaled(doc, { scale: o.scale, frame: o.frame, marks: o.marks, theme: o.theme })
+  const img = mode === 'render' ? renderScaled(doc, { scale: o.scale, frame: o.frame, marks: o.marks, theme: o.theme, underlay: o.underlay })
     : mode === 'tile3x3' ? renderTile3x3(doc, o.frame, { marks: o.marks, theme: o.theme })
     : mode === 'game' ? renderGame([...(o.game?.frames ?? [o.frame ?? 0]).map((f) => ({ doc, frame: f })), ...(o.game?.with ?? []).map((d) => ({ doc: d }))], { ground: o.game?.ground, scale: o.game?.scale ?? 2, theme: o.theme, marks: o.marks })
     : renderRecolour(doc, o.themes ?? [], { scale: o.scale, frame: o.frame });
