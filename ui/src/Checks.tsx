@@ -42,13 +42,34 @@ function box(pts: readonly Pt[]): { x: number; y: number; w: number; h: number }
   return { x, y, w: Math.max(...xs) - x + 1, h: Math.max(...ys) - y + 1 };
 }
 
+/** Flagged pixels in clusters: pixels within 2 of each other belong together. */
+export function clusters(pts: readonly Pt[]): Pt[][] {
+  const left = [...pts];
+  const out: Pt[][] = [];
+  while (left.length) {
+    const group = [left.shift()!];
+    for (let i = 0; i < group.length; i++) {
+      for (let j = left.length - 1; j >= 0; j--) {
+        if (Math.max(Math.abs(left[j]![0] - group[i]![0]), Math.abs(left[j]![1] - group[i]![1])) <= 2) group.push(...left.splice(j, 1));
+      }
+    }
+    out.push(group);
+  }
+  return out;
+}
+
 const coords = (pts: readonly Pt[], n = 16) => pts.slice(0, n).map(([x, y]) => `${x},${y}`).join(' ') + (pts.length > n ? ` … +${pts.length - n}` : '');
 
 export function CheckDetails({ result, ed, editable, onClose }: { result: CheckResult; ed: Editor; editable: boolean; onClose(): void }) {
+  // One note per cluster of flagged pixels (a box around scattered pixels would cover the whole
+  // sprite), the biggest clusters first, all in one batch.
   const pin = (label: string, pts: readonly Pt[]) => {
-    const b = box(pts);
-    const where = b.w === 1 && b.h === 1 ? `${b.x},${b.y}` : `${b.x},${b.y} ${b.w}x${b.h}`;
-    void ed.commit(`note ${where} ${quote(`${result.id}: ${label} (${coords(pts, 12)})`.slice(0, 900))}`, { context: false });
+    const lines = clusters(pts).sort((a, b) => b.length - a.length).slice(0, 6).map((c) => {
+      const b = box(c);
+      const where = b.w === 1 && b.h === 1 ? `${b.x},${b.y}` : `${b.x},${b.y} ${b.w}x${b.h}`;
+      return `note ${where} ${quote(`${result.id}: ${label} (${coords(c, 12)})`.slice(0, 900))}`;
+    });
+    void ed.commit(lines.join('\n'), { context: false });
   };
   return (
     <div className={`banner check-details ${result.status}`} data-testid="check-details" data-check={result.id}>
@@ -62,7 +83,7 @@ export function CheckDetails({ result, ed, editable, onClose }: { result: CheckR
         <div className="cd-group" key={g.label}>
           <span className="mark-dot" /> {g.label}: <span className="mono">{coords(g.pts)}</span>
           {editable && (
-            <button className="mini" onClick={() => pin(g.label, g.pts)} title="Pin a note on these pixels for the agent" data-testid="check-pin">📌 note</button>
+            <button className="mini" onClick={() => pin(g.label, g.pts)} title="Pin notes on these pixels for the agent (one per cluster)" data-testid="check-pin">📌 note</button>
           )}
         </div>
       ))}

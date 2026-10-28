@@ -71,7 +71,7 @@ test('live playback draws command by command, and the canvas then equals the cor
   expect(await page.locator('.cmd-row:not(.by-claude)').count()).toBe(0);
 
   // A sprite with transparent pixels, at another zoom, with the grids off.
-  await page.getByText('pixel grid').click();
+  await page.getByTestId('pixel-grid').click();
   await agent.call('run', { asset: 'idol', commands: SPRITE });
   const idolLast = await lastSeq('idol');
   await expect(page.locator('[data-testid=canvas]')).toHaveAttribute('data-asset', 'idol');

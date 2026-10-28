@@ -62,13 +62,6 @@ export function PalettePanel({ palette, ed, editable, locked, theme, themes, onT
         Palette <span className="dim">{palette.name}</span>
         {locked && <span className="dim" title="The palette is locked (palette unlock to change it)" data-testid="palette-locked">🔒</span>}
         <span className="spacer" />
-        {roles && (
-          <select className="theme-select" value={theme ?? ''} onChange={(e) => onTheme(e.target.value || null)} data-testid="theme"
-            title="Show role colours under a preview theme (only for looking: nothing is written)">
-            <option value="">own colours</option>
-            {themes.map((t) => <option key={t.name} value={t.name}>{t.name}</option>)}
-          </select>
-        )}
         {editable && (
           <button className="mini" title={locked ? 'Unlock the palette (palette unlock)' : 'Lock the palette: no more colour edits (palette lock)'} data-testid="palette-lock"
             onClick={() => void ed.commit(locked ? 'palette unlock' : 'palette lock', { context: false })}>{locked ? 'unlock' : 'lock'}</button>
@@ -78,6 +71,15 @@ export function PalettePanel({ palette, ed, editable, locked, theme, themes, onT
             onClick={() => setEditing({ name: null, hex: '#808080', newName: '', role: '', was: null })}>+</button>
         )}
       </div>
+      {roles && (
+        <label className="theme-row" title="Show role colours under a preview theme (only for looking: nothing is written)">
+          theme
+          <select className="theme-select" value={theme ?? ''} onChange={(e) => onTheme(e.target.value || null)} data-testid="theme">
+            <option value="">own colours</option>
+            {themes.map((t) => <option key={t.name} value={t.name}>{t.name}</option>)}
+          </select>
+        </label>
+      )}
       {editing && (
         <div className="palette-edit" data-testid="palette-edit">
           <input type="color" value={editing.hex} onChange={(e) => setEditing({ ...editing, hex: e.target.value })} />
@@ -197,7 +199,7 @@ export function StampsPanel({ doc, ed, editable }: { doc: Doc; ed: Editor; edita
         Stamps <span className="dim">{names.length || ''}</span>
         <span className="spacer" />
         {editable && naming === null && (
-          <button className="mini" disabled={!ed.hasSel()} title="Save your selection as a stamp (stamp save)" data-testid="stamp-save" onClick={() => setNaming(free())}>+ from selection</button>
+          <button className="mini" disabled={!ed.hasSel()} title="Save your selection as a stamp (stamp save)" data-testid="stamp-save" onClick={() => setNaming(free())}>+ stamp</button>
         )}
       </div>
       {naming !== null && (

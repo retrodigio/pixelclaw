@@ -185,11 +185,11 @@ export function App({ store }: { store: Store }) {
           <button onClick={() => step(1)} disabled={!doc} title="Zoom in (Ctrl/⌘ + wheel)">+</button>
           <button className={zoom === 'fit' ? 'on' : ''} disabled={!doc} onClick={() => setZoom('fit')}>Fit</button>
           <span className="gap" />
-          <label><input type="checkbox" checked={pixelGrid} onChange={(e) => setPixelGrid(e.target.checked)} /> pixel grid</label>
-          <label><input type="checkbox" checked={cellGrid} onChange={(e) => setCellGrid(e.target.checked)} /> cell grid</label>
+          <label><input type="checkbox" checked={pixelGrid} onChange={(e) => setPixelGrid(e.target.checked)} data-testid="pixel-grid" /> <span className="wide-only">pixel grid</span><span className="narrow-only">grid</span></label>
+          <label><input type="checkbox" checked={cellGrid} onChange={(e) => setCellGrid(e.target.checked)} /> <span className="wide-only">cell grid</span><span className="narrow-only">cells</span></label>
           {doc?.wrap && (
             <label title="Show half a tile of the neighbouring copies around a wrap document (draw on them: strokes wrap)">
-              <input type="checkbox" checked={ghosts} onChange={(e) => setGhosts(e.target.checked)} data-testid="ghosts-toggle" /> wrap ghosts
+              <input type="checkbox" checked={ghosts} onChange={(e) => setGhosts(e.target.checked)} data-testid="ghosts-toggle" /> <span className="wide-only">wrap ghosts</span><span className="narrow-only">ghosts</span>
             </label>
           )}
           <span className="gap" />
@@ -208,9 +208,9 @@ export function App({ store }: { store: Store }) {
             </>
           )}
           <span className="spacer" />
-          <button onClick={() => ed.undo()} disabled={!ed.canUndo()} title={`Undo your last edit (Ctrl/⌘+Z): undo by=${store.me}`} data-testid="undo">↶ <span className="wide-only">Undo</span></button>
-          <button onClick={() => ed.redo()} disabled={!ed.canRedo()} title={`Redo your last undo (Ctrl/⌘+Shift+Z): redo by=${store.me}`} data-testid="redo">↷ <span className="wide-only">Redo</span></button>
-          {doc && seq !== null && <span className="dim" title={`The canvas shows the document after command #${seq}`}><span className="wide-only">after </span>#{seq}</span>}
+          <button onClick={() => ed.undo()} disabled={!ed.canUndo()} title={`Undo your last edit (Ctrl/⌘+Z): undo by=${store.me}`} data-testid="undo">↶ <span className="xwide-only">Undo</span></button>
+          <button onClick={() => ed.redo()} disabled={!ed.canRedo()} title={`Redo your last undo (Ctrl/⌘+Shift+Z): redo by=${store.me}`} data-testid="redo">↷ <span className="xwide-only">Redo</span></button>
+          {doc && seq !== null && <span className="dim" title={`The canvas shows the document after command #${seq}`}><span className="xwide-only">after </span>#{seq}</span>}
         </div>
         {doc && editable && (
           <div className="options" data-testid="options">

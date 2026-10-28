@@ -144,6 +144,11 @@ describe('outline', () => {
     expect(pts(r)).toEqual(['1,5', '4,1', '5,1']);
     expect(check(g, 'outline', { style: { checks: { outline: { min: 0.95 } } } }).status).toBe('fail');
   });
+
+  it('in role art, the black role is the outline', () => {
+    const d = doc('new sprite s 8x8\npalette add rim role=black\npalette add body role=dark\nrect 1,1 6x6 c=body fill\noutline c=rim');
+    expect(check(d, 'outline', { style: { outline: ['ink'] } })).toMatchObject({ status: 'pass', score: 1 });
+  });
 });
 
 describe('seam (plan §13)', () => {

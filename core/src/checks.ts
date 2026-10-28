@@ -510,11 +510,14 @@ function edgeDistance(img: Img): Int32Array {
   return d;
 }
 
-/** The outline colours: the style's, else entries named ink, outline or black, else the darkest colour used. */
+/**
+ * The outline colours: the style's (else entries named ink, outline or black), and in role art the
+ * entries with the `black` role; with none of those, the darkest colour used.
+ */
 function inkSet(img: Img, style?: CheckStyle): Set<number> {
   const pal = img.doc.palette;
   const names = style?.outline?.length ? style.outline : ['ink', 'outline', 'black'];
-  const set = new Set(pal.entries.flatMap((e, i) => (names.includes(e.name) ? [i] : [])));
+  const set = new Set(pal.entries.flatMap((e, i) => (names.includes(e.name) || e.role === 'black' ? [i] : [])));
   if (set.size || style?.outline?.length) return set;
   let best = -1;
   for (const v of new Set(img.px)) if (v !== TRANSPARENT && (best < 0 || luma601(pal.entries[v]!.hex) < luma601(pal.entries[best]!.hex))) best = v;
@@ -612,7 +615,7 @@ function checkOutline(img: Img, p: Params, ctx: CheckContext): CheckResult {
   const gaps = edge.filter((i) => !ink.has(img.px[i]!));
   const share = 1 - gaps.length / edge.length;
   const min = Number(p.min);
-  const names = [...ink].map((i) => img.doc.palette.entries[i]!.name).join(', ') || 'none';
+  const names = [...ink].filter((i) => img.px.includes(i) || ink.size === 1).map((i) => img.doc.palette.entries[i]!.name).join(', ') || 'none';
   return result('outline', {
     status: share >= min ? 'pass' : 'fail', score: share, shown: fmt(share), limit: `≥ ${min}`,
     groups: gaps.length ? [{ label: `silhouette edge not in the outline colour (${names})`, pts: gaps.map((i) => ptOf(img, i)) }] : [],

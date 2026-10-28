@@ -224,7 +224,10 @@ header .crumbs { white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 .preview-body { padding: 0 12px 8px; overflow: auto; max-height: 250px; display: flex; flex-direction: column; gap: 4px; }
 .preview-body canvas { image-rendering: pixelated; display: block; flex: none; }
 .swatch .role { font-size: 10px; color: #c9a6ff; border: 1px solid #4b3a6a; border-radius: 3px; padding: 0 4px; line-height: 14px; }
-.theme-select { font-size: 11px; padding: 0 3px; text-transform: none; letter-spacing: 0; font-weight: normal; max-width: 96px; }
+.theme-row { display: flex; align-items: center; gap: 6px; padding: 0 12px 6px; font-size: 12px; color: var(--dim); }
+.theme-select { font-size: 12px; padding: 0 3px; }
+.narrow-only { display: none; }
+@media (max-width: 1500px) { .xwide-only { display: none; } }
 .palette-edit select { font-size: 12px; padding: 1px 3px; }
 
 /* The options bar on narrow windows: groups keep together and wrap as units; labels shorten. */
@@ -245,5 +248,6 @@ header .crumbs { white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   .chip.check { padding: 1px 5px; font-size: 10.5px; }
   .chip.check.pass .score { display: none; }
   .wide-only { display: none; }
+  .narrow-only { display: inline; }
   .toolbar { gap: 6px; padding: 5px 8px; }
 }
