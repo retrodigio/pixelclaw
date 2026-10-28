@@ -1,0 +1,25 @@
+# A seamless 24x24 grass tile for the mossy ruins: a calm base, a few soft patches, blades and tufts
+# spread evenly, a couple of lichen flowers. Every generator works on the tile as a torus (wrap=on),
+# so it tiles by construction. The texture is a macro: `call grass seed=<n>` with another seed is
+# a variant (examples/scripts/grass_b.pclaw and grass_c.pclaw fork this tape and do just that).
+new tile grass 24x24
+# Blades curve up from a dark root to a light tip; a tuft is a few of them together.
+stamp save blade <<
+  .d
+  d.
+  b.
+>>
+stamp save tuft <<
+  d...d
+  .d.d.
+  .cdc.
+  .bbb.
+>>
+def grass() {
+  noise ramp=moss weights=0,3,12,1,0 cluster=1..2 density=0.07 base=moss2
+  noise ramp=moss weights=0,4,10,0,0 cluster=3..6 density=0.07 base=keep
+  scatter stamp=blade count=12 minDist=5 flip=on
+  scatter stamp=tuft count=3 minDist=10 flip=on
+  scatter c=lichen count=2 minDist=10
+}
+call grass seed=11

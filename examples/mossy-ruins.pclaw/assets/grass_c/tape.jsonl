@@ -1,0 +1,7 @@
+{"pclaw":"tape","lang":1}
+{"seq":1,"by":"claude","at":"2026-10-28T04:42:42Z","group":"g1","cmd":"new tile grass 24x24 palette=mossy-ruins wrap=on cell=24x24 bg=none"}
+{"seq":2,"by":"claude","at":"2026-10-28T04:42:42Z","group":"g1","cmd":"stamp save blade <<\n  .d\n  d.\n  b.\n>>"}
+{"seq":3,"by":"claude","at":"2026-10-28T04:42:42Z","group":"g1","cmd":"stamp save tuft <<\n  d...d\n  .d.d.\n  .cdc.\n  .bbb.\n>>"}
+{"seq":4,"by":"claude","at":"2026-10-28T04:42:42Z","group":"g1","cmd":"def grass() {\n  noise ramp=moss weights=0,3,12,1,0 cluster=1..2 density=0.07 base=moss2\n  noise ramp=moss weights=0,4,10,0,0 cluster=3..6 density=0.07 base=keep\n  scatter stamp=blade count=12 minDist=5 flip=on\n  scatter stamp=tuft count=3 minDist=10 flip=on\n  scatter c=lichen count=2 minDist=10\n}"}
+{"seq":5,"by":"claude","at":"2026-10-28T04:42:43Z","group":"g2","cmd":"fork grass grass_c at=4"}
+{"seq":6,"by":"claude","at":"2026-10-28T04:42:43Z","group":"g2","cmd":"call grass seed=37"}

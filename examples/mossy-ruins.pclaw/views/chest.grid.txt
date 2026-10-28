@@ -1,0 +1,40 @@
+    0         1         2
+    012345678901234567890123
+ 0  ........................
+ 1  ........................
+ 2  ........kkkkkkkk........
+ 3  .....kkkZZZZZZZYkkk.....
+ 4  ....kZ32YYYYYYYY32Yk....
+ 5  ...kZY31YYYYYYYY31YYk...
+ 6  ..kZYY31YYYYYYYY31YYYk..
+ 7  ..kZYY31YYYYYYYY31YYXk..
+ 8  ..kZYY31YYYYYYYY31YYXk..
+ 9  ..kZYY31YYYYYYYY31YYXk..
+10  ..kZYY31YYYCCYYY31YYXk..
+11  ..kZZZ31ZZCDDCZZ31ZZXk..
+12  ..kXWW31WWCkDCWW31WWWk..
+13  ..kYXX31XXCkCCXX31XXWk..
+14  ..kYXX51XXXBBXXX35XXWk..
+15  ..kYXX31XXXXXXXX31XXWk..
+16  ..kYWW31WWWWWWWW31WWWk..
+17  ..kYXX31XXXXXXXX31XXWk..
+18  ..kYXX51XXXXXXXX35XXWk..
+19  ..kYXX31XXXXXXXX31XXWk..
+20  ..kXWW21WWWWWWWW21WWWk..
+21  ...kkkkkkkkkkkkkkkkkk...
+22  ........................
+23  ........................
+
+  k  ink        #17181d  68 px
+  1  stone1     #3b4044  30 px
+  2  stone2     #535a5b  4 px
+  3  stone3     #6c7570  30 px
+  5  stone5     #afb6a5  4 px
+  W  wood0      #3a2418  41 px
+  X  wood1      #603c22  73 px
+  Y  wood2      #8a5a30  87 px
+  Z  wood3      #b58044  23 px
+  B  brass0     #6a4f1f  2 px
+  C  brass1     #b08a35  9 px
+  D  brass2     #efd47c  3 px
+  .  (transparent)  202 px

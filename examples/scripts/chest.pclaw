@@ -1,0 +1,44 @@
+# A 24x24 treasure chest for the mossy ruins: wood with iron straps and a brass lock, lit from the
+# top left, with a 1-px ink outline.
+new sprite chest 24x24
+# Wood and brass for this chest, kept in its palette; then the palette is locked (no stray
+# colours) and saved to the project for the next props.
+palette add wood0 hex=#3a2418 key=W
+palette add wood1 hex=#603c22 key=X
+palette add wood2 hex=#8a5a30 key=Y
+palette add wood3 hex=#b58044 key=Z
+palette add brass0 hex=#6a4f1f key=B
+palette add brass1 hex=#b08a35 key=C
+palette add brass2 hex=#efd47c key=D
+ramp wood = wood0 wood1 wood2 wood3
+ramp brass = brass0 brass1 brass2
+palette lock
+palette save as=ruins-props
+# The body: a rounded lid over a box of planks, then light from the top left.
+ellipse 3,3 18x8 c=wood2 fill
+rect 3,7 18x5 c=wood2 fill
+rect 3,12 18x9 c=wood1 fill
+line 3,12 20,12 c=wood0
+line 4,16 19,16 c=wood0
+shade light=nw ramp=wood
+# The lid's lip catches the light; the box sits in its own shadow.
+line 4,11 19,11 c=wood3
+line 4,20 19,20 c=wood0
+# Iron straps on their own layer, drawn once with symmetry, lit from the same side.
+layer add metal
+layer metal
+mirror x=11.5 live
+rect 6,4 2x17 c=stone2 fill
+shade light=nw ramp=stone
+px 6,14 6,18 c=stone5
+mirror off
+# The lock: a brass plate with a keyhole, over the seam.
+paint 10,10 <<
+  .CC.
+  CDDC
+  CkDC
+  CkCC
+  .BB.
+>>
+layer merge metal
+outline c=ink

@@ -1,0 +1,31 @@
+    0         1         2
+    012345678901234567890123
+ 0  cccccccccccccccbbccccccc
+ 1  cccccccccccccccdcccccccc
+ 2  ccccccccdccccccdcccdcccc
+ 3  cccccccccdccccccccdcbccc
+ 4  ccbceccccbccccccccbcbccc
+ 5  cccccccccccccccdcccdcccc
+ 6  ccccdcccccccccdcdcdccccc
+ 7  ccccdcccccccccbccdcccccc
+ 8  ccbbcdccccccccccbbbdcccc
+ 9  ccbccbccccccccccccdccccc
+10  ccccccccccccdccbccbccccc
+11  ccccccdcccddcccccccccccc
+12  cccccccdcdbbcbbccccccccb
+13  cccdccccdccccccccccccccb
+14  bbccdccbbbcccccdcccccccc
+15  dcccbcccddccccccdcccdccc
+16  cccccccccbcccccdbccccdcd
+17  ccccccccccccccccccccccdc
+18  cccccccccccccccccccccbbb
+19  dccccccccccbbcccccccdbcc
+20  cddccccccccdcccccccdcecc
+21  cbccbcccccccdbcccccbcccc
+22  ccccccccccbcbcbbcbcccccc
+23  ccccccccccbccccccccccccc
+
+  b  moss1      #2c4729  47 px
+  c  moss2      #486a32  484 px
+  d  moss3      #6c8c3a  43 px
+  e  lichen     #a2ab52  2 px

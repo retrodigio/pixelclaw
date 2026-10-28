@@ -1,0 +1,3 @@
+# A variant of the grass tile: the same texture macro with another seed.
+fork grass grass_c at=4
+call grass seed=37

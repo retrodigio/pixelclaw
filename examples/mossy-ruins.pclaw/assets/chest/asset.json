@@ -1,0 +1,42 @@
+{
+  "name": "chest",
+  "kind": "sprite",
+  "size": [
+    24,
+    24
+  ],
+  "cell": [
+    24,
+    24
+  ],
+  "wrap": false,
+  "palette": "mossy-ruins",
+  "layers": [
+    {
+      "name": "main",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    }
+  ],
+  "frames": 1,
+  "paletteLocked": true,
+  "stamps": [],
+  "macros": [],
+  "tags": [],
+  "views": [],
+  "links": [],
+  "notes": [],
+  "tape": {
+    "lang": 1,
+    "commands": 30,
+    "groups": 1
+  },
+  "state": {
+    "sha256": "fc040a9cfb0d6181793e591290569c091f14ce8bef3d5dbff6ae4b54366da52f"
+  },
+  "checkpoints": {
+    "every": 200,
+    "files": []
+  }
+}
