@@ -1,0 +1,8 @@
+{
+  "format": "pixelclaw-profile",
+  "version": 1,
+  "name": "godot",
+  "description": "Godot 4: a TileSet resource (.tres) per autotile family with one terrain set (match corners and sides for blob47, corners for wang16-corner, sides for path), frames as tile animations, and each tile's name as custom data",
+  "layout": "godot",
+  "variants": "names"
+}

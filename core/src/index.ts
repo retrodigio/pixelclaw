@@ -23,3 +23,8 @@ export * from './schemes.ts';
 export * from './family.ts';
 export * from './map.ts';
 export { genLayout, routeCells, smoothCells } from './cmd-map.ts';
+export * from './decode.ts';
+export * from './aseprite.ts';
+export * from './density.ts';
+export { importRows } from './cmd-io.ts';
+export * from './profile.ts';

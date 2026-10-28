@@ -18,8 +18,8 @@ export const NB_DIRS: [number, number, number][] = [[1, 0, -1], [2, 1, -1], [4, 
 
 export type Neighbours = '8' | '4' | 'axis' | 'corners' | 'none';
 /** The geometry a quadrant kind is drawn with. */
-export type BaseKind = 'in' | 'out' | 'outer' | 'inner' | 'horiz' | 'vert';
-const BASE: readonly string[] = ['in', 'out', 'outer', 'inner', 'horiz', 'vert'];
+export type BaseKind = 'in' | 'out' | 'outer' | 'inner' | 'horiz' | 'vert' | 'fillet';
+const BASE: readonly string[] = ['in', 'out', 'outer', 'inner', 'horiz', 'vert', 'fillet'];
 /** A quadrant (or the corner a kind faces): 0 NW, 1 NE, 2 SW, 3 SE. */
 export type Quad = 0 | 1 | 2 | 3;
 const QUAD_NAMES = ['nw', 'ne', 'sw', 'se'];
@@ -30,8 +30,11 @@ export interface SchemeVariant {
   key: number | null;
   /** Kinds of the quadrants NW, NE, SW, SE, as written ("outer", "vert@se"). */
   quads: string[];
-  /** 'face': drawn in the cell below the terrain (the face scheme's south faces). */
-  on?: 'face';
+  /**
+   * Drawn in a cell outside the terrain: 'face' below it (the face scheme's south faces), 'fillet'
+   * where the terrain turns an inner corner around it (the key is those corners: NE, SE, SW, NW bits).
+   */
+  on?: 'face' | 'fillet';
 }
 
 export interface SchemeJson {
@@ -44,6 +47,8 @@ export interface SchemeJson {
   /** Extra kinds and the geometry each is drawn with. */
   kinds?: Record<string, string>;
   faces?: boolean;
+  /** Rounder inner corners: outside cells get a fillet in each corner the terrain turns around (fillet variants). */
+  fillets?: boolean;
   columns: number;
   pieces: string[];
   variants: SchemeVariant[];
@@ -59,11 +64,12 @@ export interface QuadSpec {
 export interface Scheme extends SchemeJson {
   /** quadSpecs[v][q]: variant v's quadrant q. */
   quadSpecs: QuadSpec[][];
-  /** For each variant and quadrant: the piece (variant index) and its quadrant that supply it; null for pieces. */
+  /** For each variant and quadrant: the piece (variant index) and its quadrant that supply it (-1: nothing, an empty quadrant); null for pieces. */
   sources: ([number, Quad][] | null)[];
   byName: Map<string, number>;
   byKey: Map<number, number>;
   faceByKey: Map<number, number>;
+  filletByKey: Map<number, number>;
 }
 
 export class SchemeError extends Error {}
@@ -82,13 +88,14 @@ export function loadScheme(s: SchemeJson): Scheme {
   const byName = new Map<string, number>();
   const byKey = new Map<number, number>();
   const faceByKey = new Map<number, number>();
+  const filletByKey = new Map<number, number>();
   s.variants.forEach((v, i) => {
     if (!/^[a-z][a-z0-9_]*$/.test(v.name)) throw new SchemeError(`scheme ${s.name}: '${v.name}' is not a usable variant name`);
     if (byName.has(v.name)) throw new SchemeError(`scheme ${s.name}: variant '${v.name}' twice`);
     if (v.quads.length !== 4) throw new SchemeError(`scheme ${s.name}: variant '${v.name}' needs 4 quads`);
     byName.set(v.name, i);
     if (v.key === null) return;
-    const m = v.on === 'face' ? faceByKey : byKey;
+    const m = v.on === 'face' ? faceByKey : v.on === 'fillet' ? filletByKey : byKey;
     if (m.has(v.key)) throw new SchemeError(`scheme ${s.name}: key ${v.key} is both ${s.variants[m.get(v.key)!]!.name} and ${v.name}`);
     m.set(v.key, i);
   });
@@ -105,10 +112,12 @@ export function loadScheme(s: SchemeJson): Scheme {
         const at = quadSpecs[p]!.findIndex((x) => x.kind === spec.kind && x.face === spec.face);
         if (at >= 0) return [p, at as Quad];
       }
+      // A quadrant wholly outside the terrain has no band to copy (a fillet variant's other corners).
+      if (spec.base === 'out') return [-1, q as Quad];
       throw new SchemeError(`scheme ${s.name}: no piece has the ${spec.kind}@${QUAD_NAMES[spec.face]} quadrant variant '${v.name}' needs`);
     });
   });
-  return { ...s, quadSpecs, sources, byName, byKey, faceByKey };
+  return { ...s, quadSpecs, sources, byName, byKey, faceByKey, filletByKey };
 }
 
 export const BUILTIN_SCHEMES: ReadonlyMap<string, Scheme> = new Map(
@@ -147,6 +156,13 @@ export function reduceKey(s: SchemeJson, bits: number): number {
 export function resolveVariant(s: Scheme, here: boolean, bits: number): number | null {
   if (s.neighbours === 'corners') return s.byKey.get(reduceKey(s, bits)) ?? null;
   if (here) return s.byKey.get(reduceKey(s, bits)) ?? null;
+  if (s.fillets) {
+    // An inner corner of the terrain around this cell: both sides and the diagonal between them.
+    const { N, NE, E, SE, S, SW, W, NW } = NB;
+    const k = ((bits & (N | E | NE)) === (N | E | NE) ? NE : 0) | ((bits & (S | E | SE)) === (S | E | SE) ? SE : 0)
+      | ((bits & (S | W | SW)) === (S | W | SW) ? SW : 0) | ((bits & (N | W | NW)) === (N | W | NW) ? NW : 0);
+    return k ? s.filletByKey.get(k) ?? null : null;
+  }
   if (!s.faces || !(bits & NB.N)) return null;
   // A face joins the faces beside it: a neighbour out of the terrain with terrain above it.
   const k = ((bits & NB.E) === 0 && (bits & NB.NE) ? NB.E : 0) | ((bits & NB.W) === 0 && (bits & NB.NW) ? NB.W : 0);
@@ -202,6 +218,8 @@ export interface Geometry {
   inset: number;
   /** The radius of the band's inner edge at outer corners (0: square). */
   radius: number;
+  /** Fillet schemes: the radius of the rounding in the outside cell at an inner corner (unset: the band's width). */
+  fillet?: number;
   bands: Band[];
 }
 
@@ -239,6 +257,12 @@ function below(base: BaseKind, U: number, V: number, K: number, C: number): bool
       // d = C - sqrt((C-U)^2 + (C-V)^2) < K  <=>  sqrt(..) > C - K
       return C - K < 0 || isq(C - U) + isq(C - V) > isq(C - K);
     }
+    case 'fillet': {
+      // C is the fillet's doubled radius here: terrain in the corner outside the disc about (C, C),
+      // as deep as its distance from that disc.
+      if (U >= C || V >= C) return true;
+      return isq(U - C) + isq(V - C) < isq(C + K);
+    }
     case 'inner': {
       if (U > 0 && V > 0) return K > 0 && isq(U) + isq(V) < isq(K);
       if (U > 0) return U < K;
@@ -254,7 +278,7 @@ function below(base: BaseKind, U: number, V: number, K: number, C: number): bool
  */
 export function bandAt(spec: QuadSpec, t: number, q: Quad, x: number, y: number, g: Geometry): number {
   const [U, V] = uv(t, q, spec.face, x, y, g.inset);
-  const C = 2 * (bandWidth(g) + g.radius);
+  const C = spec.base === 'fillet' ? 2 * (g.fillet ?? bandWidth(g)) : 2 * (bandWidth(g) + g.radius);
   if (below(spec.base, U, V, 0, C)) return -1;
   let k = 0;
   for (let i = 0; i < g.bands.length; i++) {

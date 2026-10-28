@@ -6,6 +6,7 @@ import { LANG_VERSION, applyOp, normaliseCommand, type NormaliseContext } from '
 import './registry.ts';
 import { cloneDoc, flatten, type Doc } from './doc.ts';
 import type { Palette } from './palette.ts';
+import type { SchemeJson } from './schemes.ts';
 import { DiagError, parse, type Diag } from './parser.ts';
 import { Pcg32, hashString, seedFrom } from './pcg.ts';
 
@@ -21,6 +22,8 @@ export interface TapeEntry {
 export interface PaletteSource {
   get(name: string): Palette | undefined;
   defaultName?: string;
+  /** The project's own autotile schemes (schemes/*.json): a `new family` line copies the one it uses. */
+  scheme?(name: string): SchemeJson | undefined;
 }
 
 /** Other assets' documents, for commands that copy from one when first run (the line records what they copied). */
@@ -171,6 +174,7 @@ function context(doc: Doc | null, entries: TapeEntry[], current: string, palette
     by,
     palette: (n) => palettes.get(n),
     defaultPalette: palettes.defaultName,
+    scheme: (n) => palettes.scheme?.(n),
     newSeed: () => seedFrom(new Pcg32(seq, hashString(doc?.name ?? 'doc'))),
     undoTarget: (group, by) => findUndo(entries, group, by ?? null, current),
     redoTarget: (group, by) => findRedo(entries, group, by ?? null, current),

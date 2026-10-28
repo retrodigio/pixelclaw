@@ -15,10 +15,10 @@ const N = 1, NE = 2, E = 4, SE = 8, S = 16, SW = 32, W = 64, NW = 128;
 const SIDES: [number, string][] = [[N, 'n'], [E, 'e'], [S, 's'], [W, 'w']];
 const DIAGS: [number, string][] = [[NE, 'ne'], [SE, 'se'], [SW, 'sw'], [NW, 'nw']];
 
-interface Variant { name: string; key: number | null; quads: string[]; on?: 'face' }
+interface Variant { name: string; key: number | null; quads: string[]; on?: 'face' | 'fillet' }
 interface Scheme {
   name: string; description: string; neighbours: '8' | '4' | 'axis' | 'corners' | 'none'; cornerRule?: boolean;
-  inset?: [number, number]; kinds?: Record<string, string>; faces?: boolean; columns: number; pieces: string[]; variants: Variant[];
+  inset?: [number, number]; kinds?: Record<string, string>; faces?: boolean; fillets?: boolean; columns: number; pieces: string[]; variants: Variant[];
 }
 
 const sideName = (k: number) => SIDES.filter(([b]) => k & b).map(([, s]) => s).join('') || 'o';
@@ -130,12 +130,43 @@ function single(): Scheme {
   };
 }
 
-mkdirSync(OUT, { recursive: true });
-for (const s of [blob47(), wang16(), path(), bridge8(), single(), face()]) {
+/**
+ * blob47 with rounder inner corners (a scheme option, plan §17): every cell outside the terrain
+ * that the terrain turns an inner corner around (both sides and the diagonal between them) gets a
+ * fillet in that corner, so the edge curves through the outside cell instead of meeting at a
+ * right angle. 15 fillet variants keyed by those corners; the piece with all four supplies them.
+ * The example project ships it as one of its own schemes (schemes/*.json), which a family's tape copies.
+ */
+function blob47Round(): Scheme {
+  const b = blob47();
+  const fillets: Variant[] = [];
+  for (let m = 1; m < 16; m++) {
+    const k = (m & 1 ? NE : 0) | (m & 2 ? SE : 0) | (m & 4 ? SW : 0) | (m & 8 ? NW : 0);
+    const corners = DIAGS.filter(([bit]) => k & bit).map(([, n]) => n);
+    // Quadrants NW NE SW SE: a fillet in each corner the terrain turns around.
+    fillets.push({ name: `f_${corners.join('_')}`, key: k, quads: [NW, NE, SW, SE].map((bit) => (k & bit ? 'fillet' : 'out')), on: 'fillet' });
+  }
+  fillets.sort((a, c) => a.key! - c.key!);
+  return {
+    ...b, name: 'blob47-round', fillets: true,
+    description: 'blob47 with rounder inner corners: outside cells round off each inner corner of the terrain around them (47 + 15 fillet variants)',
+    pieces: [...b.pieces, 'f_ne_se_sw_nw'], variants: [...b.variants, ...fillets],
+  };
+}
+
+const write = (dir: string, s: Scheme) => {
   // One variant per line, so the files read (and diff) as tables.
   const { variants, ...head } = s;
   const lines = JSON.stringify(head, null, 2).replace(/\n}$/, ',\n  "variants": [\n');
   const body = variants.map((v) => '    ' + JSON.stringify(v)).join(',\n');
-  writeFileSync(join(OUT, `${s.name}.json`), `${lines}${body}\n  ]\n}\n`);
+  writeFileSync(join(dir, `${s.name}.json`), `${lines}${body}\n  ]\n}\n`);
   console.log(`${s.name}: ${variants.length} variants, pieces ${s.pieces.join(' ')}`);
+};
+
+mkdirSync(OUT, { recursive: true });
+const EXAMPLE = join(import.meta.dirname, '..', 'examples', 'mossy-ruins.pclaw', 'schemes');
+mkdirSync(EXAMPLE, { recursive: true });
+write(EXAMPLE, blob47Round());
+for (const s of [blob47(), wang16(), path(), bridge8(), single(), face()]) {
+  write(OUT, s);
 }

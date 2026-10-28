@@ -5,7 +5,7 @@
 import { syncMirrors, viewOf } from './anim.ts';
 import { DOC_KINDS, TRANSPARENT, createDoc, ctxOf, type Doc, type DocKind, type FamilyState, type MapState, type OverlayState } from './doc.ts';
 import { defaultOverlay, familyLayout, familyCell, syncFamily } from './family.ts';
-import { defaultInset, schemeNamed, BUILTIN_SCHEMES } from './schemes.ts';
+import { defaultInset, loadScheme, schemeNamed, BUILTIN_SCHEMES, type Scheme, type SchemeJson } from './schemes.ts';
 import { drawColoured, drawPoints, mirrored, targetOf } from './draw.ts';
 import { DEFAULT_ROLE_HEX, RESERVED_KEYS, ROLES, autoKeys, isRole, normaliseHex, paletteRows, parsePaletteRows, type Palette, type PaletteEntry } from './palette.ts';
 import { DiagError, quote, type BlockRow, type ParsedCommand, type Token } from './parser.ts';
@@ -42,6 +42,8 @@ export interface NormaliseContext {
   depth?: number;
   /** Another asset's document, for commands that copy from one (`family texture … from=`); the line records the pixels. */
   asset?(name: string): Doc | undefined;
+  /** A project scheme by name (a `new family` line copies it into the tape). */
+  scheme?(name: string): SchemeJson | undefined;
 }
 
 export type Op =
@@ -223,12 +225,23 @@ export function colourOpt(a: Args, doc: Doc): { index: number; name: string } {
 
 export const shiftPts = (pts: Pt[], dx: number, dy: number): Pt[] => (dx || dy ? pts.map(([x, y]) => [x + dx, y + dy]) : pts);
 
+/** A scheme's JSON in a fixed key order (what a tape records). */
+export function canonicalScheme(s: SchemeJson): SchemeJson {
+  return {
+    name: s.name, description: s.description, neighbours: s.neighbours,
+    ...(s.cornerRule !== undefined ? { cornerRule: s.cornerRule } : {}), ...(s.inset ? { inset: s.inset } : {}),
+    ...(s.kinds ? { kinds: s.kinds } : {}), ...(s.faces !== undefined ? { faces: s.faces } : {}), ...(s.fillets !== undefined ? { fillets: s.fillets } : {}),
+    columns: s.columns, pieces: s.pieces,
+    variants: s.variants.map((v) => ({ name: v.name, key: v.key, quads: v.quads, ...(v.on ? { on: v.on } : {}) })),
+  };
+}
+
 const newCmd: CommandSpec = {
   name: 'new',
   summary: 'new <kind> <name> <W>x<H> [palette=<name>] [wrap=on|off] [cell=<W>x<H>] [bg=<colour>|none] [<< palette rows >>]   (new family <name> <T>x<T> scheme=<scheme> [map=<C>x<R>]: an autotile family of T px tiles; new map <name> <C>x<R> [tile=<T>]: a map of C x R cells of T px)',
   normalise(cmd, ctx) {
     if (ctx.doc) throw new DiagError(cmd.line, cmd.col, `new must be the first command of a tape (this document already exists)`);
-    const a = new Args(cmd, ['palette', 'wrap', 'cell', 'bg', 'scheme', 'map', 'tile']);
+    const a = new Args(cmd, ['palette', 'wrap', 'cell', 'bg', 'scheme', 'def', 'map', 'tile']);
     const kindTok = a.take('word', `a kind (${DOC_KINDS.join(', ')})`);
     if (!DOC_KINDS.includes(kindTok.v as DocKind)) throw new DiagError(kindTok.line, kindTok.col, `unknown kind '${kindTok.v}' (kinds: ${DOC_KINDS.join(', ')})`);
     const kind = kindTok.v as DocKind;
@@ -281,8 +294,21 @@ const newCmd: CommandSpec = {
       // The size is the tile's; the canvas is the sheet (plan §4.2).
       if (size.w !== size.h || size.w % 2 || size.w < 4 || size.w > 256) throw new DiagError(size.line, size.col, `a family's tiles are square, even and 4..256 px (${size.w}x${size.h})`);
       if (!schemeOpt) throw new DiagError(cmd.line, cmd.col, `new family: missing scheme=<scheme> (${[...BUILTIN_SCHEMES.keys()].join(', ')})`);
-      const scheme = schemeNamed(schemeOpt.value);
-      if (!scheme) throw new DiagError(schemeOpt.line, schemeOpt.vcol, `unknown scheme '${schemeOpt.value}' (schemes: ${[...BUILTIN_SCHEMES.keys()].join(', ')})`);
+      // A built-in scheme by name; a project's own scheme is copied into the line (def=), like the palette.
+      const defOpt = a.opts.get('def');
+      let def: SchemeJson | null = null;
+      let scheme: Scheme | undefined = defOpt ? undefined : schemeNamed(schemeOpt.value);
+      if (!scheme) {
+        try {
+          const raw = defOpt ? (JSON.parse(defOpt.value) as SchemeJson) : ctx.scheme?.(schemeOpt.value) ?? null;
+          def = raw ? canonicalScheme(raw) : null;
+          if (def) scheme = loadScheme(def);
+        } catch (e) {
+          throw new DiagError((defOpt ?? schemeOpt).line, (defOpt ?? schemeOpt).vcol, `scheme '${schemeOpt.value}': ${(e as Error).message}`);
+        }
+        if (def && def.name !== schemeOpt.value) throw new DiagError(schemeOpt.line, schemeOpt.vcol, `def= holds scheme '${def.name}', not '${schemeOpt.value}'`);
+      }
+      if (!scheme) throw new DiagError(schemeOpt.line, schemeOpt.vcol, `unknown scheme '${schemeOpt.value}' (schemes: ${[...BUILTIN_SCHEMES.keys()].join(', ')}, or the project's schemes/*.json)`);
       if (wrap) throw new DiagError(a.opts.get('wrap')!.line, a.opts.get('wrap')!.vcol, `a family sheet does not wrap (its textures are tiles that do)`);
       if (cellOpt && (cellW !== size.w || cellH !== size.h)) throw new DiagError(cellOpt.line, cellOpt.vcol, `a family's cells are its tiles (${size.w}x${size.h})`);
       let mc = 0, mr = 0;
@@ -295,9 +321,9 @@ const newCmd: CommandSpec = {
       width = L.cols * size.w; height = L.rows * size.h; cellW = size.w; cellH = size.h;
       family = {
         scheme: scheme.name, tile: size.w, geometry: { inset: defaultInset(scheme, size.w), radius: 0, bands: [] }, detached: [],
-        mapCols: mc, mapRows: mr, terrain: new Uint8Array(),
+        mapCols: mc, mapRows: mr, terrain: new Uint8Array(), def,
       };
-      extra = ` scheme=${scheme.name}${mc ? ` map=${mc}x${mr}` : ''}`;
+      extra = ` scheme=${scheme.name}${def ? ` def=${quote(JSON.stringify(def))}` : ''}${mc ? ` map=${mc}x${mr}` : ''}`;
     } else if (kind === 'map') {
       // The size is in cells; the canvas is the grid of cells (plan §4.11).
       if (size.w > 512 || size.h > 512) throw new DiagError(size.line, size.col, `a map is at most 512x512 cells`);
@@ -311,7 +337,7 @@ const newCmd: CommandSpec = {
       map = { tile, entries: [] };
       extra = ` tile=${tile}`;
     } else {
-      for (const o of [schemeOpt, mapOpt]) if (o) throw new DiagError(o.line, o.col, `${o.key}= is for new family`);
+      for (const o of [schemeOpt, mapOpt, a.opts.get('def')]) if (o) throw new DiagError(o.line, o.col, `${o.key}= is for new family`);
     }
     const head = map ? `new map ${nameTok.v} ${size.w}x${size.h}${extra} palette=${palette.name}`
       : `new ${kind} ${nameTok.v} ${size.w}x${size.h}${extra} palette=${palette.name} wrap=${wrap ? 'on' : 'off'} cell=${cellW}x${cellH} bg=${bg.name}`;

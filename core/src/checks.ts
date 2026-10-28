@@ -11,8 +11,9 @@ import { hasRoles } from './themes.ts';
 import { DEFAULT_MAP, composeMap, islandTerrain, layoutOf, mapSeam, schemeOf } from './family.ts';
 import { artGrid, cellFlag, composeMapDoc, inFootprint, mapChecks, variantMatch, type MapWorld } from './map.ts';
 import { rampsOf } from './values.ts';
+import { densityDiff, type ReducerOptions } from './density.ts';
 
-export const CHECK_IDS = ['palette', 'orphans', 'jaggies', 'banding', 'outline', 'seam', 'coverage', 'readability', 'revert', 'repetition', 'anim', 'views', 'fit', 'variant', 'footprint', 'draworder'] as const;
+export const CHECK_IDS = ['palette', 'orphans', 'jaggies', 'banding', 'outline', 'seam', 'coverage', 'readability', 'revert', 'repetition', 'anim', 'views', 'fit', 'variant', 'footprint', 'draworder', 'density'] as const;
 export type CheckId = (typeof CHECK_IDS)[number];
 
 export function isCheckId(s: string): s is CheckId {
@@ -81,6 +82,8 @@ export interface CheckStyle {
   checks?: Record<string, unknown>;
   /** Per-asset overrides, from `style.assets.<name>.checks` (a laid stone floor's rows are its pattern). */
   assets?: Record<string, { checks?: Record<string, unknown> }>;
+  /** density: the reducer (default ink-vote) and its options. */
+  density?: { reducer?: string } & ReducerOptions;
 }
 
 export interface CheckContext {
@@ -136,6 +139,9 @@ const DEFAULTS: Record<CheckId, { all: Params } & Partial<Record<string, Params>
   // Maps: footprints and draw order without problems.
   footprint: { all: { max: 0 } },
   draworder: { all: { max: 0 } },
+  // A higher-density copy reduced to its base: the share of the base's pixels that differ (a lower
+  // copy is authored, so some difference is expected; the report says where).
+  density: { all: { max: 0.25 } },
 };
 
 /** A check's thresholds for a document kind: defaults, then the style guide's. */
@@ -1161,12 +1167,34 @@ function checkVariant(img: Img, p: Params, ctx: CheckContext): CheckResult {
   });
 }
 
+/** A higher-density copy against its base: the reducer's result over the base's pixels. */
+function checkDensity(img: Img, p: Params, ctx: CheckContext): CheckResult {
+  const d = img.doc;
+  if (!d.densityOf) return skip('density', 'not a density copy (density of=<asset> d=<n>)');
+  const base = ctx.world?.get(d.densityOf.of);
+  if (!base) return result('density', { status: 'fail', score: null, shown: '?', limit: '', detail: `no asset '${d.densityOf.of}' to be a density of` });
+  const k = d.densityOf.d;
+  if (base.width * k !== d.width || base.height * k !== d.height) {
+    return result('density', { status: 'fail', score: null, shown: 'size', limit: '', detail: `${d.width}x${d.height} is not ${k} x ${d.densityOf.of}'s ${base.width}x${base.height}` });
+  }
+  const { reducer = 'ink-vote', ...opts } = ctx.style?.density ?? {};
+  const r = densityDiff(base, d, k, reducer, opts, ctx.frame ?? 0);
+  const max = Number(p.max);
+  // Flag the whole block of this copy that reduces to each differing pixel.
+  const pts: Pt[] = r.pts.flatMap(([x, y]) => Array.from({ length: k * k }, (_, i): Pt => [x * k + (i % k), y * k + Math.floor(i / k)]));
+  return result('density', {
+    status: r.share <= max ? 'pass' : 'fail', score: r.share, shown: pct(r.share), limit: `≤ ${pct(max)}`,
+    groups: r.pts.length ? [{ label: `blocks the ${reducer} reducer turns into another colour than ${d.densityOf.of} has`, pts }] : [],
+    detail: `reduced by ${k} with ${reducer}: ${r.pts.length} of ${d.densityOf.of}'s pixels differ (${pct(r.share)})`,
+  });
+}
+
 const notMap = (id: CheckId) => (): CheckResult => skip(id, 'a map check (on map documents)');
 
 const RUNNERS: Record<CheckId, (img: Img, p: Params, ctx: CheckContext) => CheckResult> = {
   palette: checkPalette, orphans: checkOrphans, jaggies: checkJaggies, banding: checkBanding, outline: checkOutline,
   seam: checkSeam, coverage: checkCoverage, readability: checkReadability, revert: checkRevert, repetition: checkRepetition,
-  anim: checkAnim, views: checkViews, fit: checkFit, variant: checkVariant, footprint: notMap('footprint'), draworder: notMap('draworder'),
+  anim: checkAnim, views: checkViews, fit: checkFit, variant: checkVariant, footprint: notMap('footprint'), draworder: notMap('draworder'), density: checkDensity,
 };
 
 /** Checks of the whole document (every frame at once); the others read one frame's image. */

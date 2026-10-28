@@ -1,0 +1,8 @@
+{
+  "format": "pixelclaw-profile",
+  "version": 1,
+  "name": "aseprite",
+  "description": "One .aseprite file per asset (indexed: layers, frames and durations, linked cels, tags, views as tags named 'view S'); density copies as <asset>@<d>x.aseprite",
+  "layout": "aseprite",
+  "variants": "names"
+}

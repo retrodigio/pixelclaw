@@ -195,7 +195,7 @@ export interface ComposeOptions {
   groundOnly?: boolean;
 }
 
-const fullInside = (s: Scheme, v: number): boolean => s.variants[v]!.on !== 'face' && s.variants[v]!.quads.every((q) => q === 'in' || q.startsWith('in@'));
+const fullInside = (s: Scheme, v: number): boolean => !s.variants[v]!.on && s.variants[v]!.quads.every((q) => q === 'in' || q.startsWith('in@'));
 
 /** The frame of an asset at a tick: its first sequence playing (one frame: 0). */
 export function frameOf(d: Doc, tick: number): number {

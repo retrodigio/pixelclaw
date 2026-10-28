@@ -8,7 +8,7 @@ import { TRANSPARENT, flatten, type Doc, type FamilyState, type OverlayState } f
 import { luma601, seamAxis } from './checks.ts';
 import { Pcg32 } from './pcg.ts';
 import {
-  bandMap, bandWidth, reachable, resolveMap, schemeNamed, terrainWidth, type Geometry, type Scheme, type Terrain,
+  bandMap, bandWidth, loadScheme, reachable, resolveMap, schemeNamed, terrainWidth, type Geometry, type Scheme, type Terrain,
 } from './schemes.ts';
 
 import type { Pt } from './raster.ts';
@@ -17,7 +17,17 @@ export const GROUND_LAYER = 'ground';
 export const BAND_LAYER = 'band';
 
 /** The scheme of a family (built in). */
+const loaded = new Map<string, Scheme>();
+
 export function schemeOf(f: FamilyState): Scheme {
+  if (f.def) {
+    const k = JSON.stringify(f.def);
+    const hit = loaded.get(k);
+    if (hit) return hit;
+    const s = loadScheme(f.def);
+    loaded.set(k, s);
+    return s;
+  }
   const s = schemeNamed(f.scheme);
   if (!s) throw new Error(`unknown scheme '${f.scheme}'`);
   return s;
@@ -142,6 +152,10 @@ export function syncFamily(d: Doc): void {
         if (!src || detached.has(v)) continue;
         const [cx, cy] = L.cells[v]!;
         src.forEach(([p, pq], q) => {
+          if (p < 0) {
+            for (let y = 0; y < h; y++) cel.fill(TRANSPARENT, (cy * t + (q & 2 ? h : 0) + y) * W + cx * t + (q & 1 ? h : 0), (cy * t + (q & 2 ? h : 0) + y) * W + cx * t + (q & 1 ? h : 0) + h);
+            return;
+          }
           const [px, py] = L.cells[p]!;
           copyBlock(cel, W, px * t + (pq & 1 ? h : 0), py * t + (pq & 2 ? h : 0), cx * t + (q & 1 ? h : 0), cy * t + (q & 2 ? h : 0), h, h);
         });
@@ -268,6 +282,10 @@ export function neighbourhoodOf(s: Scheme, v: number): Terrain | null {
     return { cols: 3, rows: 3, cells };
   }
   const cells = new Uint8Array(9);
+  if (x.on === 'fillet') {
+    for (const [b, around] of [[2, [1, 2, 5]], [8, [5, 8, 7]], [32, [7, 6, 3]], [128, [3, 0, 1]]] as [number, number[]][]) if (x.key & b) for (const i of around) cells[i] = 1;
+    return { cols: 3, rows: 3, cells };
+  }
   if (x.on === 'face') {
     cells[1] = 1;
     if (x.key & 4) cells[2] = 1;
@@ -423,7 +441,7 @@ export function cutFamily(d: Doc, textures: boolean): CutResult {
     s.variants.forEach((v, vi) => {
       const tiles = vs.flatMap((x, i) => (x === vi ? [i] : []));
       if (!tiles.length) { if (fr === 0 && v.key !== null) missing.push(v.name); return; }
-      const keep = (k: number) => v.on === 'face' || inBand(f.geometry, maps[vi]![k]!);
+      const keep = (k: number) => !!v.on || inBand(f.geometry, maps[vi]![k]!);
       const blocks = tiles.map(tileBlock);
       const m = medoid(blocks, keep);
       if (fr === 0) chosen.set(vi, { tile: tiles[m]!, of: tiles.length });
@@ -434,7 +452,7 @@ export function cutFamily(d: Doc, textures: boolean): CutResult {
       if (!s.pieces.includes(v.name)) detached.add(v.name);
     });
     if (textures && gl >= 0) {
-      const full = s.variants.findIndex((v) => v.on !== 'face' && v.quads.every((q) => q === 'in' || q.startsWith('in@')));
+      const full = s.variants.findIndex((v) => !v.on && v.quads.every((q) => q === 'in' || q.startsWith('in@')));
       const pureIn = vs.flatMap((x, i) => (x === full ? [i] : []));
       const pureOut = vs.flatMap((x, i) => {
         if (x !== null) return [];
@@ -515,7 +533,7 @@ export function drawOverlays(img: MapImage, items: Doc[], tick: number, fam: Doc
     const flats = new Map<number, Uint16Array>();
     img.variants.forEach((v, i) => {
       const tx = i % cols, ty = Math.floor(i / cols);
-      const inside = v !== null && s?.variants[v]!.on !== 'face';
+      const inside = v !== null && !s?.variants[v]!.on;
       if ((st.on === 'outside' && inside) || (st.on === 'inside' && !inside)) return;
       const f = overlayFrameAt(o, tx, ty, tick);
       if (f === null) return;

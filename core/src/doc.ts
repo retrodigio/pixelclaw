@@ -5,7 +5,7 @@
 // mirror of another), a pivot and a ground line. Linked cels are one shared pixel array.
 
 import type { Palette, Role } from './palette.ts';
-import type { Geometry } from './schemes.ts';
+import type { Geometry, SchemeJson } from './schemes.ts';
 
 /** The pixel value for "no colour". Palette entry i is stored as i. */
 export const TRANSPARENT = 0xffff;
@@ -75,6 +75,8 @@ export interface FamilyState {
   mapRows: number;
   /** The coverage map's terrain (1 = the family's terrain), once laid out; empty otherwise. */
   terrain: Uint8Array;
+  /** A project's own scheme, as its tape recorded it (null: a built-in scheme by name). */
+  def?: SchemeJson | null;
 }
 
 export type OverlayMode = 'cycle' | 'pingpong' | 'wave' | 'sparkle';
@@ -211,6 +213,8 @@ export interface Doc {
   footprint: Footprint | null;
   /** The asset this one is a texture variant of (plan §4.1): maps pick among an asset and its variants per cell. */
   variantOf: string | null;
+  /** The asset this one is a higher-density copy of, and how many times its size (plan §4.7). */
+  densityOf: { of: string; d: number } | null;
   map: MapState | null;
 }
 
@@ -242,7 +246,7 @@ export function createDoc(o: {
     ctx: {}, home: { layer: o.family ? 1 : 0, frame: 0 }, notes: [], stamps: {}, macros: {},
     ticks: [DEFAULT_TICKS], tags: [], views: [], pivot: null, ground: null,
     family: o.family ? cloneFamily(o.family) : null, overlay: o.overlay ? cloneOverlay(o.overlay) : null,
-    footprint: null, variantOf: null, map: o.map ? cloneMap(o.map) : null,
+    footprint: null, variantOf: null, densityOf: null, map: o.map ? cloneMap(o.map) : null,
   };
 }
 
@@ -366,7 +370,7 @@ export function utf8(s: string): Uint8Array {
   return Uint8Array.from(out);
 }
 
-function utf8Decode(b: Uint8Array): string {
+export function utf8Decode(b: Uint8Array): string {
   let s = '';
   for (let i = 0; i < b.length;) {
     const c = b[i]!;
@@ -418,8 +422,10 @@ export function serializeDoc(d: Doc): Uint8Array {
     ...(d.family ? {
       family: {
         scheme: d.family.scheme, tile: d.family.tile, inset: d.family.geometry.inset, radius: d.family.geometry.radius,
+        ...(d.family.geometry.fillet !== undefined ? { fillet: d.family.geometry.fillet } : {}),
         bands: d.family.geometry.bands.map((b) => [b.w, b.fill]), detached: d.family.detached, map: [d.family.mapCols, d.family.mapRows],
         terrain: Array.from(d.family.terrain).join(''),
+        ...(d.family.def ? { def: d.family.def } : {}),
       },
     } : {}),
     ...(d.overlay ? {
@@ -427,6 +433,7 @@ export function serializeDoc(d: Doc): Uint8Array {
     } : {}),
     ...(d.footprint ? { footprint: [d.footprint.cols, d.footprint.rows, d.footprint.at, d.footprint.anchor, d.footprint.flags] } : {}),
     ...(d.variantOf ? { variantOf: d.variantOf } : {}),
+    ...(d.densityOf ? { densityOf: [d.densityOf.of, d.densityOf.d] } : {}),
     ...(d.map ? { map: { tile: d.map.tile, entries: d.map.entries.map((e) => [e.name, e.variant, e.cols, e.rows, e.anchor]) } } : {}),
   });
   const head = utf8('PCLAWDOC 2\n' + header + '\n');
@@ -461,10 +468,11 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
       ticks: number[]; tags: [string, number, number, Loop][]; views: [string, number, number, string | null][];
       pivot: [number, number] | null; ground: number | null; links: [number, number, number][];
     };
-    family?: { scheme: string; tile: number; inset: number; radius: number; bands: [number, number | 'outside' | 'inside'][]; detached: string[]; map: [number, number]; terrain: string };
+    family?: { scheme: string; tile: number; inset: number; radius: number; fillet?: number; bands: [number, number | 'outside' | 'inside'][]; detached: string[]; map: [number, number]; terrain: string; def?: SchemeJson };
     overlay?: OverlayState;
     footprint?: [number, number, [number, number], [number, number], string[]];
     variantOf?: string;
+    densityOf?: [string, number];
     map?: { tile: number; entries: [string, string | null, number, number, [number, number]][] };
   };
   const h = JSON.parse(utf8Decode(bytes.subarray(magic.length, nl))) as Header;
@@ -504,12 +512,14 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
     views: (h.anim?.views ?? []).map(([name, from, to, mirror]) => ({ name, from, to, mirror })),
     pivot: h.anim?.pivot ?? null, ground: h.anim?.ground ?? null,
     family: h.family ? {
-      scheme: h.family.scheme, tile: h.family.tile, geometry: { inset: h.family.inset, radius: h.family.radius, bands: h.family.bands.map(([w, fill]) => ({ w, fill })) },
+      scheme: h.family.scheme, tile: h.family.tile, geometry: { inset: h.family.inset, radius: h.family.radius, bands: h.family.bands.map(([w, fill]) => ({ w, fill })), ...(h.family.fillet !== undefined ? { fillet: h.family.fillet } : {}) },
       detached: h.family.detached, mapCols: h.family.map[0], mapRows: h.family.map[1], terrain: Uint8Array.from([...h.family.terrain].map(Number)),
+      ...(h.family.def ? { def: h.family.def } : {}),
     } : null,
     overlay: h.overlay ?? null,
     footprint: h.footprint ? { cols: h.footprint[0], rows: h.footprint[1], at: h.footprint[2], anchor: h.footprint[3], flags: h.footprint[4] } : null,
     variantOf: h.variantOf ?? null,
+    densityOf: h.densityOf ? { of: h.densityOf[0], d: h.densityOf[1] } : null,
     map: h.map ? { tile: h.map.tile, entries: h.map.entries.map(([name, variant, cols, rows, anchor]) => ({ name, variant, cols, rows, anchor })) } : null,
   };
 }
@@ -535,7 +545,7 @@ function mapLayerFromJson(a: string[]): MapLayerInfo {
  */
 export function serializeDocV1(d: Doc): Uint8Array | null {
   const authors = Object.keys(d.ctx);
-  if (hasAnim(d) || d.family || d.overlay || d.footprint || d.variantOf || d.map || d.paletteLocked || d.home.layer || d.home.frame || d.frameCount !== 1 || d.layers.length !== 1 || Object.keys(d.stamps).length || Object.keys(d.macros).length) return null;
+  if (hasAnim(d) || d.family || d.overlay || d.footprint || d.variantOf || d.densityOf || d.map || d.paletteLocked || d.home.layer || d.home.frame || d.frameCount !== 1 || d.layers.length !== 1 || Object.keys(d.stamps).length || Object.keys(d.macros).length) return null;
   const l = d.layers[0]!;
   if (l.hidden || l.locked || l.reference) return null;
   if (authors.length > 1 || authors.some((a) => d.ctx[a]!.mirror || d.ctx[a]!.brush || d.ctx[a]!.layer || d.ctx[a]!.frame)) return null;

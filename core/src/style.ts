@@ -26,6 +26,8 @@ export interface StyleJson {
   /** The engine's screen in art pixels ("384x216"): the map camera's view. */
   camera?: string;
   sizes?: Record<string, string>;
+  /** Densities (plan §4.7): the reducer the density check runs, and its options. */
+  density?: { reducer?: string; ink?: string[]; share?: [number, number] };
   checks?: Record<string, unknown>;
   assets?: Record<string, { checks?: Record<string, unknown>; ground?: string; set?: string[] }>;
 }
@@ -43,6 +45,7 @@ export function checkStyleOf(json: StyleJson | undefined, palette: (name: string
     style: {
       ...(palettes.length ? { palettes } : {}), ...(s.outline ? { outline: s.outline } : {}), ...(s.sizes ? { sizes: s.sizes } : {}),
       ...(s.checks ? { checks: s.checks } : {}), ...(s.assets ? { assets: s.assets } : {}),
+      ...(s.density ? { density: s.density } : {}),
     },
     problems,
   };
@@ -118,7 +121,7 @@ export function checkContextFor(
     ctx: {
       frame: o.frame, style, ground: ground?.doc ?? null, ref: ref?.doc ?? null,
       set: setOf(name, doc, assets, json, o.set).map((a) => ({ name: a.name, doc: a.doc })),
-      ...(doc.map || doc.variantOf ? { world: mapWorld(assets) } : {}),
+      ...(doc.map || doc.variantOf || doc.densityOf ? { world: mapWorld(assets) } : {}),
     },
     problems,
   };

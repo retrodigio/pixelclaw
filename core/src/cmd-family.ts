@@ -68,7 +68,8 @@ function bandCmd(a: Args, doc: Doc, f: FamilyState): { text: string; run: (d: Do
     bands.push({ w, fill });
     parts.push(`${w}:${name}`);
   }
-  onlyOpts(a, 'family band', ['radius', 'inset', 'draw']);
+  const fillets = !!schemeOf(f).fillets;
+  onlyOpts(a, 'family band', fillets ? ['radius', 'inset', 'draw', 'fillet'] : ['radius', 'inset', 'draw']);
   const h = f.tile / 2;
   const radius = intOpt(a, 'radius', 0, h, 0);
   const inset = intOpt(a, 'inset', 0, h - 1, f.geometry.inset);
@@ -77,9 +78,11 @@ function bandCmd(a: Args, doc: Doc, f: FamilyState): { text: string; run: (d: Do
   if (inset + total + radius > h) {
     throw new DiagError(a.cmd.line, a.cmd.col, `family band: the inset (${inset}), the band (${total}) and the corner radius (${radius}) must fit in half a tile (${h} px)`);
   }
-  const geometry = { inset, radius, bands };
+  // A fillet scheme rounds inner corners into the outside cell, by the band's width unless told.
+  const fillet = fillets ? intOpt(a, 'fillet', 1, h, Math.min(h, total || 1)) : undefined;
+  const geometry = { inset, radius, bands, ...(fillet !== undefined ? { fillet } : {}) };
   return {
-    text: `band ${parts.join(' ')} radius=${radius} inset=${inset} draw=${draw ? 'on' : 'off'}`,
+    text: `band ${parts.join(' ')} radius=${radius} inset=${inset}${fillet !== undefined ? ` fillet=${fillet}` : ''} draw=${draw ? 'on' : 'off'}`,
     run: (d) => {
       const fam = d.family!;
       fam.geometry = geometry;
@@ -172,7 +175,7 @@ const familyCmd: CommandSpec = {
     'family detach|attach <variant>|all | family coverage [seed=<n>] [copies=<n>] [fill=on|off] | family cut [textures=on|off]',
   normalise(cmd, ctx) {
     const { doc, f } = familyOf(cmd, ctx);
-    const a = new Args(cmd, ['radius', 'inset', 'draw', 'from', 'frame', 'seed', 'copies', 'fill', 'textures']);
+    const a = new Args(cmd, ['radius', 'inset', 'fillet', 'draw', 'from', 'frame', 'seed', 'copies', 'fill', 'textures']);
     noFlags(a);
     const how = a.take('word', 'band, texture, detach, attach, coverage or cut');
     const s = schemeOf(f);

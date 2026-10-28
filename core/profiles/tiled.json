@@ -1,0 +1,10 @@
+{
+  "format": "pixelclaw-profile",
+  "version": 1,
+  "name": "tiled",
+  "description": "Tiled: a .tsx per autotile family (its sheet, frames as tile animations, a wang set: mixed for blob47, corner for wang16-corner, edge for path), a collection tileset of every other image, and a .tmx per map that uses them",
+  "layout": "tiled",
+  "variants": "names",
+  "mirrors": "bake",
+  "oversized": "sprite"
+}

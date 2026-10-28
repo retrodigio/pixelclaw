@@ -1,0 +1,53 @@
+{
+  "format": "pixelclaw-profile",
+  "version": 1,
+  "name": "bramble",
+  "description": "A sample profile for an invented engine, 'Bramble', that exercises every profile feature: an atlas page per density with CSV records, reduced density levels, role encoding, autotile naming per scheme, numbered sets from 1, directional views with mirrors flagged for the engine, texture variants as numbered frames, oversized objects as one sprite with their footprint, and animation snippets",
+  "layout": "atlas",
+  "names": {
+    "single": "{asset}",
+    "frame": "{asset}_{n}",
+    "view": "{asset}_{view}{n}",
+    "start": 1
+  },
+  "autotile": {
+    "blob47": {
+      "names": { "o": "{asset}_lone", "nesw_ne_se_sw_nw": "{asset}_full", "inside": "{asset}_fill", "outside": "{asset}_bare" },
+      "template": "{asset}_{sides}{corners}",
+      "sides": "nsew"
+    },
+    "blob47-round": {
+      "names": { "o": "{asset}_lone", "nesw_ne_se_sw_nw": "{asset}_full", "inside": "{asset}_fill", "outside": "{asset}_bare" },
+      "template": "{asset}_{sides}{corners}",
+      "sides": "nsew"
+    },
+    "path": {
+      "names": { "o": "{asset}_dot", "inside": "{asset}_fill", "outside": "{asset}_bare" },
+      "template": "{asset}_{sides}",
+      "sides": "nsew"
+    },
+    "*": { "template": "{asset}_{variant}" }
+  },
+  "variants": "frames",
+  "mirrors": "flag",
+  "oversized": "sprite",
+  "roles": { "black": "#000000", "white": "#ffffff", "light": "#c8c8c8", "dark": "#707070", "darkest": "#2a2a2a" },
+  "density": { "levels": [1, 2, 4], "plain": 1, "suffix": "@{d}x", "reduce": true, "reducer": "ink-vote", "ink": ["ink"], "share": [1, 4] },
+  "page": { "name": "bramble", "width": 384, "padding": 1, "trim": true },
+  "records": {
+    "format": "csv",
+    "header": true,
+    "columns": ["sprite", "x", "y", "w", "h", "cropX", "cropY", "frameW", "frameH", "pivotX", "pivotY"]
+  },
+  "snippets": {
+    "file": "bramble-entries.txt",
+    "header": "-- Bramble entries written by PixelClaw: paste them into the game's data files.",
+    "templates": {
+      "sprite": "sprite \"{asset}\" {{ frames = {{ {names} }}, ticks = {{ {ticks} }}, directions = {directions}, mirror = \"{mirror}\", pivot = {{ {pivotX}, {pivotY} }} }}",
+      "tile": "tile \"{asset}\" {{ frames = {{ {names} }}, frameTicks = {frameTicks} }}",
+      "family": "terrain \"{asset}\" {{ scheme = \"{scheme}\", first = \"{first}\", tiles = {frames}, frameTicks = {frameTicks} }}",
+      "object": "object \"{asset}\" {{ image = \"{first}\", size = {{ {w}, {h} }}, footprint = {{ {cols}, {rows} }}, anchor = {{ {anchorX}, {anchorY} }}, variants = {variants} }}",
+      "overlay": "overlay \"{asset}\" {{ frames = {{ {names} }}, ticks = {{ {ticks} }} }}"
+    }
+  }
+}

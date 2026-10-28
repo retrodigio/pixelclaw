@@ -1,0 +1,15 @@
+{
+  "format": "pixelclaw-profile",
+  "version": 1,
+  "name": "atlas",
+  "description": "One atlas page (trimmed images, shelf-packed) with JSON records: every column, including frame, ticks, view, pivot and footprint",
+  "layout": "atlas",
+  "page": { "name": "atlas", "width": 256, "padding": 1, "trim": true },
+  "records": {
+    "format": "json",
+    "columns": ["sprite", "x", "y", "w", "h", "cropX", "cropY", "frameW", "frameH", "pivotX", "pivotY", "asset", "frame", "n", "view", "ticks", "ms", "cols", "rows", "anchorX", "anchorY", "flags", "variant"]
+  },
+  "variants": "frames",
+  "mirrors": "bake",
+  "oversized": "sprite"
+}
