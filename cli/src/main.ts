@@ -23,7 +23,7 @@ const nodeIo: Io = {
   now: () => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
 };
 
-const USAGE = `pixelclaw: a pixel art editor driven by commands
+export const USAGE = `pixelclaw: a pixel art editor driven by commands
 
   pixelclaw new <project> [--name <name>] [--palette <file.json|.hex|.gpl>]...
       Create a project folder. The first palette becomes the default.
@@ -36,18 +36,21 @@ const USAGE = `pixelclaw: a pixel art editor driven by commands
       Write views (default: <project>/views/<asset>.<mode>.png|txt). The grid is also printed.
   pixelclaw verify <project> [<asset>...]
       Replay every tape and compare with asset.json, preview.png and checkpoints.
+  pixelclaw serve --project <project> [--port 7417] [--no-mcp]
+      Own the project: MCP on stdin/stdout for the agent, and the live watch view on
+      http://127.0.0.1:<port>/?token=... (printed to stderr). Creates the project if needed.
 
 Command reference: docs/commands.md
 `;
 
-class UsageError extends Error {}
+export class UsageError extends Error {}
 
-interface Parsed {
+export interface Parsed {
   pos: string[];
   flags: Map<string, string[]>;
 }
 
-function parseArgs(argv: string[], valued: string[], bare: string[]): Parsed {
+export function parseArgs(argv: string[], valued: string[], bare: string[]): Parsed {
   const pos: string[] = [];
   const flags = new Map<string, string[]>();
   for (let i = 0; i < argv.length; i++) {
@@ -65,7 +68,7 @@ function parseArgs(argv: string[], valued: string[], bare: string[]): Parsed {
   return { pos, flags };
 }
 
-const one = (p: Parsed, k: string): string | undefined => p.flags.get(k)?.at(-1);
+export const one = (p: Parsed, k: string): string | undefined => p.flags.get(k)?.at(-1);
 
 function printErrors(io: Io, source: string, errors: { line: number; col: number; message: string }[]): void {
   for (const e of errors) io.err(`${source}:${e.line}:${e.col}: error: ${e.message}\n`);

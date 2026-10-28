@@ -1,0 +1,190 @@
+// HTTP and WebSocket for the watch view, on localhost only. The page and its scripts are public
+// (they hold no art), but the project itself (/api/*, /ws) needs the token printed at start, and
+// so does the page's own URL, so a bare link shows how to get in.
+
+import { timingSafeEqual } from 'node:crypto';
+import { existsSync, readFileSync, statSync } from 'node:fs';
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { extname, join, normalize, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { ServerMessage } from './protocol.ts';
+import type { Writer } from './writer.ts';
+import { acceptWebSocket, type WsConnection } from './ws.ts';
+
+const TYPES: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
+  '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.woff2': 'font/woff2', '.map': 'application/json',
+};
+
+/** The built UI: next to the bundle (dist/ui) or, from the sources, ui/dist. */
+export function findUiDir(): string | null {
+  const candidates = [
+    process.env.PIXELCLAW_UI_DIR,
+    fileURLToPath(new URL('./ui/', import.meta.url)),
+    fileURLToPath(new URL('../../ui/dist/', import.meta.url)),
+  ];
+  for (const d of candidates) if (d && existsSync(join(d, 'index.html'))) return d;
+  return null;
+}
+
+function tokenOk(given: string | null, token: string): boolean {
+  if (!given) return false;
+  const a = Buffer.from(given);
+  const b = Buffer.from(token);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+const HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'no-referrer',
+  'X-Frame-Options': 'DENY',
+};
+
+const CSP = "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'";
+
+function page(res: ServerResponse, status: number, title: string, body: string): void {
+  res.writeHead(status, { ...HEADERS, 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+  res.end(`<!doctype html><meta charset="utf-8"><title>${title}</title>
+<body style="font:15px system-ui;background:#16171b;color:#d8dbe0;padding:3em;max-width:40em">
+<h1 style="font-size:20px">Pixel Claw: ${title}</h1>${body}</body>`);
+}
+
+export interface WatchServer {
+  url: string;
+  port: number;
+  token: string;
+  clients(): number;
+  close(): Promise<void>;
+}
+
+export interface WatchOptions {
+  writer: Writer;
+  token: string;
+  /** The port to try first; 0 picks a free one. */
+  port: number;
+  /** How many ports after `port` to try when it is taken. */
+  tries?: number;
+  host?: string;
+}
+
+export async function startWatchServer(o: WatchOptions): Promise<WatchServer> {
+  const host = o.host ?? '127.0.0.1';
+  const uiDir = findUiDir();
+  const sockets = new Set<WsConnection>();
+  let port = 0;
+  const allowedHosts = (): string[] => [`127.0.0.1:${port}`, `localhost:${port}`, `[::1]:${port}`];
+
+  const broadcast = (m: ServerMessage): void => {
+    const text = JSON.stringify(m);
+    for (const s of sockets) s.send(text);
+  };
+  const unsubscribe = o.writer.on(broadcast);
+
+  const handle = (req: IncomingMessage, res: ServerResponse): void => {
+    // Only localhost names: a page on another site can't reach us by rebinding a DNS name.
+    if (!allowedHosts().includes(String(req.headers.host))) {
+      res.writeHead(421, HEADERS).end('wrong host\n');
+      return;
+    }
+    const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
+    const authed = tokenOk(url.searchParams.get('token'), o.token);
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      res.writeHead(405, HEADERS).end();
+      return;
+    }
+    if (url.pathname === '/' || url.pathname === '/index.html') {
+      if (!authed) {
+        page(res, 401, 'token required', `<p>This view needs the link with its token, as printed when the server
+          started (<code>pixelclaw: watch at http://127.0.0.1:${port}/?token=…</code>). Ask the agent for the
+          link, or look in the server's log.</p>`);
+        return;
+      }
+      if (!uiDir) {
+        page(res, 503, 'UI not built', '<p>The watch view has not been built. Run <code>pnpm build</code> in the repo.</p>');
+        return;
+      }
+      res.writeHead(200, { ...HEADERS, 'Content-Security-Policy': CSP, 'Content-Type': TYPES['.html']!, 'Cache-Control': 'no-store' });
+      res.end(readFileSync(join(uiDir, 'index.html')));
+      return;
+    }
+    if (url.pathname === '/api/state') {
+      if (!authed) {
+        res.writeHead(401, { ...HEADERS, 'Content-Type': 'application/json' }).end('{"error":"token required"}\n');
+        return;
+      }
+      res.writeHead(200, { ...HEADERS, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify(o.writer.snapshot()));
+      return;
+    }
+    if (uiDir && url.pathname.startsWith('/assets/')) {
+      const file = normalize(join(uiDir, decodeURIComponent(url.pathname)));
+      if (file.startsWith(join(uiDir, 'assets') + sep) && existsSync(file) && statSync(file).isFile()) {
+        res.writeHead(200, {
+          ...HEADERS, 'Content-Type': TYPES[extname(file)] ?? 'application/octet-stream',
+          'Cache-Control': 'public, max-age=31536000, immutable',
+        });
+        res.end(readFileSync(file));
+        return;
+      }
+    }
+    res.writeHead(404, { ...HEADERS, 'Content-Type': 'text/plain' }).end('not found\n');
+  };
+
+  const server: Server = createServer(handle);
+  server.on('upgrade', (req, socket) => {
+    const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
+    if (!allowedHosts().includes(String(req.headers.host)) || url.pathname !== '/ws') {
+      socket.end('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n');
+      return;
+    }
+    if (!tokenOk(url.searchParams.get('token'), o.token)) {
+      socket.end('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
+      return;
+    }
+    const ws = acceptWebSocket(req, socket);
+    if (!ws) return;
+    sockets.add(ws);
+    ws.onclose = () => sockets.delete(ws);
+    ws.onmessage = (text) => {
+      // Pages only ping for now; editing from the page arrives in G3.
+      if (text.includes('"ping"')) ws.send('{"type":"pong"}');
+    };
+    ws.send(JSON.stringify({ type: 'hello', snapshot: o.writer.snapshot() } satisfies ServerMessage));
+  });
+
+  const tries = o.port === 0 ? 1 : Math.max(1, o.tries ?? 20);
+  let lastErr: unknown;
+  for (let i = 0; i < tries; i++) {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        server.once('error', reject);
+        server.listen(o.port === 0 ? 0 : o.port + i, host, () => {
+          server.off('error', reject);
+          resolve();
+        });
+      });
+      lastErr = undefined;
+      break;
+    } catch (e) {
+      lastErr = e;
+      if ((e as NodeJS.ErrnoException).code !== 'EADDRINUSE') break;
+    }
+  }
+  if (lastErr) {
+    unsubscribe();
+    throw lastErr;
+  }
+  port = (server.address() as AddressInfo).port;
+  const url = `http://127.0.0.1:${port}/?token=${o.token}`;
+  return {
+    url, port, token: o.token,
+    clients: () => sockets.size,
+    close: () => new Promise<void>((resolve) => {
+      unsubscribe();
+      for (const s of sockets) s.close(1001);
+      server.close(() => resolve());
+      server.closeAllConnections();
+    }),
+  };
+}
