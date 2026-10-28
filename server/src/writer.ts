@@ -7,7 +7,7 @@ import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   CHECK_IDS, TapeCursor, Timeline, activeGroups, checkContextFor, drawScaleOf, groundOf, paletteToJson, parse, projectThemes, replay, runBatch,
-  flaggedOn, runChecks, setOf, type AssetDoc, type AssetState, type CheckId, type CheckResult, type Diag, type Doc, type Note, type Palette, type Pt,
+  VIEW_NAMES, flaggedOn, runChecks, setOf, type AssetDoc, type AssetState, type CheckId, type CheckResult, type Diag, type Doc, type Note, type Palette, type Pt,
   type TapeEntry, type Theme, type Token,
 } from '@pixelclaw/core';
 import {
@@ -439,7 +439,7 @@ export class Writer {
     this.freshStyle();
     const doc = this.doc(asset);
     const style = this.project.json.style;
-    const o: ViewOptions = { scale: req.scale, region: req.region, since: req.since, frame: req.frame };
+    const o: ViewOptions = { scale: req.scale, region: req.region, since: req.since, frame: req.frame, tickRate: this.project.json.tickRate ?? 60 };
     if (req.theme) o.theme = this.themeNamed(req.theme);
     if (req.marks) {
       const ids = req.marks === 'failing' ? undefined : req.marks;
@@ -457,7 +457,11 @@ export class Writer {
       const ground = groundOf(asset, all, style, req.ground);
       if (req.ground && !ground) throw new ProjectError(`no asset '${req.ground}' to use as ground`);
       const others = req.with ? req.with.map((n) => ({ name: n, doc: this.doc(n) })) : setOf(asset, doc, all, style).slice(0, 7);
-      o.game = { ground: ground?.doc ?? null, with: others.map((x) => x.doc), scale: drawScaleOf(style) };
+      // All directions of the sprite (each view's first frame) after the frame asked for, then its set.
+      const f = req.frame ?? 0;
+      const here = doc.views.find((v) => v.from <= f && f <= v.to);
+      const dirs = [f, ...[...doc.views].sort((x, y) => VIEW_NAMES.indexOf(x.name as never) - VIEW_NAMES.indexOf(y.name as never)).flatMap((v) => (v === here ? [] : [v.from]))];
+      o.game = { ground: ground?.doc ?? null, with: others.map((x) => x.doc), scale: drawScaleOf(style), frames: [...new Set(dirs)] };
     }
     if (mode === 'recolour') o.themes = req.themes ? req.themes.map((n) => this.themeNamed(n)) : this.themes().slice(0, 6);
     if (mode !== 'diff' || before !== undefined) return makeView(doc, mode, o, dir, before);

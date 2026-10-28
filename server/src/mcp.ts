@@ -210,7 +210,8 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
     description: 'Look at an asset. render: a scaled PNG (about 192 px, faint pixel grid, rulers every 8 px). ' +
       'tile3x3: the asset repeated 3x3 at 1x and 4x, for seams and repetition. grid: text, one palette key per pixel, with coordinates and a legend. ' +
       'diff: before and after the latest group (or since a command number) with changed pixels outlined in magenta and notes in yellow, plus the changed pixels as text (up to 60; per frame on animated assets). ' +
-      'game: the asset on its ground tile at 1x and at the engine\'s draw scale, beside the rest of its set. recolour: role art under several preview themes. ' +
+      'game: the asset on its ground tile at 1x and at the engine\'s draw scale, beside its other directions (views) and the rest of its set. recolour: role art under several preview themes. ' +
+      'anim: a contact sheet of every sequence (tags, views): each frame with its ticks, the frame before it as a tinted onion skin, the pivot and ground line, and the share of pixels changed from the frame before; plus an animated GIF at the game\'s speed saved for the person, and the numbers as text. ' +
       'marks="failing" circles every pixel a failing check flags. ' +
       'Images come back inline and are also saved as files; the person watching sees the last image you were shown.',
     annotations: { readOnlyHint: true },

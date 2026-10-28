@@ -1,7 +1,9 @@
 // Renders of a document: the flat image at 1x, the scaled view with pixel grid and rulers, the
 // text index grid, and the tile 3x3 preview. All RGBA images go through encodePng.
 
+import { frameAtTick, loopTicks, playOrder, sequences, type Sequence } from './anim.ts';
 import { TRANSPARENT, flatten, flattenReference, type Doc } from './doc.ts';
+import type { GifFrame } from './gif.ts';
 import { ROLES, rgbOf } from './palette.ts';
 import { createRgba, type Rgba } from './png.ts';
 import { indexOf, type Pt } from './raster.ts';
@@ -49,9 +51,19 @@ function tint(img: Rgba, x: number, y: number, c: RGB, alpha: number): void {
   for (let ch = 0; ch < 3; ch++) img.data[o + ch] = (img.data[o + ch]! * (256 - alpha) + c[ch]! * alpha) >> 8;
 }
 
+// 3x5 capitals and a few signs for labels (lower case is drawn as capitals).
+const GLYPHS: Record<string, number[]> = {
+  A: [2, 5, 7, 5, 5], B: [6, 5, 6, 5, 6], C: [3, 4, 4, 4, 3], D: [6, 5, 5, 5, 6], E: [7, 4, 6, 4, 7], F: [7, 4, 6, 4, 4],
+  G: [3, 4, 5, 5, 3], H: [5, 5, 7, 5, 5], I: [7, 2, 2, 2, 7], J: [1, 1, 1, 5, 2], K: [5, 5, 6, 5, 5], L: [4, 4, 4, 4, 7],
+  M: [5, 7, 7, 5, 5], N: [6, 5, 5, 5, 5], O: [2, 5, 5, 5, 2], P: [6, 5, 6, 4, 4], Q: [2, 5, 5, 6, 3], R: [6, 5, 6, 5, 5],
+  S: [3, 4, 2, 1, 6], T: [7, 2, 2, 2, 2], U: [5, 5, 5, 5, 7], V: [5, 5, 5, 5, 2], W: [5, 5, 7, 7, 5], X: [5, 5, 2, 5, 5],
+  Y: [5, 5, 2, 2, 2], Z: [7, 1, 2, 4, 7], '%': [5, 1, 2, 4, 5], '-': [0, 0, 7, 0, 0], '.': [0, 0, 0, 0, 2], '>': [4, 2, 1, 2, 4],
+  _: [0, 0, 0, 0, 7], ':': [0, 2, 0, 2, 0], '/': [1, 1, 2, 4, 4], '+': [0, 2, 7, 2, 0],
+};
+
 function text(img: Rgba, x: number, y: number, s: string, c: RGB, scale: number): void {
   for (const ch of s) {
-    const g = DIGITS[ch.charCodeAt(0) - 48];
+    const g = DIGITS[ch.charCodeAt(0) - 48] ?? GLYPHS[ch.toUpperCase()];
     if (g) g.forEach((bits, row) => {
       for (let col = 0; col < 3; col++) if (bits & (4 >> col)) rect(img, x + col * scale, y + row * scale, scale, scale, c);
     });
@@ -483,4 +495,170 @@ export function renderRecolour(doc: Doc, themes: Theme[], o: { scale?: number; f
     ROLES.forEach((r, i) => rect(img, ox + i * sw, pad + H + 4, sw, 6, rgbOf(t.colours[r])));
   });
   return img;
+}
+
+// --- animation (plan §2 `anim`, §4.4)
+
+const GUIDE: RGB = [64, 220, 230];
+const ONION_PREV: RGB = [255, 110, 70];
+const ANIM_BG: RGB = [58, 60, 68];
+const LABEL: RGB = [216, 219, 224];
+const LABEL_DIM: RGB = [150, 156, 166];
+
+const pctText = (v: number): string => `${Math.round(v * 100)}%`;
+
+/** The share of pixels that differ between two frames, over the union of their silhouettes. */
+export function frameDiffShare(doc: Doc, a: number, b: number): number {
+  const A = flatten(doc, a);
+  const B = flatten(doc, b);
+  let changed = 0, union = 0;
+  for (let i = 0; i < A.length; i++) {
+    if (A[i] !== TRANSPARENT || B[i] !== TRANSPARENT) union++;
+    if (A[i] !== B[i]) changed++;
+  }
+  return union ? changed / union : 0;
+}
+
+export interface AnimOptions {
+  /** Pixels per art pixel (default: about 96 px per frame, 2..8). */
+  scale?: number;
+  theme?: Theme | null;
+  /** Game ticks per second (the project's tick rate; default 60). */
+  tickRate?: number;
+  /** Only these sequences (by name). */
+  only?: string[];
+}
+
+const animScale = (doc: Doc, o: AnimOptions): number => o.scale ?? Math.max(2, Math.min(8, Math.floor(96 / Math.max(doc.width, doc.height))));
+
+function pickSequences(doc: Doc, o: AnimOptions): Sequence[] {
+  const all = sequences(doc);
+  if (!o.only?.length) return all;
+  const out = all.filter((s) => o.only!.includes(s.name));
+  if (!out.length) throw new Error(`no sequence named ${o.only.join(', ')} (sequences: ${all.map((s) => s.name).join(', ')})`);
+  return out;
+}
+
+/** The frame before f when a sequence plays (a cycle wraps; a ping-pong turns back). */
+function prevInPlay(s: Sequence, k: number): number | null {
+  const order = playOrder(s);
+  if (order.length < 2) return null;
+  const i = order.indexOf(s.frames[k]!);
+  return order[(i - 1 + order.length) % order.length]!;
+}
+
+/**
+ * The `anim` contact sheet: one row per sequence (tags, views), every frame with its number and
+ * ticks above, the previous frame as an onion skin (tinted) under it, the pivot and the ground
+ * line, and under each frame the share of pixels that changed from the frame before it.
+ */
+export function renderAnimSheet(doc: Doc, o: AnimOptions = {}): Rgba {
+  const s = animScale(doc, o);
+  const seqs = pickSequences(doc, o);
+  const W = doc.width * s;
+  const H = doc.height * s;
+  const pad = 8;
+  const t = 2; // label text scale
+  const lh = 5 * t + 4;
+  const labelW = Math.max(...seqs.map((q) => Math.max(textWidth(q.name, t), textWidth(q.mirror ? 'MIRROR' : q.loop, t), textWidth(`${loopTicks(doc, q)}T`, t)))) + pad;
+  const cols = Math.max(...seqs.map((q) => q.frames.length));
+  const rowH = lh + H + lh + pad;
+  const img = createRgba(pad + labelW + cols * (W + pad), pad + seqs.length * rowH);
+  rect(img, 0, 0, img.width, img.height, RULER_BG);
+  const pal = colourTable(doc, o.theme);
+  const chk = Math.max(2, s >> 1);
+  seqs.forEach((q, r) => {
+    const oy = pad + r * rowH;
+    text(img, pad, oy + lh, q.name, LABEL, t);
+    text(img, pad, oy + lh * 2, q.mirror ? 'MIRROR' : q.loop, LABEL_DIM, t);
+    text(img, pad, oy + lh * 3, `${loopTicks(doc, q)}T`, LABEL_DIM, t);
+    q.frames.forEach((f, k) => {
+      const ox = pad + labelW + k * (W + pad);
+      text(img, ox, oy, `${f + 1} ${doc.ticks[f]}T`, LABEL, t);
+      const px = flatten(doc, f);
+      const prev = prevInPlay(q, k);
+      const under = prev !== null && prev !== f ? flatten(doc, prev) : null;
+      for (let y = 0; y < doc.height; y++) for (let x = 0; x < doc.width; x++) {
+        const i = y * doc.width + x;
+        const v = px[i]!;
+        for (let j = 0; j < s; j++) for (let ii = 0; ii < s; ii++) {
+          const X = ox + x * s + ii, Y = oy + lh + y * s + j;
+          if (v !== TRANSPARENT) { put(img, X, Y, pal[v]!); continue; }
+          put(img, X, Y, (((x * s + ii) / chk | 0) + ((y * s + j) / chk | 0)) % 2 ? CHECK_A : CHECK_B);
+          if (under && under[i] !== TRANSPARENT) tint(img, X, Y, ONION_PREV, 110);
+        }
+      }
+      if (!doc.wrap && doc.ground !== null) for (let x = 0; x < W; x += 2) put(img, ox + x, oy + lh + (doc.ground + 1) * s - 1, GUIDE);
+      if (!doc.wrap && doc.pivot) {
+        const [px0, py0] = doc.pivot;
+        const cx = ox + px0 * s, cy = oy + lh + py0 * s;
+        for (let i = -1; i <= s; i++) { put(img, cx + i, cy - 1, GUIDE); put(img, cx + i, cy + s, GUIDE); put(img, cx - 1, cy + i, GUIDE); put(img, cx + s, cy + i, GUIDE); }
+      }
+      if (prev !== null && prev !== f) text(img, ox, oy + lh + H + 4, `${prev + 1}>${f + 1} ${pctText(frameDiffShare(doc, prev, f))}`, LABEL_DIM, t);
+    });
+  });
+  return img;
+}
+
+/** The sheet's numbers as text: per sequence, its frames, ticks, loop time and frame diffs. */
+export function animText(doc: Doc, o: AnimOptions = {}): string {
+  const rate = o.tickRate ?? 60;
+  const out = [`${doc.name}: ${doc.frameCount} frame${doc.frameCount === 1 ? '' : 's'} at ${rate} ticks/s` +
+    (doc.pivot ? `; pivot ${doc.pivot[0]},${doc.pivot[1]}` : '') + (doc.ground !== null ? `; ground ${doc.ground}` : '')];
+  for (const q of pickSequences(doc, o)) {
+    const ticks = loopTicks(doc, q);
+    const order = playOrder(q);
+    const pairs = order.length < 2 ? [] : (q.loop === 'pingpong' ? q.frames.slice(1).map((b, k) => [q.frames[k]!, b]) : order.map((a, k) => [a, order[(k + 1) % order.length]!]));
+    const src = q.mirror ? doc.views.find((v) => v.name === q.name)?.mirror : null;
+    out.push(`  ${q.name}: ${src ? `mirror of ${src}, ` : ''}${q.loop}, frames ${q.frames.map((f) => f + 1).join(',')}, ticks ${q.frames.map((f) => doc.ticks[f]).join(',')}` +
+      ` (a loop is ${ticks} ticks, ${Math.round((ticks * 1000) / rate)} ms)` + (pairs.length ? `; changed ${pairs.map(([a, b]) => `${a! + 1}→${b! + 1} ${pctText(frameDiffShare(doc, a!, b!))}`).join(', ')}` : ''));
+  }
+  return out.join('\n');
+}
+
+/**
+ * The animation as GIF frames: every sequence side by side, each playing its own frames at the
+ * game's tick rate (tiles 3x3, so a shimmer reads as a surface). One GIF loop is the least common
+ * multiple of the sequences' loops (capped at a minute).
+ */
+export function animGifFrames(doc: Doc, o: AnimOptions = {}): GifFrame[] {
+  const s = o.scale ?? (doc.wrap ? Math.max(1, Math.min(4, Math.floor(72 / doc.width))) : animScale(doc, o));
+  const rate = o.tickRate ?? 60;
+  const seqs = pickSequences(doc, o);
+  const reps = doc.wrap ? 3 : 1;
+  const W = doc.width * s * reps, H = doc.height * s * reps;
+  const pad = 8;
+  const pal = colourTable(doc, o.theme);
+  const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
+  let period = 1;
+  for (const q of seqs) {
+    const l = Math.max(1, loopTicks(doc, q));
+    period = Math.min(rate * 60, (period / gcd(period, l)) * l);
+  }
+  // Every tick where some sequence changes frame.
+  const cuts = new Set<number>([0]);
+  for (const q of seqs) {
+    const order = playOrder(q);
+    let t = 0;
+    for (let k = 0; t < period; k++) { cuts.add(t); t += Math.max(1, doc.ticks[order[k % order.length]!]!); }
+  }
+  // Delays in hundredths, rounded at each boundary so they add up exactly; a cut that rounds to the same hundredth as the one before is dropped.
+  const cs = (t: number) => Math.round((t * 100) / rate);
+  const times = [...cuts].sort((a, b) => a - b).filter((t, k, all) => k === 0 || cs(t) !== cs(all[k - 1]!));
+  const flat = new Map<number, Uint16Array>();
+  const frameAt = (f: number) => flat.get(f) ?? flat.set(f, flatten(doc, f)).get(f)!;
+  return times.map((t0, k) => {
+    const t1 = k + 1 < times.length ? times[k + 1]! : period;
+    const img = createRgba(pad + seqs.length * (W + pad), pad + H + pad);
+    rect(img, 0, 0, img.width, img.height, ANIM_BG);
+    seqs.forEach((q, n) => {
+      const px = frameAt(frameAtTick(doc, q, t0));
+      const ox = pad + n * (W + pad);
+      for (let y = 0; y < doc.height * reps; y++) for (let x = 0; x < doc.width * reps; x++) {
+        const v = px[(y % doc.height) * doc.width + (x % doc.width)]!;
+        if (v !== TRANSPARENT) rect(img, ox + x * s, pad + y * s, s, s, pal[v]!);
+      }
+    });
+    return { img, delay: Math.max(1, cs(t1) - cs(t0)) };
+  });
 }
