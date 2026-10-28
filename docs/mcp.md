@@ -44,7 +44,7 @@ link").
 
 ## Tools
 
-All five tools go through the writer's queue. Errors come back as tool errors (`isError`) with a
+All seven tools go through the writer's queue. Errors come back as tool errors (`isError`) with a
 plain message.
 
 ### `project`
@@ -79,7 +79,7 @@ Apply command text (see [commands.md](commands.md)) to an asset as one undo grou
 |---|---|---|
 | `asset` | string | The asset to draw on. To create it, start the commands with `new <kind> <asset> <W>x<H> …`. |
 | `commands` | string | One or more lines of the command language. |
-| `view` | `render` \| `grid` \| `tile3x3` \| `diff`, optional | Also return this view of the result. |
+| `view` | `render` \| `grid` \| `tile3x3` \| `diff` \| `game` \| `recolour`, optional | Also return this view of the result. |
 | `replace` | boolean, optional | With a leading `new` for an asset that exists: start its tape again. |
 
 The result lists the commands as written to the tape (normal form, with their numbers), the
@@ -92,6 +92,7 @@ stone_floor: applied 6 commands as group g2; 462 px changed
 …
 tape: 7 commands in 2 groups
 warnings: none
+checks: palette 0 ✓ · orphans 0.5% ✓ · jaggies 0 ✓ · seam 0.41 ✓ · coverage 0 ✓ · repetition 3.4 ✗  (1 failing: `check` gives coordinates)
 ```
 
 If any line has an error, nothing is applied and every error is listed with its line and column:
@@ -101,24 +102,62 @@ If any line has an error, nothing is applied and every error is listed with its 
 1 error; nothing was applied.
 ```
 
-Warnings so far: `the batch changed no pixels`. The check summary of plan §8.2 joins the result
-when the checks exist (G5).
+Warnings so far: `the batch changed no pixels`. The last line is the check summary: every check that
+applies to the asset, with its score and ✓ or ✗ against the style guide (see [checks.md](checks.md)).
 
 ### `view`
 
 | Argument | Type | Does |
 |---|---|---|
 | `asset` | string | |
-| `mode` | `render` (default) \| `grid` \| `tile3x3` \| `diff` | See [commands.md, Views](commands.md#views). |
+| `mode` | `render` (default) \| `grid` \| `tile3x3` \| `diff` \| `game` \| `recolour` | See [commands.md, Views](commands.md#views). |
 | `scale` | 1..64, optional | `render` and `diff`. Default: about 192 px on the long side. |
 | `region` | string, optional | `grid` only: `"x,y WxH"`, e.g. `"8,0 12x10"`. |
 | `since` | integer, optional | `diff` only: compare with the document after this command (default: before the latest group). |
-| `frame` | integer from 1, optional | `render`, `grid`, `tile3x3`: the frame to show. Default: the frame the agent draws on (`frame <n>`). |
+| `frame` | integer from 1, optional | The frame to show. Default: the frame the agent draws on (`frame <n>`). |
+| `marks` | string, optional | `render`, `tile3x3`, `game`: circle the pixels checks flag in magenta: `"failing"`, or check names (`"orphans,jaggies"`). |
+| `theme` | string, optional | `render`, `tile3x3`, `game`: show role entries under this preview theme. |
+| `themes` | string[], optional | `recolour`: the themes to show (default: the first six). |
+| `ground` | string, optional | `game`: the ground tile (default: the style guide's, else the first tile). |
+| `with` | string[], optional | `game`: the assets beside this one (default: its set, the same kind and size). |
 
 Images come back inline (`image/png`) with a line giving their size and the file they were saved
 to (`<project>/views/<asset>.<mode>.png`, overwritten each time). The grid comes back as text and
 is saved as `.txt`. The diff comes back as an image plus the list of changed pixels. Every image returned to the agent, from `view` or from `run`'s `view`, becomes
 "Claude's eye" in the watch view.
+
+### `check`
+
+The full check table for an asset (see [checks.md](checks.md)): each check's mark, score,
+threshold and finding, and under a failing one the pixels it flags, by what is wrong with them.
+With failures it also returns the render (tile3x3 for tiles) with those pixels circled in magenta.
+
+| Argument | Type | Does |
+|---|---|---|
+| `asset` | string, optional | The asset to check. Without one: one summary line per asset. |
+| `checks` | string[], optional | Only these checks. |
+| `frame` | integer from 1, optional | The frame to check (default: the agent's). |
+| `ground` | string, optional | `readability`: the ground tile. |
+| `ref` | string, optional | `revert`: the reference asset. |
+| `set` | string[], optional | `readability`: the assets its silhouette must differ from. |
+| `image` | boolean, optional | Return the marked image (default: when something fails). |
+
+```
+glowcap: 5 of 7 checks failing
+  ✗  palette     4      ≤ 0     4 px outside the style palettes (mossy-ruins, ruins-props): glow #ff4fd8 is not in the style palettes (4)
+       glow #ff4fd8 is not in the style palettes: 9,7 10,7 14,9 15,9
+  ✗  orphans     1.2%   ≤ 1%    3 stray px in 245 (3 lone, 0 near-orphans)
+       lone pixel (no neighbour shares its colour): 6,2 20,20 3,21
+  …
+  ✓  coverage    0      ≤ 0     1 frame, every cell drawn, size 24x24 (autotile names come with schemes)
+  –  seam        skipped: not a wrap (tile) document
+```
+
+### `review`
+
+Write a blind review bundle under `reviews/<date>-<set>/` (see [checks.md](checks.md#the-review-bundle)):
+`assets` (default all) and `name` (default `all`). Hand the folder to a fresh agent with no other
+context, ask it to follow `rubric.md`, and pin its findings on the pixels with `note` commands.
 
 ### `history`
 
@@ -209,6 +248,16 @@ Open the link (with its token). The page shows:
   Earlier states come from snapshots kept every 100 commands, so travelling is quick on long tapes.
 - **The command line** under the tape runs any commands on the shown asset, as you.
 - **Notes**: the open notes, with who wrote them; ✓ closes one.
+- **Checks** (header): a chip per check that applies, green or red, with its score. Click one to
+  circle its flagged pixels on the canvas in magenta and open its details under the toolbar: the
+  finding, the flagged pixels by kind and their coordinates, and **📌 note**, which pins them as
+  notes for the agent (one per cluster of pixels, in one undo group). Checks are worked out in the
+  page with the project's style guide, so they follow time travel and match the agent's `check`.
+- **Preview** (right): `3x3` for tiles (the tile repeated, at 1x and 2x), `game` for sprites (on
+  the ground beside the set, at 1x and the draw scale), and `themes` (the art under the preview
+  themes). Role art also gets a **theme** menu under the palette, which recolours the canvas;
+  only for looking, nothing is written. Double-click a swatch to give an entry a role (`palette
+  set <entry> role=…`).
 - **Claude's eye**: the last image the agent was shown (a view, or the diff `changes` returned).
   Click it to enlarge.
 

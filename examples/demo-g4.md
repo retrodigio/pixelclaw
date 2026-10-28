@@ -81,7 +81,8 @@ link (open it to watch), and runs the scripts in [examples/scripts/](scripts/) b
 
    ![The finished chest](../docs/screenshots/g4-chest.png)
 
-The same four assets are checked in, in [examples/mossy-ruins.pclaw](mossy-ruins.pclaw), with their
+The same four assets are checked in, in [examples/mossy-ruins.pclaw](mossy-ruins.pclaw) (with G5's
+fixes on top since then: see [demo-g5.md](demo-g5.md)), with their
 views (`views/grass.tile3x3.png`, `views/chest.render.png`, the grids); a test rebuilds them from
 the scripts and checks the tapes, states and previews.
 

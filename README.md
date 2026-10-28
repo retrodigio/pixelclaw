@@ -9,15 +9,17 @@ Every edit is a line of a small command language. A document *is* its tape of co
 and replay is deterministic (integer maths, seeded randomness), so the same tape always gives the
 same pixels.
 
-**Status: step G4.** The core library and CLI (G1); the MCP server and the live watch view (G2);
+**Status: step G5.** The core library and CLI (G1); the MCP server and the live watch view (G2);
 editing in the browser, with every action a command on the tape and the agent's `changes` tool
-(G3); and the drawing toolkit (G4): layers (with reference layers), frames, every kind of
-selection, transforms, symmetry, curves and polygons, dithering, gradients and ramps, palette
-locking, `outline`, `shade` and `clean`, seeded generators (`noise`, `scatter`, `voronoi`,
-`bricks`), stamps and brushes, and macros. Each author draws on their own layer and frame with
-their own selection. See [PROGRESS.md](PROGRESS.md).
+(G3); the drawing toolkit (G4): layers, frames, selections, transforms, symmetry, curves,
+dithering, gradients, `outline`, `shade`, `clean`, seeded generators, stamps, brushes and macros;
+and checks and in-context previews (G5): palette, orphans, jaggies, banding, outline, the seam
+score, coverage, readability, revert and repetition against the project's style guide, with the
+flagged pixels circled in magenta in images and in the watch view; the `game` and `recolour`
+previews, role palettes and preview themes; a blind review bundle; and tapes that carry their
+own palette. See [PROGRESS.md](PROGRESS.md).
 
-![The G4 chest sprite in the watch view: the tape of commands that drew it, and the agent's render as Claude's eye](docs/screenshots/g4-chest.png)
+![The G5 test sprite in the watch view: a red chip per failing check, the outline's gaps and the stray pixels circled, the game preview](docs/screenshots/g5-checks.png)
 
 ## Use it from Claude Code
 
@@ -78,7 +80,9 @@ node cli/bin/pixelclaw.js verify my-art.pclaw
 | `pixelclaw new <project> [--palette <file>]...` | Create a project folder. Palettes can be `.json`, Lospec `.json`, `.hex` or `.gpl`. |
 | `pixelclaw new <project> <kind> <name> <W>x<H> [opts]` | Create an asset (a `new` command). |
 | `pixelclaw run <project> <script.pclaw>\|-\|-e "..." [--asset <name>] [--replace] [--by <who>] [--view <mode>]` | Apply commands as one undo group. Any error applies nothing. |
-| `pixelclaw view <project> <asset> [render\|grid\|tile3x3\|diff\|all] [--scale N] [--region x,y,WxH] [--frame N]` | Write views and print the text grid (or the diff's list of changes). |
+| `pixelclaw view <project> <asset> [render\|grid\|tile3x3\|diff\|game\|recolour\|all] [--scale N] [--region x,y,WxH] [--frame N] [--marks failing] [--theme t]` | Write views and print the text grid (or the diff's list of changes). |
+| `pixelclaw check <project> [<asset>...] [--checks a,b] [--marks]` | Run the quality checks against the style guide; exits 1 if any fails. See [docs/checks.md](docs/checks.md). |
+| `pixelclaw review <project> [<asset>...] [--name set]` | Write a blind review bundle (images, palette, style guide, rubric). |
 | `pixelclaw verify <project> [<asset>...]` | Replay every tape and compare it with the saved state, the preview and the checkpoints. |
 | `pixelclaw serve --project <project> [--port 7417] [--no-mcp]` | Own the project: MCP on stdin/stdout and the live watch view on localhost (the link, with its token, is printed to stderr). See [docs/mcp.md](docs/mcp.md). |
 
@@ -88,14 +92,16 @@ The command language is described in [docs/commands.md](docs/commands.md).
 
 ```
 my-art.pclaw/
-  project.json              name, tick rate, default palette
-  palettes/<name>.json      entries (key, name, hex) and ramps
+  project.json              name, tick rate, default palette, the style guide's check settings, preview themes
+  style.md                  the style guide in words
+  palettes/<name>.json      entries (key, name, hex or role) and ramps
   assets/<name>/
     asset.json              kind, size, cell grid, wrap, palette, layers, frames, stamps, macros, open notes, fork link, state hash
     tape.jsonl              the history: one command per line, with its author
     preview.png             the current image at 1x (frame 1)
     checkpoints/            the state every 200 commands (NNNNNN.gwc): fast loading, checked by verify
   views/                    renders written by 'pixelclaw view' and the MCP 'view' and 'changes' tools
+  reviews/<date>-<set>/     blind review bundles (and the findings brought back)
   reads.json                how far each agent has read each tape (for 'changes')
   .pixelclaw.lock           present while a server owns the project (not for git)
 ```
@@ -103,10 +109,11 @@ my-art.pclaw/
 ## The demo
 
 [`examples/mossy-ruins.pclaw`](examples/mossy-ruins.pclaw) uses an original 16-colour "mossy
-ruins" palette. Its seamless 24x24 stone floor tile is drawn by
+ruins" palette and a style guide. Its seamless 24x24 stone floor tile is drawn by
 [`examples/scripts/stone_floor.pclaw`](examples/scripts/stone_floor.pclaw); a seamless grass tile
-with two variants and a treasure chest sprite by the G4 scripts beside it. The views are checked
-in:
+with two variants and a treasure chest sprite by the G4 scripts beside it; a test sprite, the
+glowcap, by G5's. G5's `*_fix.pclaw` and `*_review.pclaw` scripts fix what the checks and a blind
+reviewer found, and every check passes on every asset. The views are checked in:
 
 - the stone floor: [8x render](examples/mossy-ruins.pclaw/views/stone_floor.render.png),
   [index grid](examples/mossy-ruins.pclaw/views/stone_floor.grid.txt),
@@ -116,18 +123,23 @@ in:
   [grass_c](examples/mossy-ruins.pclaw/views/grass_c.tile3x3.png)),
   [index grid](examples/mossy-ruins.pclaw/views/grass.grid.txt)
 - the chest: [8x render](examples/mossy-ruins.pclaw/views/chest.render.png),
+  [game view](examples/mossy-ruins.pclaw/views/chest.game.png),
   [index grid](examples/mossy-ruins.pclaw/views/chest.grid.txt)
+- the glowcap: [8x render](examples/mossy-ruins.pclaw/views/glowcap.render.png),
+  [game view](examples/mossy-ruins.pclaw/views/glowcap.game.png)
 
 The G2 demo ([examples/demo-g2.md](examples/demo-g2.md)) draws the same tile through MCP while you
 watch. In the G3 demo ([examples/demo-g3.md](examples/demo-g3.md)) you fix three pixels and leave a
 note, and the agent reads them with `changes` and carries on. The G4 demo
-([examples/demo-g4.md](examples/demo-g4.md)) draws the grass, its variants and the chest.
+([examples/demo-g4.md](examples/demo-g4.md)) draws the grass, its variants and the chest. The G5
+demo ([examples/demo-g5.md](examples/demo-g5.md)) checks them, fixes them by coordinates, and runs
+a blind review.
 
 ## Packages
 
 - `core`: the document (layers, frames, each author's context), palettes, command parser and
   normaliser, raster operations, helpers and generators, tape and replay, a PCG random generator,
-  renders and a PNG encoder. It uses no DOM or Node APIs, so it
+  the checks, renders and previews, and a PNG encoder. It uses no DOM or Node APIs, so it
   runs anywhere.
 - `server`: the project folder, the single writer (one queue for every command), views, the MCP
   server (stdio) and the HTTP + WebSocket server for the watch view.

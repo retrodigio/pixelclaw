@@ -340,3 +340,101 @@ Points where the plan was unclear or silent. Each has the reading that was follo
     forks the tape after the macro is defined and calls it with another seed. The demo prints the
     three colour mixes side by side; `variant add` and its acceptance rule are left for G5/G7 with
     the seam and consistency checks.
+
+## G5
+
+54. **The palette snapshot (§13, item 46).** "The `new` line (or a `palette` header block right after
+    it) carries the full palette."
+    *Reading:* in the `new` line itself, as a block: `new … palette=<name> <<` then one row per
+    entry (`<key> <name> #rrggbb [role=<role>]`) and per ramp (`ramp <name> <entries…>`), then
+    `>>`. The normaliser reads the project palette once and writes it down; a script may give the
+    block itself. A tape's language is read from its first line (no block: language 1), and the
+    header must agree; language 1 tapes replay by reading the project palette, and a branch of one
+    stays in language 1. The example project was rebuilt in language 2 (same pixels); a language 1
+    copy is kept as a test fixture.
+
+55. **Role entries and themes (§3.1, §4.8).** An entry "may be a role instead of a fixed colour".
+    *Reading:* an entry keeps a `hex` (what it looks like without a theme; by default the grey
+    theme's colour for its role) and gains `role` (black, white, light, dark, darkest), set by
+    `palette add … role=` and `palette set … role=|none`. Themes give the roles colours, for
+    looking only (views and the watch view); the generic built-ins are `grey`, `moss`, `ember`,
+    `tide`, `dusk`, `sand` (from the triad formula of §7.4, with invented hues), and a project
+    adds its own in `project.json` `themes`. In role art the `palette` check wants every pixel to
+    be a role, and the `black` role counts as outline ink. The "encoding margin" part of `palette`
+    needs an export profile's thresholds and is left for G9.
+
+56. **Where thresholds live.** "A threshold (set in the project's style guide)"; §7.1 puts
+    thresholds in project.json and the guide's words in style.md.
+    *Reading:* `project.json` `style`: `palettes`, `outline`, `ground`, `drawScale`, `sizes`,
+    `checks` (per check, per kind, `off`), and `assets.<name>` overrides (the stone floor's
+    courses are its pattern, so it is not held to `repetition`). Defaults are in docs/checks.md.
+    The server reads project.json again when it changes and tells the pages.
+
+57. **What the checks measure, where §5 is a sketch.** Each reading is in docs/checks.md; the
+    ones worth questioning:
+    - `orphans`: a pixel no 4-neighbour shares *and* whose 8-connected cluster is at most two
+      pixels (a lone pixel or a diagonal pair). Read literally, "no 4-neighbour shares its colour"
+      flags every pixel of a diagonal line and every diagonal step of an outline. Score: strays per
+      100 opaque pixels (so the A1 bar "sprite strays < 1" reads as under 1 %). On tiles a stray one
+      ramp step from its surroundings is texture.
+    - `jaggies`: a doubled L-corner is a corner a line zig-zags through (it steps the same way
+      before and after); a corner where a line turns and carries on (a box, a hook) is meant.
+      Irregular runs: a run longer or shorter than both neighbours by 2 or more (1-2-1-3), never
+      counting the cut runs at a segment's ends; on thin lines of at least 6 px and on silhouette
+      contours. Spikes and notches (a notch needs solid shape two pixels deep behind it). On
+      tiles the ground colour is not a line. Tiles allow 2.
+    - `banding`: pillow shading is judged per ramp: the ramp steps that follow the outline get
+      lighter (or darker) inward on every side alike. A rim light on the lit side only (what
+      `shade` draws) is not banding. Score: the weakest side's agreement (0 to 1); fail above 0.5.
+    - `outline`: the share of the silhouette edge in the outline colour; the gaps are the other
+      edge pixels. Outline thickness is not checked.
+    - `readability`: ΔL* of each edge pixel against the ground under it (the usual ground tile,
+      repeated), at least 15 for 80 % of the edge; silhouette IoU with the set at most 0.9; L*
+      spread (p95 − p5) at least 25. The set is every other asset of the same kind and size that
+      does not wrap, leaving out branches of the same asset.
+    - `revert`: by colour (palettes may differ), over the union of opaque pixels; only with
+      `ref=`.
+    - `coverage` in G5: the style's sizes, whole cells, empty frames and cells. Autotile names
+      need schemes (G7); frame counts per asset need the manifest (G10).
+
+58. **The repetition check for tiles.** §13 asks it to "catch grass_b's faint rows".
+    *Reading:* every band of 1-6 whole rows (or columns) repeats across a tiled floor as a
+    stripe; the score is the worst band's lightness difference from the tile's mean, in L*, times
+    the square root of its width (wider bands show at lower contrast), at most 3. Measuring
+    against random noise was tried and rejected: random noise of the same contrast makes
+    stripes too, and they show. A motif repeating (the same tuft every 24 px) did not separate
+    from noise by any simple measure tried (a hot-spot ratio scored noise higher than the grass);
+    that is left to the eye, the blind reviewer and G8's map hot spots.
+
+59. **The check summary in every `run`.** *Reading:* every check that applies, on the agent's
+    frame, after every batch (cheap at these sizes), one line. The CLI's `run` prints it too.
+
+60. **The `game` view's neighbours and scale.** "Next to its neighbours in the set (all
+    characters in a row, all directions of one character)."
+    *Reading:* the set as in item 57 (up to seven), or `with=`; directions come with G6's views.
+    Sprites stand on a common baseline on the ground tile, repeated; 1x and `style.drawScale`
+    (default 2).
+
+61. **The review bundle (§5).** *Reading:* `reviews/<date>-<set>/` with each asset enlarged with
+    rulers and at game scale, tiles 3x3, sprites on their ground beside their set, the colours the
+    art uses, style.md and rubric.md (asking for defects as `<asset> x,y [WxH] "text"`, ready to
+    become notes). No tape, no author or method names; the date is the writer's clock. The tool
+    calls no model; the agent's findings can be kept beside the bundle (`findings.md`, as in the
+    demo). The first bundle listed every palette entry, including one no pixel used, and the
+    reviewer took it as a clue; it now lists only the colours used.
+
+62. **Checks in the watch view.** *Reading:* the page computes them with core from the same style
+    guide (so they follow time travel and agree with `check`). Chips toggle magenta rings on the
+    canvas; a check's details pin its pixels as notes, one per cluster (a box around scattered
+    pixels would cover the whole sprite).
+
+63. **Diff across frames** (G4 notes). *Reading:* the diff compares every frame; one row of
+    before/after per frame that changed, numbered; the text prefixes `f<n>` on documents with
+    frames. A new empty frame is not a change; a copied one is (its pixels are new).
+
+64. **Playback speed.** G2 item 24 plays "at the chosen speed". A slow first frame (over 33 ms at
+    60/s) made the page skip a command. *Reading:* up to 60 commands a second, at most one per
+    frame, so a slow frame delays playback instead of skipping.
+
+65. **Variants' acceptance rule** (§4.1, item 53). Still not built: it compares a variant's colour
+    mix with its base, which belongs with `consistency` (G10) or the family tools (G7).

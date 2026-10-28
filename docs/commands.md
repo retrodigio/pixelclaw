@@ -1,4 +1,4 @@
-# Command reference (language version 1)
+# Command reference (language version 2)
 
 PixelClaw documents are edited with a small line-based command language. The same text works from
 the CLI (`pixelclaw run`), the MCP server (`run`) and the watch view, whose tools write these
@@ -50,7 +50,7 @@ view (a pencil drag, a fill, a move, a palette edit, a note) is one group.
 
 | Command | Normal form | Notes |
 |---|---|---|
-| `new <kind> <name> <W>x<H> [palette=] [wrap=] [cell=] [bg=]` | `new tile floor 24x24 palette=mossy-ruins wrap=on cell=24x24 bg=none` | First command of a tape only. Kinds: `tile`, `sprite`, `sheet`, `icon`. `wrap` defaults to `on` for tiles, `off` otherwise. `cell` defaults to the canvas size. `palette` defaults to the project's default palette. |
+| `new <kind> <name> <W>x<H> [palette=] [wrap=] [cell=] [bg=] [<< rows >>]` | `new tile floor 24x24 palette=mossy-ruins wrap=on cell=24x24 bg=none <<` palette rows `>>` | First command of a tape only. Kinds: `tile`, `sprite`, `sheet`, `icon`. `wrap` defaults to `on` for tiles, `off` otherwise. `cell` defaults to the canvas size. `palette` defaults to the project's default palette, and the line records the whole palette in a block (see *The palette in the tape*). |
 | `px <x,y> [<x,y> ...] c=` | `px 3,4 4,4 c=ink` | Single pixels. |
 | `line <x,y> <x,y> [<x,y> ...] c= [pp=on\|off]` | `line 3,10 9,7 c=stone2 pp=on` | A line or polyline. See *Lines* below. |
 | `curve <x,y> <x,y> <x,y> [<x,y>] c= [pp=on\|off]` | `curve 2,20 8,12 16,14 c=soil2 pp=on` | A quadratic (3 points) or cubic (4 points) Bezier. See *Curves and polygons*. |
@@ -328,6 +328,27 @@ line, not its expansion; replay expands it again. A generator in a body without 
 its seed from the call's: the call's line then records `seed=<n>`, and `call … seed=<n>` with
 another number gives another variant of the whole macro.
 
+### The palette in the tape
+
+Since language version 2 a tape does not depend on the project's palette files: its `new` line
+carries the palette, as it was when the asset was made, in a block of rows. One row per entry,
+`<key> <name> #rrggbb [role=<role>]`, then one per ramp, `ramp <name> <entries...>`:
+
+```
+new sprite chest 24x24 palette=mossy-ruins wrap=off cell=24x24 bg=none <<
+  k ink #17181d
+  0 stone0 #272a30
+  ...
+  ramp stone stone0 stone1 stone2 stone3 stone4 stone5
+>>
+```
+
+You write `new sprite chest 24x24` (the project palette is read once, and written down), or give
+the block yourself. A tape in language 1 (made before G5: its `new` line has no block) still
+replays, reading the project palette as it did; a branch of such a tape stays in language 1. Its
+header says which (`{"pclaw":"tape","lang":1}`), and `verify` refuses a header that does not match
+the tape. So changing or saving a project palette (`palette save`) affects only assets made later.
+
 ### Palette edits
 
 A document holds its own copy of its palette, taken from the project when `new` runs. `palette
@@ -340,6 +361,14 @@ reordered (pixels store entry numbers); the names on the tape stay valid.
 - `palette add [<name>] hex=#rrggbb [key=<k>]` appends an entry. Without a name it is called
   `c<N>` (N = its position); without a key it gets the first free one (`0-9`, `a-z`, `A-Z`, then
   punctuation). The normal form always records both.
+- **Roles** (recolourable art, plan §3.1): `palette add <name> role=<role>` and `palette set
+  <entry> role=<role>|none`. The roles are `black`, `white`, `light`, `dark` and `darkest`. A role
+  entry stands for a colour a theme gives it; its own `hex` (by default the grey theme's) is only
+  what it looks like without a theme. In role art (a palette with any role entry) the `palette`
+  check wants every pixel to be a role, and the `black` role counts as outline ink. Themes are for
+  looking only: the watch view's theme menu and the `recolour` and `theme=` views. Built-in themes:
+  `grey`, `moss`, `ember`, `tide`, `dusk`, `sand`; a project adds its own in `project.json`
+  (`"themes": { "lantern": { "light": "#f2d27a", "dark": "#b0702c", "darkest": "#4a2410" } }`).
 
 `#` would start a comment after a space, so colours are written as `hex=#…`.
 
@@ -397,6 +426,8 @@ A branch's `tape.jsonl` is self-contained. It holds:
 2. the fork line, numbered `at+1`, in the forking author's next group: `fork chest chest_b at=20`;
 3. the branch's own commands after it.
 
+(This example is a language 1 tape; in language 2 the `new` line also carries its palette block.)
+
 ```
 {"pclaw":"tape","lang":1}
 {"seq":1,"by":"claude","at":"…","group":"g1","cmd":"new sprite chest 12x12 palette=mossy-ruins wrap=off cell=12x12 bg=none"}
@@ -415,7 +446,8 @@ changes a branch. `asset.json` records the link: `"links": [{"fork": {"from": "c
 
 ## Views
 
-`pixelclaw view <project> <asset> [render|grid|tile3x3|diff|all]` (`all` is the first three):
+`pixelclaw view <project> <asset> [render|grid|tile3x3|diff|game|recolour|all]` (`all` is the
+first three):
 
 - **render**: a nearest-neighbour PNG. The default scale gives about 192 px on the long side
   (8x for a 24 px tile). It has a faint pixel grid, stronger lines every 8 px, rulers labelled
@@ -429,7 +461,20 @@ changes a branch. `asset.json` records the link: `"links": [{"fork": {"from": "c
   magenta on both, and open notes are outlined in yellow dashes. With more than 60 changed pixels a
   third panel shows them as a map (the after image dimmed, changes solid magenta). The text lists
   up to 60 changes as `x,y from→to` by entry name. By default it shows what the latest group
-  changed; the MCP `view` takes `since=<n>` and `changes` uses the agent's read position.
+  changed; the MCP `view` takes `since=<n>` and `changes` uses the agent's read position. On
+  documents with frames it compares every frame: one row per frame that changed (numbered at the
+  left), and the text says which (`f2 12,5 ink→wood2`).
+- **game**: the asset on its usual ground tile (repeated under it) beside the rest of its set,
+  at 1x (real size) and again at the engine's draw scale (`style.drawScale`, default 2). The
+  ground is `--ground`, else the style guide's (`style.ground`, or per asset), else the first
+  tile; the set is `--with` (repeatable), else every other asset of the same kind and size that
+  does not wrap, leaving out branches of the same asset.
+- **recolour**: role art under several preview themes side by side (`--themes a,b,c`, default the
+  first six), each with a strip of its role colours.
+
+`--marks failing` (or check names: `--marks orphans,jaggies`) circles the pixels those checks flag
+in magenta, on `render`, `tile3x3` (the middle copy of the enlarged one) and `game`. `--theme
+<name>` shows role entries under a theme. See [checks.md](checks.md) for the checks.
 
 Views show the art layers of one frame (`--frame N`, default 1 in the CLI; the agent's frame in
 MCP), with visible reference layers faded underneath in `render`. Views are written to
@@ -440,8 +485,8 @@ MCP), with visible reference layers faded underneath in `render`. Views are writ
 `assets/<name>/tape.jsonl` starts with a version header, then one entry per command:
 
 ```
-{"pclaw":"tape","lang":1}
-{"seq":1,"by":"claude","at":"2026-10-27T12:00:00Z","group":"g1","cmd":"new tile floor 24x24 palette=mossy-ruins wrap=on cell=24x24 bg=stone1"}
+{"pclaw":"tape","lang":2}
+{"seq":1,"by":"claude","at":"2026-10-27T12:00:00Z","group":"g1","cmd":"new tile floor 24x24 palette=mossy-ruins wrap=on cell=24x24 bg=stone1 <<\n  k ink #17181d\n ...\n>>"}
 ```
 
 `by` is the author (the CLI's `--by`, default `claude`; `human:<name>` from the watch view), and
