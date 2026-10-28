@@ -1,0 +1,42 @@
+{
+  "name": "walker",
+  "kind": "sprite",
+  "size": [
+    24,
+    24
+  ],
+  "cell": [
+    24,
+    24
+  ],
+  "wrap": false,
+  "palette": "mossy-ruins",
+  "layers": [
+    {
+      "name": "main",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    }
+  ],
+  "frames": 8,
+  "paletteLocked": false,
+  "stamps": [],
+  "macros": [],
+  "tags": [],
+  "views": [],
+  "links": [],
+  "notes": [],
+  "tape": {
+    "lang": 2,
+    "commands": 35,
+    "groups": 1
+  },
+  "state": {
+    "sha256": "0a42751ef3f4e7ae41f6585833fccd62fd8cee2cdd21288352d632c7606fe29b"
+  },
+  "checkpoints": {
+    "every": 200,
+    "files": []
+  }
+}

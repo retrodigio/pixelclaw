@@ -8,7 +8,9 @@
   "style": {
     "palettes": [
       "mossy-ruins",
-      "ruins-props"
+      "ruins-props",
+      "ruins-folk",
+      "ruins-water"
     ],
     "outline": [
       "ink"

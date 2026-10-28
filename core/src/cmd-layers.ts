@@ -225,10 +225,12 @@ const frameCmd: CommandSpec = {
       const tk = a.opts.get('ticks');
       if (!tk) throw new DiagError(cmd.line, cmd.col, `frame set: give ticks=<t>`);
       const ticks = ticksOpt(tk);
-      for (let f = r.from - 1; f < r.to; f++) notMirror(doc, f, cmd, 'frame set');
+      // Frames of mirror views follow their source; a range over them sets the others.
+      const own = (f: number) => !viewOf(doc, f)?.mirror;
+      if (r.from === r.to) notMirror(doc, r.from - 1, cmd, 'frame set');
       return {
         text: `frame set ${r.text} ticks=${ticks}`,
-        op: fn((d) => { for (let f = r.from - 1; f < r.to; f++) d.ticks[f] = ticks; }),
+        op: fn((d) => { for (let f = r.from - 1; f < r.to; f++) if (own(f)) d.ticks[f] = ticks; }),
       };
     }
     if (how.v === 'add') {

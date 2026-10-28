@@ -1,0 +1,56 @@
+# Mossy ruins: a 24x24 seamless water tile that shimmers in four frames (plan §10 G6).
+# The deep body (layer main) is the same in every frame: its cels are linked. The crests (layer
+# crest) drift a quarter of the tile per frame and come back round (24 = 4 x 6), so the loop has
+# no seam; the glints (layer glint) catch the light in a different place in each frame.
+new tile water 24x24 palette=mossy-ruins wrap=on bg=none
+palette add water0 hex=#1d3446 key=m
+palette add water1 hex=#284b5e key=n
+palette add water2 hex=#3a6578 key=o
+palette add water3 hex=#5f93a2 key=p
+palette add foam hex=#a9d0cc key=q
+ramp water = water0 water1 water2 water3 foam
+palette save as=ruins-water
+
+# --- the body: short dark troughs, one or two in every row (so no row is lighter than the rest)
+rect 0,0 24x24 c=water1 fill
+px 12,0 13,0 14,0 19,1 20,1 21,1 10,2 11,2 12,2 20,3 21,3 22,3 c=water0
+px 16,4 17,4 18,4 6,5 7,5 8,5 0,6 1,6 23,6 4,7 5,7 6,7 c=water0
+px 14,8 15,8 16,8 21,9 22,9 23,9 0,10 22,10 23,10 9,11 10,11 11,11 c=water0
+px 13,12 14,12 15,12 1,13 2,13 3,13 18,14 19,14 20,14 8,15 9,15 10,15 c=water0
+px 5,16 6,16 7,16 15,17 16,17 17,17 7,18 8,18 9,18 2,19 3,19 4,19 c=water0
+px 17,20 18,20 19,20 3,21 4,21 5,21 0,22 1,22 2,22 11,23 12,23 13,23 c=water0
+
+# --- crests: low arcs, a water3 top over two water2 ends, one every other row, off any grid
+layer add crest
+layer crest
+px 1,1 22,1 10,3 13,3 8,5 11,5 14,7 17,7 4,9 7,9 0,11 3,11 c=water2
+px 18,13 21,13 2,15 5,15 20,17 23,17 12,19 15,19 6,21 9,21 16,23 19,23 c=water2
+px 0,0 23,0 11,2 12,2 9,4 10,4 15,6 16,6 5,8 6,8 1,10 2,10 c=water3
+px 19,12 20,12 3,14 4,14 21,16 22,16 13,18 14,18 7,20 8,20 17,22 18,22 c=water3
+
+# --- four frames: the body linked, the crests drifting east a quarter tile at a time
+frame add copy=1
+frame add copy=1
+frame add copy=1
+cel link 1-4 layer=main
+frame 2
+shift 6,0 wrap
+frame 3
+shift 12,0 wrap
+frame 4
+shift 18,0 wrap
+
+# --- glints: a fleck of foam on two crests, different ones each frame
+layer add glint
+layer glint
+frame 1
+px 12,2 21,16 c=foam
+frame 2
+px 2,12 17,2 c=foam
+frame 3
+px 6,22 7,12 c=foam
+frame 4
+px 0,8 11,22 c=foam
+frame set all ticks=15
+frame 1
+layer main

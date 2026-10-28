@@ -1,0 +1,179 @@
+# Mossy ruins: a 24x24 walking figure in four directions, two frames each (plan §10 G6).
+# A wanderer with a red tunic, a satchel on a strap and brown hair, lit from the top left.
+# Frames 1-2 face south, 3-4 north, 5-6 east; west is a live mirror of east (frames 7-8).
+# The feet rest on row 22 (the ground line); the pivot is the pixel between them.
+new sprite walker 24x24 palette=mossy-ruins
+palette add skin0 hex=#8e5b3e key=s
+palette add skin1 hex=#c48a5c key=t
+palette add skin2 hex=#e6b98c key=u
+palette add cloth0 hex=#4a2420 key=n
+palette add cloth1 hex=#7e3a2a key=o
+palette add cloth2 hex=#b05a36 key=p
+ramp skin = skin0 skin1 skin2
+ramp cloth = cloth0 cloth1 cloth2
+palette save as=ruins-folk
+frame add empty
+frame add empty
+frame add empty
+frame add empty
+frame add empty
+view S frames=1-2
+view N frames=3-4
+view E frames=5-6
+pivot 11,22
+ground 22
+
+# S1
+frame 1
+paint 5,3 <<
+  ....kkkkkk....
+  ...khhhhggk...
+  ..kgggggggfk..
+  ..kgggggggfk..
+  ..kgguuttsgk..
+  ..kgukutksgk..
+  ..kgukutksgk..
+  ..kguuttssgk..
+  ..kkkttttkkk..
+  .kphhoooooonk.
+  .kpoohhoooonk.
+  .kpoooohhoonk.
+  .kpoffffffssk.
+  .kttooooookk..
+  ..kknnnnnnnk..
+  ..k32kkkk32k..
+  ..k32k..k32k..
+  ..k32k..kffk..
+  ..kffk..kkkk..
+  ..kkkk........
+>>
+
+# S2
+frame 2
+paint 5,3 <<
+  ....kkkkkk....
+  ...khhhhggk...
+  ..kgggggggfk..
+  ..kgggggggfk..
+  ..kgguuttsgk..
+  ..kgukutksgk..
+  ..kgukutksgk..
+  ..kguuttssgk..
+  ..kkkttttkkk..
+  .kphhoooooonk.
+  .kpoohhoooonk.
+  .kpoooohhoonk.
+  .kttffffffnok.
+  ..kkoooooossk.
+  ..knnnnnnnkk..
+  ..k32kkkk32k..
+  ..k32k..k32k..
+  ..kggk..k32k..
+  ..kkkk..kggk..
+  ........kkkk..
+>>
+
+# N1
+frame 3
+paint 5,3 <<
+  ....kkkkkk....
+  ...khhhhggk...
+  ..kgggggggfk..
+  ..khggggggfk..
+  ..khgggggffk..
+  ..khggggggfk..
+  ..kgggggggfk..
+  ..kgggggfffk..
+  ..kkkgggfkkk..
+  .kpoooooooonk.
+  .kpokkkkkkonk.
+  .kpkhhhhggknk.
+  .kttggggggnok.
+  ..kkkkkkkkssk.
+  ..knnnnnnnkk..
+  ..k32kkkk32k..
+  ..k32k..k32k..
+  ..kggk..k32k..
+  ..kkkk..kggk..
+  ........kkkk..
+>>
+
+# N2
+frame 4
+paint 5,3 <<
+  ....kkkkkk....
+  ...khhhhggk...
+  ..kgggggggfk..
+  ..khggggggfk..
+  ..khgggggffk..
+  ..khggggggfk..
+  ..kgggggggfk..
+  ..kgggggfffk..
+  ..kkkgggfkkk..
+  .kpoooooooonk.
+  .kpokkkkkkonk.
+  .kpkhhhhggknk.
+  .kpoggggggssk.
+  .kttkkkkkkkk..
+  ..kknnnnnnnk..
+  ..k32kkkk32k..
+  ..k32k..k32k..
+  ..k32k..kffk..
+  ..kffk..kkkk..
+  ..kkkk........
+>>
+
+# E1
+frame 5
+paint 5,3 <<
+  ....kkkkk.....
+  ...khhhggk....
+  ..kgggggggk...
+  ..khgggggguk..
+  ..kgggggutuk..
+  ..kfggguutkk..
+  ..kfgguttktk..
+  ...kfguttssk..
+  ...kkkttttk...
+  ...kkpooonk...
+  ..kgkpononk...
+  ..kgkponnnk...
+  ..kkkfffttk...
+  ....koooonk...
+  ....knnnnnk...
+  ....k32k32k...
+  ...k32kk32k...
+  ..k32k..k32k..
+  ..kffk..kffk..
+  ..kkkk..kkkk..
+>>
+
+# E2
+frame 6
+paint 5,3 <<
+  ....kkkkk.....
+  ...khhhggk....
+  ..kgggggggk...
+  ..khgggggguk..
+  ..kgggggutuk..
+  ..kfggguutkk..
+  ..kfgguttktk..
+  ...kfguttssk..
+  ...kkkttttk...
+  ...kkpooonk...
+  ..kgkpnoonk...
+  ..kgknnoonk...
+  ..kkttffffk...
+  ....koooonk...
+  ....knnnnnk...
+  ....k33222k...
+  ....k33222k...
+  ....k33222k...
+  ....kfffffk...
+  ....kkkkkkk...
+>>
+
+# West is east, flipped left to right, kept up to date.
+view W mirror=E
+frame set all ticks=12
+frame 1

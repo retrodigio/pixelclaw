@@ -104,6 +104,8 @@ describe('views and live mirror links', () => {
     expect(flatten(d, 5)[2 * 6 + 3]).toBe(5);
     expect(flatten(d, 6)[2 * 6 + 3]).toBe(5);
     expect(d.ticks.slice(5)).toEqual([6, 6, 6]);
+    // A range over a mirror's frames sets the others; the mirror follows.
+    expect(run(s, 'frame set all ticks=4').doc!.ticks).toEqual([4, 4, 4, 4, 4, 4, 4, 4]);
     expect(serializeDoc(replay(s.entries, palettes).doc!)).toEqual(serializeDoc(d));
   });
   it('refuses drawing on a mirror, and frees it with mirror=off', () => {

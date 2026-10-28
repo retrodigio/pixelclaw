@@ -1,0 +1,36 @@
+{"pclaw":"tape","lang":2}
+{"seq":1,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"new sprite walker 24x24 palette=mossy-ruins wrap=off cell=24x24 bg=none <<\n  k ink #17181d\n  0 stone0 #272a30\n  1 stone1 #3b4044\n  2 stone2 #535a5b\n  3 stone3 #6c7570\n  4 stone4 #8b9489\n  5 stone5 #afb6a5\n  a moss0 #1c2e21\n  b moss1 #2c4729\n  c moss2 #486a32\n  d moss3 #6c8c3a\n  e lichen #a2ab52\n  f soil0 #2a211c\n  g soil1 #44352a\n  h soil2 #65503a\n  w pool #34566a\n  ramp stone stone0 stone1 stone2 stone3 stone4 stone5\n  ramp moss moss0 moss1 moss2 moss3 lichen\n  ramp soil soil0 soil1 soil2\n>>"}
+{"seq":2,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"palette add skin0 hex=#8e5b3e key=s"}
+{"seq":3,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"palette add skin1 hex=#c48a5c key=t"}
+{"seq":4,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"palette add skin2 hex=#e6b98c key=u"}
+{"seq":5,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"palette add cloth0 hex=#4a2420 key=n"}
+{"seq":6,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"palette add cloth1 hex=#7e3a2a key=o"}
+{"seq":7,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"palette add cloth2 hex=#b05a36 key=p"}
+{"seq":8,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"ramp skin = skin0 skin1 skin2"}
+{"seq":9,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"ramp cloth = cloth0 cloth1 cloth2"}
+{"seq":10,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"palette save as=ruins-folk"}
+{"seq":11,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"frame add 2 empty"}
+{"seq":12,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"frame add 3 empty"}
+{"seq":13,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"frame add 4 empty"}
+{"seq":14,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"frame add 5 empty"}
+{"seq":15,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"frame add 6 empty"}
+{"seq":16,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"view S frames=1-2"}
+{"seq":17,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"view N frames=3-4"}
+{"seq":18,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"view E frames=5-6"}
+{"seq":19,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"pivot 11,22"}
+{"seq":20,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"ground 22"}
+{"seq":21,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"frame 1"}
+{"seq":22,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"paint 5,3 <<\n  ....kkkkkk....\n  ...khhhhggk...\n  ..kgggggggfk..\n  ..kgggggggfk..\n  ..kgguuttsgk..\n  ..kgukutksgk..\n  ..kgukutksgk..\n  ..kguuttssgk..\n  ..kkkttttkkk..\n  .kphhoooooonk.\n  .kpoohhoooonk.\n  .kpoooohhoonk.\n  .kpoffffffssk.\n  .kttooooookk..\n  ..kknnnnnnnk..\n  ..k32kkkk32k..\n  ..k32k..k32k..\n  ..k32k..kffk..\n  ..kffk..kkkk..\n  ..kkkk........\n>>"}
+{"seq":23,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"frame 2"}
+{"seq":24,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"paint 5,3 <<\n  ....kkkkkk....\n  ...khhhhggk...\n  ..kgggggggfk..\n  ..kgggggggfk..\n  ..kgguuttsgk..\n  ..kgukutksgk..\n  ..kgukutksgk..\n  ..kguuttssgk..\n  ..kkkttttkkk..\n  .kphhoooooonk.\n  .kpoohhoooonk.\n  .kpoooohhoonk.\n  .kttffffffnok.\n  ..kkoooooossk.\n  ..knnnnnnnkk..\n  ..k32kkkk32k..\n  ..k32k..k32k..\n  ..kggk..k32k..\n  ..kkkk..kggk..\n  ........kkkk..\n>>"}
+{"seq":25,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"frame 3"}
+{"seq":26,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"paint 5,3 <<\n  ....kkkkkk....\n  ...khhhhggk...\n  ..kgggggggfk..\n  ..khggggggfk..\n  ..khgggggffk..\n  ..khggggggfk..\n  ..kgggggggfk..\n  ..kgggggfffk..\n  ..kkkgggfkkk..\n  .kpoooooooonk.\n  .kpokkkkkkonk.\n  .kpkhhhhggknk.\n  .kttggggggnok.\n  ..kkkkkkkkssk.\n  ..knnnnnnnkk..\n  ..k32kkkk32k..\n  ..k32k..k32k..\n  ..kggk..k32k..\n  ..kkkk..kggk..\n  ........kkkk..\n>>"}
+{"seq":27,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"frame 4"}
+{"seq":28,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"paint 5,3 <<\n  ....kkkkkk....\n  ...khhhhggk...\n  ..kgggggggfk..\n  ..khggggggfk..\n  ..khgggggffk..\n  ..khggggggfk..\n  ..kgggggggfk..\n  ..kgggggfffk..\n  ..kkkgggfkkk..\n  .kpoooooooonk.\n  .kpokkkkkkonk.\n  .kpkhhhhggknk.\n  .kpoggggggssk.\n  .kttkkkkkkkk..\n  ..kknnnnnnnk..\n  ..k32kkkk32k..\n  ..k32k..k32k..\n  ..k32k..kffk..\n  ..kffk..kkkk..\n  ..kkkk........\n>>"}
+{"seq":29,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"frame 5"}
+{"seq":30,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"paint 5,3 <<\n  ....kkkkk.....\n  ...khhhggk....\n  ..kgggggggk...\n  ..khgggggguk..\n  ..kgggggutuk..\n  ..kfggguutkk..\n  ..kfgguttktk..\n  ...kfguttssk..\n  ...kkkttttk...\n  ...kkpooonk...\n  ..kgkpononk...\n  ..kgkponnnk...\n  ..kkkfffttk...\n  ....koooonk...\n  ....knnnnnk...\n  ....k32k32k...\n  ...k32kk32k...\n  ..k32k..k32k..\n  ..kffk..kffk..\n  ..kkkk..kkkk..\n>>"}
+{"seq":31,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"frame 6"}
+{"seq":32,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"paint 5,3 <<\n  ....kkkkk.....\n  ...khhhggk....\n  ..kgggggggk...\n  ..khgggggguk..\n  ..kgggggutuk..\n  ..kfggguutkk..\n  ..kfgguttktk..\n  ...kfguttssk..\n  ...kkkttttk...\n  ...kkpooonk...\n  ..kgkpnoonk...\n  ..kgknnoonk...\n  ..kkttffffk...\n  ....koooonk...\n  ....knnnnnk...\n  ....k33222k...\n  ....k33222k...\n  ....k33222k...\n  ....kfffffk...\n  ....kkkkkkk...\n>>"}
+{"seq":33,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"view W mirror=E"}
+{"seq":34,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"frame set 1-8 ticks=12"}
+{"seq":35,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"frame 1"}

@@ -1,0 +1,45 @@
+{"pclaw":"tape","lang":2}
+{"seq":1,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"new tile water 24x24 palette=mossy-ruins wrap=on cell=24x24 bg=none <<\n  k ink #17181d\n  0 stone0 #272a30\n  1 stone1 #3b4044\n  2 stone2 #535a5b\n  3 stone3 #6c7570\n  4 stone4 #8b9489\n  5 stone5 #afb6a5\n  a moss0 #1c2e21\n  b moss1 #2c4729\n  c moss2 #486a32\n  d moss3 #6c8c3a\n  e lichen #a2ab52\n  f soil0 #2a211c\n  g soil1 #44352a\n  h soil2 #65503a\n  w pool #34566a\n  ramp stone stone0 stone1 stone2 stone3 stone4 stone5\n  ramp moss moss0 moss1 moss2 moss3 lichen\n  ramp soil soil0 soil1 soil2\n>>"}
+{"seq":2,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"palette add water0 hex=#1d3446 key=m"}
+{"seq":3,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"palette add water1 hex=#284b5e key=n"}
+{"seq":4,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"palette add water2 hex=#3a6578 key=o"}
+{"seq":5,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"palette add water3 hex=#5f93a2 key=p"}
+{"seq":6,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"palette add foam hex=#a9d0cc key=q"}
+{"seq":7,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"ramp water = water0 water1 water2 water3 foam"}
+{"seq":8,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"palette save as=ruins-water"}
+{"seq":9,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"rect 0,0 24x24 c=water1 fill"}
+{"seq":10,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"px 12,0 13,0 14,0 19,1 20,1 21,1 10,2 11,2 12,2 20,3 21,3 22,3 c=water0"}
+{"seq":11,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"px 16,4 17,4 18,4 6,5 7,5 8,5 0,6 1,6 23,6 4,7 5,7 6,7 c=water0"}
+{"seq":12,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"px 14,8 15,8 16,8 21,9 22,9 23,9 0,10 22,10 23,10 9,11 10,11 11,11 c=water0"}
+{"seq":13,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"px 13,12 14,12 15,12 1,13 2,13 3,13 18,14 19,14 20,14 8,15 9,15 10,15 c=water0"}
+{"seq":14,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"px 5,16 6,16 7,16 15,17 16,17 17,17 7,18 8,18 9,18 2,19 3,19 4,19 c=water0"}
+{"seq":15,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"px 17,20 18,20 19,20 3,21 4,21 5,21 0,22 1,22 2,22 11,23 12,23 13,23 c=water0"}
+{"seq":16,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"layer add crest above=main"}
+{"seq":17,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"layer crest"}
+{"seq":18,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"px 1,1 22,1 10,3 13,3 8,5 11,5 14,7 17,7 4,9 7,9 0,11 3,11 c=water2"}
+{"seq":19,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"px 18,13 21,13 2,15 5,15 20,17 23,17 12,19 15,19 6,21 9,21 16,23 19,23 c=water2"}
+{"seq":20,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"px 0,0 23,0 11,2 12,2 9,4 10,4 15,6 16,6 5,8 6,8 1,10 2,10 c=water3"}
+{"seq":21,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"px 19,12 20,12 3,14 4,14 21,16 22,16 13,18 14,18 7,20 8,20 17,22 18,22 c=water3"}
+{"seq":22,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"frame add 2 copy=1"}
+{"seq":23,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"frame add 3 copy=1"}
+{"seq":24,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"frame add 4 copy=1"}
+{"seq":25,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"cel link 1-4 layer=main"}
+{"seq":26,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"frame 2"}
+{"seq":27,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"shift 6,0 wrap"}
+{"seq":28,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"frame 3"}
+{"seq":29,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"shift 12,0 wrap"}
+{"seq":30,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"frame 4"}
+{"seq":31,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"shift 18,0 wrap"}
+{"seq":32,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"layer add glint above=crest"}
+{"seq":33,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"layer glint"}
+{"seq":34,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"frame 1"}
+{"seq":35,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"px 12,2 21,16 c=foam"}
+{"seq":36,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"frame 2"}
+{"seq":37,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"px 2,12 17,2 c=foam"}
+{"seq":38,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"frame 3"}
+{"seq":39,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"px 6,22 7,12 c=foam"}
+{"seq":40,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"frame 4"}
+{"seq":41,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"px 0,8 11,22 c=foam"}
+{"seq":42,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"frame set 1-4 ticks=15"}
+{"seq":43,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"frame 1"}
+{"seq":44,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"layer main"}
