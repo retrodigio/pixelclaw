@@ -72,6 +72,12 @@ export class Store {
   marked = new Set<CheckId>();
   /** The check whose details are open under the toolbar. */
   openCheck: CheckId | null = null;
+  /** The tab shown: the editor, or the dashboard (the plan, plan §7.3). Only for looking. */
+  tab: 'editor' | 'dashboard' = new URLSearchParams(location.search).get('tab') === 'dashboard' ? 'dashboard' : 'editor';
+  /** Bumped when the plan may have changed (a batch, an export, a new manifest): the dashboard reloads it. */
+  planVersion = 0;
+  /** The token the page was opened with (the dashboard's requests carry it). */
+  token = '';
   private styleVersion = 0;
   private checkCache: { key: string; asset: string; at: number; results: CheckResult[] } | null = null;
   /** Assets in the order their batches arrived and have not played yet. */
@@ -142,7 +148,16 @@ export class Store {
 
   // --- connection
 
+  setTab(t: 'editor' | 'dashboard'): void {
+    this.tab = t;
+    const u = new URL(location.href);
+    if (t === 'dashboard') u.searchParams.set('tab', 'dashboard'); else u.searchParams.delete('tab');
+    history.replaceState(null, '', u);
+    this.changed();
+  }
+
   connect(token: string): void {
+    this.token = token;
     const url = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws?token=${encodeURIComponent(token)}`;
     const ws = new WebSocket(url);
     this.ws = ws;
@@ -163,7 +178,7 @@ export class Store {
   }
 
   receive(m: ServerMessage): void {
-    if (m.type === 'hello') this.load(m.snapshot);
+    if (m.type === 'hello') { this.load(m.snapshot); this.planVersion++; }
     else if (m.type === 'palettes') {
       this.palettes = new Map(m.palettes.map((p) => [p.name, p]));
       this.defaultPalette = m.defaultPalette;
@@ -177,7 +192,9 @@ export class Store {
       const done = this.waiting.get(m.id);
       this.waiting.delete(m.id);
       done?.(m.ok ? { ok: true, asset: m.asset, group: m.group, seq: m.seq } : { ok: false, errors: m.errors });
-    } else if (m.type === 'batch') {
+    } else if (m.type === 'plan') this.planVersion++;
+    else if (m.type === 'batch') {
+      this.planVersion++;
       let a = this.assets.get(m.asset);
       if (!a || m.reset) {
         a = this.model(m.asset, []);

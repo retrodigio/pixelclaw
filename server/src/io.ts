@@ -13,6 +13,7 @@ import {
   type AssetDoc, type Doc, type Palette, type ProfileJson, type Rgba, type SchemeJson,
 } from '@pixelclaw/core';
 import { ProjectError, sha256, type Project } from './project.ts';
+import type { ExportRecord } from './protocol.ts';
 
 /** The project's own schemes (schemes/*.json). */
 export function projectSchemes(dir: string): Map<string, SchemeJson> {
@@ -90,14 +91,7 @@ export const EXPORTED_FILE = 'exported.json';
 
 // --- exported.json: the last export of each asset (plan §7.3 "exported")
 
-export interface ExportRecord {
-  profile: string;
-  /** The folder, relative to the project when it is inside it. */
-  dir: string;
-  at: string;
-  /** The art's hash when it was exported: a later change makes the export stale. */
-  art: string;
-}
+export type { ExportRecord } from './protocol.ts';
 
 export function readExported(p: Project): Record<string, ExportRecord> {
   try {

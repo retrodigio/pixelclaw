@@ -10,7 +10,9 @@ import {
   BUILTIN_SCHEMES, FLAT_COLOURS, STATUSES, artHash, coverageTemplate, encodePng, loadScheme, mockupScreen, parseSize, rgbOf, setName, statusOf, validateManifest,
   cameraOf, type Doc, type Manifest, type ManifestAsset, type ManifestError, type ManifestKnown, type Scheme, type Status, type StyleDefaults,
 } from '@pixelclaw/core';
-import { projectProfiles, projectSchemes, readExported, type ExportRecord } from './io.ts';
+import { projectProfiles, projectSchemes, readExported } from './io.ts';
+import type { PlanAsset, PlanReport } from './protocol.ts';
+export type { PlanAsset, PlanReport } from './protocol.ts';
 import { ProjectError, type Project } from './project.ts';
 import type { Writer } from './writer.ts';
 
@@ -85,36 +87,6 @@ export function styleDefaults(p: Project, m: Manifest | null): StyleDefaults {
 }
 
 // --- the report
-
-export interface PlanAsset {
-  name: string;
-  kind: string;
-  size: string;
-  set: string;
-  description: string;
-  status: Status;
-  next: string;
-  flags: string[];
-  /** In the manifest (false: an asset the manifest does not plan). */
-  planned: boolean;
-  exists: boolean;
-  /** Failing checks (ids), and every check's line. */
-  failing: string[];
-  checks: { id: string; status: string; shown: string }[];
-  notes: number;
-  /** The tape's last command. */
-  seq: number | null;
-  exported: ExportRecord | null;
-}
-
-export interface PlanReport {
-  project: string;
-  theme: string | null;
-  manifest: { exists: boolean; errors: ManifestError[] };
-  sets: { name: string; description: string; assets: string[] }[];
-  assets: PlanAsset[];
-  counts: Record<Status, number>;
-}
 
 /** Every planned asset's status (and the assets the manifest does not plan), optionally one set's. */
 export function planReport(w: Writer, o: { set?: string } = {}): PlanReport {

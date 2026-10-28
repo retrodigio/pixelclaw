@@ -303,3 +303,49 @@ header .crumbs { white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 .map-editor .map-tools { flex-wrap: wrap; gap: 6px; }
 .map-editor .map-body { flex: 1; overflow: auto; padding: 8px; }
 .map-editor canvas { image-rendering: pixelated; display: block; }
+
+/* The dashboard (plan §7.3): the plan by set, each asset's status and checks. */
+.tabs button { padding: 3px 12px; }
+.app.dash { grid-template-areas: 'head head head' 'dash dash dash'; }
+.dashboard { grid-area: dash; overflow: auto; padding: 0 0 24px; }
+.dashboard .pad { padding: 16px; }
+.dash-top { position: sticky; top: 0; z-index: 2; background: var(--bg); padding: 10px 16px 8px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
+.dash-theme { max-width: 120ch; }
+.dash-progress { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--panel2); }
+.seg-bar { display: block; min-width: 4px; }
+.dash-filters { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.dash-set { padding: 4px 12px 0; }
+.dash-set .panel-title { padding-left: 4px; }
+.dash-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+.dash-card { display: flex; gap: 10px; padding: 9px; background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--st, var(--line)); border-radius: 6px; min-width: 0; }
+.dash-card.unplanned { border-style: dashed; }
+.dash-card .thumb { flex: none; width: 108px; height: 108px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 4px;
+  background: repeating-conic-gradient(#2a2d33 0 25%, #24272c 0 50%) 0 0 / 12px 12px; }
+.dash-card .thumb img { image-rendering: pixelated; }
+.dash-card .thumb:disabled { opacity: 1; cursor: default; }
+.planned-box { width: 64px; height: 64px; border: 1px dashed #4a505a; border-radius: 3px; display: flex; align-items: center; justify-content: center; color: var(--dim); font: 11px var(--mono); }
+.card-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.card-head { display: flex; align-items: center; gap: 8px; }
+.card-head b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mono { font-family: var(--mono); }
+.desc { color: #b9bec6; font-size: 12px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.next { font-size: 12px; color: var(--accent); }
+.next.dim { color: var(--dim); }
+.flag { font-size: 11px; color: #e7c55a; }
+.card-checks { display: flex; flex-wrap: wrap; gap: 3px; }
+.chk { font: 11px var(--mono); padding: 0 6px; border-radius: 8px; border: 1px solid var(--line); }
+.chk.pass { color: #8fd18b; }
+.chk.fail { color: #ff9a9a; border-color: #7a3036; background: #3a1d20; }
+.card-actions { display: flex; gap: 6px; margin-top: 4px; }
+.card-actions.ask input { flex: 1; min-width: 0; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 3px 6px; }
+button.approve { border-color: #3f7a4a; color: #8fd18b; }
+.badge { font-size: 11px; padding: 1px 8px; border-radius: 9px; border: 1px solid var(--st, var(--line)); color: var(--st, var(--dim)); background: transparent; white-space: nowrap; }
+button.badge { cursor: pointer; }
+button.badge.on { background: var(--st); color: #111; }
+.st-planned { --st: #6a707c; }
+.st-drafted { --st: #e8955a; }
+.st-checked { --st: #e2cf5c; }
+.st-reviewed { --st: #6cc4ff; }
+.st-approved { --st: #b9a3ff; }
+.st-exported { --st: #8fd18b; }
+.seg-bar.st-planned, .seg-bar.st-drafted, .seg-bar.st-checked, .seg-bar.st-reviewed, .seg-bar.st-approved, .seg-bar.st-exported { background: var(--st); }

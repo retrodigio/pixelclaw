@@ -1,7 +1,7 @@
 // Messages between the server and the watch view (WebSocket, JSON). Types only, so the UI can
 // import them without pulling in any Node code.
 
-import type { Diag, Palette, StyleJson, TapeEntry, Theme } from '@pixelclaw/core';
+import type { Diag, ManifestError, Palette, Status, StyleJson, TapeEntry, Theme } from '@pixelclaw/core';
 
 export interface AssetTape {
   name: string;
@@ -61,3 +61,45 @@ export type ClientMessage =
   | { type: 'ping' }
   /** Commands from a person: applied by the single writer as one undo group, written `by`. */
   | { type: 'run'; id: number; asset: string; commands: string; by: string };
+
+// The plan (plan §7.3), as the dashboard and the MCP `plan` tool show it.
+
+export interface ExportRecord {
+  profile: string;
+  /** The folder, relative to the project when it is inside it. */
+  dir: string;
+  at: string;
+  /** The art's hash when it was exported: a later change makes the export stale. */
+  art: string;
+}
+
+export interface PlanAsset {
+  name: string;
+  kind: string;
+  size: string;
+  set: string;
+  description: string;
+  status: Status;
+  next: string;
+  flags: string[];
+  /** In the manifest (false: an asset the manifest does not plan). */
+  planned: boolean;
+  exists: boolean;
+  /** Failing checks (ids), and every check's line. */
+  failing: string[];
+  checks: { id: string; status: string; shown: string }[];
+  notes: number;
+  /** The tape's last command. */
+  seq: number | null;
+  exported: ExportRecord | null;
+}
+
+export interface PlanReport {
+  project: string;
+  theme: string | null;
+  manifest: { exists: boolean; errors: ManifestError[] };
+  sets: { name: string; description: string; assets: string[] }[];
+  assets: PlanAsset[];
+  counts: Record<Status, number>;
+}
+

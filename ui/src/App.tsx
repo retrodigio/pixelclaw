@@ -11,6 +11,7 @@ import { NotesPanel, PalettePanel, StampsPanel, ToolsPanel } from './Panels.tsx'
 import { TimelinePanel } from './Timeline.tsx';
 import { FamilyMap, FamilyVariants, type FamilyMode } from './Family.tsx';
 import { MapEditor } from './MapEditor.tsx';
+import { Dashboard } from './Dashboard.tsx';
 import { SPEEDS, type Store } from './store.ts';
 import { TapePanel, authorClass, time } from './TapePanel.tsx';
 
@@ -146,11 +147,35 @@ export function App({ store }: { store: Store }) {
   };
 
   const draft = ed.noteDraft;
+  const dash = store.tab === 'dashboard';
+  const tabs = (
+    <span className="seg tabs" data-testid="tabs">
+      <button className={dash ? '' : 'on'} onClick={() => store.setTab('editor')} data-tab="editor">Editor</button>
+      <button className={dash ? 'on' : ''} onClick={() => store.setTab('dashboard')} data-tab="dashboard" title="The plan: every planned asset by set, with its status">Dashboard</button>
+    </span>
+  );
+
+  if (dash) {
+    return (
+      <div className="app dash">
+        <header>
+          <span className="logo">PixelClaw</span>
+          {tabs}
+          <span className="crumbs">{store.project?.name ?? '…'}</span>
+          <span className="spacer" />
+          <span className="chip me" title="The name your approvals are written with on the tape">you: <b>{store.me}</b></span>
+          <span className={`chip conn-${store.status}`} data-testid="status">{store.status === 'open' ? '● connected' : store.status === 'connecting' ? 'connecting…' : 'reconnecting…'}</span>
+        </header>
+        <Dashboard store={store} />
+      </div>
+    );
+  }
 
   return (
     <div className="app">
       <header>
         <span className="logo">PixelClaw</span>
+        {tabs}
         <span className="crumbs">
           {store.project?.name ?? '…'}
           {a && <> <span className="sep">▸</span> {a.name}</>}
