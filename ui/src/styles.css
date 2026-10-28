@@ -297,3 +297,9 @@ header .crumbs { white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 .rowhead.fold { cursor: pointer; user-select: none; }
 .rowhead.fold:hover { color: var(--accent); }
 .timeline.folded { flex: none; }
+
+/* The map editor (G8): tools above, the map scrolling below. */
+.map-editor { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.map-editor .map-tools { flex-wrap: wrap; gap: 6px; }
+.map-editor .map-body { flex: 1; overflow: auto; padding: 8px; }
+.map-editor canvas { image-rendering: pixelated; display: block; }

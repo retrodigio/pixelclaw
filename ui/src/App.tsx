@@ -10,6 +10,7 @@ import { CheckChips, CheckDetails, PreviewPanel } from './Checks.tsx';
 import { NotesPanel, PalettePanel, StampsPanel, ToolsPanel } from './Panels.tsx';
 import { TimelinePanel } from './Timeline.tsx';
 import { FamilyMap, FamilyVariants, type FamilyMode } from './Family.tsx';
+import { MapEditor } from './MapEditor.tsx';
 import { SPEEDS, type Store } from './store.ts';
 import { TapePanel, authorClass, time } from './TapePanel.tsx';
 
@@ -197,7 +198,7 @@ export function App({ store }: { store: Store }) {
           {store.assets.size === 0 && <li className="none">none yet</li>}
         </ul>
         <div className="panel-title">Tools</div>
-        <ToolsPanel ed={ed} disabled={!editable} />
+        {!doc?.map && <ToolsPanel ed={ed} disabled={!editable} />}
         {palette && (
           <PalettePanel palette={palette} ed={ed} editable={editable} locked={!!doc?.paletteLocked}
             theme={store.theme} themes={store.themes} onTheme={(t) => store.setTheme(t)} />
@@ -251,7 +252,7 @@ export function App({ store }: { store: Store }) {
           <button onClick={() => ed.redo()} disabled={!ed.canRedo()} title={`Redo your last undo (Ctrl/⌘+Shift+Z): redo by=${store.me}`} data-testid="redo">↷ <span className="xwide-only">Redo</span></button>
           {doc && seq !== null && <span className="dim" title={`The canvas shows the document after command #${seq}`}><span className="xwide-only">after </span>#{seq}</span>}
         </div>
-        {doc && editable && (!doc.family || famMode === 'sheet') && (
+        {doc && editable && !doc.map && (!doc.family || famMode === 'sheet') && (
           <div className="options" data-testid="options">
             {(ed.tool === 'rect' || ed.tool === 'ellipse') && (
               <label title="Filled shapes (F)"><input type="checkbox" checked={ed.filled} onChange={(e) => toggle(() => { ed.filled = e.target.checked; })} /> filled</label>
@@ -341,7 +342,8 @@ export function App({ store }: { store: Store }) {
         {a?.problem && <div className="banner error">This tape does not replay: {a.problem}</div>}
         {doc?.family && famMode === 'variants' && <FamilyVariants doc={doc} ed={ed} editable={editable} frame={frameShown} theme={store.themeObj()} />}
         {doc?.family && famMode === 'map' && <FamilyMap doc={doc} store={store} frame={frameShown} />}
-        {(!doc?.family || famMode === 'sheet') && <CanvasView
+        {doc?.map && <MapEditor doc={doc} store={store} ed={ed} editable={editable} />}
+        {!doc?.map && (!doc?.family || famMode === 'sheet') && <CanvasView
           doc={doc}
           frame={frameShown}
           onion={onion}
@@ -366,7 +368,7 @@ export function App({ store }: { store: Store }) {
           onZoom={setZoom}
           onEffectiveZoom={setEffZoom}
         />}
-        {doc && <TimelinePanel doc={doc} ed={ed} editable={editable} frameShown={frameShown} />}
+        {doc && !doc.map && <TimelinePanel doc={doc} ed={ed} editable={editable} frameShown={frameShown} />}
       </main>
 
       <aside className="right">

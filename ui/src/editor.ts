@@ -455,7 +455,9 @@ export class Editor {
   private apply(text: string): Doc | null {
     const a = this.store.current;
     if (!a || !a.cursor.doc) return null;
-    const r = runBatch({ doc: a.cursor.doc, entries: a.cursor.done }, text, { by: this.store.me, palettes: this.store.paletteSource });
+    const r = runBatch({ doc: a.cursor.doc, entries: a.cursor.done }, text, {
+      by: this.store.me, palettes: this.store.paletteSource, assets: (n) => (n === a.name ? undefined : this.store.assets.get(n)?.cursor.doc ?? undefined),
+    });
     return r.ok ? r.state.doc : null;
   }
 
