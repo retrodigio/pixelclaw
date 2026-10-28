@@ -472,6 +472,15 @@ export class Writer {
       const dirs = [f, ...[...doc.views].sort((x, y) => VIEW_NAMES.indexOf(x.name as never) - VIEW_NAMES.indexOf(y.name as never)).flatMap((v) => (v === here ? [] : [v.from]))];
       o.game = { ground: ground?.doc ?? null, with: others.map((x) => x.doc), scale: drawScaleOf(style), frames: [...new Set(dirs)] };
     }
+    if (mode === 'density') {
+      // The base and its copies, whichever of them this is.
+      const all = this.assetDocs();
+      const baseName = doc.densityOf?.of ?? asset;
+      const base = all.find((a) => a.name === baseName)?.doc;
+      if (!base) throw new ProjectError(`no asset '${baseName}' (the base of ${asset})`);
+      const d = style?.density ?? {};
+      o.density = { base, copies: all.filter((a) => a.doc.densityOf?.of === baseName).map((a) => a.doc), reducer: d.reducer, ink: d.ink, share: d.share };
+    }
     if (mode === 'diff' && doc.map) o.mapDoc = { doc, world: mapWorld(this.assetDocs()), screen: cameraOf(style), drawScale: drawScaleOf(style) };
     if (mode === 'map' && (doc.map || doc.kind === 'object' || doc.footprint)) {
       const all = this.assetDocs();

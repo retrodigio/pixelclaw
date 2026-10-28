@@ -6,7 +6,7 @@
 
 import { useLayoutEffect, useRef, useState } from 'react';
 import {
-  renderMap, drawScaleOf, groundOf, hasRoles, quote, renderGame, renderRecolour, renderTile3x3, setOf, type CheckId, type CheckResult, type Doc, type Pt,
+  renderMap, drawScaleOf, groundOf, hasRoles, quote, renderDensity, renderGame, renderRecolour, renderTile3x3, setOf, type CheckId, type CheckResult, type Doc, type Pt,
   type Rgba,
 } from '@pixelclaw/core';
 import type { Editor } from './editor.ts';
@@ -109,10 +109,14 @@ function RgbaCanvas({ img, testid }: { img: Rgba; testid: string }) {
   return <canvas ref={ref} data-testid={testid} style={{ width: img.width, height: img.height }} />;
 }
 
-type Tab = '3x3' | 'game' | 'themes' | 'map';
+type Tab = '3x3' | 'game' | 'themes' | 'map' | 'density';
 
 export function PreviewPanel({ doc, frame, store, marks }: { doc: Doc; frame: number; store: Store; marks: readonly Pt[] }) {
-  const tabs: Tab[] = doc.family || doc.overlay ? ['map', 'themes'] : doc.wrap ? ['3x3', 'themes'] : ['game', 'themes'];
+  const base: Tab[] = doc.family || doc.overlay ? ['map', 'themes'] : doc.wrap ? ['3x3', 'themes'] : ['game', 'themes'];
+  // An asset with higher-density copies (or a copy): its densities side by side and the reduction.
+  const all0 = store.assetDocs();
+  const densityBase = doc.densityOf?.of ?? (all0.some((a) => a.doc.densityOf?.of === (store.current?.name ?? doc.name)) ? store.current?.name ?? doc.name : null);
+  const tabs: Tab[] = densityBase ? [...base, 'density'] : base;
   const [want, setWant] = useState<Tab>('3x3');
   const tab = tabs.includes(want) ? want : tabs[0]!;
   const [open, setOpen] = useState(true);
@@ -128,6 +132,14 @@ export function PreviewPanel({ doc, frame, store, marks }: { doc: Doc; frame: nu
         img = renderMap(doc, { cols: 12, rows: 9, seed: 1, scale: 1, theme: store.themeObj(), ground: under?.doc ?? null });
         note = doc.family ? `a random island; the seam and more in the map view (toolbar)` : `over ${under!.name}`;
       } else note = 'no family or tile to show it over';
+    } else if (tab === 'density') {
+      const b = all0.find((a) => a.name === densityBase)?.doc;
+      if (b) {
+        const d = store.style?.density ?? {};
+        const v = renderDensity(b, all0.filter((a) => a.doc.densityOf?.of === densityBase).map((a) => a.doc), { frame, scale: 1, reducer: d.reducer, ink: d.ink, share: d.share });
+        img = v.img;
+        note = v.text.split('\n').filter((l) => / reduced |no higher/.test(l)).join(' ');
+      } else note = `no asset '${densityBase}'`;
     } else if (tab === '3x3') img = renderTile3x3(doc, frame, { theme: store.themeObj(), marks, scale: doc.width <= 32 ? 2 : 1 });
     else if (tab === 'game') {
       const all = store.assetDocs();

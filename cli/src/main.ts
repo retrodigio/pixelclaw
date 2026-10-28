@@ -1,4 +1,4 @@
-// pixelclaw: new | run | view | check | review | export | verify | upgrade. A thin layer over @pixelclaw/core and the project folder.
+// pixelclaw: new | run | view | check | review | export | import | verify | upgrade. A thin layer over @pixelclaw/core and the project folder.
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -9,7 +9,7 @@ import {
 import {
   AssetExistsError, NoAssetError, ProjectError, VIEW_MODES, Writer, assetDir, checkpointNames, createProject, formatChecks, isViewMode, listAssets,
   loadProject, lockHolder, paletteSource, parseRegion, prefixHash, previewPng, readAssetJson, readCheckpoints, readPaletteFile,
-  readTape, saveAsset, sha256, writeReview, SUMMARY_BUDGET, EXPORT_FORMATS, exportAsset, type ExportFormat, type Project, type ViewMode,
+  readTape, saveAsset, sha256, writeReview, SUMMARY_BUDGET, EXPORT_FORMATS, exportAsset, exportWithProfile, importSummary, planImport, type ExportFormat, type Project, type ViewMode,
 } from '@pixelclaw/server';
 
 export interface Io {
@@ -50,10 +50,18 @@ export const USAGE = `pixelclaw: a pixel art editor driven by commands
       tiles) with the flagged pixels circled.
   pixelclaw review <project> [<asset>...] [--name <set>] [--size CxR] [--seed N]
       Write a blind review bundle under <project>/reviews/<date>-<set>/ (rubric.md inside).
-  pixelclaw export <project> <asset> [--format tmx|split|png] [--out <dir>]
-      tmx: a map as a Tiled map with its tileset and object images; split: an oversized asset as
-      one-cell pieces plus a stamp; png: a map at 1x or an asset's first frame.
-      Default folder: <project>/exports/<format>/.
+  pixelclaw export <project> [<asset>...] [--profile <name|file.json>] [--out <dir>]
+      Write assets through an export profile (default png): built-in png, atlas, tiled, godot,
+      aseprite-json, aseprite, or the project's profiles/*.json (docs/profiles.md). Without assets,
+      all; a map brings what it draws. Default folder: <project>/exports/<profile>/.
+  pixelclaw export <project> <asset> --format split|png [--out <dir>]
+      split: an oversized asset as one-cell pieces plus a stamp; png: a map at 1x or a first frame.
+  pixelclaw import <project> <file.png|file.aseprite|folder> [--profile <name>] [--as <name>] [--kind <kind>]
+         [--palette <name> | --build] [--grid WxH [--cells]] [--by <author>] [--replace]
+      A PNG or .aseprite file becomes a new asset quantised to a palette (--build: one made from
+      the image); --grid slices a sheet into frames (--cells: one image with that cell grid). With
+      --profile, a folder an export wrote is read back by name and compared with the project;
+      images no asset exports become new assets.
   pixelclaw upgrade <project> [<asset>...]
       Rewrite language 1 tapes (G1-G4) in the current language: the palette goes into the 'new'
       line. Each is replayed before and after; it is written only if the pixels are the same.
@@ -263,13 +271,46 @@ function cmdView(io: Io, p: Parsed): number {
 function cmdExport(io: Io, p: Parsed): number {
   const [dir, name] = p.pos;
   if (!dir || !name) throw new UsageError('export: give a project folder and an asset name');
-  const format = (one(p, 'format') ?? 'png') as ExportFormat;
+  const format = one(p, 'format') as ExportFormat;
   if (!(EXPORT_FORMATS as readonly string[]).includes(format)) throw new UsageError(`--format must be one of ${EXPORT_FORMATS.join(', ')}`);
   const proj = loadProject(dir);
   const w = new Writer(proj);
   const files = exportAsset(w.doc(name), w.assetDocs(), format, one(p, 'out') ?? join(proj.dir, 'exports', format));
   io.out(`${format}: wrote ${files.length} files\n${files.map((f) => `  ${f}\n`).join('')}`);
   return 0;
+}
+
+function cmdExportProfile(io: Io, p: Parsed): number {
+  const [dir, ...names] = p.pos;
+  if (!dir) throw new UsageError('export: give a project folder');
+  const proj = loadProject(dir);
+  const w = new Writer(proj);
+  const profile = one(p, 'profile') ?? 'png';
+  const r = exportWithProfile(proj, w.assetDocs(), profile, { names: names.length ? names : undefined, dest: one(p, 'out') });
+  io.out(`${profile}: ${r.images} images, wrote ${r.files.length} files into ${r.dir}\n${r.notes.map((n) => `  note: ${n}\n`).join('')}`);
+  return 0;
+}
+
+function cmdImport(io: Io, p: Parsed): number {
+  const [dir, path] = p.pos;
+  if (!dir || !path) throw new UsageError('import: give a project folder and a file or folder');
+  const proj = loadProject(dir);
+  assertNoServer(proj);
+  const w = new Writer(proj, { now: io.now });
+  const grid = one(p, 'grid');
+  if (grid && !/^\d+x\d+$/.test(grid)) throw new UsageError('--grid is a size like 24x24');
+  const plan = planImport(proj, w.assetDocs(), {
+    path, profile: one(p, 'profile'), as: one(p, 'as'), kind: one(p, 'kind'), palette: one(p, 'palette'), build: p.flags.has('build'),
+    grid: grid ? (grid.split('x').map(Number) as [number, number]) : undefined, cells: p.flags.has('cells'),
+  });
+  const created: string[] = [];
+  for (const c of plan.create) {
+    const r = w.run({ asset: c.name, commands: c.tape, by: one(p, 'by') ?? 'claude', replace: p.flags.has('replace') });
+    if (!r.ok) throw new ProjectError(`${c.name}: ${r.errors.map((e) => `${e.line}:${e.col} ${e.message}`).join('; ')}`);
+    created.push(c.name);
+  }
+  io.out((importSummary(plan, created) || 'nothing to import') + '\n');
+  return plan.differ.length ? 1 : 0;
 }
 
 function cmdUpgrade(io: Io, p: Parsed): number {
@@ -389,8 +430,12 @@ export function main(argv: string[], io: Io = nodeIo): number {
         return cmdRun(io, parseArgs(rest, ['asset', 'by', 'e', 'view', 'scale', 'region', 'out', 'frame', 'marks', 'theme', 'themes', 'ground', 'with', 'size', 'seed', 'camera'], ['replace']));
       case 'view':
         return cmdView(io, parseArgs(rest, ['scale', 'region', 'out', 'frame', 'marks', 'theme', 'themes', 'ground', 'with', 'size', 'seed', 'camera'], []));
-      case 'export':
-        return cmdExport(io, parseArgs(rest, ['format', 'out'], []));
+      case 'export': {
+        const p = parseArgs(rest, ['format', 'out', 'profile'], []);
+        return one(p, 'format') ? cmdExport(io, p) : cmdExportProfile(io, p);
+      }
+      case 'import':
+        return cmdImport(io, parseArgs(rest, ['profile', 'as', 'kind', 'palette', 'grid', 'by'], ['build', 'cells', 'replace']));
       case 'check':
         return cmdCheck(io, parseArgs(rest, ['checks', 'frame', 'ground', 'ref'], ['marks']));
       case 'review':

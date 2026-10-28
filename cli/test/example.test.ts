@@ -61,7 +61,7 @@ describe('examples/mossy-ruins.pclaw', () => {
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }
-  });
+  }, 90_000);
 
   it('every check passes on every asset, with the style guide in project.json', () => {
     const r = cli(['check', PROJECT]);

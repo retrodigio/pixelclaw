@@ -4,7 +4,7 @@
 // variants; Tiled export; map gen.
 import { describe, expect, it } from 'vitest';
 import {
-  BUILTIN_SCHEMES, TRANSPARENT, composeMapDoc, flatten, layoutOf, mapChecks, mapDocText, mapToTmx, mapWorld, reassemble, replay, resolveVariant,
+  BUILTIN_PROFILES, BUILTIN_SCHEMES, TRANSPARENT, composeMapDoc, decodePng, exportProfile, flatten, layoutOf, mapChecks, mapDocText, mapWorld, reassemble, replay, resolveVariant,
   runBatch, runChecks, serializeDoc, deserializeDoc, splitAsset, variantMatch, type AssetState, type Doc,
 } from '../src/index.ts';
 import { EMPTY, palettes, run } from './helpers.ts';
@@ -203,28 +203,30 @@ describe('oversized assets (§4.10)', () => {
     expect(variantMatch(a, far).ok).toBe(false);
   });
 
-  it('Tiled export: a tile layer per ground layer, objects as tile objects with their footprint', () => {
+  it('Tiled export (the tiled profile): a tile layer per ground layer through the family\'s .tsx, objects as tile objects with their footprint', () => {
     const house = run(EMPTY, HOUSE).doc!, tree = run(EMPTY, TREE).doc!, land = run(EMPTY, FAMILY).doc!;
     const docs = { land, house, tree };
     const st = runMap(EMPTY, `new map m 6x5 tile=${T}\nlayer add ground terrain=land outside=on\nterrain ground rect 1,1 4x3\nlayer add props objects\nplace house 1,3 layer=props`, docs);
-    const x = mapToTmx(st.doc!, world(docs));
-    expect(x.tmx).toMatch(/<map version="1.10"[^>]* width="6" height="5" tilewidth="8" tileheight="8"/);
-    expect(x.tmx).toMatch(/<layer id="\d+" name="ground" width="6" height="5">/);
-    expect(x.tmx).toMatch(/<object id="1" name="house" gid="100001" x="8" y="32" width="16" height="16">/);
-    expect(x.tmx).toMatch(/name="footprint" value="2x1"/);
-    // Every gid of the ground layer points at a tile of the tileset; a cell's tile is the composed cell.
-    const csv = /name="ground"[^>]*>\n   <data encoding="csv">\n([\s\S]*?)\n<\/data>/.exec(x.tmx)![1]!.split(/,\s*/).map(Number);
+    const ex = exportProfile(BUILTIN_PROFILES.get('tiled')!, [land, house, tree, st.doc!], { world: world(docs) });
+    const tmx = new TextDecoder().decode(ex.files.get('m.tmx')!);
+    expect(tmx).toMatch(/<map version="1.10"[^>]* width="6" height="5" tilewidth="8" tileheight="8"/);
+    expect(tmx).toMatch(/<layer id="\d+" name="ground" width="6" height="5">/);
+    expect(tmx).toMatch(/<object id="1" name="house" gid="\d+" x="8" y="32" width="16" height="16">/);
+    expect(tmx).toMatch(/name="footprint" value="2x1"/);
+    // Every gid of the ground layer is the family's tile for the cell's variant: its pixels are the composed cell's.
+    const csv = /name="ground"[^>]*>\n   <data encoding="csv">\n([\s\S]*?)\n<\/data>/.exec(tmx)![1]!.split(/,\s*/).map(Number);
     expect(csv.length).toBe(30);
-    expect(Math.max(...csv)).toBe(x.tileset.count);
+    const cols = Number(/columns="(\d+)"/.exec(new TextDecoder().decode(ex.files.get('land.tsx')!))![1]);
+    const sheet = decodePng(ex.files.get('land.png')!);
     const c = composeMapDoc({ ...st.doc!, layers: st.doc!.layers.map((l) => ({ ...l, hidden: l.name !== 'ground' })) }, world(docs));
     for (let i = 0; i < 30; i++) {
       const g = csv[i]! - 1, cx = i % 6, cy = Math.floor(i / 6);
-      const tx = (g % x.tileset.columns) * T, ty = Math.floor(g / x.tileset.columns) * T;
+      const tx = (g % cols) * T, ty = Math.floor(g / cols) * T;
       for (let j = 0; j < T; j++) for (let k = 0; k < T; k++) {
-        const a = x.tileset.px[(ty + j) * x.tileset.width + tx + k]!, b = c.px[(cy * T + j) * c.w + cx * T + k]!;
-        expect(a === TRANSPARENT ? null : x.palette[a]!.hex).toBe(b === TRANSPARENT ? null : c.palette[b]!.hex);
+        const o = ((ty + j) * sheet.width + tx + k) * 4, b = c.px[(cy * T + j) * c.w + cx * T + k]!;
+        const hex = sheet.data[o + 3] ? '#' + [0, 1, 2].map((q) => sheet.data[o + q]!.toString(16).padStart(2, '0')).join('') : null;
+        expect(hex).toBe(b === TRANSPARENT ? null : c.palette[b]!.hex);
       }
     }
-    expect(x.objects.map((o) => o.name)).toEqual(['house']);
   });
 });

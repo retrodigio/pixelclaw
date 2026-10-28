@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync
 import { basename, join } from 'node:path';
 import {
   deserializeDoc, tapeLang, encodePng, entryToJson, importPalette, paletteToJson, parseTape, renderFlat, serializeDoc, tapeToJsonl,
-  type AssetState, type Doc, type Layer, type Note, type Palette, type PaletteSource, type StyleJson, type TapeEntry,
+  type AssetState, type Doc, type Layer, type Note, type Palette, type PaletteSource, type SchemeJson, type StyleJson, type TapeEntry,
 } from '@pixelclaw/core';
 
 export const PROJECT_FORMAT = 'pixelclaw-project';
@@ -104,7 +104,22 @@ export function loadProject(dir: string): Project {
 }
 
 export function paletteSource(p: Project): PaletteSource {
-  return { get: (n) => p.palettes.get(n), defaultName: p.json.defaultPalette ?? undefined };
+  return { get: (n) => p.palettes.get(n), defaultName: p.json.defaultPalette ?? undefined, scheme: (n) => projectScheme(p.dir, n) };
+}
+
+/** A project scheme (schemes/<name>.json, or any file there naming it), read when a `new family` line asks for it. */
+function projectScheme(dir: string, name: string): SchemeJson | undefined {
+  const d = join(dir, 'schemes');
+  if (!existsSync(d)) return undefined;
+  for (const f of readdirSync(d).filter((x) => x.endsWith('.json')).sort()) {
+    try {
+      const s = JSON.parse(readFileSync(join(d, f), 'utf8')) as SchemeJson;
+      if (s.name === name) return s;
+    } catch {
+      // a broken file: the family line reports the scheme as unknown
+    }
+  }
+  return undefined;
 }
 
 export function assetDir(p: Project, name: string): string {

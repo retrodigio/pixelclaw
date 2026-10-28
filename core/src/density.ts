@@ -7,6 +7,8 @@
 import { TRANSPARENT, flatten, type Doc } from './doc.ts';
 import { rgbOf, type Palette } from './palette.ts';
 import type { Pt } from './raster.ts';
+import { createRgba, type Rgba } from './png.ts';
+import { drawMarks, renderFlat } from './render.ts';
 
 export interface ReducerOptions {
   /** ink-vote: the entries that count as ink (default: entries named ink, outline or black). */
@@ -120,4 +122,47 @@ export function densityDiff(base: Doc, high: Doc, d: number, reducer = 'mode', o
     if (a !== b) pts.push([x, y]);
   }
   return { pts, share: opaque ? pts.length / opaque : 0, reduced };
+}
+
+export interface DensityView {
+  img: Rgba;
+  text: string;
+}
+
+const BG = [40, 42, 48];
+
+/**
+ * The density view (plan §2 (4)): every copy of an asset side by side at the same size on screen
+ * (the base at its draw scale times the highest level, each copy at a share of that), then the
+ * highest copy reduced to the base's size with the pixels where it differs from the authored base
+ * marked in magenta.
+ */
+export function renderDensity(base: Doc, copies: Doc[], o: { reducer?: string; frame?: number; scale?: number } & ReducerOptions = {}): DensityView {
+  const { reducer = 'ink-vote', frame = 0, scale = 2, ...ro } = o;
+  const levels = [{ d: 1, doc: base }, ...copies.filter((c) => c.densityOf).map((c) => ({ d: c.densityOf!.d, doc: c }))].sort((a, b) => a.d - b.d);
+  const top = levels[levels.length - 1]!;
+  const panels: { img: Rgba; s: number; label: string; marks?: Pt[] }[] = levels.map((l) => ({ img: renderFlat(l.doc, Math.min(frame, l.doc.frameCount - 1)), s: (top.d / l.d) * scale, label: `${l.d}x ${l.doc.name}` }));
+  const lines = levels.map((l) => `${l.d}x  ${l.doc.name}  ${l.doc.width}x${l.doc.height}${l.d === 1 ? ' (base)' : ''}`);
+  if (top.d > 1) {
+    const r = densityDiff(base, top.doc, top.d, reducer, ro, frame);
+    const red: Doc = { ...base, cels: [[r.reduced]], layers: [{ name: 'reduced', hidden: false, locked: false, reference: false }], frameCount: 1 };
+    panels.push({ img: renderFlat(red, 0), s: top.d * scale, label: `${top.d}x reduced`, marks: r.pts });
+    lines.push(`${top.d}x reduced by ${top.d} with ${reducer}: ${r.pts.length} pixels differ from ${base.name} (${(r.share * 100).toFixed(1)}%)${r.pts.length ? ` at ${r.pts.slice(0, 12).map(([x, y]) => `${x},${y}`).join(' ')}${r.pts.length > 12 ? ' …' : ''}` : ''}`);
+  } else lines.push('no higher-density copies (density of=<asset> d=<n> on a copy made with scale <n>)');
+  const gap = 8;
+  const W = panels.reduce((s, p) => s + p.img.width * p.s + gap, gap);
+  const H = Math.max(...panels.map((p) => p.img.height * p.s)) + 2 * gap;
+  const img = createRgba(W, H);
+  for (let i = 0; i < W * H; i++) img.data.set([BG[0]!, BG[1]!, BG[2]!, 255], i * 4);
+  let x0 = gap;
+  for (const p of panels) {
+    for (let y = 0; y < p.img.height * p.s; y++) for (let x = 0; x < p.img.width * p.s; x++) {
+      const k = (Math.floor(y / p.s) * p.img.width + Math.floor(x / p.s)) * 4;
+      if (!p.img.data[k + 3]) continue;
+      img.data.set(p.img.data.subarray(k, k + 4), ((gap + y) * W + x0 + x) * 4);
+    }
+    if (p.marks?.length) drawMarks(img, x0, gap, p.s, p.marks, p.img.width, p.img.height);
+    x0 += p.img.width * p.s + gap;
+  }
+  return { img, text: [...lines, `panels: ${panels.map((p) => p.label).join(' | ')}`].join('\n') };
 }

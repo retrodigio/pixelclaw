@@ -1,7 +1,7 @@
 // Plan §10 G8 on the server: a map painted and furnished through MCP (objects with footprints, a
 // family's terrain, a road, scatter, map gen), its views (the whole map, a region, the camera, an
 // object on its ground), the map checks in the run summary, a person's move read through
-// `changes`, the review bundle's scenes, the Tiled and split exports, and verify.
+// `changes`, the review bundle's scenes, the Tiled (profile) and split exports, and verify.
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -100,16 +100,17 @@ describe('maps through MCP', () => {
   });
 
   it('exports the map for Tiled and splits the hut into cells; the tapes verify', async () => {
-    const x = await call('export', { asset: 'isle', format: 'tmx' });
-    expect(texts(x.content)).toMatch(/tmx: wrote 4 files/);
-    const tmx = readFileSync(join(s.proj, 'exports', 'tmx', 'isle.tmx'), 'utf8');
+    const x = await call('export', { assets: ['isle'], profile: 'tiled' });
+    expect(texts(x.content)).toMatch(/tiled: \d+ images, wrote \d+ files/);
+    const tmx = readFileSync(join(s.proj, 'exports', 'tiled', 'isle.tmx'), 'utf8');
     expect(tmx).toMatch(/<objectgroup id="\d+" name="props">/);
-    for (const f of ['isle.tiles.png', 'objects/hut.png', 'objects/pine.png']) expect(existsSync(join(s.proj, 'exports', 'tmx', f))).toBe(true);
+    expect(tmx).toMatch(/<tileset firstgid="1" source="bank.tsx"\/>/);
+    for (const f of ['bank.tsx', 'bank.png', 'tiles.tsx', 'tiles/hut.png', 'tiles/pine.png']) expect(existsSync(join(s.proj, 'exports', 'tiled', f)), f).toBe(true);
     const sp = await call('export', { asset: 'hut', format: 'split' });
     expect(texts(sp.content)).toMatch(/split: wrote 5 files/);
     const stamp = JSON.parse(readFileSync(join(s.proj, 'exports', 'split', 'hut', 'hut.stamp.json'), 'utf8'));
     expect(stamp.pieces.map((p: { name: string; roof: boolean }) => [p.name, p.roof])).toEqual([['hut_0_0', true], ['hut_1_0', true], ['hut_0_1', false], ['hut_1_1', false]]);
-    const wrong = await call('export', { asset: 'soil', format: 'tmx' });
+    const wrong = await call('export', { asset: 'isle', format: 'split' });
     expect(wrong.isError).toBe(true);
     const { execFileSync } = await import('node:child_process');
     const { BIN } = await import('./spawn.ts');

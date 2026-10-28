@@ -9,12 +9,12 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   animGifFrames, animText, diffPixels, diffText, encodeGif, encodePng, mapGifFrames, mapText, renderAnimSheet, renderDiff, renderFamilyView, renderGame, renderGrid, renderMap,
-  renderRecolour, renderScaled, renderTile3x3, layoutOf, schemeOf, cameraRegion, composeMapDoc, mapAscii, mapDiff, mapDocGifFrames, mapDocText, paintComposed,
+  renderRecolour, renderDensity, renderScaled, renderTile3x3, layoutOf, schemeOf, cameraRegion, composeMapDoc, mapAscii, mapDiff, mapDocGifFrames, mapDocText, paintComposed,
   type Doc, type MapWorld, type Pt, type Region, type Theme,
 } from '@pixelclaw/core';
 import { ProjectError } from './project.ts';
 
-export const VIEW_MODES = ['render', 'grid', 'tile3x3', 'diff', 'game', 'recolour', 'anim', 'map', 'family'] as const;
+export const VIEW_MODES = ['render', 'grid', 'tile3x3', 'diff', 'game', 'recolour', 'anim', 'map', 'family', 'density'] as const;
 export type ViewMode = (typeof VIEW_MODES)[number];
 
 export interface ViewOptions {
@@ -40,6 +40,8 @@ export interface ViewOptions {
    * map of a map document (or of an object, set on its ground): the assets it names, the cells to
    * show (a region, or the camera's screen around a cell), and the game's draw scale.
    */
+  /** density: the base asset, its higher-density copies and the reducer. */
+  density?: { base: Doc; copies: Doc[]; reducer?: string; ink?: string[]; share?: [number, number] };
   mapDoc?: { doc: Doc; world: MapWorld; region?: Region; camera?: [number, number]; screen: [number, number]; drawScale: number; note?: string };
 }
 
@@ -121,6 +123,15 @@ export function makeView(doc: Doc, mode: ViewMode, o: ViewOptions, outDir: strin
       text += `\nanimated GIF at game speed: ${gif}`;
     }
     return { mode, kind: 'image', png, width: img.width, height: img.height, path, text, ...(gif ? { gif } : {}) };
+  }
+  if (mode === 'density') {
+    if (!o.density) throw new ProjectError('the density view needs the base asset and its copies');
+    const { base, copies, ...ro } = o.density;
+    const v = renderDensity(base, copies, { ...ro, frame: o.frame, scale: o.scale });
+    const png = encodePng(v.img);
+    const path = join(outDir, `${doc.name}.density.png`);
+    writeFileSync(path, png);
+    return { mode, kind: 'image', png, width: v.img.width, height: v.img.height, path, text: v.text };
   }
   if (mode === 'family') {
     if (!doc.family) throw new ProjectError(`'${doc.name}' is not a family (the family view shows each variant among its neighbours)`);

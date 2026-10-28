@@ -8,6 +8,7 @@ import { ProjectError, listAssets, readPaletteFile } from './project.ts';
 import { formatChecks } from './report.ts';
 import { writeReview } from './review.ts';
 import { EXPORT_FORMATS, exportAsset } from './export.ts';
+import { exportWithProfile, importSummary, planImport, projectProfiles, projectSchemes } from './io.ts';
 import { join } from 'node:path';
 import { VIEW_MODES, parseRegion, type View, type ViewMode } from './views.ts';
 import { SUMMARY_BUDGET, type AssetChanges, type Writer } from './writer.ts';
@@ -112,6 +113,13 @@ export function projectSummary(w: Writer, url: string): string {
     if (ramps.length) lines.push('  ramps: ' + ramps.map(([k, v]) => `${k} [${v.join(' ')}]`).join('; '));
   }
   lines.push(`autotile schemes: ${[...BUILTIN_SCHEMES.values()].map((x) => `${x.name} (${x.variants.length})`).join(', ')}`);
+  const own = projectSchemes(p.dir);
+  if (own.size) lines.push(`project schemes (copied into a family's tape): ${[...own.values()].map((x) => `${x.name} (${x.variants.length})`).join(', ')}`);
+  try {
+    lines.push(`export profiles: ${[...projectProfiles(p).values()].map((x) => `${x.name} (${x.layout})`).join(', ')}`);
+  } catch (e) {
+    lines.push(`export profiles: ${(e as Error).message}`);
+  }
   const assets = listAssets(p);
   lines.push('', assets.length ? `assets (${assets.length}):` : `assets: none yet. Create one with run(asset, "new tile <name> 24x24 ...").`);
   for (const a of assets) {
@@ -378,18 +386,58 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
   }));
 
   server.registerTool('export', {
-    title: 'Export an asset',
-    description: 'Write an asset out (export profiles come later). tmx: a map document as a Tiled map (a tile layer per ground layer, objects as tile objects with footprint, anchor and cell flags), with its tileset image and one image per object. ' +
-      'split: an oversized tile or object as one-cell pieces <name>_<cx>_<cy>.png plus <name>.stamp.json that puts them back (with each cell\'s block and roof flags). png: a map composed at 1x, or an asset\'s first frame.',
+    title: 'Export through a profile',
+    description: 'Write assets out through an export profile (plan §4.9): built-in png (loose PNGs), atlas (a page plus JSON records), tiled (.tsx wang sets per family, .tmx per map), ' +
+      'godot (a TileSet with terrains per family), aseprite-json (Aseprite sheets), aseprite (.aseprite files), or the project\'s own (profiles/*.json: naming templates, numbered sets, density pages, role colours, CSV, snippets; docs/profiles.md). ' +
+      'Without assets, every asset; a map brings what it draws, an asset its texture variants and density copies. format=split|png instead writes one asset G8\'s way (one-cell pieces plus a stamp, or a PNG).',
     inputSchema: z.object({
-      asset: z.string(),
-      format: z.enum(EXPORT_FORMATS),
-      dest: z.string().optional().describe('The folder to write into (default: <project>/exports/<format>)'),
+      profile: z.string().optional().describe('A profile name (see project) or a profile .json path (default png)'),
+      assets: z.array(z.string()).optional().describe('The assets to export (default: all)'),
+      asset: z.string().optional().describe('With format: the asset'),
+      format: z.enum(EXPORT_FORMATS).optional(),
+      dest: z.string().optional().describe('The folder to write into, e.g. a game folder (default: <project>/exports/<profile>)'),
     }),
   }, (a) => w.enqueue(() => {
     try {
-      const files = exportAsset(w.doc(a.asset), w.assetDocs(), a.format, a.dest ?? join(w.project.dir, 'exports', a.format));
-      return { content: [text(`${a.format}: wrote ${files.length} files\n${files.map((f) => `  ${f}`).join('\n')}`)] };
+      if (a.format) {
+        if (!a.asset) throw new ProjectError('format= exports one asset: give asset');
+        const files = exportAsset(w.doc(a.asset), w.assetDocs(), a.format, a.dest ?? join(w.project.dir, 'exports', a.format));
+        return { content: [text(`${a.format}: wrote ${files.length} files\n${files.map((f) => `  ${f}`).join('\n')}`)] };
+      }
+      const r = exportWithProfile(w.project, w.assetDocs(), a.profile ?? 'png', { names: a.assets ?? (a.asset ? [a.asset] : undefined), dest: a.dest });
+      const shown = r.files.length > 24 ? [...r.files.slice(0, 24), `… ${r.files.length - 24} more`] : r.files;
+      return { content: [text(`${a.profile ?? 'png'}: ${r.images} images, wrote ${r.files.length} files into ${r.dir}\n${shown.map((f) => `  ${f}`).join('\n')}${r.notes.length ? `\nnotes:\n${r.notes.map((n) => `  ${n}`).join('\n')}` : ''}`)] };
+    } catch (e) {
+      return errorResult(e);
+    }
+  }));
+
+  server.registerTool('import', {
+    title: 'Import images',
+    description: 'Bring art in (plan §4.9). A PNG becomes a new asset quantised to a palette (palette=, default the project\'s; build=true makes one from the image); grid="24x24" slices a sheet into frames ' +
+      '(cells=true keeps it one image with that cell grid). An .aseprite file keeps its layers, frames, durations, tags and views. With profile=, path is a folder a profile wrote: each image is read back by name ' +
+      'into the asset it came from and the result says which match the project exactly; images no asset exports become new assets. The new tapes start with import commands; the files are kept under blobs/.',
+    inputSchema: z.object({
+      path: z.string().describe('A .png or .aseprite file, or (with profile) the folder an export wrote'),
+      profile: z.string().optional(),
+      as: z.string().regex(/^[a-z][a-z0-9_-]*$/).optional().describe('The new asset\'s name (default: the file\'s)'),
+      kind: z.enum(['sprite', 'tile', 'object', 'icon', 'sheet']).optional(),
+      palette: z.string().optional(),
+      build: z.boolean().optional(),
+      grid: z.string().regex(/^\d+x\d+$/).optional(),
+      cells: z.boolean().optional(),
+      replace: z.boolean().optional().describe('Start an existing asset\'s tape again'),
+    }),
+  }, (a) => w.enqueue(() => {
+    try {
+      const plan = planImport(w.project, w.assetDocs(), { ...a, grid: a.grid ? (a.grid.split('x').map(Number) as [number, number]) : undefined });
+      const created: string[] = [];
+      for (const c of plan.create) {
+        const r = w.run({ asset: c.name, commands: c.tape, by: AGENT, replace: a.replace });
+        if (!r.ok) throw new ProjectError(`${c.name}: ${r.errors.map((e) => `${e.line}:${e.col} ${e.message}`).join('; ')}`);
+        created.push(c.name);
+      }
+      return { content: [text(importSummary(plan, created) || 'nothing to import')] };
     } catch (e) {
       return errorResult(e);
     }

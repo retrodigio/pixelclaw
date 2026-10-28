@@ -1,15 +1,16 @@
-// Exports that G8 needs before G9's profiles (plan §4.10, §4.11): a map as a Tiled `.tmx` with its
-// tileset image and one image per object, an oversized asset `split` into one-cell pieces plus the
+// G8's single-asset exports (plan §4.10): an oversized asset `split` into one-cell pieces plus the
 // stamp that puts them back, and a plain PNG (a map composed at 1x, or any asset's first frame).
+// Everything else, Tiled maps included, goes through export profiles (io.ts).
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  TRANSPARENT, composeMapDoc, encodePng, flatten, mapToTmx, mapWorld, splitAsset, type AssetDoc, type Doc, type Rgba,
+  TRANSPARENT, composeMapDoc, encodePng, flatten, mapWorld, splitAsset, type AssetDoc, type Doc, type Rgba,
 } from '@pixelclaw/core';
 import { ProjectError } from './project.ts';
 
-export const EXPORT_FORMATS = ['tmx', 'split', 'png'] as const;
+/** G8's single-asset exports; everything else goes through a profile (io.ts). */
+export const EXPORT_FORMATS = ['split', 'png'] as const;
 export type ExportFormat = (typeof EXPORT_FORMATS)[number];
 
 /** Palette indices as RGBA (transparent stays transparent). */
@@ -35,14 +36,6 @@ export function exportAsset(doc: Doc, assets: AssetDoc[], format: ExportFormat, 
     writeFileSync(f, data);
     files.push(f);
   };
-  if (format === 'tmx') {
-    if (!doc.map) throw new ProjectError(`'${doc.name}' is not a map (tmx exports map documents)`);
-    const x = mapToTmx(doc, mapWorld(assets));
-    save(`${doc.name}.tmx`, x.tmx);
-    save(`${doc.name}.tiles.png`, encodePng(rgbaOf(x.tileset.px, x.tileset.width, x.tileset.height, x.palette)));
-    for (const o of x.objects) save(`objects/${o.name}.png`, encodePng(rgbaOf(o.px, o.width, o.height, x.palette)));
-    return files;
-  }
   if (format === 'split') {
     if (doc.map || doc.family || doc.overlay) throw new ProjectError(`'${doc.name}' is a ${doc.kind}; split takes an oversized tile or object`);
     if (doc.width % doc.cellW || doc.height % doc.cellH) throw new ProjectError(`'${doc.name}' is ${doc.width}x${doc.height}, not whole ${doc.cellW}x${doc.cellH} cells (new … cell=<W>x<H>)`);
