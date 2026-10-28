@@ -172,28 +172,48 @@ export interface ReplayResult {
 }
 
 /**
+ * Applies tape entries one at a time, exactly as they were first run: the step-by-step form of
+ * `replay`, for live playback and time travel. Each line must normalise to itself.
+ */
+export class TapeCursor {
+  doc: Doc | null = null;
+  readonly done: TapeEntry[] = [];
+  private readonly palettes: PaletteSource;
+
+  constructor(palettes: PaletteSource) {
+    this.palettes = palettes;
+  }
+
+  /** Apply one entry. On a problem the cursor is unchanged and the message is returned. */
+  step(e: TapeEntry): string | null {
+    const { commands, errors } = parse(e.cmd);
+    if (errors.length || commands.length !== 1) {
+      return errors[0] ? `does not parse: ${errors[0].message}` : `holds ${commands.length} commands`;
+    }
+    try {
+      const n = normaliseCommand(commands[0]!, context(this.doc, this.done, e.group, this.palettes, e.seq));
+      if (n.text !== e.cmd) return `not in normal form: expected '${n.text}'`;
+      this.done.push(e);
+      this.doc = n.op.k === 'undo' ? replayEffective(this.done, this.palettes) : applyOp(this.doc, n.op);
+      return null;
+    } catch (err) {
+      if (!(err instanceof DiagError)) throw err;
+      return err.message;
+    }
+  }
+}
+
+/**
  * Re-run a tape from the start, command by command, exactly as it was first run. Each line must
  * normalise to itself; any line that does not is reported (and replay stops there).
  */
 export function replay(entries: TapeEntry[], palettes: PaletteSource): ReplayResult {
-  let doc: Doc | null = null;
-  const done: TapeEntry[] = [];
+  const cur = new TapeCursor(palettes);
   for (const e of entries) {
-    const { commands, errors } = parse(e.cmd);
-    if (errors.length || commands.length !== 1) {
-      return { doc, problems: [{ seq: e.seq, message: errors[0] ? `does not parse: ${errors[0].message}` : `holds ${commands.length} commands` }] };
-    }
-    try {
-      const n = normaliseCommand(commands[0]!, context(doc, done, e.group, palettes, e.seq));
-      if (n.text !== e.cmd) return { doc, problems: [{ seq: e.seq, message: `not in normal form: expected '${n.text}'` }] };
-      done.push(e);
-      doc = n.op.k === 'undo' ? replayEffective(done, palettes) : applyOp(doc, n.op);
-    } catch (err) {
-      if (!(err instanceof DiagError)) throw err;
-      return { doc, problems: [{ seq: e.seq, message: err.message }] };
-    }
+    const message = cur.step(e);
+    if (message !== null) return { doc: cur.doc, problems: [{ seq: e.seq, message }] };
   }
-  return { doc, problems: [] };
+  return { doc: cur.doc, problems: [] };
 }
 
 export function tapeHeader(): string {

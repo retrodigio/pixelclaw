@@ -1,15 +1,13 @@
 // pixelclaw: new | run | view | verify. A thin layer over @pixelclaw/core and the project folder.
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { replay, serializeDoc, type AssetState, type Doc } from '@pixelclaw/core';
 import {
-  encodePng, importPalette, parse, renderGrid, renderScaled, renderTile3x3, replay, runBatch, serializeDoc,
-  type AssetState, type Doc, type Region,
-} from '@pixelclaw/core';
-import {
-  ProjectError, assetDir, assetExists, createProject, listAssets, loadProject, paletteSource, previewPng,
-  readAssetJson, readTape, saveAsset, sha256, type Project,
-} from './project.ts';
+  AssetExistsError, NoAssetError, ProjectError, VIEW_MODES, Writer, assetDir, createProject, isViewMode, listAssets,
+  loadProject, lockHolder, makeView, paletteSource, parseRegion, previewPng, readAssetJson, readPaletteFile, readTape, sha256,
+  type Project, type ViewMode,
+} from '@pixelclaw/server';
 
 export interface Io {
   out(s: string): void;
@@ -75,13 +73,7 @@ function printErrors(io: Io, source: string, errors: { line: number; col: number
 }
 
 function cmdNewProject(io: Io, dir: string, p: Parsed): number {
-  const palettes = (p.flags.get('palette') ?? []).map((f) => {
-    try {
-      return importPalette(f, readFileSync(f, 'utf8'));
-    } catch (e) {
-      throw new ProjectError(`${f}: ${(e as Error).message}`);
-    }
-  });
+  const palettes = (p.flags.get('palette') ?? []).map(readPaletteFile);
   const proj = createProject(dir, { name: one(p, 'name'), palettes });
   io.out(`created project '${proj.json.name}' at ${dir}\n`);
   for (const pal of proj.palettes.values()) io.out(`  palette ${pal.name}: ${pal.entries.length} entries${pal.name === proj.json.defaultPalette ? ' (default)' : ''}\n`);
@@ -89,47 +81,33 @@ function cmdNewProject(io: Io, dir: string, p: Parsed): number {
 }
 
 function loadState(proj: Project, name: string): AssetState {
-  const entries = readTape(proj, name);
-  const r = replay(entries, paletteSource(proj));
-  if (r.problems.length) throw new ProjectError(`asset '${name}': tape seq ${r.problems[0]!.seq}: ${r.problems[0]!.message} (run 'pixelclaw verify')`);
-  return { doc: r.doc, entries };
+  return new Writer(proj).state(name);
+}
+
+/** A running server is the single writer for its project; the CLI does not write behind its back. */
+function assertNoServer(proj: Project): void {
+  const held = lockHolder(proj.dir);
+  if (held) throw new ProjectError(`a pixelclaw server (pid ${held.pid}) owns ${proj.dir}; send commands through it (MCP), or stop it first`);
 }
 
 function apply(io: Io, proj: Project, text: string, source: string, o: { asset?: string; replace: boolean; by: string }): { code: number; doc?: Doc } {
-  const parsed = parse(text);
-  const first = parsed.commands[0];
-  const startsNew = first?.name === 'new';
-  const newName = startsNew ? first.args.find((a, i) => i === 1 && a.t === 'word') : undefined;
-  const name = o.asset ?? (newName && newName.t === 'word' ? newName.v : undefined);
-  if (!name) {
-    if (parsed.errors.length) { printErrors(io, source, parsed.errors); return { code: 1 }; }
-    io.err(`error: say which asset with --asset <name> (or start the script with 'new')\n`);
-    return { code: 1 };
+  assertNoServer(proj);
+  const w = new Writer(proj, { now: io.now });
+  let r;
+  try {
+    r = w.run({ asset: o.asset, commands: text, by: o.by, replace: o.replace });
+  } catch (e) {
+    if (e instanceof NoAssetError) { io.err(`error: say which asset with --asset <name> (or start the script with 'new')\n`); return { code: 1 }; }
+    if (e instanceof AssetExistsError) { io.err(`error: asset '${e.asset}' already exists; use --replace to start its tape again\n`); return { code: 1 }; }
+    throw e;
   }
-  let state: AssetState = { doc: null, entries: [] };
-  if (assetExists(proj, name)) {
-    if (startsNew && !o.replace) {
-      io.err(`error: asset '${name}' already exists; use --replace to start its tape again\n`);
-      return { code: 1 };
-    }
-    if (!startsNew) state = loadState(proj, name);
-  } else if (!startsNew && !parsed.errors.length) {
-    io.err(`error: no asset '${name}' in ${proj.dir}; start the script with 'new'\n`);
-    return { code: 1 };
-  }
-  const r = runBatch(state, text, { by: o.by, at: io.now(), palettes: paletteSource(proj) });
   if (!r.ok) { printErrors(io, source, r.errors); return { code: 1 }; }
-  if (!r.state.doc) { io.out('nothing to do\n'); return { code: 0 }; }
-  if (r.state.doc.name !== name) {
-    io.err(`error: the script creates '${r.state.doc.name}' but --asset says '${name}'\n`);
-    return { code: 1 };
-  }
-  if (r.added.length === 0) { io.out(`${name}: no commands\n`); return { code: 0, doc: r.state.doc }; }
-  const dir = saveAsset(proj, r.state);
-  const groups = new Set(r.state.entries.map((e) => e.group)).size;
-  io.out(`${name}: applied ${r.added.length} command${r.added.length === 1 ? '' : 's'} as group ${r.group}; ${r.changed} px changed\n`);
-  io.out(`  tape: ${r.state.entries.length} commands in ${groups} group${groups === 1 ? '' : 's'}; preview: ${join(dir, 'preview.png')}\n`);
-  return { code: 0, doc: r.state.doc };
+  if (!r.doc) { io.out('nothing to do\n'); return { code: 0 }; }
+  if (r.added.length === 0) { io.out(`${r.asset}: no commands\n`); return { code: 0, doc: r.doc }; }
+  io.out(`${r.asset}: applied ${r.added.length} command${r.added.length === 1 ? '' : 's'} as group ${r.group}; ${r.changed} px changed\n`);
+  io.out(`  tape: ${r.commands} commands in ${r.groups} group${r.groups === 1 ? '' : 's'}; preview: ${join(r.dir!, 'preview.png')}\n`);
+  for (const wn of r.warnings) io.out(`  warning: ${wn}\n`);
+  return { code: 0, doc: r.doc };
 }
 
 function cmdNewAsset(io: Io, dir: string, p: Parsed): number {
@@ -162,43 +140,26 @@ function cmdRun(io: Io, p: Parsed): number {
   return r.code;
 }
 
-function parseRegion(s: string): Region {
-  const m = /^(\d+),(\d+)[ ,](\d+)x(\d+)$/.exec(s.trim()) ?? /^(\d+),(\d+),(\d+),(\d+)$/.exec(s.trim());
-  if (!m) throw new UsageError(`--region must look like 8,0,12x10 or "8,0 12x10"`);
-  const [x, y, w, h] = m.slice(1).map(Number) as [number, number, number, number];
-  if (w < 1 || h < 1) throw new UsageError('--region size must be at least 1x1');
-  return { x, y, w, h };
-}
-
-const MODES = ['render', 'grid', 'tile3x3'];
-
 function writeViews(io: Io, proj: Project, doc: Doc, modesIn: string[], p: Parsed): number {
   let modes = modesIn.length ? modesIn : ['render'];
-  if (modes.includes('all')) modes = MODES;
-  for (const m of modes) if (!MODES.includes(m)) throw new UsageError(`unknown view '${m}' (views: ${MODES.join(', ')}, all)`);
-  const outDir = one(p, 'out') ?? join(proj.dir, 'views');
-  mkdirSync(outDir, { recursive: true });
+  if (modes.includes('all')) modes = [...VIEW_MODES];
+  for (const m of modes) if (!isViewMode(m)) throw new UsageError(`unknown view '${m}' (views: ${VIEW_MODES.join(', ')}, all)`);
   const scaleS = one(p, 'scale');
   const scale = scaleS === undefined ? undefined : Number(scaleS);
   if (scale !== undefined && (!Number.isInteger(scale) || scale < 1 || scale > 64)) throw new UsageError('--scale must be an integer 1..64');
   const regionS = one(p, 'region');
   const region = regionS ? parseRegion(regionS) : undefined;
+  if (region === null) throw new UsageError(`--region must look like 8,0,12x10 or "8,0 12x10"`);
+  if (region && (region.w < 1 || region.h < 1)) throw new UsageError('--region size must be at least 1x1');
   if (region && !doc.wrap && (region.x + region.w > doc.width || region.y + region.h > doc.height)) {
     throw new UsageError(`--region runs past the ${doc.width}x${doc.height} canvas`);
   }
-  for (const m of modes) {
-    if (m === 'grid') {
-      const g = renderGrid(doc, region);
-      const f = join(outDir, `${doc.name}.grid${region ? `.${region.x}-${region.y}-${region.w}x${region.h}` : ''}.txt`);
-      writeFileSync(f, g);
-      io.out(g);
-      io.out(`wrote ${f}\n`);
-    } else {
-      const img = m === 'render' ? renderScaled(doc, { scale }) : renderTile3x3(doc);
-      const f = join(outDir, `${doc.name}.${m}.png`);
-      writeFileSync(f, encodePng(img));
-      io.out(`wrote ${f} (${img.width}x${img.height})\n`);
-    }
+  for (const m of modes as ViewMode[]) {
+    const v = makeView(doc, m, { scale, region }, one(p, 'out') ?? join(proj.dir, 'views'));
+    if (v.kind === 'text') {
+      io.out(v.text);
+      io.out(`wrote ${v.path}\n`);
+    } else io.out(`wrote ${v.path} (${v.width}x${v.height})\n`);
   }
   return 0;
 }

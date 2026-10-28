@@ -2,8 +2,8 @@
 // preview.png, checkpoints/}. Everything here is plain files so a project diffs well in git.
 
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { basename, join } from 'node:path';
 import {
   LANG_VERSION, encodePng, importPalette, paletteToJson, parseTape, renderFlat, serializeDoc, tapeToJsonl,
   type AssetState, type Doc, type Palette, type PaletteSource, type TapeEntry,
@@ -133,6 +133,31 @@ export function assetJsonFor(doc: Doc, entries: TapeEntry[]): AssetJson {
   };
 }
 
+/** Read a palette file (.json, Lospec .json, .hex, .gpl), naming any error after the file. */
+export function readPaletteFile(file: string): Palette {
+  try {
+    return importPalette(basename(file), readFileSync(file, 'utf8'));
+  } catch (e) {
+    throw new ProjectError(`${file}: ${(e as Error).message}`);
+  }
+}
+
+/** Add palettes to a project (palettes/<name>.json); the first becomes the default if none is set. */
+export function addPalettes(p: Project, palettes: Palette[]): void {
+  for (const pal of palettes) {
+    if (p.palettes.has(pal.name)) throw new ProjectError(`the project already has a palette named '${pal.name}'`);
+  }
+  mkdirSync(join(p.dir, 'palettes'), { recursive: true });
+  for (const pal of palettes) {
+    writeFileSync(join(p.dir, 'palettes', `${pal.name}.json`), paletteToJson(pal));
+    p.palettes.set(pal.name, pal);
+  }
+  if (!p.json.defaultPalette && palettes[0]) {
+    p.json.defaultPalette = palettes[0].name;
+    writeJson(join(p.dir, 'project.json'), p.json);
+  }
+}
+
 export function previewPng(doc: Doc): Uint8Array {
   return encodePng(renderFlat(doc));
 }
@@ -147,4 +172,52 @@ export function saveAsset(p: Project, state: AssetState): string {
   writeJson(join(dir, 'asset.json'), assetJsonFor(doc, state.entries));
   writeFileSync(join(dir, 'preview.png'), previewPng(doc));
   return dir;
+}
+
+// The server lock: a running server is the single writer for its project. It writes
+// .pixelclaw.lock (pid and URL) and removes it on exit; other writers refuse while it is held.
+
+export const LOCK_FILE = '.pixelclaw.lock';
+
+export interface LockInfo {
+  pid: number;
+  url: string;
+}
+
+function alive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+/** The live server holding this project, if any (a lock left by a dead process is ignored). */
+export function lockHolder(dir: string): LockInfo | null {
+  const f = join(dir, LOCK_FILE);
+  if (!existsSync(f)) return null;
+  try {
+    const info = JSON.parse(readFileSync(f, 'utf8')) as LockInfo;
+    return info.pid !== process.pid && alive(info.pid) ? info : null;
+  } catch {
+    return null;
+  }
+}
+
+export function acquireLock(dir: string, url: string): void {
+  const held = lockHolder(dir);
+  if (held) throw new ProjectError(`another pixelclaw server (pid ${held.pid}) owns ${dir}; watch it at ${held.url.replace(/\?.*$/, '')}`);
+  // The URL is stored without its token: the lock file sits in the project folder.
+  writeFileSync(join(dir, LOCK_FILE), JSON.stringify({ pid: process.pid, url: url.replace(/\?.*$/, '') }) + '\n');
+}
+
+export function releaseLock(dir: string): void {
+  const f = join(dir, LOCK_FILE);
+  try {
+    const info = JSON.parse(readFileSync(f, 'utf8')) as LockInfo;
+    if (info.pid === process.pid) rmSync(f, { force: true });
+  } catch {
+    // no lock, or not ours
+  }
 }

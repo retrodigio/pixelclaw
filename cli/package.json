@@ -4,7 +4,14 @@
   "private": true,
   "type": "module",
   "description": "Pixel Claw command line: new, run, view, verify.",
-  "bin": { "pixelclaw": "./bin/pixelclaw.js" },
-  "exports": { ".": "./src/index.ts" },
-  "dependencies": { "@pixelclaw/core": "workspace:*" }
+  "bin": {
+    "pixelclaw": "./bin/pixelclaw.js"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@pixelclaw/core": "workspace:*",
+    "@pixelclaw/server": "workspace:*"
+  }
 }
