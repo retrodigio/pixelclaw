@@ -1,0 +1,43 @@
+{
+  "name": "kiln-hollow",
+  "entries": [
+    {"key": "0", "name": "ink", "hex": "#1e1714"},
+    {"key": "1", "name": "clay0", "hex": "#5a2c20"},
+    {"key": "2", "name": "clay1", "hex": "#83432d"},
+    {"key": "3", "name": "clay2", "hex": "#a85f3d"},
+    {"key": "4", "name": "clay3", "hex": "#c98458"},
+    {"key": "5", "name": "clay4", "hex": "#e3ac80"},
+    {"key": "6", "name": "sage0", "hex": "#2d3b29"},
+    {"key": "7", "name": "sage1", "hex": "#4a6136"},
+    {"key": "8", "name": "sage2", "hex": "#6f8a47"},
+    {"key": "9", "name": "sage3", "hex": "#a2b46a"},
+    {"key": "a", "name": "stream0", "hex": "#28454c"},
+    {"key": "b", "name": "stream1", "hex": "#3b6a6c"},
+    {"key": "c", "name": "stream2", "hex": "#66988f"},
+    {"key": "d", "name": "stream3", "hex": "#b1d0bd"},
+    {"key": "e", "name": "stone0", "hex": "#3b373b"},
+    {"key": "f", "name": "stone1", "hex": "#5d585a"},
+    {"key": "g", "name": "stone2", "hex": "#8a8380"},
+    {"key": "h", "name": "stone3", "hex": "#bbb2a6"},
+    {"key": "i", "name": "wood0", "hex": "#392416"},
+    {"key": "j", "name": "wood1", "hex": "#5e3c22"},
+    {"key": "k", "name": "wood2", "hex": "#8a5f36"},
+    {"key": "l", "name": "glaze0", "hex": "#1d3052"},
+    {"key": "m", "name": "glaze1", "hex": "#2e568a"},
+    {"key": "n", "name": "glaze2", "hex": "#5a8cc0"},
+    {"key": "o", "name": "glaze3", "hex": "#a4c8e6"},
+    {"key": "t", "name": "ember0", "hex": "#9c301b"},
+    {"key": "u", "name": "ember1", "hex": "#e2702a"},
+    {"key": "v", "name": "ember2", "hex": "#ffd06a"},
+    {"key": "w", "name": "smoke", "hex": "#d6d0c6"}
+  ],
+  "ramps": {
+    "clay": ["clay0", "clay1", "clay2", "clay3", "clay4"],
+    "sage": ["sage0", "sage1", "sage2", "sage3"],
+    "stream": ["stream0", "stream1", "stream2", "stream3"],
+    "stone": ["stone0", "stone1", "stone2", "stone3"],
+    "wood": ["wood0", "wood1", "wood2"],
+    "glaze": ["glaze0", "glaze1", "glaze2", "glaze3"],
+    "ember": ["ember0", "ember1", "ember2"]
+  }
+}

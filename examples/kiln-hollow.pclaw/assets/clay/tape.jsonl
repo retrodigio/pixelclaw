@@ -1,0 +1,32 @@
+{"pclaw":"tape","lang":2}
+{"seq":1,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g1","cmd":"new tile clay 24x24 palette=kiln-hollow wrap=on cell=24x24 bg=clay2 <<\n  0 ink #1e1714\n  1 clay0 #5a2c20\n  2 clay1 #83432d\n  3 clay2 #a85f3d\n  4 clay3 #c98458\n  5 clay4 #e3ac80\n  6 sage0 #2d3b29\n  7 sage1 #4a6136\n  8 sage2 #6f8a47\n  9 sage3 #a2b46a\n  a stream0 #28454c\n  b stream1 #3b6a6c\n  c stream2 #66988f\n  d stream3 #b1d0bd\n  e stone0 #3b373b\n  f stone1 #5d585a\n  g stone2 #8a8380\n  h stone3 #bbb2a6\n  i wood0 #392416\n  j wood1 #5e3c22\n  k wood2 #8a5f36\n  l glaze0 #1d3052\n  m glaze1 #2e568a\n  n glaze2 #5a8cc0\n  o glaze3 #a4c8e6\n  t ember0 #9c301b\n  u ember1 #e2702a\n  v ember2 #ffd06a\n  w smoke #d6d0c6\n  ramp clay clay0 clay1 clay2 clay3 clay4\n  ramp sage sage0 sage1 sage2 sage3\n  ramp stream stream0 stream1 stream2 stream3\n  ramp stone stone0 stone1 stone2 stone3\n  ramp wood wood0 wood1 wood2\n  ramp glaze glaze0 glaze1 glaze2 glaze3\n  ramp ember ember0 ember1 ember2\n>>"}
+{"seq":2,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g1","cmd":"noise 0,0 24x24 ramp=clay weights=0,1,0,3,0 cluster=3..6 density=0.13 base=keep wrap=on seed=18"}
+{"seq":3,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g1","cmd":"line 8,5 10,6 12,6 c=clay1 pp=on"}
+{"seq":4,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g1","cmd":"line 15,2 16,4 c=clay1 pp=on"}
+{"seq":5,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g1","cmd":"line 18,13 21,14 c=clay1 pp=on"}
+{"seq":6,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g1","cmd":"line 13,18 14,20 16,21 c=clay1 pp=on"}
+{"seq":7,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g1","cmd":"line 1,21 2,22 c=clay1 pp=on"}
+{"seq":8,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g1","cmd":"paint 12,9 <<\n  hg\n  gf\n>>"}
+{"seq":9,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g1","cmd":"paint 21,4 <<\n  h.\n  gf\n>>"}
+{"seq":10,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g1","cmd":"paint 5,13 <<\n  hg.\n  ggf\n>>"}
+{"seq":11,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g2","cmd":"note 0,19 16x5 \"bottom band of alternating clay1/clay3 single pixels (13,20 14,20 15,20; 7,21 8,21 9,21) is noise, not 2-6 px clusters, and makes every tile's bottom denser than the rest, which shows as a horizontal stripe in the 3x3; merge it into two or three cracks and move some marks into the bare rows 7-8, 11-12 and 17\" id=n1"}
+{"seq":12,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g2","cmd":"note 5,13 3x2 \"the three pebbles (5,13 / 12,9 / 21,4) all have the same pale-top-left, dark-bottom-right shape and sit on an even diagonal, so tiled they form a regular grid of grey dots; vary their size and shape and break the spacing\" id=n2"}
+{"seq":13,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g2","cmd":"note 21,2 3x1 \"light clay3 mark wraps around the tile corner ((21-23,2), (0,2), (23,23)-(23,1)), which marks the grid at every corner in the 3x3; move it off the corner\" id=n3"}
+{"seq":14,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g2","cmd":"note 2,23 2x1 \"the crack at (2-3,20-23) is cut off at the bottom edge, and (2-3,0) above it is plain clay2; continue it into rows 0-1 or end it at row 22\" id=n4"}
+{"seq":15,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g2","cmd":"note 9,6 4x1 \"cracks are straight horizontal dashes (also 5,10 3x1 and 18,13 2x1) and read as streaks; give them a kink or branch so they read as fine cracks\" id=n5"}
+{"seq":16,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g3","cmd":"paint 0,19 <<\n  333333333443333333333333\n  333333334444333333333333\n  332333333443333333333333\n  333222333333333333333333\n  333333333333333333333333\n>>"}
+{"seq":17,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g3","cmd":"px 21,2 22,2 23,2 0,2 23,0 23,1 21,3 c=clay2"}
+{"seq":18,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g3","cmd":"px 11,6 12,6 c=clay2"}
+{"seq":19,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g3","cmd":"px 11,7 12,7 c=clay1"}
+{"seq":20,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g3","cmd":"paint 12,9 <<\n  33\n  33\n>>"}
+{"seq":21,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g3","cmd":"px 21,4 c=clay2"}
+{"seq":22,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g3","cmd":"paint 2,2 <<\n  .h\n  hgf\n>>"}
+{"seq":23,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g3","cmd":"paint 13,11 <<\n  44.\n  .44\n>>"}
+{"seq":24,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g3","cmd":"paint 3,7 <<\n  44\n  4.\n>>"}
+{"seq":25,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g3","cmd":"note done n1"}
+{"seq":26,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g3","cmd":"note done n2"}
+{"seq":27,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g3","cmd":"note done n3"}
+{"seq":28,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g3","cmd":"note done n4"}
+{"seq":29,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g3","cmd":"note done n5"}
+{"seq":30,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g4","cmd":"mark reviewed \"blind review g10: 5 findings fixed by coordinates\""}
+{"seq":31,"by":"human:chris","at":"2026-10-28T10:46:41Z","group":"h1","cmd":"mark approved"}

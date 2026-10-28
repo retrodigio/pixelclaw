@@ -1,0 +1,6 @@
+# The blind review's findings on kiln (findings.md), pinned on their pixels.
+note 15,12 7x16 "the far side on the shoulder is a 1-px clay1 line with a clay2 column between it and the ink (15,12-13; 16,16-17; 17,18-19; 18,20-21; 19,22-23; 20,24-25; 21,26-27), which reads as a second outline; make that column clay1 so the shadow is solid, as on rows 14-15 and 28-46"
+note 1,24 2x3 "the 2:1 cone meets the vertical wall at a hard angle (2,24-1,26, and 21,24-22,26 on the right), so the bottle looks like a cone on a box; round the shoulder with longer steps (3-4 rows) for the last steps"
+note 4,8 16x16 "no brickwork on the neck or cone; mortar dashes only start at row 24, so at 1x the kiln reads as plain clay, not fired brick; continue offset courses up the body"
+note 4,26 16x13 "the body is flat clay2, the same as the ground, so it separates only by its outline; shift the brick toward clay1 or clay0 with clay2 mortar so the kiln stands out from the clay"
+note 7,5 10x2 "the rim highlight is symmetric: the right end (15-16,5-6) is as light as the left; darken the right end to clay2, and consider a clay0/ink opening on top so it reads as an open chimney, not a capped bottle"

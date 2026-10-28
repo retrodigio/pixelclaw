@@ -1,0 +1,250 @@
+{
+  "format": "pixelclaw-manifest",
+  "version": 1,
+  "theme": "Kiln Hollow is a potters' hamlet in a narrow valley of red clay. The ground is packed clay worn into terraces, with sage scrub on the banks and a slow, silty stream along the valley floor. Bottle kilns of fired brick stand against the hillside with their fire-mouths glowing; drying racks, stacked urns and a glaze-seller's stall line the lanes between them, and a potter and her goat work the yard. The morning sun comes over the eastern rim from the top left, warm and dusty; smoke drifts from the kilns. Colours are earthen (clay, sage, silt-green water, smoke-grey stone) with one bright accent: the blue glaze, used sparingly.",
+  "sets": {
+    "ground": {
+      "description": "the valley floor: tiles and the edges between them"
+    },
+    "props": {
+      "description": "pots and small things on the clay"
+    },
+    "works": {
+      "description": "the kilns, racks and stall"
+    },
+    "folk": {
+      "description": "who lives here"
+    },
+    "scenes": {
+      "description": "places built from the set"
+    }
+  },
+  "export": {
+    "profile": "atlas"
+  },
+  "assets": [
+    {
+      "name": "clay",
+      "kind": "tile",
+      "size": "24x24",
+      "set": "ground",
+      "description": "packed red clay with fine cracks and a few pale pebbles",
+      "flat": "clay2"
+    },
+    {
+      "name": "clay_b",
+      "kind": "tile",
+      "size": "24x24",
+      "set": "ground",
+      "variantOf": "clay",
+      "description": "the clay with its marks moved, to break up repeats",
+      "flat": "clay2"
+    },
+    {
+      "name": "sage",
+      "kind": "tile",
+      "size": "24x24",
+      "set": "ground",
+      "description": "low sage scrub on dry soil",
+      "flat": "sage2"
+    },
+    {
+      "name": "stream",
+      "kind": "tile",
+      "size": "24x24",
+      "set": "ground",
+      "frames": 4,
+      "ticks": 12,
+      "description": "slow silty water with drifting glints",
+      "flat": "stream1"
+    },
+    {
+      "name": "terrace",
+      "kind": "family",
+      "size": "24x24",
+      "set": "ground",
+      "scheme": "blob47",
+      "inside": "clay",
+      "outside": "sage",
+      "band": "2:outside 1:clay1 2:clay3 radius=2",
+      "description": "the clay terrace's worn edge against the scrub",
+      "flat": "clay2"
+    },
+    {
+      "name": "bank",
+      "kind": "family",
+      "size": "24x24",
+      "set": "ground",
+      "scheme": "blob47-round",
+      "inside": "stream",
+      "outside": "clay",
+      "band": "2:outside 1:clay0 1:stream3 radius=3",
+      "description": "the stream's muddy bank, rounded",
+      "flat": "stream1"
+    },
+    {
+      "name": "lane",
+      "kind": "family",
+      "size": "24x24",
+      "set": "ground",
+      "scheme": "path",
+      "inside": "clay",
+      "outside": "sage",
+      "band": "1:clay1",
+      "description": "a trodden lane through the scrub",
+      "flat": "clay3"
+    },
+    {
+      "name": "urn",
+      "kind": "sprite",
+      "size": "24x24",
+      "set": "props",
+      "height": 14,
+      "description": "a squat terracotta urn with a dark rim",
+      "flat": "clay3"
+    },
+    {
+      "name": "urn_blue",
+      "kind": "sprite",
+      "size": "24x24",
+      "set": "props",
+      "recolourOf": "urn",
+      "height": 14,
+      "description": "the urn glazed blue",
+      "flat": "glaze2"
+    },
+    {
+      "name": "urn_green",
+      "kind": "sprite",
+      "size": "24x24",
+      "set": "props",
+      "recolourOf": "urn",
+      "height": 14,
+      "description": "the urn glazed sage green",
+      "flat": "sage3"
+    },
+    {
+      "name": "reeds",
+      "kind": "sprite",
+      "size": "24x24",
+      "set": "props",
+      "height": 16,
+      "description": "a clump of reeds for the stream bank",
+      "flat": "sage1"
+    },
+    {
+      "name": "jar_icon",
+      "kind": "icon",
+      "size": "16x16",
+      "set": "props",
+      "height": 13,
+      "description": "a glaze jar for the trade menu",
+      "flat": "glaze1"
+    },
+    {
+      "name": "kiln",
+      "kind": "object",
+      "size": "24x48",
+      "set": "works",
+      "cells": "1x1",
+      "height": 44,
+      "description": "a bottle kiln of fired brick, its fire-mouth glowing at the foot",
+      "flat": "clay1"
+    },
+    {
+      "name": "rack",
+      "kind": "object",
+      "size": "48x24",
+      "set": "works",
+      "cells": "2x1",
+      "height": 18,
+      "description": "a wooden drying rack with pots in rows",
+      "flat": "wood2"
+    },
+    {
+      "name": "stall",
+      "kind": "object",
+      "size": "48x48",
+      "set": "works",
+      "cells": "2x1",
+      "height": 40,
+      "description": "the glaze-seller's stall under a blue awning",
+      "flat": "glaze1"
+    },
+    {
+      "name": "smoke",
+      "kind": "overlay",
+      "size": "12x12",
+      "set": "works",
+      "frames": 4,
+      "description": "a puff of kiln smoke, drifting up",
+      "flat": "smoke"
+    },
+    {
+      "name": "potter",
+      "kind": "sprite",
+      "size": "24x24",
+      "set": "folk",
+      "frames": 2,
+      "ticks": 12,
+      "views": [
+        "S",
+        "N",
+        "E",
+        "W"
+      ],
+      "mirror": {
+        "W": "E"
+      },
+      "height": 21,
+      "description": "the potter in a clay-stained apron, walking",
+      "flat": "wood1"
+    },
+    {
+      "name": "goat",
+      "kind": "sprite",
+      "size": "24x24",
+      "set": "folk",
+      "frames": 2,
+      "ticks": 16,
+      "views": [
+        "E",
+        "W"
+      ],
+      "mirror": {
+        "W": "E"
+      },
+      "height": 15,
+      "description": "a pale goat, grazing",
+      "flat": "stone3"
+    },
+    {
+      "name": "cistern",
+      "kind": "object",
+      "size": "24x24",
+      "set": "works",
+      "cells": "1x1",
+      "height": 16,
+      "description": "a stone cistern the potters draw water from",
+      "flat": "stone2"
+    },
+    {
+      "name": "hollow",
+      "kind": "map",
+      "size": "32x24",
+      "set": "scenes",
+      "uses": [
+        "terrace",
+        "bank",
+        "lane",
+        "kiln",
+        "rack",
+        "stall",
+        "urn",
+        "cistern"
+      ],
+      "description": "the hamlet: kilns on the slope, the stream below",
+      "flat": "clay2"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+# The review round (reviews/2026-10-28-g10/findings.md), by coordinates: the doubled ink corners
+# under the rim (8,12 15,12) and at the base (8,20 15,20) go; the body gets a 2-3 px lit side
+# (clay3, clay4) and a far side and bottom in clay1 and clay0, so it no longer reads as the
+# ground's colour inside a ring; then the urn moves down a row to stand on the cell's bottom.
+paint 4,12 <<
+  ...0443333220...
+  ..044333332220..
+  .04455333332220.
+  0445433333322210
+  0444333333322210
+  0443333332222110
+  .04333333222110.
+  ..033333222110..
+  ...0332222220...
+  ....02221110....
+>>
+shift 0,1
+# Every finding dealt with: its note closed.
+note done n1
+note done n2
+note done n3
+note done n4
+note done n5
+note done n6
+note done n7

@@ -1,0 +1,32 @@
+{"pclaw":"tape","lang":2}
+{"seq":1,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g1","cmd":"new sprite urn 24x24 palette=kiln-hollow wrap=off cell=24x24 bg=none <<\n  0 ink #1e1714\n  1 clay0 #5a2c20\n  2 clay1 #83432d\n  3 clay2 #a85f3d\n  4 clay3 #c98458\n  5 clay4 #e3ac80\n  6 sage0 #2d3b29\n  7 sage1 #4a6136\n  8 sage2 #6f8a47\n  9 sage3 #a2b46a\n  a stream0 #28454c\n  b stream1 #3b6a6c\n  c stream2 #66988f\n  d stream3 #b1d0bd\n  e stone0 #3b373b\n  f stone1 #5d585a\n  g stone2 #8a8380\n  h stone3 #bbb2a6\n  i wood0 #392416\n  j wood1 #5e3c22\n  k wood2 #8a5f36\n  l glaze0 #1d3052\n  m glaze1 #2e568a\n  n glaze2 #5a8cc0\n  o glaze3 #a4c8e6\n  t ember0 #9c301b\n  u ember1 #e2702a\n  v ember2 #ffd06a\n  w smoke #d6d0c6\n  ramp clay clay0 clay1 clay2 clay3 clay4\n  ramp sage sage0 sage1 sage2 sage3\n  ramp stream stream0 stream1 stream2 stream3\n  ramp stone stone0 stone1 stone2 stone3\n  ramp wood wood0 wood1 wood2\n  ramp glaze glaze0 glaze1 glaze2 glaze3\n  ramp ember ember0 ember1 ember2\n>>"}
+{"seq":2,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g1","cmd":"ellipse 5,12 14x9 c=clay2 fill"}
+{"seq":3,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g1","cmd":"rect 9,20 6x2 c=clay2 fill"}
+{"seq":4,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g1","cmd":"rect 9,11 6x2 c=clay2 fill"}
+{"seq":5,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g1","cmd":"rect 8,10 8x1 c=clay3 fill"}
+{"seq":6,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g1","cmd":"line 8,11 15,11 c=clay0 pp=on"}
+{"seq":7,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g1","cmd":"shade light=nw ramp=clay edge=1"}
+{"seq":8,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g1","cmd":"px 14,10 c=clay3"}
+{"seq":9,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g1","cmd":"px 14,13 15,13 c=clay1"}
+{"seq":10,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g1","cmd":"px 8,19 9,20 c=clay2"}
+{"seq":11,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g1","cmd":"px 8,14 9,14 8,15 c=clay4"}
+{"seq":12,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g1","cmd":"line 10,21 13,21 c=clay1 pp=on"}
+{"seq":13,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g1","cmd":"outline c=ink mode=outer corners=off"}
+{"seq":14,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g2","cmd":"note 8,12 \"doubled corner: an extra ink pixel inside the outline under the rim (with 7,12); make it clay3\" id=n1"}
+{"seq":15,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g2","cmd":"note 15,12 \"doubled corner under the rim (with 16,12); make it clay1\" id=n2"}
+{"seq":16,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g2","cmd":"note 8,20 \"doubled corner: ink L-shape with 7,20 and 8,21 squares off the base; make it clay2\" id=n3"}
+{"seq":17,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g2","cmd":"note 15,20 \"doubled corner: ink L-shape with 16,20 and 15,21; make it clay1\" id=n4"}
+{"seq":18,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g2","cmd":"note 14,13 5x3 \"the upper right of the body is plain clay2 ((16,13) and (14-18,14-15)); the clay1 far-side shade only starts at 18,16; carry it up the right edge\" id=n5"}
+{"seq":19,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g2","cmd":"note 5,13 14x8 \"the body is mostly flat clay2, the ground's own colour, so at 1x on the clay it reads as an ink ring; widen the clay1 shadow to 2-3 px on the right and bottom and the clay3 lit side on the left\" id=n6"}
+{"seq":20,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g2","cmd":"note 9,22 6x1 \"the base ends at row 22, so the urn floats one row above its cell's bottom while the kiln stands on its last row; move it down 1 px\" id=n7"}
+{"seq":21,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g3","cmd":"paint 4,12 <<\n  ...0443333220...\n  ..044333332220..\n  .04455333332220.\n  0445433333322210\n  0444333333322210\n  0443333332222110\n  .04333333222110.\n  ..033333222110..\n  ...0332222220...\n  ....02221110....\n>>"}
+{"seq":22,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g3","cmd":"shift 0,1"}
+{"seq":23,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g3","cmd":"note done n1"}
+{"seq":24,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g3","cmd":"note done n2"}
+{"seq":25,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g3","cmd":"note done n3"}
+{"seq":26,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g3","cmd":"note done n4"}
+{"seq":27,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g3","cmd":"note done n5"}
+{"seq":28,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g3","cmd":"note done n6"}
+{"seq":29,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g3","cmd":"note done n7"}
+{"seq":30,"by":"claude","at":"2026-10-28T10:46:40Z","group":"g4","cmd":"mark reviewed \"blind review g10: 7 findings fixed by coordinates\""}
+{"seq":31,"by":"human:chris","at":"2026-10-28T10:46:41Z","group":"h1","cmd":"mark approved"}

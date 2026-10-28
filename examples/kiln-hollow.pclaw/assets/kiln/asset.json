@@ -1,0 +1,42 @@
+{
+  "name": "kiln",
+  "kind": "object",
+  "size": [
+    24,
+    48
+  ],
+  "cell": [
+    24,
+    24
+  ],
+  "wrap": false,
+  "palette": "kiln-hollow",
+  "layers": [
+    {
+      "name": "main",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    }
+  ],
+  "frames": 1,
+  "paletteLocked": false,
+  "stamps": [],
+  "macros": [],
+  "tags": [],
+  "views": [],
+  "links": [],
+  "notes": [],
+  "tape": {
+    "lang": 2,
+    "commands": 31,
+    "groups": 5
+  },
+  "state": {
+    "sha256": "c1d01899489d4c032882ba75bb5757f8e39e971edfc005eaf6329e870edd151d"
+  },
+  "checkpoints": {
+    "every": 200,
+    "files": []
+  }
+}

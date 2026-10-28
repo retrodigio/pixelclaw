@@ -188,7 +188,7 @@ export function App({ store }: { store: Store }) {
         {naming === null ? (
           <button className="chip me" data-testid="me" title="The name your edits are written with on the tape. Click to change it."
             onClick={() => setNaming(store.me.slice('human:'.length))}>
-            you: <b>{store.me}</b>
+            <span className="xwide-only">you: </span><b>{store.me}</b>
           </button>
         ) : (
           <form className="me-form" onSubmit={(e) => { e.preventDefault(); if (store.setMe(naming)) setNaming(null); }}>

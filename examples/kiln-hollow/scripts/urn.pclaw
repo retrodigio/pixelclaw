@@ -1,0 +1,18 @@
+# A squat terracotta urn (manifest: urn, 14 px tall): a wide rim with a dark band under it, a
+# short neck, a round belly on a small foot; shaded from the style guide's light (top left) and
+# outlined in the style guide's ink. It stands on the bottom rows.
+new sprite urn
+ellipse 5,12 14x9 c=clay2 fill
+rect 9,20 6x2 c=clay2 fill
+rect 9,11 6x2 c=clay2 fill
+rect 8,10 8x1 c=clay3 fill
+line 8,11 15,11 c=clay0
+shade ramp=clay
+# Shade leaves a few lone steps at the rim, the neck and the foot: even them out.
+px 14,10 c=clay3
+px 14,13 15,13 c=clay1
+px 8,19 9,20 c=clay2
+# A glint on the shoulder of the belly, and the foot in shadow.
+px 8,14 9,14 8,15 c=clay4
+line 10,21 13,21 c=clay1
+outline

@@ -1,0 +1,42 @@
+{
+  "name": "urn",
+  "kind": "sprite",
+  "size": [
+    24,
+    24
+  ],
+  "cell": [
+    24,
+    24
+  ],
+  "wrap": false,
+  "palette": "kiln-hollow",
+  "layers": [
+    {
+      "name": "main",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    }
+  ],
+  "frames": 1,
+  "paletteLocked": false,
+  "stamps": [],
+  "macros": [],
+  "tags": [],
+  "views": [],
+  "links": [],
+  "notes": [],
+  "tape": {
+    "lang": 2,
+    "commands": 31,
+    "groups": 5
+  },
+  "state": {
+    "sha256": "4c5df11a7050ba46b1f141ce9287d2b61e7ec47393c6fef34e656f67e61bfd0a"
+  },
+  "checkpoints": {
+    "every": 200,
+    "files": []
+  }
+}

@@ -1,0 +1,60 @@
+{
+ "page": "atlas.png",
+ "size": [
+  256,
+  46
+ ],
+ "d": 1,
+ "sprites": [
+  {
+   "sprite": "clay",
+   "x": 24,
+   "y": 1,
+   "w": 24,
+   "h": 24,
+   "cropX": 0,
+   "cropY": 0,
+   "frameW": 24,
+   "frameH": 24,
+   "asset": "clay",
+   "frame": 1,
+   "ticks": 10,
+   "ms": 167
+  },
+  {
+   "sprite": "kiln",
+   "x": 1,
+   "y": 1,
+   "w": 22,
+   "h": 44,
+   "cropX": 1,
+   "cropY": 4,
+   "frameW": 24,
+   "frameH": 48,
+   "asset": "kiln",
+   "frame": 1,
+   "ticks": 10,
+   "ms": 167,
+   "cols": 1,
+   "rows": 1,
+   "anchorX": 0,
+   "anchorY": 1,
+   "flags": "r/."
+  },
+  {
+   "sprite": "urn",
+   "x": 49,
+   "y": 1,
+   "w": 16,
+   "h": 14,
+   "cropX": 4,
+   "cropY": 10,
+   "frameW": 24,
+   "frameH": 24,
+   "asset": "urn",
+   "frame": 1,
+   "ticks": 10,
+   "ms": 167
+  }
+ ]
+}

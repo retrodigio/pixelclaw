@@ -1,0 +1,50 @@
+{
+  "format": "pixelclaw-project",
+  "version": 1,
+  "name": "kiln-hollow",
+  "tickRate": 60,
+  "defaultPalette": "kiln-hollow",
+  "grid": 24,
+  "style": {
+    "palettes": [
+      "kiln-hollow"
+    ],
+    "outline": [
+      "ink"
+    ],
+    "light": "nw",
+    "ground": "clay",
+    "drawScale": 2,
+    "sizes": {
+      "tile": "24x24",
+      "sprite": "24x24",
+      "object": "24x48|48x24|48x48",
+      "icon": "16x16"
+    },
+    "camera": "384x216",
+    "assets": {
+      "urn": {
+        "checks": {
+          "jaggies": {
+            "max": 2
+          }
+        }
+      },
+      "urn_blue": {
+        "checks": {
+          "jaggies": {
+            "max": 2
+          }
+        }
+      },
+      "urn_green": {
+        "checks": {
+          "jaggies": {
+            "max": 2
+          }
+        }
+      }
+    }
+  },
+  "profiles": []
+}

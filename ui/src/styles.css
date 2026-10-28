@@ -248,7 +248,7 @@ header .crumbs { white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 .theme-row { display: flex; align-items: center; gap: 6px; padding: 0 12px 6px; font-size: 12px; color: var(--dim); }
 .theme-select { font-size: 12px; padding: 0 3px; }
 .narrow-only { display: none; }
-@media (max-width: 1500px) { .xwide-only { display: none; } }
+@media (max-width: 1500px) { .xwide-only { display: none; } header .crumbs .meta { display: none; } }
 .palette-edit select { font-size: 12px; padding: 1px 3px; }
 
 /* The options bar on narrow windows: groups keep together and wrap as units; labels shorten. */
@@ -305,7 +305,7 @@ header .crumbs { white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 .map-editor canvas { image-rendering: pixelated; display: block; }
 
 /* The dashboard (plan §7.3): the plan by set, each asset's status and checks. */
-.tabs button { padding: 3px 12px; }
+.tabs button { padding: 2px 9px; }
 .app.dash { grid-template-areas: 'head head head' 'dash dash dash'; }
 .dashboard { grid-area: dash; overflow: auto; padding: 0 0 24px; }
 .dashboard .pad { padding: 16px; }
@@ -336,8 +336,10 @@ header .crumbs { white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 .chk { font: 11px var(--mono); padding: 0 6px; border-radius: 8px; border: 1px solid var(--line); }
 .chk.pass { color: #8fd18b; }
 .chk.fail { color: #ff9a9a; border-color: #7a3036; background: #3a1d20; }
-.card-actions { display: flex; gap: 6px; margin-top: 4px; }
-.card-actions.ask input { flex: 1; min-width: 0; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 3px 6px; }
+.card-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.card-actions button { white-space: nowrap; }
+.card-actions.ask { flex-wrap: wrap; }
+.card-actions.ask input { flex: 1 1 100%; min-width: 0; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 3px 6px; }
 button.approve { border-color: #3f7a4a; color: #8fd18b; }
 .badge { font-size: 11px; padding: 1px 8px; border-radius: 9px; border: 1px solid var(--st, var(--line)); color: var(--st, var(--dim)); background: transparent; white-space: nowrap; }
 button.badge { cursor: pointer; }

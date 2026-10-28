@@ -1,0 +1,36 @@
+# The review round (reviews/2026-10-28-g10/findings.md), by coordinates. The busy bottom band
+# becomes one kinked crack and one cluster; the corner mark moves off the corner; the straight
+# crack gets a kink; the pebbles differ in size and leave their diagonal; the bare rows get marks.
+paint 0,19 <<
+  333333333443333333333333
+  333333334444333333333333
+  332333333443333333333333
+  333222333333333333333333
+  333333333333333333333333
+>>
+px 21,2 22,2 23,2 0,2 23,0 23,1 21,3 c=clay2
+px 11,6 12,6 c=clay2
+px 11,7 12,7 c=clay1
+paint 12,9 <<
+  33
+  33
+>>
+px 21,4 c=clay2
+paint 2,2 <<
+  .h
+  hgf
+>>
+paint 13,11 <<
+  44.
+  .44
+>>
+paint 3,7 <<
+  44
+  4.
+>>
+# Every finding dealt with: its note closed.
+note done n1
+note done n2
+note done n3
+note done n4
+note done n5

@@ -1,0 +1,8 @@
+# The blind review's findings on urn (findings.md), pinned on their pixels.
+note 8,12 "doubled corner: an extra ink pixel inside the outline under the rim (with 7,12); make it clay3"
+note 15,12 "doubled corner under the rim (with 16,12); make it clay1"
+note 8,20 "doubled corner: ink L-shape with 7,20 and 8,21 squares off the base; make it clay2"
+note 15,20 "doubled corner: ink L-shape with 16,20 and 15,21; make it clay1"
+note 14,13 5x3 "the upper right of the body is plain clay2 ((16,13) and (14-18,14-15)); the clay1 far-side shade only starts at 18,16; carry it up the right edge"
+note 5,13 14x8 "the body is mostly flat clay2, the ground's own colour, so at 1x on the clay it reads as an ink ring; widen the clay1 shadow to 2-3 px on the right and bottom and the clay3 lit side on the left"
+note 9,22 6x1 "the base ends at row 22, so the urn floats one row above its cell's bottom while the kiln stands on its last row; move it down 1 px"

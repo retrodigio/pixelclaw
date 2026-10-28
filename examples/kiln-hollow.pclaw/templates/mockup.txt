@@ -1,0 +1,23 @@
+A mockup screen, 16x9 cells of 24 px, laid out from the manifest (sets: ground, props, works, folk, scenes).
+
+  0: aaaaaaaaaaKaaaaa
+  1: aFFaabbaDaaaaaaa
+  2: aaabbbbcaaacccaa
+  3: bbbbbbbbcaacccaH
+  4: aaabbbbbcaacccaa
+  5: aaabbbbbaaacccaG
+  6: aaaEEaJbaaaIaaaa
+  7: aaaaaaabbbbbbbbb
+  8: aaaaaaaaaaaaaaaa
+
+  a  sage
+  b  clay
+  c  stream
+  D  kiln stands here
+  E  rack stands here
+  F  stall stands here
+  G  cistern stands here
+  H  urn stands here
+  I  reeds stands here
+  J  potter stands here
+  K  goat stands here

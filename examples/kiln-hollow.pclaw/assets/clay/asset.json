@@ -1,0 +1,42 @@
+{
+  "name": "clay",
+  "kind": "tile",
+  "size": [
+    24,
+    24
+  ],
+  "cell": [
+    24,
+    24
+  ],
+  "wrap": true,
+  "palette": "kiln-hollow",
+  "layers": [
+    {
+      "name": "main",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    }
+  ],
+  "frames": 1,
+  "paletteLocked": false,
+  "stamps": [],
+  "macros": [],
+  "tags": [],
+  "views": [],
+  "links": [],
+  "notes": [],
+  "tape": {
+    "lang": 2,
+    "commands": 31,
+    "groups": 5
+  },
+  "state": {
+    "sha256": "7b53d65d16d5938730304a62a24fe2514ce330e7e0d0257bcfdb471a80c04b9e"
+  },
+  "checkpoints": {
+    "every": 200,
+    "files": []
+  }
+}

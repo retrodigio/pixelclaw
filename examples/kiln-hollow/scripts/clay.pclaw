@@ -1,0 +1,23 @@
+# Packed red clay (manifest: clay): a mid-clay floor with darker and lighter patches in small
+# clusters, fine cracks one step darker, and a few pale pebbles lit from the top left.
+new tile clay bg=clay2
+noise ramp=clay weights=0,1,0,3,0 cluster=3..6 density=0.13 seed=18 base=keep
+# Cracks: short, broken, never in a row.
+line 8,5 10,6 12,6 c=clay1
+line 15,2 16,4 c=clay1
+line 18,13 21,14 c=clay1
+line 13,18 14,20 16,21 c=clay1
+line 1,21 2,22 c=clay1
+# Pebbles: a lit top-left pixel, a body, a shadow below right.
+paint 12,9 <<
+  hg
+  gf
+>>
+paint 21,4 <<
+  h.
+  gf
+>>
+paint 5,13 <<
+  hg.
+  ggf
+>>

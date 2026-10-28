@@ -1,0 +1,8 @@
+path: 6x6 tiles of 24 px, 16 of 16 variants
+
+  0: -    -    s    -    -    -
+  1: es   esw  new  sw   -    o
+  2: nes  nsw  -    ns   -    -
+  3: ne   nesw ew   nesw w    -
+  4: -    ns   -    n    -    -
+  5: e    nw   -    -    -    -

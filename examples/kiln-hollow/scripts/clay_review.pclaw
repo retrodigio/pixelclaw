@@ -1,0 +1,6 @@
+# The blind review's findings on clay (findings.md), pinned on their pixels.
+note 0,19 16x5 "bottom band of alternating clay1/clay3 single pixels (13,20 14,20 15,20; 7,21 8,21 9,21) is noise, not 2-6 px clusters, and makes every tile's bottom denser than the rest, which shows as a horizontal stripe in the 3x3; merge it into two or three cracks and move some marks into the bare rows 7-8, 11-12 and 17"
+note 5,13 3x2 "the three pebbles (5,13 / 12,9 / 21,4) all have the same pale-top-left, dark-bottom-right shape and sit on an even diagonal, so tiled they form a regular grid of grey dots; vary their size and shape and break the spacing"
+note 21,2 3x1 "light clay3 mark wraps around the tile corner ((21-23,2), (0,2), (23,23)-(23,1)), which marks the grid at every corner in the 3x3; move it off the corner"
+note 2,23 2x1 "the crack at (2-3,20-23) is cut off at the bottom edge, and (2-3,0) above it is plain clay2; continue it into rows 0-1 or end it at row 22"
+note 9,6 4x1 "cracks are straight horizontal dashes (also 5,10 3x1 and 18,13 2x1) and read as streaks; give them a kink or branch so they read as fine cracks"
