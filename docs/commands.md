@@ -145,7 +145,7 @@ text; `export` writes a map for Tiled (the `tiled` profile) and splits an oversi
 
 | Command | Normal form | Notes |
 |---|---|---|
-| `new <kind> <name> <W>x<H> [palette=] [wrap=] [cell=] [bg=] [<< rows >>]` | `new tile floor 24x24 palette=mossy-ruins wrap=on cell=24x24 bg=none <<` palette rows `>>` | First command of a tape only. Kinds: `tile`, `sprite`, `sheet`, `icon`, `object`, `family`, `overlay` (see *Autotile families*), `map` (see *Oversized assets, maps and scenes*). `wrap` defaults to `on` for tiles, `off` otherwise. `cell` defaults to the canvas size. `palette` defaults to the project's default palette, and the line records the whole palette in a block (see *The palette in the tape*). |
+| `new <kind> <name> <W>x<H> [palette=] [wrap=] [cell=] [bg=] [<< rows >>]` | `new tile floor 24x24 palette=mossy-ruins wrap=on cell=24x24 bg=none <<` palette rows `>>` | First command of a tape only. Kinds: `tile`, `sprite`, `sheet`, `icon`, `object`, `family`, `overlay` (see *Autotile families*), `map` (see *Oversized assets, maps and scenes*). `wrap` defaults to `on` for tiles, `off` otherwise. `cell` defaults to the canvas size. `palette` defaults to the project's default palette, and the line records the whole palette in a block (see *The palette in the tape*). The size (and palette, a family's scheme, an object's cell grid) may be left out for an asset the manifest plans (`new sprite urn`), or a kind the style guide sizes (`style.sizes`); the line records what was filled in ([pipeline.md](pipeline.md)). |
 | `px <x,y> [<x,y> ...] c=` | `px 3,4 4,4 c=ink` | Single pixels. |
 | `line <x,y> <x,y> [<x,y> ...] c= [pp=on\|off]` | `line 3,10 9,7 c=stone2 pp=on` | A line or polyline. See *Lines* below. |
 | `curve <x,y> <x,y> <x,y> [<x,y>] c= [pp=on\|off]` | `curve 2,20 8,12 16,14 c=soil2 pp=on` | A quadratic (3 points) or cubic (4 points) Bezier. See *Curves and polygons*. |
@@ -187,8 +187,8 @@ text; `export` writes a map for Tiled (the `tiled` profile) and splits an oversi
 | `dither <x,y> <W>x<H> a= b= [pattern=] [level=]` | `dither 0,0 24x8 a=pool b=moss1 pattern=bayer4 level=0.25` | See *Dithering and gradients*. |
 | `gradient <x,y> <W>x<H> ramp= [dir=] [steps=] [pattern=]` | `gradient 0,0 24x24 ramp=moss dir=down steps=5 pattern=none` | |
 | `ramp <name> = <entry> <entry> ...` | `ramp wood = wood0 wood1 wood2` | Define or replace a ramp of this document's palette, darkest first. |
-| `outline c= [mode=outer\|inner] [corners=on\|off] [from=<layer>]` | `outline c=ink mode=outer corners=off` | See *Helpers*. |
-| `shade light= [ramp=<ramp>\|all] [edge=<n>]` | `shade light=nw ramp=wood edge=1` | |
+| `outline c= [mode=outer\|inner] [corners=on\|off] [from=<layer>]` | `outline c=ink mode=outer corners=off` | See *Helpers*. Without `c=`: the style guide's outline colour (`style.outline`). |
+| `shade light= [ramp=<ramp>\|all] [edge=<n>]` | `shade light=nw ramp=wood edge=1` | Without `light=`: the style guide's (`style.light`). |
 | `clean orphans [size=<n>] [keep=none\|texture]` | `clean orphans size=1 keep=none` | |
 | `noise [<x,y> <W>x<H>] ramp= ...` | `noise 0,0 24x24 ramp=moss weights=0,3,12,1,0 cluster=1..2 density=0.07 base=moss2 wrap=on seed=7` | See *Generators*. |
 | `scatter [<x,y> <W>x<H>] stamp=\|c= count= ...` | `scatter 0,0 24x24 stamp=tuft count=3 minDist=10 flip=on wrap=on seed=3` | |
@@ -206,6 +206,7 @@ text; `export` writes a map for Tiled (the `tiled` profile) and splits an oversi
 | `palette save as=<name>` | `palette save as=ruins-props` | Write this asset's palette to the project as a new palette. |
 | `note <x,y> [<W>x<H>] "text"` | `note 12,5 "beak too long" id=n1` | Pin a note to a pixel or a region. See *Notes*. |
 | `note done <id>` | `note done n1` | Close a note. |
+| `mark <name> ["text"]` | `mark reviewed "fixed the rim"` | A named point on the tape; `reviewed`, `approved`, `rejected` set the status. See *Marks*. |
 | `undo [group=<g>] [by=<author>]` | `undo group=g4` | See *Undo and redo* below. |
 | `redo [group=<g>] [by=<author>]` | `redo group=h5` | Take back an undo. |
 | `fork <from> <to> [at=<n>]` | `fork chest chest_b at=20` | Start asset `<to>` as a branch of `<from>`. See *Forks*. |
@@ -520,6 +521,15 @@ agent reads them through `changes` (see [mcp.md](mcp.md)). The normal form adds 
 `id=n1`, one past the highest id on the tape, so ids are never reused, even after an undo. Open
 notes are part of the document's state (they appear in `asset.json` and the state hash) and show
 on the canvas. `note done n1` closes one. Undoing a note's group removes it.
+
+### Marks
+
+`mark <name> ["text"]` names this point on the tape (plan §7.2): `mark reviewed "blind review
+g10: 5 findings fixed"`. Names are words (a-z, 0-9, `_`, `-`). Three set an asset's status
+(see [pipeline.md](pipeline.md#statuses)): `reviewed` (the agent, after a blind review's findings
+are dealt with), `approved` and `rejected` (a person, from the dashboard). Each mark keeps the
+art's hash, so a later change to the pixels makes it stale. Marks are part of the state (written
+only when there are any); undoing the group takes the mark away.
 
 ### Undo and redo
 

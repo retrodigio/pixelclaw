@@ -9,26 +9,19 @@ Every edit is a line of a small command language. A document *is* its tape of co
 and replay is deterministic (integer maths, seeded randomness), so the same tape always gives the
 same pixels.
 
-**Status: step G7.** The core library and CLI (G1); the MCP server and the live watch view (G2);
-editing in the browser, with every action a command on the tape and the agent's `changes` tool
-(G3); the drawing toolkit (G4): layers, frames, selections, transforms, symmetry, curves,
-dithering, gradients, `outline`, `shade`, `clean`, seeded generators, stamps, brushes and macros;
-and checks and in-context previews (G5): palette, orphans, jaggies, banding, outline, the seam
-score, coverage, readability, revert and repetition against the project's style guide, with the
-flagged pixels circled in magenta in images and in the watch view; the `game` and `recolour`
-previews, role palettes and preview themes; a blind review bundle; and tapes that carry their
-own palette; and animation and sprites (G6): frame durations in game ticks, tags with cycle and
-ping-pong loops, linked cels, directional views with live mirror links, pivots and ground lines,
-the `anim` contact sheet and GIF, the `anim` and `views` checks, checks over every frame, a
-timeline with playback at the game's speed and an onion skin, and `pixelclaw upgrade`; and tile
-sets and autotiling (G7): autotile schemes as data (`blob47`, `wang16-corner`, `path`,
-`bridge8`, `single`, `face`), family documents whose 47 (or 16, or 8) variants are built live from
-a band profile and a few hand-drawn pieces over shared textures, or cut from a painted coverage
-map; sample maps with the seam score over them, overlays (glints, ripples) played over a map, and
-in the watch view each variant among its neighbours and a map to roll. See
-[PROGRESS.md](PROGRESS.md).
+**Status: step G10.** The core library and CLI (G1); the MCP server and the live watch view (G2);
+editing in the browser, every action a command on the tape, and the agent's `changes` tool (G3);
+the drawing toolkit (G4); checks and in-context previews against the project's style guide, with
+flagged pixels circled, and a blind review bundle (G5); animation and sprites (G6); autotile
+schemes as data and family documents built live from a band profile and a few pieces (G7); map
+documents, terrain painting, oversized objects and the map checks (G8); export profiles, import
+and densities (G9); and the project pipeline (G10): a manifest of the assets a game needs, each
+asset's status worked out from the project (planned, drafted, checked, reviewed, approved,
+exported), style-guide defaults, the `consistency` check across a set, flat templates (a mockup
+screen and coverage maps) from the plan, a dashboard where a person approves work, the MCP `plan`
+tool, a state cache, and a Claude Code skill. See [PROGRESS.md](PROGRESS.md).
 
-![A shore family on a random island in the watch view: sand meeting shimmering water through a band of foam and wet sand, the seam score over the map above it, every check green](docs/screenshots/g7-map.png)
+![The dashboard: the kiln-hollow example's 20 planned assets by set, three of them drawn, reviewed, approved and exported](docs/screenshots/g10-dashboard.png)
 
 ## Use it from Claude Code
 
@@ -50,11 +43,19 @@ Once the package is published to npm, the same thing is
 (until then, `npx -y --package /path/to/pixelclaw-0.2.0.tgz pixelclaw serve …` works from a tarball
 made with `cd cli && pnpm pack`).
 
+Install the skill, which teaches Claude Code the workflows, the house rules and the blind-review
+hand-off ([docs/pipeline.md](docs/pipeline.md#the-skill)):
+
+```sh
+node /path/to/pixelclaw/cli/dist/pixelclaw.js skill install     # into ~/.claude/skills/pixelclaw
+```
+
 Start `claude` and ask for the watch link: the `project` tool returns
 `http://127.0.0.1:7417/?token=…`. Open it, then ask Claude to draw. Draw in the page too, or pin a
 note on a pixel, and tell Claude: its `changes` tool returns your lines, your notes and a diff
-image. The tools are `project`, `run`, `view`, `history` and `changes`; see
-[docs/mcp.md](docs/mcp.md). [examples/demo-g2.md](examples/demo-g2.md),
+image. Give it a theme and it plans a whole set: a manifest you follow on the page's Dashboard tab.
+The tools are `project`, `run`, `view`, `check`, `changes`, `history`, `plan`, `review`, `export`
+and `import`; see [docs/mcp.md](docs/mcp.md). [examples/demo-g2.md](examples/demo-g2.md),
 [examples/demo-g3.md](examples/demo-g3.md) and [examples/demo-g4.md](examples/demo-g4.md) walk
 through sessions, with scripts that stand in for the agent.
 
@@ -93,8 +94,10 @@ node cli/bin/pixelclaw.js verify my-art.pclaw
 | `pixelclaw check <project> [<asset>...] [--checks a,b] [--marks]` | Run the quality checks against the style guide; exits 1 if any fails. See [docs/checks.md](docs/checks.md). |
 | `pixelclaw export <project> [<asset>...] [--profile <name>] [--out <dir>]` | Write assets through an export profile (built-in `png`, `atlas`, `tiled`, `godot`, `aseprite-json`, `aseprite`, or the project's own). See [docs/profiles.md](docs/profiles.md). |
 | `pixelclaw import <project> <file.png\|file.aseprite\|folder> [--profile <name>] [--as <name>] [--grid WxH] [--palette <p>\|--build]` | Make a new asset from an image (quantised, sliced by a grid) or an `.aseprite` file, or read a profile's export back and compare. |
-| `pixelclaw review <project> [<asset>...] [--name set]` | Write a blind review bundle (images, palette, style guide, rubric). |
-| `pixelclaw verify <project> [<asset>...]` | Replay every tape and compare it with the saved state, the preview and the checkpoints. |
+| `pixelclaw review <project> [<asset>...] [--set s] [--name n]` | Write a blind review bundle (images, palette, style guide, brief, rubric). |
+| `pixelclaw plan <project> [--set s] [--json] [--manifest <file>] [--templates]` | The asset plan and each asset's status; write a manifest (checked first); draw the flat templates. See [docs/pipeline.md](docs/pipeline.md). |
+| `pixelclaw skill install [--dest <dir> \| --project <dir>]` | Install the Claude Code skill (default `~/.claude/skills/pixelclaw`). |
+| `pixelclaw verify <project> [<asset>...]` | Replay every tape and compare it with the saved state, the preview, the checkpoints and the state cache. |
 | `pixelclaw upgrade <project> [<asset>...]` | Rewrite tapes from tape language 1 (G1-G4) in language 2 (the palette in the `new` line); written only if the replay gives the same pixels, then verified. |
 | `pixelclaw serve --project <project> [--port 7417] [--no-mcp]` | Own the project: MCP on stdin/stdout and the live watch view on localhost (the link, with its token, is printed to stderr). See [docs/mcp.md](docs/mcp.md). |
 
@@ -106,6 +109,9 @@ The command language is described in [docs/commands.md](docs/commands.md).
 my-art.pclaw/
   project.json              name, tick rate, default palette, the style guide's check settings, preview themes
   style.md                  the style guide in words
+  manifest.json             the asset plan (docs/pipeline.md)
+  exported.json             each asset's last export (profile, folder, art hash), for its status
+  templates/                flat templates drawn from the manifest: mockup screen, coverage maps
   palettes/<name>.json      entries (key, name, hex or role) and ramps
   assets/<name>/
     asset.json              kind, size, cell grid, wrap, palette, layers, frames, stamps, macros, open notes, fork link, state hash
@@ -116,6 +122,7 @@ my-art.pclaw/
   reviews/<date>-<set>/     blind review bundles (and the findings brought back)
   reads.json                how far each agent has read each tape (for 'changes')
   .pixelclaw.lock           present while a server owns the project (not for git)
+  .cache/state/<asset>.gwc  each asset's state after its tape, keyed by the tape (never committed)
 ```
 
 ## The demo
@@ -176,6 +183,11 @@ The G9 demo ([examples/demo-g9.md](examples/demo-g9.md)) exports the G6-G8 art t
 export profile into a scratch game folder and reads it back exactly, writes the village for Tiled,
 re-imports a sheet and edits it, and shows the village with its review notes closed and the house
 at twice the density. Export profiles, import and densities: [docs/profiles.md](docs/profiles.md).
+The G10 demo ([examples/demo-g10.md](examples/demo-g10.md)) starts a new game, *Kiln Hollow*
+([`examples/kiln-hollow.pclaw`](examples/kiln-hollow.pclaw)), from a one-paragraph theme: a
+palette, a style guide and a manifest of 20 assets, flat templates, then the clay tile, an urn and
+a bottle kiln taken end to end (drawn, checked, reviewed blind, approved in the dashboard,
+exported). The pipeline: [docs/pipeline.md](docs/pipeline.md).
 
 ## Packages
 
@@ -188,6 +200,7 @@ at twice the density. Export profiles, import and densities: [docs/profiles.md](
   server (stdio) and the HTTP + WebSocket server for the watch view.
 - `ui`: the watch view and editor (Vite + React + canvas 2D). It replays the tape with `core`
   itself, and its tools write commands that `core` previews before they are sent.
+- `skill/`: the Claude Code skill (`pixelclaw skill install`).
 - `cli`: the `pixelclaw` command. `pnpm build` bundles it with `core`, `server` and the built UI
   into `cli/dist` (no runtime dependencies), which is what `pnpm pack` ships.
 

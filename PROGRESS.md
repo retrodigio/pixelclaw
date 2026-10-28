@@ -153,6 +153,19 @@ Status of plan features touched so far. Steps refer to the build plan (§10).
 | The open sea in the repetition check's motif windows; water and sand variants | §17, G9 | done | `example.test.ts` (the village passes) | `water_b/c/d`, `sand_b/c`, `shore_c/d`. |
 | The village's five open notes closed | §17, G9 | done | `example.test.ts` | Sea, sand stripes, straight coast, square corners, lanes to the beach (the lanes' outside left empty). |
 | Demo: the G6-G8 art through the sample profile into a scratch game folder, read back; the village for Tiled; a sheet re-imported and edited | G9 | done | `examples/demo-g9-agent.ts` (run by hand) | `examples/demo-g9.md`; screenshots `docs/screenshots/g9-*.png`. |
+| State cache: each asset's state after its tape, keyed by the tape, the engine and (language 1) the palettes | §18, G10 | done | `cache.test.ts` (every asset of the example byte-identical to a full replay, cached and loaded; a changed tape or a broken file replays; verify catches a cache that differs) | `.cache/state/<asset>.gwc`, its own `.gitignore`. Example: all states 1018 → 75 ms; a CLI run 1.55 → 0.62 s; the example test 49 → 10 s; the unit suite 58 → 20 s. |
+| Manifest and schema validation | §7.3, G10 | done | `g10.test.ts` (core: a good manifest; every problem with its path), `g10.test.ts` (server: nothing written when invalid) | `manifest.json`; written by `plan(manifest=)` or `pixelclaw plan --manifest`; docs/pipeline.md. |
+| Statuses planned → drafted → checked → reviewed → approved → exported | §7.3, G10 | done | `g10.test.ts` (core ladder and stale marks; server: up the ladder through MCP, a person's approval, an export, down on a change, back on undo) | Worked out, never stored. `mark reviewed\|approved\|rejected` on the tape with the art's hash; exports recorded in `exported.json`. |
+| Marks (`mark <name> ["text"]`) | §7.2, G10 | done | `g10.test.ts` (normal form, replay, undo, art hash ignores notes) | Part of the state only when present (old hashes unchanged). |
+| Style-guide-driven defaults and thresholds | §7.3, G10 | done | `g10.test.ts` (`new` without a size, palette or scheme; `outline` without `c=`; `shade` without `light=`; replay needs no defaults), `g10.test.ts` (server: `new sprite urn` takes the manifest's size) | Written into the line. `style.light`, `style.sets.<set>.checks`. |
+| `consistency` check across sets | §5, G10 | done | `g10.test.ts` (fixtures: the one lit from the wrong side, a height off the plan), `g10.test.ts` (server: a planned height), `example.test.ts` (every example asset passes) | Height against the manifest (G6's note), lightness within a material, outline share, light from the shading gradient, cluster size, ramp steps; objects on a map (§4.11). |
+| Palette-swap recolours recognised | §4.8, G10 | done | `g10.test.ts` (a swap is, a copy and a reshuffle are not; readability no longer fails a recolour's IoU 1) | Not compared in consistency or readability's distinctness. |
+| Flat templates: mockup screen and coverage maps from the manifest (blob47-round included) | §7.3, G10 | done | `g10.test.ts` (every scheme's coverage holds every variant, blob47-round's 176; golden `g10/coverage-blob47-round.png`; the mockup places every object, same seed same image; golden `g10/mockup.png`), `g10.test.ts` (server) | `templates/`; `plan(templates=true)`, `pixelclaw plan --templates`. |
+| The dashboard tab | §7.3, §8.3, G10 | done | `dashboard.spec.ts` (cards by status; Approve and Ask for changes log their marks and core's status from the replayed tape is the card's; filters and opening log nothing) | Screenshots `docs/screenshots/g10-*.png`. |
+| The MCP `plan` tool | §7.3, §8.2, G10 | done | `g10.test.ts` (server), `mcp.test.ts` | By set; writes a manifest; draws templates; the dashboard's link. |
+| `review` bundles of a manifest set, with a brief; no author or method names | §5, G10 | done | `g10.test.ts` (server: every text file free of author and method names, no PNG text chunks) | `review(set=)`, `pixelclaw review --set`; `brief.md`. |
+| The Claude Code skill and its install | §8.1, G10 | done | `g10.test.ts` (server: installs, holds the workflows and the hand-off) | `skill/SKILL.md`, `skill/manifest.md`; `pixelclaw skill install [--dest\|--project]`; bundled in `cli/dist/skill`. |
+| Demo: a theme, a manifest and style guide, 20 planned assets on the dashboard, three end to end | G10 | done | `kiln-hollow.test.ts` (verify, rebuild from the scripts, 3 exported and 17 planned, every check passes) | `examples/demo-g10.md`, `examples/demo-g10-agent.ts`, `examples/kiln-hollow/`, `examples/kiln-hollow.pclaw`; a real blind review (`findings.md`). |
 
 ## Notes for G8
 
@@ -229,3 +242,22 @@ Status of plan features touched so far. Steps refer to the build plan (§10).
 - **The engine's own profile** (§7.4) is for a reader to write outside the repo, from the sample
   `bramble.json`: CSV columns, `@2x` and `@1x` levels, five-tone `roles`, autotile names (`root`,
   `root_surrounded`, `root_<letters>_<diagonals>`), numbered sets, Lua snippets.
+
+## Notes for G11
+
+- **Underlays follow the templates**: §6's workflow is code-drawn flat layout → mockup underlay →
+  snap. `templates/mockup.png` (a camera-sized screen from the manifest) and the coverage maps are
+  that flat layout; `underlay generate … layout=` can take them, and a snapped coverage map can be
+  cut into a family (`family cut`).
+- **Icons and fonts in the manifest**: `kind` follows the document kinds (no `font` yet); the
+  icon-set checks (stroke weight, bounding-box fill, optical centre) fit `consistency`, which
+  already holds a set to its median (icons are compared with icons).
+- **`jaggies` on shading inside a ramp** (plan question 138): a round form's stepped bands count as
+  doubled corners; the urns have a style-guide allowance.
+- **`map gen` from the manifest** (§4.11): it still lays out terrain only; the manifest now lists
+  the terrains and objects a scene `uses`.
+- **Cost of the plan**: `plan` runs every check on every drawn asset (2 s on the mossy-ruins
+  example; kept in the server until something they read changes). The state cache is 8 MB there,
+  uncompressed.
+- **Cost of this step**: not measured.
+

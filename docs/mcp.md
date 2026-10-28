@@ -44,7 +44,7 @@ link").
 
 ## Tools
 
-All seven tools go through the writer's queue. Errors come back as tool errors (`isError`) with a
+All ten tools (`project`, `run`, `view`, `check`, `review`, `plan`, `export`, `import`, `history`, `changes`) go through the writer's queue. Errors come back as tool errors (`isError`) with a
 plain message.
 
 ### `project`
@@ -159,13 +159,25 @@ glowcap: 5 of 7 checks failing
 ### `review`
 
 Write a blind review bundle under `reviews/<date>-<set>/` (see [checks.md](checks.md#the-review-bundle)):
-`assets` (default all) and `name` (default `all`); for families, `size` and `seed` choose the
+`assets` (default all), `set` (a manifest set: its drawn assets, with `brief.md` from the manifest)
+and `name` (default the set, else `all`); for families, `size` and `seed` choose the
 island they are shown on (default 16x12, seed 1). Hand the folder to a fresh agent with no other
 context, ask it to follow `rubric.md`, and pin its findings on the pixels with `note` commands.
 
+### `plan`
+
+The asset plan (`manifest.json`) and each planned asset's status by set: planned, drafted,
+checked, reviewed, approved, exported, with what it needs next and why it is not further on
+(failing checks, a stale mark or export, changes a person asked for); `set` shows one set.
+`manifest` writes a manifest, checked against its schema first (nothing is written when it has
+problems, each listed with its path). `templates: true` draws the flat templates (the mockup
+screen, returned inline, and a coverage map per family) into `templates/`. The result ends with
+the dashboard's link. See [pipeline.md](pipeline.md).
+
 ### `export`
 
-Write assets through an export profile (see [profiles.md](profiles.md)): `profile` is a built-in
+Write assets through an export profile (see [profiles.md](profiles.md)); each asset written is
+recorded in `exported.json` for its status: `profile` is a built-in
 (`png`, `atlas`, `tiled`, `godot`, `aseprite-json`, `aseprite`), one of the project's
 (`profiles/*.json`) or a profile file's path (default `png`); `assets` (default all; a map brings
 the families, tiles and objects it draws, and every asset its texture variants and density
@@ -253,7 +265,10 @@ is watching, to carry on from what they did, and to close notes it has dealt wit
 
 ## The watch view
 
-Open the link (with its token). The page shows:
+Open the link (with its token). Two tabs in the header: **Editor** (below) and **Dashboard**, the
+plan by set with each asset's status, where a person approves work or asks for changes (both are
+`mark` commands on the asset's tape with their name; see [pipeline.md](pipeline.md#the-dashboard)).
+`&tab=dashboard` in the link opens it. The editor shows:
 
 - **Assets** (left), with a dot on assets that have commands still to play (branches show `⑂`
   and their source). With **follow** on (the default), the view moves to whichever asset the

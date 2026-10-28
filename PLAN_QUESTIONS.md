@@ -831,3 +831,100 @@ Points where the plan was unclear or silent. Each has the reading that was follo
      order, levels 1/2/4 with reduction, five role colours (not the engine's), autotile naming in
      the style of `root_<letters>_<diagonals>`, numbered sets from 1, flagged mirrors, Lua-like
      snippets.
+
+## G10
+
+126. **The replay or state cache** (§18). *Reading:* a state cache rather than more checkpoints:
+     each asset's state after its whole tape in `<project>/.cache/state/<asset>.gwc`, keyed by the
+     SHA-256 of the tape file, of the engine (core's sources and built-in schemes from the repo,
+     the bundle when packed) and, for a language 1 tape, of the palettes it reads. It is a cache,
+     not history: never committed (its own `.gitignore`), rebuilt by any replay, compared by
+     `verify`. Checkpoints stay as they are (§7.1).
+
+127. **Statuses.** *Reading:* worked out from the project every time, never written by hand or
+     stored: planned (in the manifest only), drafted (exists), checked (every check passes),
+     reviewed (`mark reviewed` on the tape), approved (`mark approved`, a person in the
+     dashboard), exported (`exported.json`). Each needs the ones before it. A mark keeps the art's
+     hash (frames as they look; notes, marks and selections leave it), so a later change makes it
+     stale and the status falls back, with the reason in `plan`. `mark rejected "…"` after an
+     approval sends it back to reviewed; undoing a mark's group takes it away.
+
+128. **"Exported"** (G9's note). *Reading:* recorded outside the tape, since exporting does not
+     change the document: `exported.json` keeps each asset's last profile, folder, time and art
+     hash; an asset is exported while that hash is its art's.
+
+129. **The manifest's fields** (§7.3: kind, size, scheme, frames, views, band, status).
+     *Reading:* `manifest.json` with `format`, `version`, `theme` (the paragraph), `sets`,
+     `export`, and per asset `name`, `kind`, `size`, `set` (default: the kind), `description`,
+     `palette`, `scheme`, `inside`, `outside`, `band`, `frames`, `ticks`, `views`, `mirror`,
+     `cells`, `height`, `variantOf`, `recolourOf`, `uses`, `flat`. Unknown fields are errors.
+     The status is not a field (127). `height` (the drawn shape's height) is how size
+     consistency is planned (G6's note: a chest as tall as the walker).
+
+130. **Style-guide-driven defaults and thresholds.** *Reading:* `new` without a size, palette or
+     scheme takes the manifest's entry (else the style guide's size for the kind; an object's
+     cell grid is the project's grid); `shade` without `light=` takes `style.light`; `outline`
+     without `c=` the first of `style.outline` the palette has. Defaults are written into the
+     line, so replay never reads them. Thresholds: `style.sets.<set>.checks`, between the style
+     guide's and the asset's own.
+
+131. **`consistency`** (§5: colour usage per material, light direction, outline share, cluster
+     sizes, mean lightness per family). *Reading:* each asset against the rest of its set (the
+     manifest's set, else ground tiles with tiles and figures and props together) and the plan:
+     height (± 2), lightness compared only among assets mostly in the same ramp ("per family" as
+     per material: sand is lighter than moss by nature), outline share, the light from the
+     shading gradient between neighbours of one ramp (lighter toward the light) against
+     `style.light`, cluster size over the square root of the drawn area, ramp steps per material.
+     An outlier is one beyond a limit from the set's median (two others needed). Families and
+     overlays are judged on their maps; on a map, the objects standing on it are held to each
+     other (§4.11's "consistency of light and palette across everything on screen"; G8 left it
+     here).
+
+132. **Palette-swap recolours** (§4.8, G9's note). *Reading:* `b` is a recolour of `a` when both
+     have the same size and opaque pixels on every frame and each of `a`'s colours is always one
+     of `b`'s and no two share one (a bijection), with at least one colour different. They are not
+     compared with each other in consistency or in readability's silhouette distinctness.
+
+133. **Flat templates** (§7.3 step 3). *Reading:* drawn from the manifest alone into
+     `templates/`, not as assets: the mockup screen is one camera-sized screen in flat colours
+     (each asset's `flat`, else a fixed list), the first plain tile as the ground, each family's
+     terrain over it through the scheme's own geometry and band (a road for path schemes, a blob
+     for the others), objects and figures at their planned sizes on free ground; a coverage map
+     per family through `coverageTerrain`, sized so the first try places every variant
+     (blob47-round: 25x19 tiles for its 176).
+
+134. **The dashboard** (§7.3, §8.3). *Reading:* a second tab of the watch view, not a separate
+     page: cards by set, coloured by status, with failing checks and what each needs next. A
+     person's two controls are tape commands (`mark approved`, `mark rejected "…"`); filters and
+     opening an asset log nothing. Thumbnails are each asset's `preview.png`.
+
+135. **The `plan` tool** ("returns the same as text"). *Reading:* also the way to write a manifest
+     (validated) and to draw the templates, so the tool count stays at ten; Claude Code can
+     equally write `manifest.json` with its own file tools.
+
+136. **`review` of a set, with a brief.** *Reading:* `review(set=)` takes a manifest set's drawn
+     assets and adds `brief.md` (the theme and each piece's description and planned size), so
+     the reviewer can say whether a piece reads as what it is meant to be. The text is the
+     agent's; the skill tells it to keep method names out, and the test holds the bundle to it.
+
+137. **The skill, "installable by a documented command".** *Reading:* `skill/` in the repo
+     (`SKILL.md` with the session routine, house rules, workflows and the blind-review hand-off;
+     `manifest.md`), installed by `pixelclaw skill install` into `~/.claude/skills/pixelclaw`
+     (`--project <dir>` or `--dest <dir>` elsewhere) with `docs/commands.md` beside it; the
+     bundle carries a copy.
+
+138. **`jaggies` on shading inside a shape.** The checks read every colour's contours, so a round
+     form's stepped shading bands (which the blind reviewer asked for, two to three pixels deep)
+     count as doubled L-corners. *Reading:* allowed per asset in the style guide with the reason
+     (the urns: 2), as G8 did for the trees' leaf clusters. A reader may prefer `jaggies` to skip
+     boundaries between steps of one ramp on sprites.
+
+139. **"Claude completes three end to end (drawn, checked, reviewed, exported)".** *Reading:*
+     the ladder puts a person's approval before the export (§7.3 step 7), so the stand-in's
+     headless browser approves them in the dashboard. The blind review was run once by a real
+     fresh-context agent on the bundle (copied to a neutral folder); the stand-in replays its
+     report (`examples/kiln-hollow/findings.md`) instead of calling a model.
+
+140. **The demo's theme.** *Reading:* an original one, *Kiln Hollow* (a potters' hamlet in a clay
+     valley), with an original 29-colour palette; it lives beside the mossy-ruins example as a
+     second project, `examples/kiln-hollow.pclaw`, whose tapes carry the stand-in run's times.

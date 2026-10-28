@@ -64,7 +64,7 @@ writeFileSync(join(project, 'project.json'), JSON.stringify(pj, null, 2) + '\n')
 // The stream's rounded bank uses the rounder-corner scheme from the mossy-ruins example.
 mkdirSync(join(project, 'schemes'), { recursive: true });
 copyFileSync(join(REPO, 'examples', 'mossy-ruins.pclaw', 'schemes', 'blob47-round.json'), join(project, 'schemes', 'blob47-round.json'));
-console.log(indent(readFileSync(join(SRC, 'style.md'), 'utf8').split('\n').filter((l) => l.startsWith('- **')).map((l) => l.replace(/^- \*\*(.*?)\*\*.*/, '$1')).join(' · '), 2));
+console.log(indent(readFileSync(join(SRC, 'style.md'), 'utf8').split('\n').filter((l) => l.startsWith('- **')).map((l) => l.replace(/^- \*\*(.*?)\.?\*\*.*/, '$1')).join(' · '), 2));
 await sleep(pause);
 
 console.log('\n3. The manifest: 20 assets in five sets, written through the plan tool (checked against its schema first)');

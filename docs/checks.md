@@ -28,13 +28,14 @@ they always agree.
 | `outline` | sprites | share of the silhouette edge in ink | ≥ 0.85 | Edge pixels not in the outline colour (`style.outline`, else entries named ink, outline or black; in role art the `black` role). |
 | `seam` | tiles, families | the pilot's metric (below) | ≤ 1 | Tiles: the edge columns or rows that stand out. Families: the same metric over a composed map (the 12x10 island of seed 1, the `map` view's default), no pixels flagged; `view map` shows it. |
 | `coverage` | all | missing items | ≤ 0 | A size other than the style's (`style.sizes`), a size that is not whole cells, empty frames, empty cells of a sheet. Families: every variant the scheme names and both textures drawn, on every frame (an outside left empty on purpose, over a drawn inside, is fine: the ground below shows). A density copy is held to its level's sizes (d times the style's). |
-| `readability` | sprites | edge contrast share | ≥ 0.8 | Edge pixels within ΔL* 15 of the ground under them (the usual ground tile, repeated). Also: the silhouette's IoU with each asset of its set (≤ 0.9), and the lightness spread inside (L* p95 − p5 ≥ 25). |
+| `readability` | sprites | edge contrast share | ≥ 0.8 | Edge pixels within ΔL* 15 of the ground under them (the usual ground tile, repeated). Also: the silhouette's IoU with each asset of its set (≤ 0.9; a palette-swap recolour of it is not compared), and the lightness spread inside (L* p95 − p5 ≥ 25). |
 | `revert` | with `ref=` | share of pixels unchanged from the reference | ≤ 0.15 | Pixels with the same colour as the reference asset at the same place. |
 | `repetition` | tiles | ΔL* × √width of the worst band | ≤ 3 | The most visible stripe when the tile is repeated: a band of 1 to 6 rows (or columns) lighter or darker than the rest. Flags the marks that make it. |
 | `anim` | 2 frames or more | the worst frame-to-frame change | 8–35 % (tiles 3–35 %) | Per sequence (tags, views; mirror views are their source): **frame diff** (changed pixels over the union of both silhouettes; the pilot's good pairs changed 16-19 %): too little (a held frame or one that barely moves) or too much (a jump), flagging the changed pixels; the **loop seam** of a cycle (last frame back to the first) in the same band; sprites also: **pivot drift** (the silhouette's centre column moving by more than 1 px between frames: it slides), **ground drift** (the lowest row off the ground line, or off the first frame's: it floats or sinks; 0 px), and **area jumps** (the silhouette growing or shrinking by more than 15 %). Thresholds `minDiff`, `maxDiff`, `maxPivot`, `maxGround`, `maxArea`. |
 | `fit` | objects and oversized tiles | problems | ≤ 0 | Footprint cells with nothing drawn, and art outside the footprint that is not a roof (`r`): an actor walking behind would be drawn over it. Skips one-cell assets without a footprint, families, overlays and sheets. |
 | `variant` | assets with `variant of=` | L1 of the colour shares; mean ΔL* | < 0.3; < 2 | The pilot's rule for texture variants: a variant whose colour mix strays from its base reads as a patch on a map. Flags the border pixels that differ from the base's (a seam where they meet, unless the textures blend). |
 | `density` | copies with `density of=` | share of the base's pixels the reduction changes | ≤ 25 % | The copy reduced by its factor with the style's reducer (`style.density`: `reducer` ink-vote, mode or nearest; `ink`; `share`) against its authored base; flags the copy's blocks that reduce to another colour. A lower copy is authored, so some difference is expected: the report says where. See [profiles.md](profiles.md#densities). |
+| `consistency` | everything but families and overlays; maps | outlier measures | ≤ 0 | Held to the rest of its set (the manifest's set, else tiles with tiles and figures and props with figures and props) and to the plan: the drawn shape's **height** against the manifest's (± `heightTol` 2); **lightness** (mean L*) against the set's median among assets drawn mostly in the same ramp (± `maxL` 18); **outline share** (± `maxOutline` 0.3); the **light** direction from the shading gradient inside each ramp against `style.light`, else the set's (≤ `maxAngle` 90°); **cluster size** (mean same-colour cluster over the square root of the drawn area, within × `maxCluster` 3 of the median); **ramp steps** used per material (± `maxSteps` 1.5). Set measures need two others. Palette-swap recolours (the same pixels through a one-to-one colour mapping) are not compared with each other. On a map: the objects standing on it, each against the others; flags the cells of the one that stands out. Flags a shape's top and bottom rows when its height is off. |
 | `views` | 2 views or more | the least difference between two views | ≥ 20 % | Directions that look too alike (the pilot's player directions did): each pair of views is compared on its first frame, by colour over both silhouettes. Mirror views count as their source, and views facing each other left to right (E and W) are not compared. |
 
 Checks that do not apply are skipped (seam on a sprite, outline on a tile, revert without a
@@ -77,6 +78,8 @@ in the test palette; a tile half moss, half leaf scores `jump = (1 - 1/7) / (sqr
   "ground": "grass",
   "drawScale": 2,
   "sizes": { "tile": "24x24", "sprite": "24x24" },
+  "light": "nw",
+  "sets": { "props": { "checks": { "orphans": { "max": 1.5 } } } },
   "checks": { "orphans": { "max": 1.5, "tile": { "max": 3 } }, "jaggies": { "off": true } },
   "assets": { "stone_floor": { "checks": { "repetition": { "off": true } }, "ground": "...", "set": ["..."] } }
 },
@@ -84,8 +87,10 @@ in the test palette; a tile half moss, half leaf scores `jump = (1 - 1/7) / (sqr
 ```
 
 Each check's parameters merge in this order: the defaults for every kind, the defaults for the
-asset's kind, `style.checks.<check>`, `style.checks.<check>.<kind>`, then
-`style.assets.<asset>.checks.<check>`. The parameter names are the ones in the table (`max`,
+asset's kind, `style.checks.<check>`, `style.checks.<check>.<kind>`, the asset's manifest set's
+`style.sets.<set>.checks.<check>` (G10), then `style.assets.<asset>.checks.<check>`. `light` is
+the light direction `consistency` holds the art to and `shade` uses when it is not given; see
+[pipeline.md](pipeline.md#style-guide-defaults-and-thresholds). The parameter names are the ones in the table (`max`,
 `min`), plus `off`, and for some checks more: `orphans.texture` (allow one-step strays),
 `banding.minEdges`, `readability.delta`, `readability.maxIou`, `readability.minSpread`. The server
 reads `project.json` again when it changes, and tells the watch view.
@@ -95,7 +100,9 @@ includes it.
 
 ## The review bundle
 
-`review(assets?, name?)` (CLI: `pixelclaw review <project> [asset...] [--name set]`) writes
+`review(assets?, set?, name?)` (CLI: `pixelclaw review <project> [asset...] [--set s] [--name n]`; `set`
+reviews a manifest set's drawn assets and adds `brief.md`, the theme and what each piece is meant
+to be, see [pipeline.md](pipeline.md#the-review-hand-off)) writes
 `reviews/<date>-<set>/`: each asset enlarged with rulers (for coordinates) and at game scale,
 tiles repeated 3x3, sprites on their ground beside their set, the colours the art uses, the style
 guide and `rubric.md` (readability, cohesion, seams and repetition, style-guide fit, defects with
