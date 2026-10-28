@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync
 import { basename, join } from 'node:path';
 import {
   LANG_VERSION, encodePng, importPalette, paletteToJson, parseTape, renderFlat, serializeDoc, tapeToJsonl,
-  type AssetState, type Doc, type Palette, type PaletteSource, type TapeEntry,
+  type AssetState, type Doc, type Note, type Palette, type PaletteSource, type TapeEntry,
 } from '@pixelclaw/core';
 
 export const PROJECT_FORMAT = 'pixelclaw-project';
@@ -35,7 +35,10 @@ export interface AssetJson {
   frames: number;
   tags: unknown[];
   views: unknown[];
+  /** `{ "fork": { "from": <asset>, "at": <seq> } }` for a branch. */
   links: unknown[];
+  /** The open notes (plan §1.3): pinned to a pixel (1x1) or a region. */
+  notes: Note[];
   tape: { lang: number; commands: number; groups: number };
   state: { sha256: string };
   checkpoints: { every: number; files: string[] };
@@ -122,11 +125,23 @@ export function readAssetJson(p: Project, name: string): AssetJson {
   return JSON.parse(readFileSync(join(assetDir(p, name), 'asset.json'), 'utf8')) as AssetJson;
 }
 
+const FORK_RE = /^fork (\S+) \S+ at=(\d+)$/;
+
+/** Where a branch was forked from: its tape's fork line, if it has one. */
+export function forkOf(entries: TapeEntry[]): { from: string; at: number } | null {
+  for (const e of entries) {
+    const m = FORK_RE.exec(e.cmd);
+    if (m) return { from: m[1]!, at: Number(m[2]) };
+  }
+  return null;
+}
+
 export function assetJsonFor(doc: Doc, entries: TapeEntry[]): AssetJson {
+  const fork = forkOf(entries);
   return {
     name: doc.name, kind: doc.kind, size: [doc.width, doc.height], cell: [doc.cellW, doc.cellH], wrap: doc.wrap,
     palette: doc.palette.name, layers: doc.layers.map((l) => ({ name: l.name })), frames: doc.frameCount,
-    tags: [], views: [], links: [],
+    tags: [], views: [], links: fork ? [{ fork }] : [], notes: doc.notes,
     tape: { lang: LANG_VERSION, commands: entries.length, groups: new Set(entries.map((e) => e.group)).size },
     state: { sha256: sha256(serializeDoc(doc)) },
     checkpoints: { every: CHECKPOINT_EVERY, files: [] },
@@ -172,6 +187,24 @@ export function saveAsset(p: Project, state: AssetState): string {
   writeJson(join(dir, 'asset.json'), assetJsonFor(doc, state.entries));
   writeFileSync(join(dir, 'preview.png'), previewPng(doc));
   return dir;
+}
+
+// Read positions (plan §8.2 `changes`): for each agent, the last tape position it has seen on each
+// asset. Kept in <project>/reads.json so a restarted server still knows what the agent has seen.
+
+export const READS_FILE = 'reads.json';
+export type Reads = Record<string, Record<string, number>>;
+
+export function readReads(p: Project): Reads {
+  try {
+    return JSON.parse(readFileSync(join(p.dir, READS_FILE), 'utf8')) as Reads;
+  } catch {
+    return {};
+  }
+}
+
+export function writeReads(p: Project, r: Reads): void {
+  writeJson(join(p.dir, READS_FILE), r);
 }
 
 // The server lock: a running server is the single writer for its project. It writes

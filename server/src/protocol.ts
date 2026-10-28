@@ -1,7 +1,7 @@
 // Messages between the server and the watch view (WebSocket, JSON). Types only, so the UI can
 // import them without pulling in any Node code.
 
-import type { Palette, TapeEntry } from '@pixelclaw/core';
+import type { Diag, Palette, TapeEntry } from '@pixelclaw/core';
 
 export interface AssetTape {
   name: string;
@@ -40,6 +40,16 @@ export type ServerMessage =
   | { type: 'batch'; asset: string; by: string; group: string; entries: TapeEntry[]; changed: number; reset: boolean }
   | { type: 'eye'; eye: Eye }
   /** Palettes were added to the project. */
-  | { type: 'palettes'; palettes: Palette[]; defaultPalette: string | null };
+  | { type: 'palettes'; palettes: Palette[]; defaultPalette: string | null }
+  /** The answer to one page's `run` (only to that page; the batch itself goes to every page). */
+  | { type: 'result'; id: number; ok: true; asset: string; group: string | null; seq: number | null }
+  | { type: 'result'; id: number; ok: false; errors: Diag[] }
+  | { type: 'pong' };
 
-export type ClientMessage = { type: 'ping' };
+/** Authors a page may write as: `human:<name>`. */
+export const HUMAN_RE = /^human:[A-Za-z0-9_.-]{1,32}$/;
+
+export type ClientMessage =
+  | { type: 'ping' }
+  /** Commands from a person: applied by the single writer as one undo group, written `by`. */
+  | { type: 'run'; id: number; asset: string; commands: string; by: string };

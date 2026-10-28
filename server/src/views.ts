@@ -1,21 +1,26 @@
-// The views of plan §2 that exist so far: the scaled render, the text index grid and the 3x3 tile
-// preview. Each is rendered from a document and saved under <project>/views/ (or another folder).
+// The views of plan §2 that exist so far: the scaled render, the text index grid, the 3x3 tile
+// preview and the diff (before / after with the changed pixels marked, plus the list of changes).
+// Each is rendered from a document and saved under <project>/views/ (or another folder).
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { encodePng, renderGrid, renderScaled, renderTile3x3, type Doc, type Region } from '@pixelclaw/core';
+import {
+  diffPixels, diffText, encodePng, renderDiff, renderGrid, renderScaled, renderTile3x3, type Doc, type Region,
+} from '@pixelclaw/core';
 import { ProjectError } from './project.ts';
 
-export const VIEW_MODES = ['render', 'grid', 'tile3x3'] as const;
+export const VIEW_MODES = ['render', 'grid', 'tile3x3', 'diff'] as const;
 export type ViewMode = (typeof VIEW_MODES)[number];
 
 export interface ViewOptions {
   scale?: number;
   region?: Region;
+  /** diff only: compare with the document after this command (default: before the last group). */
+  since?: number;
 }
 
 export type View =
-  | { mode: ViewMode; kind: 'image'; png: Uint8Array; width: number; height: number; path: string }
+  | { mode: ViewMode; kind: 'image'; png: Uint8Array; width: number; height: number; path: string; text?: string }
   | { mode: ViewMode; kind: 'text'; text: string; path: string };
 
 export function isViewMode(s: string): s is ViewMode {
@@ -44,10 +49,21 @@ export function checkViewOptions(doc: Doc, o: ViewOptions): void {
   }
 }
 
-/** Render one view and write it to outDir (views/<asset>.<mode>.png|txt, overwritten each time). */
-export function makeView(doc: Doc, mode: ViewMode, o: ViewOptions, outDir: string): View {
+/**
+ * Render one view and write it to outDir (views/<asset>.<mode>.png|txt, overwritten each time).
+ * The diff compares `before` (null: nothing yet) with `doc`.
+ */
+export function makeView(doc: Doc, mode: ViewMode, o: ViewOptions, outDir: string, before?: Doc | null): View {
   checkViewOptions(doc, o);
   mkdirSync(outDir, { recursive: true });
+  if (mode === 'diff') {
+    const img = renderDiff(before ?? null, doc, { scale: o.scale });
+    const png = encodePng(img);
+    const path = join(outDir, `${doc.name}.diff.png`);
+    writeFileSync(path, png);
+    const text = diffText(before ?? null, doc, diffPixels(before ?? null, doc));
+    return { mode, kind: 'image', png, width: img.width, height: img.height, path, text };
+  }
   if (mode === 'grid') {
     const r = o.region;
     const text = renderGrid(doc, r);

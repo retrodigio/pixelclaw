@@ -4,4 +4,4 @@
 export * from './project.ts';
 export * from './views.ts';
 export * from './writer.ts';
-export type * from './protocol.ts';
+export * from './protocol.ts';

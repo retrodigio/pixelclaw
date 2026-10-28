@@ -1,13 +1,15 @@
 // The single writer for a project (plan §8.1). Every command, from the agent (MCP), the CLI or a
 // browser, goes through `run` in the order it arrives; each applied batch is saved and then sent
-// to every listener (the watch view's sockets).
+// to every listener (the watch view's sockets). It also keeps each agent's read position for
+// `changes`, and a timeline per asset so any earlier state is quick to rebuild.
 
 import { join } from 'node:path';
 import {
-  activeGroups, parse, replay, runBatch, type AssetState, type Diag, type Doc, type TapeEntry,
+  Timeline, activeGroups, parse, replay, runBatch, type AssetState, type Diag, type Doc, type Note, type TapeEntry, type Token,
 } from '@pixelclaw/core';
 import {
-  ProjectError, addPalettes, assetExists, listAssets, paletteSource, readTape, saveAsset, type Project,
+  ProjectError, addPalettes, assetExists, forkOf, listAssets, paletteSource, readReads, readTape, saveAsset, writeReads,
+  type Project,
 } from './project.ts';
 import type { Eye, ServerMessage, Snapshot } from './protocol.ts';
 import { makeView, type View, type ViewMode, type ViewOptions } from './views.ts';
@@ -66,7 +68,29 @@ export interface History {
   undone: string[];
 }
 
+/** What changed on one asset since an agent last looked (`changes`). */
+export interface AssetChanges {
+  asset: string;
+  /** The agent had seen the tape up to this command (0: nothing yet). */
+  from: number;
+  /** The tape's last command now. */
+  to: number;
+  /** The commands since `from` that other authors wrote. */
+  lines: TapeEntry[];
+  /** How many of the agent's own commands are in the same range (they are in the diff too). */
+  own: number;
+  /** The asset's open notes now, and the ids of those written in `lines`. */
+  notes: Note[];
+  newNotes: string[];
+  before: Doc | null;
+  after: Doc;
+}
+
 export type Listener = (m: ServerMessage) => void;
+
+/** Commands that write pixels: a batch of these that changes nothing gets a warning. */
+const DRAWING_RE = /^(px|line|rect|ellipse|fill|paint|stroke|shift) /;
+const words = (args: Token[]): string[] => args.flatMap((t) => (t.t === 'word' ? [t.v] : []));
 
 export interface WriterOptions {
   /** The clock for tape `at` stamps (UTC, whole seconds). */
@@ -78,6 +102,7 @@ const utcNow = (): string => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 export class Writer {
   project: Project;
   private readonly states = new Map<string, AssetState>();
+  private readonly timelines = new Map<string, Timeline>();
   private readonly listeners = new Set<Listener>();
   private queue: Promise<unknown> = Promise.resolve();
   private readonly now: () => string;
@@ -116,6 +141,7 @@ export class Writer {
   setProject(p: Project): void {
     this.project = p;
     this.states.clear();
+    this.timelines.clear();
     this.live = null;
     this.lastEye = null;
     this.emit({ type: 'hello', snapshot: this.snapshot() });
@@ -146,13 +172,26 @@ export class Writer {
     return doc;
   }
 
-  /** Parse, apply and save one batch as one undo group. Any error applies nothing. */
+  /** The document right after command `seq` of an asset's tape (null before its first command). */
+  docAt(name: string, seq: number): Doc | null {
+    let tl = this.timelines.get(name);
+    if (!tl) this.timelines.set(name, (tl = new Timeline(paletteSource(this.project))));
+    const r = tl.docAfter(this.state(name).entries, seq);
+    if (r.problem) throw new ProjectError(`asset '${name}': ${r.problem}`);
+    return r.doc;
+  }
+
+  /**
+   * Parse, apply and save one batch as one undo group. Any error applies nothing. A batch that
+   * starts with `new` creates an asset; one that starts with `fork <from> <to>` creates asset
+   * <to> from a copy of <from>'s tape up to the fork point.
+   */
   run(req: RunRequest): RunOutcome {
     const parsed = parse(req.commands);
     const first = parsed.commands[0];
     const startsNew = first?.name === 'new';
-    const newName = startsNew ? first.args[1] : undefined;
-    const declared = newName?.t === 'word' ? newName.v : undefined;
+    const startsFork = first?.name === 'fork';
+    const declared = startsNew ? words(first.args)[1] : startsFork ? words(first.args)[1] : undefined;
     const name = req.asset ?? declared;
     if (!name) {
       if (parsed.errors.length) return { ok: false, errors: parsed.errors };
@@ -163,15 +202,17 @@ export class Writer {
     }
     let state: AssetState = { doc: null, entries: [] };
     const exists = assetExists(this.project, name);
+    const creates = startsNew || startsFork;
     if (exists) {
-      if (startsNew && !req.replace) throw new AssetExistsError(name);
-      if (!startsNew) state = this.state(name);
-    } else if (!startsNew && !parsed.errors.length) {
+      if (creates && !req.replace) throw new AssetExistsError(name);
+      if (!creates) state = this.state(name);
+    } else if (!creates && !parsed.errors.length) {
       throw new ProjectError(`no asset '${name}' in ${this.project.dir}; start the commands with 'new <kind> ${name} <W>x<H>'`);
     }
+    if (startsFork && !parsed.errors.length) state = this.forkPrefix(first);
     const r = runBatch(state, req.commands, { by: req.by, at: this.now(), palettes: paletteSource(this.project) });
     if (!r.ok) return { ok: false, errors: r.errors };
-    const base = { asset: name, doc: r.state.doc, group: r.group, added: r.added, changed: r.changed, created: startsNew };
+    const base = { asset: name, doc: r.state.doc, group: r.group, added: r.added, changed: r.changed, created: creates };
     const totals = (s: AssetState) => ({ commands: s.entries.length, groups: new Set(s.entries.map((e) => e.group)).size });
     if (!r.state.doc || r.added.length === 0) {
       return { ok: true, ...base, warnings: ['no commands'], ...totals(r.state), dir: null };
@@ -181,18 +222,74 @@ export class Writer {
     this.states.set(name, r.state);
     this.live = name;
     const warnings: string[] = [];
-    const drew = r.added.some((e) => !e.cmd.startsWith('new ') && !e.cmd.startsWith('undo '));
+    const drew = r.added.some((e) => DRAWING_RE.test(e.cmd));
     if (drew && r.changed === 0) warnings.push('the batch changed no pixels');
     this.emit({
-      type: 'batch', asset: name, by: req.by, group: r.group!, entries: startsNew ? r.state.entries : r.added,
-      changed: r.changed, reset: startsNew,
+      type: 'batch', asset: name, by: req.by, group: r.group!, entries: creates ? r.state.entries : r.added,
+      changed: r.changed, reset: creates,
     });
     return { ok: true, ...base, warnings, ...totals(r.state), dir };
   }
 
-  /** Render a view and save it (under views/ unless outDir is given). */
-  view(asset: string, mode: ViewMode, o: ViewOptions = {}, outDir?: string): View {
-    return makeView(this.doc(asset), mode, o, outDir ?? join(this.project.dir, 'views'));
+  /** The start of a branch: the source's tape up to the fork point, and its document there. */
+  private forkPrefix(cmd: { args: Token[] }): AssetState {
+    const from = words(cmd.args)[0];
+    if (!from) return { doc: null, entries: [] }; // the fork command reports it
+    if (!assetExists(this.project, from)) throw new ProjectError(`fork: no asset '${from}' to fork from`);
+    const src = this.state(from).entries;
+    const atTok = cmd.args.find((t) => t.t === 'kv' && t.key === 'at');
+    const last = src.at(-1)?.seq ?? 0;
+    const at = atTok?.t === 'kv' ? Number(atTok.value) : last;
+    if (!Number.isInteger(at) || at < 1 || at > last) throw new ProjectError(`fork: at=${atTok?.t === 'kv' ? atTok.value : at} is not a command of '${from}' (1..${last})`);
+    const entries = src.filter((e) => e.seq <= at);
+    return { doc: this.docAt(from, at), entries };
+  }
+
+  /**
+   * What other authors did since `agent` last called this: their tape lines per asset, the open
+   * notes, and the documents before and after. Moves the agent's read position to the end of
+   * every tape, so a second call returns nothing new. `since` reads from that command instead.
+   */
+  changes(agent: string, o: { asset?: string; since?: number } = {}): AssetChanges[] {
+    const reads = readReads(this.project);
+    const mine = (reads[agent] ??= {});
+    const names = o.asset ? [o.asset] : this.assets();
+    const out: AssetChanges[] = [];
+    for (const name of names) {
+      const { doc, entries } = this.state(name);
+      if (!doc) continue;
+      const last = entries.at(-1)?.seq ?? 0;
+      // A branch the agent never read starts at its fork point: what came before is the source's.
+      let from = o.since ?? mine[name] ?? forkOf(entries)?.at ?? 0;
+      if (from > last) from = 0; // the tape was started again
+      mine[name] = last;
+      const after = entries.filter((e) => e.seq > from);
+      const lines = after.filter((e) => e.by !== agent);
+      if (lines.length === 0) continue;
+      const newNotes = lines.flatMap((e) => /^note .* id=(n\d+)$/.exec(e.cmd)?.slice(1) ?? []);
+      out.push({
+        asset: name, from, to: last, lines, own: after.length - lines.length, notes: doc.notes, newNotes,
+        before: from > 0 ? this.docAt(name, from) : null, after: doc,
+      });
+    }
+    writeReads(this.project, reads);
+    return out;
+  }
+
+  /**
+   * Render a view and save it (under views/ unless outDir is given). The diff compares with the
+   * document after command `since`, by default the one before the latest group.
+   */
+  view(asset: string, mode: ViewMode, o: ViewOptions = {}, outDir?: string, before?: Doc | null): View {
+    const dir = outDir ?? join(this.project.dir, 'views');
+    if (mode !== 'diff' || before !== undefined) return makeView(this.doc(asset), mode, o, dir, before);
+    const { entries } = this.state(asset);
+    let since = o.since;
+    if (since === undefined) {
+      const g = entries.at(-1)?.group;
+      since = (entries.find((e) => e.group === g)?.seq ?? 1) - 1;
+    }
+    return makeView(this.doc(asset), mode, o, dir, since > 0 ? this.docAt(asset, since) : null);
   }
 
   /** Record an image view as the last one shown to the agent, and tell the watchers. */

@@ -2,72 +2,35 @@
 // Also: the watch view's token is required, and every connected page gets the same stream.
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { PassThrough } from 'node:stream';
-import { Client } from '@modelcontextprotocol/client';
-import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
+import type { Client } from '@modelcontextprotocol/client';
+import type { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { BIN, openPage, spawnServer, texts, until, type Content, type Served } from './spawn.ts';
 
-const REPO = join(import.meta.dirname, '..', '..');
-const BIN = join(REPO, 'cli', 'bin', 'pixelclaw.js');
-const PALETTE = join(REPO, 'examples', 'src', 'mossy-ruins.json');
-
-type Content = { type: string; text?: string; data?: string; mimeType?: string }[];
-
-let root: string;
+let served: Served;
 let proj: string;
 let client: Client;
 let transport: StdioClientTransport;
 let url: string;
-let stderr = '';
 
-async function call(name: string, args: Record<string, unknown>): Promise<{ content: Content; isError?: boolean }> {
-  return (await client.callTool({ name, arguments: args })) as { content: Content; isError?: boolean };
-}
-const texts = (c: Content) => c.filter((x) => x.type === 'text').map((x) => x.text).join('\n');
-
-/** Collects every message a WebSocket receives. */
-function watch(u: string): Promise<{ ws: WebSocket; messages: unknown[] }> {
-  return new Promise((resolve, reject) => {
-    const ws = new WebSocket(u);
-    const messages: unknown[] = [];
-    ws.onmessage = (ev) => messages.push(JSON.parse(String(ev.data)));
-    ws.onopen = () => resolve({ ws, messages });
-    ws.onerror = () => reject(new Error('websocket failed'));
-  });
-}
-
-async function until(f: () => boolean, ms = 3000): Promise<void> {
-  const end = Date.now() + ms;
-  while (!f()) {
-    if (Date.now() > end) throw new Error('timed out');
-    await new Promise((r) => setTimeout(r, 20));
-  }
-}
+const call = (name: string, args: Record<string, unknown>): Promise<{ content: Content; isError?: boolean }> => served.call(name, args);
+const watch = (u: string) => openPage(u);
 
 beforeAll(async () => {
-  root = mkdtempSync(join(tmpdir(), 'pixelclaw-mcp-'));
-  proj = join(root, 'ruins.pclaw');
-  execFileSync(process.execPath, [BIN, 'new', proj, '--palette', PALETTE]);
-  transport = new StdioClientTransport({ command: process.execPath, args: [BIN, 'serve', '--project', proj, '--port', '0'], stderr: 'pipe' });
-  (transport.stderr as PassThrough).on('data', (d: Buffer) => { stderr += d.toString(); });
-  client = new Client({ name: 'pixelclaw-test', version: '1.0.0' });
-  await client.connect(transport);
-  await until(() => /watch at (\S+)/.test(stderr));
-  url = /watch at (\S+)/.exec(stderr)![1]!;
+  served = await spawnServer('pixelclaw-mcp-');
+  ({ proj, client, transport, url } = served);
 }, 20000);
 
 afterAll(async () => {
-  await client?.close();
-  rmSync(root, { recursive: true, force: true });
+  await served?.close();
 });
 
 describe('MCP over stdio', () => {
-  it('lists the four G2 tools and gives instructions', async () => {
+  it('lists the tools and gives instructions', async () => {
     const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(['history', 'project', 'run', 'view']);
+    expect(tools.map((t) => t.name).sort()).toEqual(['changes', 'history', 'project', 'run', 'view']);
     expect(client.getInstructions()).toContain('watch link');
   });
 

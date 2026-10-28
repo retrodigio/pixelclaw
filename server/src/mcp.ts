@@ -1,20 +1,25 @@
-// The MCP tools (plan §8.2): project, run, view and history. Few tools; the command language
-// carries the rest. Every call goes through the writer's queue, in the order it arrives.
+// The MCP tools (plan §8.2): project, run, view, history and changes. Few tools; the command
+// language carries the rest. Every call goes through the writer's queue, in the order it arrives.
 
 import { McpServer, type CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import type { TapeEntry } from '@pixelclaw/core';
+import { diffPixels, diffText, type Note, type TapeEntry } from '@pixelclaw/core';
 import { ProjectError, listAssets, readPaletteFile } from './project.ts';
 import { VIEW_MODES, parseRegion, type View, type ViewMode } from './views.ts';
-import type { Writer } from './writer.ts';
+import type { AssetChanges, Writer } from './writer.ts';
+
+/** The author name every MCP batch is written with, and whose read position `changes` keeps. */
+export const AGENT = 'claude';
 
 export const SERVER_NAME = 'pixelclaw';
 
 export const INSTRUCTIONS = `PixelClaw is a pixel art editor you drive with a small command language. All art is indexed colour (every pixel is a palette entry).
 
-Start with the \`project\` tool: it lists palettes and assets, and gives a watch link (http://127.0.0.1:…/?token=…). Give the person that link so they can watch you draw live.
+Start with the \`project\` tool: it lists palettes and assets, and gives a watch link (http://127.0.0.1:…/?token=…). Give the person that link so they can watch you draw live, and edit too.
 
-Draw with \`run\` (one batch = one undo group; any error applies nothing). Look with \`view\` (render: scaled PNG with grid and rulers; tile3x3: seams and repetition; grid: exact palette keys per pixel). Read the tape with \`history\`.
+Draw with \`run\` (one batch = one undo group; any error applies nothing). Look with \`view\` (render: scaled PNG with grid and rulers; tile3x3: seams and repetition; grid: exact palette keys per pixel; diff: what the last group changed). Read the tape with \`history\`.
+
+People edit in the watch view too. Their edits are commands on the same tape, written by human:<name>. Call \`changes\` at the start of each turn while someone is watching, and whenever they say they changed something: it returns their commands and notes since you last looked, with a before/after diff image. Carry on from what they did; never silently redo their pixels. Close a note you have dealt with: note done <id>.
 
 Commands (one per line, or ';' between them; '#' comments):
   new tile|sprite|sheet|icon <name> <W>x<H> [palette=<p>] [wrap=on|off] [cell=WxH] [bg=<colour>]
@@ -26,7 +31,13 @@ Commands (one per line, or ';' between them; '#' comments):
   paint <x,y> <<            rows of palette keys; '.' leaves a pixel, a space clears it
     ..kk..
   >>
-  undo [group=<g>]
+  stroke pencil c=<colour> [pp=on|off] <x,y> <x,y>...    a freehand drag; stroke eraser <x,y>...
+  select rect <x,y> <W>x<H> | select all | deselect      the selection clips drawing
+  shift <dx,dy>             moves the selected pixels (or the whole canvas)
+  palette set <entry> hex=#rrggbb | palette add [<name>] hex=#rrggbb [key=<k>]   this asset's palette
+  note <x,y> [<W>x<H>] "text"   |   note done <id>
+  undo [group=<g>] [by=<author>]   |   redo [group=<undo group>]
+  fork <from> <to> [at=<n>]  (as the first command of a run on a new asset: a branch of <from>)
 Colours: an entry name (c=stone3), its key (c=3), its exact hex, or none. Coordinates wrap on wrap=on documents (tiles by default). @cell(cx,cy) after a command name offsets it to a cell of the cell grid.
 
 Habits: after each meaningful batch, look once at an image (render or tile3x3), and use the grid to check exact pixels. Never judge a tile alone when it will be seen tiled.`;
@@ -48,6 +59,7 @@ export function formatEntry(e: TapeEntry, note = ''): string {
 function viewContent(v: View): CallToolResult['content'] {
   if (v.kind === 'text') return [text(v.text), text(`saved ${v.path}`)];
   return [
+    ...(v.text ? [text(v.text)] : []),
     { type: 'image', data: Buffer.from(v.png).toString('base64'), mimeType: 'image/png' },
     text(`${v.mode}: ${v.width}x${v.height} px, saved ${v.path}`),
   ];
@@ -69,12 +81,33 @@ export function projectSummary(w: Writer, url: string): string {
     try {
       const { doc, entries } = w.state(a);
       const groups = new Set(entries.map((e) => e.group)).size;
-      lines.push(`  ${a}: ${doc ? `${doc.kind} ${doc.width}x${doc.height}${doc.wrap ? ' wrap' : ''}${doc.cellW < doc.width || doc.cellH < doc.height ? ` cell ${doc.cellW}x${doc.cellH}` : ''}, palette ${doc.palette.name}, ` : ''}${entries.length} commands in ${groups} groups`);
+      const notes = doc?.notes.length ? `; open notes: ${doc.notes.map((n) => n.id).join(', ')}` : '';
+      lines.push(`  ${a}: ${doc ? `${doc.kind} ${doc.width}x${doc.height}${doc.wrap ? ' wrap' : ''}${doc.cellW < doc.width || doc.cellH < doc.height ? ` cell ${doc.cellW}x${doc.cellH}` : ''}, palette ${doc.palette.name}, ` : ''}${entries.length} commands in ${groups} groups${notes}`);
     } catch (e) {
       lines.push(`  ${a}: cannot load: ${(e as Error).message}`);
     }
   }
   return lines.join('\n');
+}
+
+export function formatNote(n: Note, fresh = false): string {
+  const where = n.w === 1 && n.h === 1 ? `${n.x},${n.y}` : `${n.x},${n.y} ${n.w}x${n.h}`;
+  return `  ${n.id} at ${where}: ${JSON.stringify(n.text)}${fresh ? '  (new)' : ''}`;
+}
+
+/** One asset's changes as text: the lines grouped by author, the notes, and the pixel diff. */
+export function formatChanges(c: AssetChanges): string {
+  const authors = new Map<string, number>();
+  for (const e of c.lines) authors.set(e.by, (authors.get(e.by) ?? 0) + 1);
+  const who = [...authors].map(([a, n]) => `${n} by ${a}`).join(', ');
+  const out = [`${c.asset}: ${c.lines.length} command${c.lines.length === 1 ? '' : 's'} (${who}) ${c.from > 0 ? `since #${c.from}` : 'on a tape you have not read yet'}; now at #${c.to}`];
+  out.push(...c.lines.map((e) => formatEntry(e)));
+  if (c.own) out.push(`(${c.own} of your own command${c.own === 1 ? '' : 's'} in the same range are not listed; the diff includes them)`);
+  const fresh = new Set(c.newNotes);
+  out.push(c.notes.length ? `open notes (${c.notes.length}):` : 'open notes: none');
+  out.push(...c.notes.map((n) => formatNote(n, fresh.has(n.id))));
+  out.push(`diff ${c.from > 0 ? `#${c.from}` : '(nothing)'} → #${c.to}: ${diffText(c.before, c.after, diffPixels(c.before, c.after))}`);
+  return out.join('\n');
 }
 
 export interface McpHost {
@@ -122,7 +155,7 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
     }),
   }, (a) => w.enqueue(() => {
     try {
-      const r = w.run({ asset: a.asset, commands: a.commands, by: 'claude', replace: a.replace });
+      const r = w.run({ asset: a.asset, commands: a.commands, by: AGENT, replace: a.replace });
       if (!r.ok) {
         return fail(r.errors.map((e) => `${e.line}:${e.col}: error: ${e.message}`).join('\n') +
           `\n${r.errors.length} error${r.errors.length === 1 ? '' : 's'}; nothing was applied.`);
@@ -151,6 +184,7 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
     title: 'View an asset',
     description: 'Look at an asset. render: a scaled PNG (about 192 px, faint pixel grid, rulers every 8 px). ' +
       'tile3x3: the asset repeated 3x3 at 1x and 4x, for seams and repetition. grid: text, one palette key per pixel, with coordinates and a legend. ' +
+      'diff: before and after the latest group (or since a command number) with changed pixels outlined in magenta and notes in yellow, plus the changed pixels as text (up to 60). ' +
       'Images come back inline and are also saved as files; the person watching sees the last image you were shown.',
     annotations: { readOnlyHint: true },
     inputSchema: z.object({
@@ -158,12 +192,13 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
       mode: z.enum(VIEW_MODES).default('render'),
       scale: z.number().int().min(1).max(64).optional().describe('render only: pixels per pixel'),
       region: z.string().optional().describe('grid only: part of the canvas, "x,y WxH" (e.g. "8,0 12x10")'),
+      since: z.number().int().min(0).optional().describe('diff only: compare with the document after this command number (default: before the latest group)'),
     }),
   }, (a) => w.enqueue(() => {
     try {
       const region = a.region ? parseRegion(a.region) : undefined;
       if (region === null) return fail(`error: region must look like "8,0 12x10"`);
-      const v = w.view(a.asset, a.mode as ViewMode, { scale: a.scale, region });
+      const v = w.view(a.asset, a.mode as ViewMode, { scale: a.scale, region, since: a.since });
       w.showEye(a.asset, v);
       return { content: viewContent(v) };
     } catch (e) {
@@ -190,6 +225,37 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
       const head = `${h.asset}: ${h.total} commands in ${h.groups} groups${h.undone.length ? `; undone: ${h.undone.join(', ')}` : ''}` +
         (h.entries.length < h.total ? `; showing ${h.entries.length} (#${h.entries[0]?.seq ?? '-'}..#${h.entries.at(-1)?.seq ?? '-'})` : '');
       return { content: [text([head, ...h.entries.map((e) => formatEntry(e, undone.has(e.group) ? '   (undone)' : ''))].join('\n'))] };
+    } catch (e) {
+      return errorResult(e);
+    }
+  }));
+
+  server.registerTool('changes', {
+    title: 'What people changed',
+    description: 'What people did in the watch view since you last called this: their commands per asset (with author and undo group), ' +
+      'the open notes they pinned to pixels or regions, and a diff image per asset (before / after, changed pixels outlined in magenta, notes in yellow) plus its saved path. ' +
+      'Your read position then moves to the end, so a second call returns only what is new. Call it at the start of each turn while someone is watching.',
+    inputSchema: z.object({
+      asset: z.string().optional().describe('Only this asset (default: every asset)'),
+      since: z.number().int().min(0).optional().describe('Read from after this command number instead of where you last stopped'),
+    }),
+  }, (a) => w.enqueue(() => {
+    try {
+      const all = w.changes(AGENT, { asset: a.asset, since: a.since });
+      if (all.length === 0) return { content: [text(`No changes since you last looked${a.asset ? ` at ${a.asset}` : ''}.`)] };
+      const content: CallToolResult['content'] = [
+        text(`Changes since you last looked: ${all.length} asset${all.length === 1 ? '' : 's'} (${all.map((c) => c.asset).join(', ')}).`),
+      ];
+      for (const c of all) {
+        content.push(text(formatChanges(c)));
+        const v = w.view(c.asset, 'diff', {}, undefined, c.before);
+        w.showEye(c.asset, v);
+        if (v.kind === 'image') {
+          content.push({ type: 'image', data: Buffer.from(v.png).toString('base64'), mimeType: 'image/png' });
+          content.push(text(`diff image: ${v.width}x${v.height} px, saved ${v.path}`));
+        }
+      }
+      return { content };
     } catch (e) {
       return errorResult(e);
     }

@@ -8,7 +8,8 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from 'node:net';
 import { extname, join, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { ServerMessage } from './protocol.ts';
+import { HUMAN_RE, type ClientMessage, type ServerMessage } from './protocol.ts';
+import { ProjectError } from './project.ts';
 import type { Writer } from './writer.ts';
 import { acceptWebSocket, type WsConnection } from './ws.ts';
 
@@ -48,6 +49,30 @@ function page(res: ServerResponse, status: number, title: string, body: string):
   res.end(`<!doctype html><meta charset="utf-8"><title>${title}</title>
 <body style="font:15px system-ui;background:#16171b;color:#d8dbe0;padding:3em;max-width:40em">
 <h1 style="font-size:20px">PixelClaw: ${title}</h1>${body}</body>`);
+}
+
+/** Longest command text a page may send in one message. */
+const MAX_COMMANDS = 256 * 1024;
+
+/**
+ * A person's edit: one batch, through the writer's queue like everything else, written with the
+ * page's author name (which must be `human:<name>`). Pages cannot restart an existing asset.
+ */
+export async function runFromPage(w: Writer, m: Extract<ClientMessage, { type: 'run' }>): Promise<ServerMessage> {
+  const fail = (message: string): ServerMessage => ({ type: 'result', id: m.id, ok: false, errors: [{ line: 0, col: 0, message }] });
+  if (typeof m.by !== 'string' || !HUMAN_RE.test(m.by)) return fail(`a page writes as human:<name> (letters, digits, . _ -)`);
+  if (typeof m.asset !== 'string' || typeof m.commands !== 'string') return fail('run needs an asset and commands');
+  if (m.commands.length > MAX_COMMANDS) return fail('too many commands in one message');
+  return w.enqueue((): ServerMessage => {
+    try {
+      const r = w.run({ asset: m.asset || undefined, commands: m.commands, by: m.by });
+      if (!r.ok) return { type: 'result', id: m.id, ok: false, errors: r.errors };
+      return { type: 'result', id: m.id, ok: true, asset: r.asset, group: r.group, seq: r.added.at(-1)?.seq ?? null };
+    } catch (e) {
+      if (e instanceof ProjectError) return fail(e.message);
+      return fail(`internal error: ${(e as Error).message}`);
+    }
+  });
 }
 
 export interface WatchServer {
@@ -147,8 +172,14 @@ export async function startWatchServer(o: WatchOptions): Promise<WatchServer> {
     sockets.add(ws);
     ws.onclose = () => sockets.delete(ws);
     ws.onmessage = (text) => {
-      // Pages only ping for now; editing from the page arrives in G3.
-      if (text.includes('"ping"')) ws.send('{"type":"pong"}');
+      let m: ClientMessage;
+      try {
+        m = JSON.parse(text) as ClientMessage;
+      } catch {
+        return;
+      }
+      if (m.type === 'ping') ws.send(JSON.stringify({ type: 'pong' } satisfies ServerMessage));
+      else if (m.type === 'run') void runFromPage(o.writer, m).then((r) => ws.send(JSON.stringify(r)));
     };
     ws.send(JSON.stringify({ type: 'hello', snapshot: o.writer.snapshot() } satisfies ServerMessage));
   });

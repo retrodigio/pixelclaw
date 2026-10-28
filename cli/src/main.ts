@@ -32,8 +32,9 @@ export const USAGE = `pixelclaw: a pixel art editor driven by commands
   pixelclaw run <project> (<script.pclaw> | - | -e "<commands>") [--asset <name>] [--replace] [--by <author>] [--view <mode>]
       Apply commands as one undo group. Any error applies nothing.
       A script that starts with 'new' creates the asset (--replace starts its tape again).
-  pixelclaw view <project> <asset> [render|grid|tile3x3|all]... [--scale N] [--region x,y,WxH] [--out <dir>]
+  pixelclaw view <project> <asset> [render|grid|tile3x3|diff|all]... [--scale N] [--region x,y,WxH] [--out <dir>]
       Write views (default: <project>/views/<asset>.<mode>.png|txt). The grid is also printed.
+      diff shows what the latest group changed; all is render, grid and tile3x3.
   pixelclaw verify <project> [<asset>...]
       Replay every tape and compare with asset.json, preview.png and checkpoints.
   pixelclaw serve --project <project> [--port 7417] [--no-mcp]
@@ -145,7 +146,7 @@ function cmdRun(io: Io, p: Parsed): number {
 
 function writeViews(io: Io, proj: Project, doc: Doc, modesIn: string[], p: Parsed): number {
   let modes = modesIn.length ? modesIn : ['render'];
-  if (modes.includes('all')) modes = [...VIEW_MODES];
+  if (modes.includes('all')) modes = VIEW_MODES.filter((m) => m !== 'diff');
   for (const m of modes) if (!isViewMode(m)) throw new UsageError(`unknown view '${m}' (views: ${VIEW_MODES.join(', ')}, all)`);
   const scaleS = one(p, 'scale');
   const scale = scaleS === undefined ? undefined : Number(scaleS);
@@ -158,11 +159,13 @@ function writeViews(io: Io, proj: Project, doc: Doc, modesIn: string[], p: Parse
     throw new UsageError(`--region runs past the ${doc.width}x${doc.height} canvas`);
   }
   for (const m of modes as ViewMode[]) {
-    const v = makeView(doc, m, { scale, region }, one(p, 'out') ?? join(proj.dir, 'views'));
+    const out = one(p, 'out') ?? join(proj.dir, 'views');
+    // The diff needs the tape (what came before the latest group), so the writer renders it.
+    const v = m === 'diff' ? new Writer(proj).view(doc.name, 'diff', { scale }, out) : makeView(doc, m, { scale, region }, out);
     if (v.kind === 'text') {
       io.out(v.text);
       io.out(`wrote ${v.path}\n`);
-    } else io.out(`wrote ${v.path} (${v.width}x${v.height})\n`);
+    } else io.out(`${v.text ? v.text + '\n' : ''}wrote ${v.path} (${v.width}x${v.height})\n`);
   }
   return 0;
 }
