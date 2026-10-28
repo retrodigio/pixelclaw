@@ -69,6 +69,13 @@ view (a pencil drag, a fill, a move, a palette edit, a note) is one group.
 | `frame add [<n>] [copy=<m>\|empty]` | `frame add 2 copy=1` | A new frame at position n (default: last), a copy of frame m (default: yours) or empty. Frames count from 1. |
 | `frame <n>` | `frame 2` | Draw on (and see) that frame from now on (you only). |
 | `frame remove <n>`, `frame move <n> to=<m>` | `frame move 3 to=1` | |
+| `frame add [<n>] link=<m>` | `frame add link=1` | A new frame whose cels are linked to frame m's. |
+| `frame set <n>\|<a>-<b>\|all ticks=<t>` | `frame set 1-4 ticks=12` | Durations in game ticks (the project's `tickRate`, 60 by default); new frames take their source's (default 10). |
+| `tag add <name> <a>-<b> [loop=cycle\|pingpong]` | `tag add idle 1-2 loop=pingpong` | A named run of frames. Also `tag set <name> [frames=<a>-<b>] [loop=]`, `tag remove <name>`. |
+| `view <dir> frames=<a>-<b>` | `view S frames=1-2` | A direction (S N E W SE SW NE NW) and its frames. `view remove <dir>`. |
+| `view <dir> mirror=<dir>\|off` | `view W mirror=E` | A live mirror: the other view flipped left to right, kept up to date; its frames are added at the end. |
+| `cel link <a>-<b> [layer=<name>\|all]`, `cel unlink …` | `cel link 1-4 layer=main` | Linked cels share their pixels (drawing on one draws on all). |
+| `pivot <x,y>\|off`, `ground <y>\|off` | `pivot 11,22` | The pixel the sprite stands on and the row its feet rest on. |
 | `select rect <x,y> <W>x<H> [add\|sub\|and]` | `select rect 2,2 6x4` | Select a rectangle. See *Selections*. |
 | `select ellipse <cx,cy> r=<RX>x<RY>`, `select ellipse <x,y> <W>x<H>` | `select ellipse 8,8 r=6x4` | |
 | `select lasso <x,y> <x,y> <x,y> ...` | `select lasso 1,1 14,3 9,14` | A polygon (pixel centres inside, and its edge). |
@@ -168,10 +175,35 @@ show it faded underneath the art, and it is never exported. `layer add` puts a n
 above yours (or `above=`/`below=` another); the normal form always names the place. Layer names
 are letters, digits, `_` and `-` (not `add`, `set`, `rename`, `move`, `merge` or `remove`).
 
-Frames are the animation scaffolding (durations, tags and linked cels come with G6): every layer
-has a cel per frame. `frame add` inserts a copy of your frame (or `copy=m`, or `empty`) and
-`frame <n>` chooses the frame you draw on. Views show the frame the agent draws on (`frame=` in
-the MCP `view`, `--frame` in the CLI); `preview.png` shows frame 1.
+Frames are the animation (plan §4.4): every layer has a cel per frame. `frame add` inserts a
+copy of your frame (or `copy=m`, `link=m`, or `empty`) and `frame <n>` chooses the frame you draw
+on. Views show the frame the agent draws on (`frame=` in the MCP `view`, `--frame` in the CLI);
+`preview.png` shows frame 1.
+
+### Animation
+
+- **Durations** are in game ticks: `frame set 2 ticks=6`, `frame set all ticks=12`. The project
+  sets the tick rate (`tickRate` in project.json, 60 a second); playback, the `anim` view and its
+  GIF run at it. A frame added later takes the ticks of the frame it copies.
+- **Tags** name runs of frames (`walk`, `idle`) and say how they loop: `cycle` (1 2 3 1 2 3) or
+  `pingpong` (1 2 3 2 1 2 3). A frame added strictly inside a tag (or a view) makes it longer;
+  removing frames shortens it, and one left with no frames goes.
+- **Views** are directions: `view S frames=1-2`, `view N frames=3-4`, `view E frames=5-6`. Views
+  never overlap, and a frame cannot be moved out of its view. `view W mirror=E` makes W a **live
+  mirror** of E: W gets as many frames as E (added at the end the first time), each of its cels is
+  E's flipped left to right, and its durations are E's. It follows every change to E (drawing,
+  frames added or removed, ticks) after every command. Drawing on a mirror frame is refused with
+  the frame to draw on instead; `view W mirror=off` keeps W's pixels as its own. Only views facing
+  the other way left to right mirror each other (E/W, SE/SW, NE/NW).
+- **Linked cels** are one cel shown in several frames: `cel link 1-4` gives frames 2-4 of your
+  layer frame 1's pixels, shared, so drawing on any of them draws on all; `cel unlink 2-3` gives
+  each its own copy again. `layer merge` unlinks the layer below first.
+- **Sequences.** Playback, the `anim` view and the `anim` checks step through every tag, every view
+  with no tag inside it, or (with neither) all the frames as one cycle.
+- **Pivot and ground line**: `pivot 11,22` (the pixel the sprite stands on, an export field) and
+  `ground 22` (the row the feet rest on). The `anim` check measures ground drift from the ground
+  line (or the first frame's lowest row) and pivot drift as the silhouette's centre column moving
+  between frames. Both are drawn in cyan in the anim sheet and the watch view.
 
 ### Selections
 
@@ -446,7 +478,7 @@ changes a branch. `asset.json` records the link: `"links": [{"fork": {"from": "c
 
 ## Views
 
-`pixelclaw view <project> <asset> [render|grid|tile3x3|diff|game|recolour|all]` (`all` is the
+`pixelclaw view <project> <asset> [render|grid|tile3x3|diff|game|recolour|anim|all]` (`all` is the
 first three):
 
 - **render**: a nearest-neighbour PNG. The default scale gives about 192 px on the long side
@@ -468,7 +500,15 @@ first three):
   at 1x (real size) and again at the engine's draw scale (`style.drawScale`, default 2). The
   ground is `--ground`, else the style guide's (`style.ground`, or per asset), else the first
   tile; the set is `--with` (repeatable), else every other asset of the same kind and size that
-  does not wrap, leaving out branches of the same asset.
+  does not wrap, leaving out branches of the same asset. A sprite with views shows its other
+  directions (each view's first frame) beside it first.
+- **anim**: the contact sheet (plan §2): one row per sequence (tags, views, or all frames), each
+  frame with its number and ticks above it, the frame before it in the sequence tinted red under
+  it (the onion skin), the pivot and ground line in cyan, and under it the share of pixels changed
+  from the frame before (`2>3 17%`; under the first frame of a cycle, the loop seam). The text gives
+  each sequence's frames, ticks, loop time at the project's tick rate and every frame-to-frame
+  change. It also writes `<asset>.anim.gif`: every sequence side by side, looping at the game's
+  speed (tiles 3x3).
 - **recolour**: role art under several preview themes side by side (`--themes a,b,c`, default the
   first six), each with a strip of its role colours.
 

@@ -79,7 +79,16 @@ export function App({ store }: { store: Store }) {
     return () => cancelAnimationFrame(raf);
   }, [ed.playing, ed, tickRate]);
   const frameShown = doc && playing ? frameAtTick(doc, playing, playTick) : frame;
-  const onion = { prev: doc && ed.onionPrev && !playing && frame > 0 ? frame - 1 : null, next: doc && ed.onionNext && !playing && frame + 1 < doc.frameCount ? frame + 1 : null };
+  // The onion skin: the frames before and after yours in its own sequence (its view or tag, looping).
+  const around = doc ? sequences(doc).find((q) => q.frames.includes(frame)) : null;
+  const onionAt = (d: number) => {
+    if (!around || around.frames.length < 2) return null;
+    const i = around.frames.indexOf(frame);
+    return around.frames[(i + d + around.frames.length) % around.frames.length]!;
+  };
+  const onionPrev = ed.onionPrev && !playing ? onionAt(-1) : null;
+  const onionNext = ed.onionNext && !playing ? onionAt(1) : null;
+  const onion = { prev: onionPrev, next: onionNext === onionPrev ? null : onionNext };
   const mine = doc ? ctxOf(doc, store.me) : null;
   const mirrorShown = doc && (ed.mirrorX || ed.mirrorY) ? { x2: ed.mirrorX ? doc.width - 1 : null, y2: ed.mirrorY ? doc.height - 1 : null } : null;
   // Checks run on the document as shown (not on a drag's preview), with the project's style guide.

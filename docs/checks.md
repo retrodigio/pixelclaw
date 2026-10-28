@@ -1,12 +1,17 @@
 # Checks
 
-Every check reads one frame of an asset's flat art and returns a score, pass or fail against a
-threshold, and the pixels it flags (plan §5). Thresholds come from the project's style guide
+Every check reads an asset's flat art and returns a score, pass or fail against a threshold,
+and the pixels it flags (plan §5). The checks of one image run on **every frame** (since G6): the
+result is the worst frame's, its detail starts `frame N:`, and every flagged pixel names its
+frame (the watch view and marked images circle those on the frame shown). `coverage`, `anim` and
+`views` look at the whole document at once. Thresholds come from the project's style guide
 (`project.json` `style.checks`), with the defaults below. Checks never change the document; the
 server, the CLI and the watch view compute them with the same code from the same style guide, so
 they always agree.
 
-- MCP: every `run` result ends with a one-line summary; `check(asset)` gives the table with
+- MCP: every `run` result ends with a one-line summary (over every frame; on a large canvas,
+  above 262,144 pixels counting every frame, only the frame being drawn on, and the detail says
+  so: `check` always covers every frame); `check(asset)` gives the table with
   coordinates and an image with the flagged pixels circled in magenta; `check()` without an
   asset gives one line per asset. `view(..., marks="failing")` circles them on any view.
 - CLI: `pixelclaw check <project> [asset...] [--checks a,b] [--frame N] [--ground g] [--ref r]
@@ -26,6 +31,8 @@ they always agree.
 | `readability` | sprites | edge contrast share | ≥ 0.8 | Edge pixels within ΔL* 15 of the ground under them (the usual ground tile, repeated). Also: the silhouette's IoU with each asset of its set (≤ 0.9), and the lightness spread inside (L* p95 − p5 ≥ 25). |
 | `revert` | with `ref=` | share of pixels unchanged from the reference | ≤ 0.15 | Pixels with the same colour as the reference asset at the same place. |
 | `repetition` | tiles | ΔL* × √width of the worst band | ≤ 3 | The most visible stripe when the tile is repeated: a band of 1 to 6 rows (or columns) lighter or darker than the rest. Flags the marks that make it. |
+| `anim` | 2 frames or more | the worst frame-to-frame change | 8–35 % (tiles 3–35 %) | Per sequence (tags, views; mirror views are their source): **frame diff** (changed pixels over the union of both silhouettes; the pilot's good pairs changed 16-19 %): too little (a held frame or one that barely moves) or too much (a jump), flagging the changed pixels; the **loop seam** of a cycle (last frame back to the first) in the same band; sprites also: **pivot drift** (the silhouette's centre column moving by more than 1 px between frames: it slides), **ground drift** (the lowest row off the ground line, or off the first frame's: it floats or sinks; 0 px), and **area jumps** (the silhouette growing or shrinking by more than 15 %). Thresholds `minDiff`, `maxDiff`, `maxPivot`, `maxGround`, `maxArea`. |
+| `views` | 2 views or more | the least difference between two views | ≥ 20 % | Directions that look too alike (the pilot's player directions did): each pair of views is compared on its first frame, by colour over both silhouettes. Mirror views count as their source, and views facing each other left to right (E and W) are not compared. |
 
 Checks that do not apply are skipped (seam on a sprite, outline on a tile, revert without a
 reference), as are checks a style guide turns off.

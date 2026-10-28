@@ -1,0 +1,17 @@
+# The G6 blind reviewer's findings on the walking figure, pinned where it pointed
+# (examples/mossy-ruins.pclaw/reviews/2026-10-28-g6/findings.md):
+note 7,20 10x3 "boots in near-black merge with the outline into a black block; the feet don't read at 1x"
+note 7,13 11x6 "south and north: only the legs change; add arm swing or a 1-px body bob"
+note 14,6 3x5 "side view: a sliver of face under a large hair mass; widen the profile by a pixel"
+# The boots go a step lighter (soil1, as they already were in frames 2 and 3), so they read
+# inside the ink outline. The other two are left open for a later polish pass.
+frame 1
+px 14,20 15,20 8,21 9,21 c=soil1
+frame 4
+px 14,20 15,20 8,21 9,21 c=soil1
+frame 5
+px 8,21 9,21 14,21 15,21 c=soil1
+frame 6
+px 10,21 11,21 12,21 13,21 14,21 c=soil1
+frame 1
+note done n1

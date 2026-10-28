@@ -162,7 +162,7 @@ function cmdRun(io: Io, p: Parsed): number {
 
 function writeViews(io: Io, proj: Project, doc: Doc, modesIn: string[], p: Parsed): number {
   let modes = modesIn.length ? modesIn : ['render'];
-  if (modes.includes('all')) modes = VIEW_MODES.filter((m) => m !== 'diff');
+  if (modes.includes('all')) modes = ['render', 'grid', 'tile3x3'];
   for (const m of modes) if (!isViewMode(m)) throw new UsageError(`unknown view '${m}' (views: ${VIEW_MODES.join(', ')}, all)`);
   const scaleS = one(p, 'scale');
   const scale = scaleS === undefined ? undefined : Number(scaleS);

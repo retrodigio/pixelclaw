@@ -9,7 +9,7 @@ Every edit is a line of a small command language. A document *is* its tape of co
 and replay is deterministic (integer maths, seeded randomness), so the same tape always gives the
 same pixels.
 
-**Status: step G5.** The core library and CLI (G1); the MCP server and the live watch view (G2);
+**Status: step G6.** The core library and CLI (G1); the MCP server and the live watch view (G2);
 editing in the browser, with every action a command on the tape and the agent's `changes` tool
 (G3); the drawing toolkit (G4): layers, frames, selections, transforms, symmetry, curves,
 dithering, gradients, `outline`, `shade`, `clean`, seeded generators, stamps, brushes and macros;
@@ -17,9 +17,13 @@ and checks and in-context previews (G5): palette, orphans, jaggies, banding, out
 score, coverage, readability, revert and repetition against the project's style guide, with the
 flagged pixels circled in magenta in images and in the watch view; the `game` and `recolour`
 previews, role palettes and preview themes; a blind review bundle; and tapes that carry their
-own palette. See [PROGRESS.md](PROGRESS.md).
+own palette; and animation and sprites (G6): frame durations in game ticks, tags with cycle and
+ping-pong loops, linked cels, directional views with live mirror links, pivots and ground lines,
+the `anim` contact sheet and GIF, the `anim` and `views` checks, checks over every frame, a
+timeline with playback at the game's speed and an onion skin, and `pixelclaw upgrade`. See
+[PROGRESS.md](PROGRESS.md).
 
-![The G5 test sprite in the watch view: a red chip per failing check, the outline's gaps and the stray pixels circled, the game preview](docs/screenshots/g5-checks.png)
+![The walking figure in the watch view: the timeline with each frame's ticks, the views (west a live mirror of east), the pivot and ground line, every check green](docs/screenshots/g6-walker.png)
 
 ## Use it from Claude Code
 
@@ -80,10 +84,11 @@ node cli/bin/pixelclaw.js verify my-art.pclaw
 | `pixelclaw new <project> [--palette <file>]...` | Create a project folder. Palettes can be `.json`, Lospec `.json`, `.hex` or `.gpl`. |
 | `pixelclaw new <project> <kind> <name> <W>x<H> [opts]` | Create an asset (a `new` command). |
 | `pixelclaw run <project> <script.pclaw>\|-\|-e "..." [--asset <name>] [--replace] [--by <who>] [--view <mode>]` | Apply commands as one undo group. Any error applies nothing. |
-| `pixelclaw view <project> <asset> [render\|grid\|tile3x3\|diff\|game\|recolour\|all] [--scale N] [--region x,y,WxH] [--frame N] [--marks failing] [--theme t]` | Write views and print the text grid (or the diff's list of changes). |
+| `pixelclaw view <project> <asset> [render\|grid\|tile3x3\|diff\|game\|recolour\|anim\|all] [--scale N] [--region x,y,WxH] [--frame N] [--marks failing] [--theme t]` | Write views and print the text grid (or the diff's list of changes). |
 | `pixelclaw check <project> [<asset>...] [--checks a,b] [--marks]` | Run the quality checks against the style guide; exits 1 if any fails. See [docs/checks.md](docs/checks.md). |
 | `pixelclaw review <project> [<asset>...] [--name set]` | Write a blind review bundle (images, palette, style guide, rubric). |
 | `pixelclaw verify <project> [<asset>...]` | Replay every tape and compare it with the saved state, the preview and the checkpoints. |
+| `pixelclaw upgrade <project> [<asset>...]` | Rewrite tapes from tape language 1 (G1-G4) in language 2 (the palette in the `new` line); written only if the replay gives the same pixels, then verified. |
 | `pixelclaw serve --project <project> [--port 7417] [--no-mcp]` | Own the project: MCP on stdin/stdout and the live watch view on localhost (the link, with its token, is printed to stderr). See [docs/mcp.md](docs/mcp.md). |
 
 The command language is described in [docs/commands.md](docs/commands.md).
@@ -113,7 +118,11 @@ ruins" palette and a style guide. Its seamless 24x24 stone floor tile is drawn b
 [`examples/scripts/stone_floor.pclaw`](examples/scripts/stone_floor.pclaw); a seamless grass tile
 with two variants and a treasure chest sprite by the G4 scripts beside it; a test sprite, the
 glowcap, by G5's. G5's `*_fix.pclaw` and `*_review.pclaw` scripts fix what the checks and a blind
-reviewer found, and every check passes on every asset. The views are checked in:
+reviewer found, and G6's [`stone_floor_redraw.pclaw`](examples/scripts/stone_floor_redraw.pclaw)
+lays the floor again as flagstones. G6 adds a walking figure in four directions
+([`walker.pclaw`](examples/scripts/walker.pclaw)) and a shimmering water tile
+([`water.pclaw`](examples/scripts/water.pclaw)). Every check passes on every asset. The views are
+checked in:
 
 - the stone floor: [8x render](examples/mossy-ruins.pclaw/views/stone_floor.render.png),
   [index grid](examples/mossy-ruins.pclaw/views/stone_floor.grid.txt),
@@ -127,13 +136,20 @@ reviewer found, and every check passes on every asset. The views are checked in:
   [index grid](examples/mossy-ruins.pclaw/views/chest.grid.txt)
 - the glowcap: [8x render](examples/mossy-ruins.pclaw/views/glowcap.render.png),
   [game view](examples/mossy-ruins.pclaw/views/glowcap.game.png)
+- the walker: [anim sheet](examples/mossy-ruins.pclaw/views/walker.anim.png),
+  [GIF](examples/mossy-ruins.pclaw/views/walker.anim.gif),
+  [game view](examples/mossy-ruins.pclaw/views/walker.game.png)
+- the water: [anim sheet](examples/mossy-ruins.pclaw/views/water.anim.png),
+  [GIF](examples/mossy-ruins.pclaw/views/water.anim.gif),
+  [3x3 preview](examples/mossy-ruins.pclaw/views/water.tile3x3.png)
 
 The G2 demo ([examples/demo-g2.md](examples/demo-g2.md)) draws the same tile through MCP while you
 watch. In the G3 demo ([examples/demo-g3.md](examples/demo-g3.md)) you fix three pixels and leave a
 note, and the agent reads them with `changes` and carries on. The G4 demo
 ([examples/demo-g4.md](examples/demo-g4.md)) draws the grass, its variants and the chest. The G5
 demo ([examples/demo-g5.md](examples/demo-g5.md)) checks them, fixes them by coordinates, and runs
-a blind review.
+a blind review. The G6 demo ([examples/demo-g6.md](examples/demo-g6.md)) animates the walker and
+the water and plays them in the watch view at the game's speed.
 
 ## Packages
 

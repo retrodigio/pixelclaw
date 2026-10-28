@@ -224,10 +224,10 @@ aside.left .swatches { flex: 1 1 auto; min-height: 80px; }
 aside.left .stamps { max-height: 120px; overflow: auto; }
 
 /* G5: check chips, check details, the preview panel, roles and themes */
-header .crumbs { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
-.checks { display: flex; gap: 4px; min-width: 0; overflow-x: auto; scrollbar-width: none; flex: 0 1 auto; }
+header .crumbs { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 120px; flex: 0 4 auto; }
+.checks { display: flex; gap: 3px; min-width: 0; overflow-x: auto; scrollbar-width: none; flex: 0 1 auto; }
 .checks::-webkit-scrollbar { display: none; }
-.chip.check { cursor: pointer; font-family: var(--mono); font-size: 11px; padding: 1px 8px; line-height: 16px; color: #8fd18b; flex: none; }
+.chip.check { cursor: pointer; font-family: var(--mono); font-size: 11px; padding: 1px 6px; line-height: 16px; color: #8fd18b; flex: none; }
 .chip.check.fail { color: #ff8fa3; border-color: #6a2f3c; background: #2a1b20; }
 .chip.check .score { color: var(--text); }
 .chip.check.on { border-color: #ff00c8; box-shadow: 0 0 0 1px #ff00c8 inset; }

@@ -75,10 +75,10 @@ export function TimelinePanel({ doc, ed, editable, frameShown }: { doc: Doc; ed:
           {seqs.map((s) => <option key={s.name} value={s.name}>{s.name}{s.loop === 'pingpong' ? ' ⇄' : ''}</option>)}
         </select>
         <span className="tl-title">Onion</span>
-        <label className="chk" title="Show the frame before, tinted red, under yours (only for looking)">
+        <label className="chk" title="Show the frame before yours in its view or tag, tinted red, under yours (only for looking)">
           <input type="checkbox" checked={ed.onionPrev} data-testid="onion-prev" onChange={() => ed.toggle('onionPrev')} />◁
         </label>
-        <label className="chk" title="Show the frame after, tinted blue, under yours (only for looking)">
+        <label className="chk" title="Show the frame after yours in its view or tag, tinted blue, under yours (only for looking; with two frames, the one before)">
           <input type="checkbox" checked={ed.onionNext} data-testid="onion-next" onChange={() => ed.toggle('onionNext')} />▷
         </label>
         <label className="chk" title="Show the pivot and the ground line (set them with the ⌖ tool, P)">

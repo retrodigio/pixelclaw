@@ -26,14 +26,31 @@
   "tags": [],
   "views": [],
   "links": [],
-  "notes": [],
+  "notes": [
+    {
+      "id": "n2",
+      "x": 7,
+      "y": 13,
+      "w": 11,
+      "h": 6,
+      "text": "south and north: only the legs change; add arm swing or a 1-px body bob"
+    },
+    {
+      "id": "n3",
+      "x": 14,
+      "y": 6,
+      "w": 3,
+      "h": 5,
+      "text": "side view: a sliver of face under a large hair mass; widen the profile by a pixel"
+    }
+  ],
   "tape": {
     "lang": 2,
-    "commands": 35,
-    "groups": 1
+    "commands": 48,
+    "groups": 2
   },
   "state": {
-    "sha256": "0a42751ef3f4e7ae41f6585833fccd62fd8cee2cdd21288352d632c7606fe29b"
+    "sha256": "994f8cca6d6cc6434d872d38c6a708611f5967e31aa2322451e3ca4061bde037"
   },
   "checkpoints": {
     "every": 200,

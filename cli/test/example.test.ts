@@ -41,7 +41,7 @@ describe('examples/mossy-ruins.pclaw', () => {
       for (const name of ASSETS) {
         const r = cli(['run', copy, join(ROOT, 'scripts', `${name}.pclaw`), '--replace']);
         expect(r.err).toBe('');
-        for (const step of ['fix', 'review', 'redraw']) {
+        for (const step of ['fix', 'review', 'redraw', 'g6review']) {
           const f = join(ROOT, 'scripts', `${name}_${step}.pclaw`);
           if (existsSync(f)) expect(cli(['run', copy, f, '--asset', name]).err).toBe('');
         }

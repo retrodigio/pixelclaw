@@ -7,12 +7,12 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  drawScaleOf, encodePng, flatten, groundOf, renderGame, renderScaled, renderTile3x3, setOf, type AssetDoc, type Doc,
+  animGifFrames, drawScaleOf, encodeGif, encodePng, flatten, groundOf, renderAnimSheet, renderGame, renderScaled, renderTile3x3, setOf, type AssetDoc, type Doc,
 } from '@pixelclaw/core';
 import { ProjectError } from './project.ts';
 import type { Writer } from './writer.ts';
 
-function rubric(o: { project: string; tiles: string[]; sprites: string[]; scale: number; style: string | null }): string {
+function rubric(o: { project: string; tiles: string[]; sprites: string[]; animated: string[]; scale: number; tickRate: number; style: string | null }): string {
   const list = (xs: string[]) => (xs.length ? xs.map((x) => `- ${x}`).join('\n') : '- (none)');
   return `# Review: ${o.project}
 
@@ -25,6 +25,9 @@ You are reviewing pixel art for a game, with fresh eyes. Judge only what you see
 - \`assets/<name>.game.png\`: each asset at its real size (1x) and at the game's draw scale (${o.scale}x).
 - \`tiles/<name>.3x3.png\`: each tile repeated 3x3, at 1x and 4x, as it will cover the ground.
 - \`scenes/<name>.png\`: each sprite on its usual ground beside the rest of its set, at 1x and ${o.scale}x.
+- \`anim/<name>.png\`: each animated asset's frames, one row per sequence (a direction or a named
+  loop), each frame with its length in game ticks (${o.tickRate} a second) and the frame before it
+  tinted red underneath; \`anim/<name>.gif\` plays them at the game's speed.
 - \`palette.md\`: the colours the art uses.${o.style ? '\n- `style.md`: the style guide.' : ''}
 
 Tiles:
@@ -32,6 +35,9 @@ ${list(o.tiles)}
 
 Sprites:
 ${list(o.sprites)}
+
+Animated:
+${list(o.animated)}
 
 ## How to judge
 
@@ -47,6 +53,9 @@ Score each part from 1 (poor) to 5 (excellent) and say why in a sentence or two:
 4. **Style-guide fit.** Does the art follow the style guide and use only the palette?
 5. **Defects.** Stray pixels, jagged lines (uneven steps), doubled corners, pillow shading
    (shading that follows the outline on every side), muddy or flat areas, broken outlines.
+6. **Animation.** Does the motion read (a walk, a shimmer)? Does a figure slide, float or jump
+   from frame to frame? Does each loop join its end to its start without a hitch? Do the
+   directions of a figure look like one figure, and different enough to tell apart?
 
 ## How to report
 
@@ -97,7 +106,16 @@ export function writeReview(w: Writer, o: { assets?: string[]; name?: string } =
   for (const a of sprites) {
     const ground = groundOf(a.name, all, style);
     const set: Doc[] = setOf(a.name, a.doc, all, style).slice(0, 7).map((x) => x.doc);
-    save(`scenes/${a.name}.png`, encodePng(renderGame([{ doc: a.doc }, ...set.map((d) => ({ doc: d }))], { ground: ground?.doc ?? null, scale })));
+    // Every direction of the sprite (each view's first frame), then the rest of its set.
+    const dirs = a.doc.views.length ? a.doc.views.map((v) => ({ doc: a.doc, frame: v.from })) : [{ doc: a.doc }];
+    save(`scenes/${a.name}.png`, encodePng(renderGame([...dirs, ...set.map((d) => ({ doc: d }))], { ground: ground?.doc ?? null, scale })));
+  }
+  const animated = chosen.filter((a) => a.doc.frameCount > 1);
+  const tickRate = w.project.json.tickRate ?? 60;
+  if (animated.length) mkdirSync(join(dir, 'anim'), { recursive: true });
+  for (const a of animated) {
+    save(`anim/${a.name}.png`, encodePng(renderAnimSheet(a.doc)));
+    save(`anim/${a.name}.gif`, encodeGif(animGifFrames(a.doc, { tickRate })));
   }
   // The colours the art uses (an entry no pixel uses would only mislead the reviewer).
   const pals = new Map<string, string>();
@@ -110,6 +128,8 @@ export function writeReview(w: Writer, o: { assets?: string[]; name?: string } =
   const styleFile = join(w.project.dir, 'style.md');
   const styleText = existsSync(styleFile) ? readFileSync(styleFile, 'utf8') : null;
   if (styleText) save('style.md', styleText);
-  save('rubric.md', rubric({ project: w.project.json.name, tiles: tiles.map((a) => a.name), sprites: sprites.map((a) => a.name), scale, style: styleText }));
+  save('rubric.md', rubric({
+    project: w.project.json.name, tiles: tiles.map((a) => a.name), sprites: sprites.map((a) => a.name), animated: animated.map((a) => a.name), scale, tickRate, style: styleText,
+  }));
   return { dir, files };
 }

@@ -110,7 +110,7 @@ applies to the asset, with its score and ✓ or ✗ against the style guide (see
 | Argument | Type | Does |
 |---|---|---|
 | `asset` | string | |
-| `mode` | `render` (default) \| `grid` \| `tile3x3` \| `diff` \| `game` \| `recolour` | See [commands.md, Views](commands.md#views). |
+| `mode` | `render` (default) \| `grid` \| `tile3x3` \| `diff` \| `game` \| `recolour` \| `anim` | See [commands.md, Views](commands.md#views). `game` shows the sprite's other directions beside it. `anim` returns the contact sheet (a row per sequence; each frame with its ticks, the frame before it tinted red underneath, the pivot and ground line in cyan, and the share of pixels changed from the frame before), the numbers as text, and saves `views/<asset>.anim.gif` (every sequence side by side at the project's tick rate) for the person. |
 | `scale` | 1..64, optional | `render` and `diff`. Default: about 192 px on the long side. |
 | `region` | string, optional | `grid` only: `"x,y WxH"`, e.g. `"8,0 12x10"`. |
 | `since` | integer, optional | `diff` only: compare with the document after this command (default: before the latest group). |
@@ -136,7 +136,7 @@ With failures it also returns the render (tile3x3 for tiles) with those pixels c
 |---|---|---|
 | `asset` | string, optional | The asset to check. Without one: one summary line per asset. |
 | `checks` | string[], optional | Only these checks. |
-| `frame` | integer from 1, optional | The frame to check (default: the agent's). |
+| `frame` | integer from 1, optional | Only this frame (default: every frame; flagged pixels name their frame, and the image shows the frame of the first failing check). |
 | `ground` | string, optional | `readability`: the ground tile. |
 | `ref` | string, optional | `revert`: the reference asset. |
 | `set` | string[], optional | `readability`: the assets its silhouette must differ from. |
@@ -237,7 +237,11 @@ Open the link (with its token). The page shows:
   selection has marching ants, other authors' selections are tinted, and live symmetry shows
   its axes as dashed guides.
 - **The timeline** (under the canvas): layers (top first) by frames. Click a cel to draw on that
-  layer and frame; the flags beside a layer toggle hidden, locked and reference.
+  layer and frame; the flags beside a layer toggle hidden, locked and reference. Above the cels:
+  each frame's number and ticks, the views (a mirror shows as `W ⇋ E`) and the tags. Linked cels
+  show as ◆, mirror frames as ⇋. ▶ (or Enter) plays the chosen sequence at the game's speed;
+  the onion skin shows the frame before (red) and after (blue) yours in its view or tag; ⌖ shows
+  the pivot and ground line. Playing, the onion skin and the guides only change what you see.
 - **The tape** (right): every command, grouped by undo group and coloured by author (the agent in
   orange, people in blue). The list is virtualised, so a tape of 10,000 lines scrolls freely. Each batch plays command by command at the chosen speed
   (1–60 commands a second, or instant); the line being drawn is highlighted and lines still to play
@@ -318,7 +322,13 @@ layer or turning symmetry on writes nothing by itself, and never changes what th
   (`layer move`), ⤓ merges it into the one below (`layer merge`), ✕ removes it; the flags write
   `layer set <name> hidden=|locked=|reference=on|off`; double-click a name to rename it. Frames:
   ◀ ▶ (or [ and ]) step through them, **+** adds a copy of yours after it (`frame add n copy=m`),
-  ✕ removes it.
+  ✕ removes it. Shift+click frame numbers to choose a run of them; double-click a frame number
+  to set its ticks (or the chosen frames': `frame set 1-2 ticks=9`). For the chosen frames: ⛓
+  links your layer's cels (`cel link 1-2 layer=main`), ⛓̸ unlinks them, *view…* makes them a
+  direction (`view E frames=1-2`), *mirror…* adds a live mirror (`view W mirror=E`), and a name in
+  *tag* tags them (`tag add walk 1-2 loop=cycle`). On the bands: ↻/⇄ switches a tag's loop
+  (`tag set walk loop=pingpong`), ✕ removes a tag or view or ends a mirror. The ⌖ tool (P) sets
+  the pivot with a click (`pivot 11,22`) and the ground line with Shift+click (`ground 22`).
 - **Undo / Redo** (buttons, Ctrl/⌘+Z, Ctrl/⌘+Shift+Z or Ctrl+Y) take back only your own groups:
   they write `undo by=human:<you>` and `redo by=human:<you>`, which the tape records as
   `undo group=h3` and `redo group=h7`.
