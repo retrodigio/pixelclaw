@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import { ctxOf } from '@pixelclaw/core';
 import { CanvasView, ZOOMS } from './CanvasView.tsx';
 import { Editor, PATTERN_NAMES } from './editor.ts';
+import { CheckChips, CheckDetails, PreviewPanel } from './Checks.tsx';
 import { NotesPanel, PalettePanel, StampsPanel, ToolsPanel } from './Panels.tsx';
 import { TimelinePanel } from './Timeline.tsx';
 import { SPEEDS, type Store } from './store.ts';
@@ -65,6 +66,10 @@ export function App({ store }: { store: Store }) {
   const frame = doc ? ed.frameIndex(doc) : 0;
   const mine = doc ? ctxOf(doc, store.me) : null;
   const mirrorShown = doc && (ed.mirrorX || ed.mirrorY) ? { x2: ed.mirrorX ? doc.width - 1 : null, y2: ed.mirrorY ? doc.height - 1 : null } : null;
+  // Checks run on the document as shown (not on a drag's preview), with the project's style guide.
+  const checks = shown ? store.checksFor(shown, frame) : [];
+  const marks = checks.filter((r) => store.marked.has(r.id)).flatMap((r) => r.flagged);
+  const openCheck = checks.find((r) => r.id === store.openCheck && store.marked.has(r.id));
   const toggle = (f: () => void) => {
     f();
     // Shortcuts work again straight after a choice in the options bar.
@@ -124,6 +129,7 @@ export function App({ store }: { store: Store }) {
           {doc && <span className="meta"> {doc.kind} {doc.width}×{doc.height}{doc.wrap ? ' · wrap' : ''} · {doc.palette.name}</span>}
         </span>
         <span className="spacer" />
+        <CheckChips results={checks} store={store} />
         {store.travel !== null && <span className="chip travel-chip">viewing #{store.travel} · read-only</span>}
         {store.paused && <span className="chip paused-chip">paused</span>}
         {naming === null ? (
@@ -165,7 +171,10 @@ export function App({ store }: { store: Store }) {
         </ul>
         <div className="panel-title">Tools</div>
         <ToolsPanel ed={ed} disabled={!editable} />
-        {palette && <PalettePanel palette={palette} ed={ed} editable={editable} locked={!!doc?.paletteLocked} />}
+        {palette && (
+          <PalettePanel palette={palette} ed={ed} editable={editable} locked={!!doc?.paletteLocked}
+            theme={store.theme} themes={store.themes} onTheme={(t) => store.setTheme(t)} />
+        )}
         {doc && <StampsPanel doc={doc} ed={ed} editable={editable} />}
       </aside>
 
@@ -199,9 +208,9 @@ export function App({ store }: { store: Store }) {
             </>
           )}
           <span className="spacer" />
-          <button onClick={() => ed.undo()} disabled={!ed.canUndo()} title={`Undo your last edit (Ctrl/⌘+Z): undo by=${store.me}`} data-testid="undo">↶ Undo</button>
-          <button onClick={() => ed.redo()} disabled={!ed.canRedo()} title={`Redo your last undo (Ctrl/⌘+Shift+Z): redo by=${store.me}`} data-testid="redo">↷ Redo</button>
-          {doc && seq !== null && <span className="dim">after #{seq}</span>}
+          <button onClick={() => ed.undo()} disabled={!ed.canUndo()} title={`Undo your last edit (Ctrl/⌘+Z): undo by=${store.me}`} data-testid="undo">↶ <span className="wide-only">Undo</span></button>
+          <button onClick={() => ed.redo()} disabled={!ed.canRedo()} title={`Redo your last undo (Ctrl/⌘+Shift+Z): redo by=${store.me}`} data-testid="redo">↷ <span className="wide-only">Redo</span></button>
+          {doc && seq !== null && <span className="dim" title={`The canvas shows the document after command #${seq}`}><span className="wide-only">after </span>#{seq}</span>}
         </div>
         {doc && editable && (
           <div className="options" data-testid="options">
@@ -252,7 +261,7 @@ export function App({ store }: { store: Store }) {
             </span>
             <span className="spacer" />
             <span className="opt" title={mine?.sel ? 'These act on your selection' : 'These act on your whole layer (select first to act on part of it)'}>
-              <span className="dim">{mine?.sel ? 'selection:' : 'layer:'}</span>
+              <span className="dim opt-label">{mine?.sel ? 'selection:' : 'layer:'}</span>
               <button onClick={() => ed.act('flip h')} title="Flip left-right (Shift+H): flip h" data-testid="flip-h">⇋</button>
               <button onClick={() => ed.act('flip v')} title="Flip top-bottom (Shift+V): flip v" data-testid="flip-v">⇵</button>
               <button onClick={() => ed.act('rotate 90')} title="Rotate 90° clockwise (Shift+R): rotate 90" data-testid="rotate">⟳</button>
@@ -288,6 +297,7 @@ export function App({ store }: { store: Store }) {
             <button type="button" onClick={() => ed.cancel()}>Cancel</button>
           </form>
         )}
+        {openCheck && <CheckDetails result={openCheck} ed={ed} editable={editable} onClose={() => store.closeChecks()} />}
         {store.error && <div className="banner error" data-testid="error">{store.error}</div>}
         {a?.problem && <div className="banner error">This tape does not replay: {a.problem}</div>}
         <CanvasView
@@ -297,6 +307,7 @@ export function App({ store }: { store: Store }) {
           pixelGrid={pixelGrid}
           cellGrid={cellGrid}
           ghosts={ghosts}
+          theme={store.themeObj()}
           seq={seq}
           asset={a?.name ?? null}
           travel={store.travel !== null}
@@ -304,7 +315,7 @@ export function App({ store }: { store: Store }) {
             mySel: mine?.sel ?? null, selOffset: ed.dragOffset,
             otherSels: doc ? Object.entries(doc.ctx).flatMap(([who, c]) => (who !== store.me && c.sel ? [c.sel] : [])) : [],
             marquee: ed.marquee, marqueeEllipse: ed.tool === 'select-ellipse', lasso: ed.lassoPath, mirror: editable ? mirrorShown : null,
-            notes: doc?.notes ?? [], activeNote: ed.activeNote, hover: ed.hover, draft,
+            notes: doc?.notes ?? [], activeNote: ed.activeNote, hover: ed.hover, draft, marks,
           }}
           pointer={editable ? { down: (p, e) => ed.down(p, e), move: (p) => ed.move(p), up: (p) => ed.up(p) } : null}
           cursor={ed.tool === 'move' ? 'move' : ed.tool === 'picker' ? 'copy' : 'crosshair'}
@@ -338,6 +349,7 @@ export function App({ store }: { store: Store }) {
           <span className="spacer" />
           <span className="dim" data-testid="waiting">{pending > 0 ? `${pending} to play` : waiting > 0 ? `${waiting} waiting` : ''}</span>
         </div>
+        {shown && <PreviewPanel doc={shown} frame={frame} store={store} marks={marks} />}
         {doc && a && (
           <NotesPanel doc={doc} tape={a.tape} ed={ed} editable={editable} active={ed.activeNote}
             onActive={(id) => { ed.activeNote = id; store.changed(); }} />

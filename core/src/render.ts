@@ -197,12 +197,16 @@ export function renderScaled(doc: Doc, o: ScaledOptions = {}): Rgba {
   return img;
 }
 
-/** The tile repeated 3x3, at 1x and at 4x side by side, to show seams and repetition. Marks go on the middle copy at 4x. */
-export function renderTile3x3(doc: Doc, frame = 0, o: { marks?: readonly Pt[]; theme?: Theme | null } = {}): Rgba {
+/**
+ * The tile repeated 3x3, at 1x and at 4x (or `scale`) side by side, to show seams and repetition.
+ * Marks go on the middle copy of the enlarged one.
+ */
+export function renderTile3x3(doc: Doc, frame = 0, o: { marks?: readonly Pt[]; theme?: Theme | null; scale?: number } = {}): Rgba {
   const pad = 8;
   const w = doc.width;
   const h = doc.height;
-  const img = createRgba(pad + 3 * w + pad + 12 * w + pad, pad + 12 * h + pad);
+  const k = o.scale ?? 4;
+  const img = createRgba(pad + 3 * w + pad + 3 * k * w + pad, pad + Math.max(3 * h, 3 * k * h) + pad);
   rect(img, 0, 0, img.width, img.height, RULER_BG);
   const px = flatten(doc, frame);
   const pal = colourTable(doc, o.theme);
@@ -218,8 +222,8 @@ export function renderTile3x3(doc: Doc, frame = 0, o: { marks?: readonly Pt[]; t
     }
   };
   draw(pad, pad, 1);
-  draw(pad + 3 * w + pad, pad, 4);
-  if (o.marks?.length) drawMarks(img, pad + 3 * w + pad + 4 * w, pad + 4 * h, 4, o.marks, w, h);
+  draw(pad + 3 * w + pad, pad, k);
+  if (o.marks?.length) drawMarks(img, pad + 3 * w + pad + k * w, pad + k * h, k, o.marks, w, h);
   return img;
 }
 

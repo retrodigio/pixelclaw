@@ -1,14 +1,14 @@
 // A server on a temporary project, driven over MCP like an agent would, for the browser tests.
 
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { cpSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { PassThrough } from 'node:stream';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import type { Page } from '@playwright/test';
-import { TRANSPARENT, flattenReference, importPalette, renderFlat, replay, type Doc, type TapeEntry } from '../core/src/index.ts';
+import { TRANSPARENT, flattenReference, importPalette, renderFlat, replay, type Doc, type TapeEntry, type Theme } from '../core/src/index.ts';
 
 export const REPO = join(import.meta.dirname, '..');
 const BIN = join(REPO, 'cli', 'bin', 'pixelclaw.js');
@@ -23,10 +23,12 @@ export interface Agent {
   close(): Promise<void>;
 }
 
-export async function startAgent(): Promise<Agent> {
+/** A server on a new project with the demo palette, or on a copy of an existing project folder. */
+export async function startAgent(o: { copy?: string } = {}): Promise<Agent> {
   const root = mkdtempSync(join(tmpdir(), 'pixelclaw-e2e-'));
   const dir = join(root, 'ruins.pclaw');
-  execFileSync(process.execPath, [BIN, 'new', dir, '--palette', PALETTE_FILE]);
+  if (o.copy) cpSync(o.copy, dir, { recursive: true });
+  else execFileSync(process.execPath, [BIN, 'new', dir, '--palette', PALETTE_FILE]);
   const transport = new StdioClientTransport({ command: process.execPath, args: [BIN, 'serve', '--project', dir, '--port', '0'], stderr: 'pipe' });
   let stderr = '';
   (transport.stderr as PassThrough).on('data', (d: Buffer) => { stderr += d.toString(); });
@@ -85,8 +87,8 @@ export async function canvasPixels(page: Page): Promise<{ width: number; height:
  * Compare the canvas (the frame it shows) with the core's render: opaque pixels exactly,
  * transparent ones show the checkerboard (or, under a visible reference layer, its faded colour).
  */
-export function mismatches(doc: Doc, got: { width: number; height: number; frame?: number; data: number[] }): string[] {
-  const want = renderFlat(doc, got.frame ?? 0).data;
+export function mismatches(doc: Doc, got: { width: number; height: number; frame?: number; data: number[] }, theme?: Theme): string[] {
+  const want = renderFlat(doc, got.frame ?? 0, theme).data;
   const ref = flattenReference(doc, got.frame ?? 0);
   const bad: string[] = [];
   if (got.width !== doc.width || got.height !== doc.height) return [`size ${got.width}x${got.height}, want ${doc.width}x${doc.height}`];

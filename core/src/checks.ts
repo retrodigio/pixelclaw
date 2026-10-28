@@ -451,7 +451,13 @@ function checkJaggies(img: Img, p: Params): CheckResult {
         const base = N4.filter(([dx, dy]) => op(qx + dx, qy + dy)).length;
         const n8 = N8.filter(([dx, dy]) => op(x + dx, y + dy)).length;
         if (base >= 3 && n8 <= 3) spikes.push([x, y]);
-      } else if (n4.length >= 3) notches.push([x, y]);
+      } else if (n4.length === 4) notches.push([x, y]);
+      else if (n4.length === 3) {
+        // A dent in a solid edge: the shape is at least two pixels deep behind it (the inside of
+        // a thin bracket is not a notch).
+        const open = N4.find(([dx, dy]) => !op(x + dx, y + dy))!;
+        if (op(x - 2 * open[0], y - 2 * open[1])) notches.push([x, y]);
+      }
     }
   }
   const groups = [

@@ -3,7 +3,10 @@
 // travel (from a Timeline's snapshots), the agent's last image view, and this person's author name
 // for the edits the page sends. React reads it via useSyncExternalStore.
 
-import { TapeCursor, Timeline, activeGroups, type Diag, type Doc, type Palette, type PaletteSource, type TapeEntry } from '@pixelclaw/core';
+import {
+  BUILTIN_THEMES, CHECK_IDS, TapeCursor, Timeline, activeGroups, checkContextFor, runChecks, type AssetDoc, type CheckId, type CheckResult, type Diag,
+  type Doc, type Palette, type PaletteSource, type StyleJson, type TapeEntry, type Theme,
+} from '@pixelclaw/core';
 import { HUMAN_RE, type Eye, type ServerMessage, type Snapshot } from '@pixelclaw/server/protocol';
 
 export interface AssetModel {
@@ -57,6 +60,17 @@ export class Store {
   me: string = initialAuthor();
   /** The last error from an edit this page sent (shown until the next edit). */
   error: string | null = null;
+  /** The style guide (project.json `style`) and the preview themes. */
+  style: StyleJson = {};
+  themes: Theme[] = BUILTIN_THEMES;
+  /** The preview theme role entries are shown in (null: their own colours). Only for looking. */
+  theme: string | null = null;
+  /** Checks whose flagged pixels are circled on the canvas. */
+  marked = new Set<CheckId>();
+  /** The check whose details are open under the toolbar. */
+  openCheck: CheckId | null = null;
+  private styleVersion = 0;
+  private checkCache: { key: string; results: CheckResult[] } | null = null;
   /** Assets in the order their batches arrived and have not played yet. */
   private queue: string[] = [];
   private travelCache: { key: string; doc: Doc | null } | null = null;
@@ -151,6 +165,11 @@ export class Store {
       this.palettes = new Map(m.palettes.map((p) => [p.name, p]));
       this.defaultPalette = m.defaultPalette;
     } else if (m.type === 'eye') this.eye = m.eye;
+    else if (m.type === 'style') {
+      this.style = m.style;
+      this.themes = m.themes;
+      this.styleVersion++;
+    }
     else if (m.type === 'result') {
       const done = this.waiting.get(m.id);
       this.waiting.delete(m.id);
@@ -178,6 +197,9 @@ export class Store {
     this.project = s.project;
     this.palettes = new Map(s.palettes.map((p) => [p.name, p]));
     this.defaultPalette = s.defaultPalette;
+    this.style = s.style ?? {};
+    this.themes = s.themes ?? BUILTIN_THEMES;
+    this.styleVersion++;
     this.eye = s.eye;
     this.queue = [];
     this.travel = null;
@@ -251,8 +273,11 @@ export class Store {
       if (this.idle) this.budget = 1;
       else this.budget += (dt * this.speed) / 1000;
       this.idle = false;
-      const n = Math.floor(this.budget);
-      this.budget -= n;
+      // At most as many commands per frame as the speed asks of a 60 Hz display (one, up to 60/s),
+      // so a slow frame delays playback rather than skipping a command you were meant to see.
+      const most = Math.max(1, Math.ceil(this.speed / 60));
+      const n = Math.min(Math.floor(this.budget), most);
+      this.budget = Math.min(this.budget - n, most);
       this.advance(cur, n);
     }
     this.changed();
@@ -325,6 +350,64 @@ export class Store {
       this.travelCache = { key, doc: a.timeline.docAfter(a.tape, this.travel).doc };
     }
     return { doc: this.travelCache.doc, seq: this.travel };
+  }
+
+  // --- checks and previews
+
+  /** Every asset's live document, with what it was forked from. */
+  assetDocs(): AssetDoc[] {
+    const out: AssetDoc[] = [];
+    for (const a of this.assets.values()) {
+      if (!a.cursor.doc) continue;
+      const fork = a.tape.map((e) => /^fork (\S+) \S+ at=\d+$/.exec(e.cmd)).find(Boolean);
+      out.push({ name: a.name, doc: a.cursor.doc, forkOf: fork?.[1] ?? null });
+    }
+    return out;
+  }
+
+  /** The preview theme chosen, as a theme (null: role entries in their own colours). */
+  themeObj(): Theme | null {
+    return this.theme ? this.themes.find((t) => t.name === this.theme) ?? null : null;
+  }
+
+  setTheme(name: string | null): void {
+    this.theme = name;
+    this.changed();
+  }
+
+  /**
+   * The checks of the shown document, with the project's style guide (the same answers the
+   * agent's `check` gets). Kept until the document, the other assets or the style change.
+   */
+  checksFor(doc: Doc, frame: number): CheckResult[] {
+    const a = this.current;
+    if (!a) return [];
+    let total = 0;
+    for (const x of this.assets.values()) total += x.cursor.done.length;
+    const key = `${a.name}:${this.travel}:${a.cursor.done.length}:${frame}:${total}:${this.styleVersion}`;
+    if (this.checkCache?.key !== key) {
+      const { ctx } = checkContextFor(a.name, doc, this.assetDocs(), this.style, (n) => this.palettes.get(n), { frame });
+      this.checkCache = { key, results: runChecks(doc, CHECK_IDS, ctx) };
+    }
+    return this.checkCache.results;
+  }
+
+  /** Show or hide a check's flagged pixels; the details of the last one shown stay open. */
+  toggleCheck(id: CheckId): void {
+    if (this.marked.has(id)) {
+      this.marked.delete(id);
+      if (this.openCheck === id) this.openCheck = [...this.marked].at(-1) ?? null;
+    } else {
+      this.marked.add(id);
+      this.openCheck = id;
+    }
+    this.changed();
+  }
+
+  closeChecks(): void {
+    this.marked.clear();
+    this.openCheck = null;
+    this.changed();
   }
 
   private undoneCache: { tape: TapeEntry[]; n: number; set: Set<string> } | null = null;

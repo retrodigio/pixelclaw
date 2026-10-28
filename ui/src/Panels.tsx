@@ -3,7 +3,7 @@
 // open notes.
 
 import { useEffect, useRef, useState } from 'react';
-import { TRANSPARENT, rgbOf, type Doc, type Note, type Palette, type Stamp, type TapeEntry } from '@pixelclaw/core';
+import { ROLES, TRANSPARENT, hasRoles, rgbOf, themedPalette, type Doc, type Note, type Palette, type Stamp, type TapeEntry, type Theme } from '@pixelclaw/core';
 import { TOOLS, type Editor } from './editor.ts';
 
 export function ToolsPanel({ ed, disabled }: { ed: Editor; disabled: boolean }) {
@@ -30,18 +30,30 @@ const HEX_RE = /^#[0-9a-f]{6}$/;
 
 /**
  * The palette: click a swatch for colour A (drawing), right-click for colour B (gradient end,
- * dither ground); double-click to change its colour; + adds one. Locked palettes say so.
+ * dither ground); double-click to change its colour or role; + adds one. Locked palettes say so.
+ * Role art (entries that stand for colour roles) can be shown under a preview theme.
  */
-export function PalettePanel({ palette, ed, editable, locked }: { palette: Palette; ed: Editor; editable: boolean; locked: boolean }) {
-  const [editing, setEditing] = useState<{ name: string | null; hex: string; newName: string } | null>(null);
+export function PalettePanel({ palette, ed, editable, locked, theme, themes, onTheme }: {
+  palette: Palette; ed: Editor; editable: boolean; locked: boolean; theme: string | null; themes: Theme[]; onTheme(t: string | null): void;
+}) {
+  const [editing, setEditing] = useState<{ name: string | null; hex: string; newName: string; role: string; was: { hex: string; role: string } | null } | null>(null);
   const current = ed.doc ? ed.colourName(ed.doc) : ed.colour;
   const second = ed.doc ? ed.colourName(ed.doc, true) : ed.colour2;
   const canEdit = editable && !locked;
+  const roles = hasRoles(palette);
+  const shownPalette = themedPalette(palette, themes.find((t) => t.name === theme));
   const save = async () => {
     if (!editing || !HEX_RE.test(editing.hex)) return;
-    const cmd = editing.name === null
-      ? `palette add${editing.newName.trim() ? ` ${editing.newName.trim()}` : ''} hex=${editing.hex}`
-      : `palette set ${editing.name} hex=${editing.hex}`;
+    let cmd: string;
+    if (editing.name === null) {
+      cmd = `palette add${editing.newName.trim() ? ` ${editing.newName.trim()}` : ''} hex=${editing.hex}${editing.role ? ` role=${editing.role}` : ''}`;
+    } else {
+      const was = editing.was!;
+      const hex = editing.hex !== was.hex ? ` hex=${editing.hex}` : '';
+      const role = editing.role !== was.role ? ` role=${editing.role || 'none'}` : '';
+      if (!hex && !role) { setEditing(null); return; }
+      cmd = `palette set ${editing.name}${hex}${role}`;
+    }
     if (await ed.commit(cmd, { context: false })) setEditing(null);
   };
   return (
@@ -50,13 +62,20 @@ export function PalettePanel({ palette, ed, editable, locked }: { palette: Palet
         Palette <span className="dim">{palette.name}</span>
         {locked && <span className="dim" title="The palette is locked (palette unlock to change it)" data-testid="palette-locked">🔒</span>}
         <span className="spacer" />
+        {roles && (
+          <select className="theme-select" value={theme ?? ''} onChange={(e) => onTheme(e.target.value || null)} data-testid="theme"
+            title="Show role colours under a preview theme (only for looking: nothing is written)">
+            <option value="">own colours</option>
+            {themes.map((t) => <option key={t.name} value={t.name}>{t.name}</option>)}
+          </select>
+        )}
         {editable && (
           <button className="mini" title={locked ? 'Unlock the palette (palette unlock)' : 'Lock the palette: no more colour edits (palette lock)'} data-testid="palette-lock"
             onClick={() => void ed.commit(locked ? 'palette unlock' : 'palette lock', { context: false })}>{locked ? 'unlock' : 'lock'}</button>
         )}
         {canEdit && (
           <button className="mini" title="Add a colour to this asset's palette" data-testid="palette-add"
-            onClick={() => setEditing({ name: null, hex: '#808080', newName: '' })}>+</button>
+            onClick={() => setEditing({ name: null, hex: '#808080', newName: '', role: '', was: null })}>+</button>
         )}
       </div>
       {editing && (
@@ -69,8 +88,13 @@ export function PalettePanel({ palette, ed, editable, locked }: { palette: Palet
             <input className="pname" placeholder="name" value={editing.newName} aria-label="name"
               onChange={(e) => setEditing({ ...editing, newName: e.target.value })} />
           )}
+          <select value={editing.role} onChange={(e) => setEditing({ ...editing, role: e.target.value })} data-testid="palette-role"
+            title="A role makes the entry recolourable: themes show it in their colour (palette … role=)">
+            <option value="">no role</option>
+            {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+          </select>
           <button onClick={() => void save()} disabled={!HEX_RE.test(editing.hex)} data-testid="palette-save"
-            title={editing.name === null ? 'Add this colour (palette add)' : `Set ${editing.name} to this colour (palette set)`}>
+            title={editing.name === null ? 'Add this colour (palette add)' : `Set ${editing.name} (palette set)`}>
             {editing.name === null ? 'Add' : 'Set'}
           </button>
           <button onClick={() => setEditing(null)} title="Cancel (Esc)">✕</button>
@@ -84,19 +108,20 @@ export function PalettePanel({ palette, ed, editable, locked }: { palette: Palet
           <span className="sname">none</span>
           {current === 'none' && <span className="ab">A</span>}{second === 'none' && <span className="ab b">B</span>}
         </div>
-        {palette.entries.map((e) => (
+        {palette.entries.map((e, i) => (
           <div
             key={e.key}
             className={`swatch${current === e.name ? ' on' : ''}${second === e.name ? ' two' : ''}`}
-            title={`${e.name}  ${e.hex}  key ${e.key}  (click: colour A, right-click: colour B${canEdit ? ', double-click to change the colour' : ''})`}
+            title={`${e.name}  ${e.hex}${e.role ? `  role ${e.role}` : ''}  key ${e.key}  (click: colour A, right-click: colour B${canEdit ? ', double-click to change the colour or role' : ''})`}
             data-colour={e.name}
             onClick={() => ed.setColour(e.name)}
             onContextMenu={(ev) => { ev.preventDefault(); ed.setColour(e.name, true); }}
-            onDoubleClick={() => canEdit && setEditing({ name: e.name, hex: e.hex, newName: '' })}
+            onDoubleClick={() => canEdit && setEditing({ name: e.name, hex: e.hex, newName: '', role: e.role ?? '', was: { hex: e.hex, role: e.role ?? '' } })}
           >
-            <span className="chip-colour" style={{ background: e.hex }} />
+            <span className="chip-colour" style={{ background: shownPalette.entries[i]!.hex }} />
             <span className="key">{e.key}</span>
             <span className="sname">{e.name}</span>
+            {e.role && <span className="role" data-role={e.role}>{e.role}</span>}
             {current === e.name && <span className="ab">A</span>}{second === e.name && <span className="ab b">B</span>}
           </div>
         ))}

@@ -4,10 +4,11 @@
 // renders. On wrap documents, "wrap ghosts" show half a tile of the neighbouring copies around the
 // canvas (you can draw on them: the strokes wrap). A second canvas on top draws what is not art:
 // your selection (marching ants), other authors' selections, symmetry guides, the marquee or lasso
-// being dragged, notes and the hovered pixel. Notes also get a label with their id and text.
+// being dragged, notes, the pixels checks flagged (circled in magenta) and the hovered pixel.
+// Notes also get a label with their id and text. Role entries show in the chosen preview theme.
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { TRANSPARENT, flattenReference, renderFlat, rgbOf, type Doc, type Note } from '@pixelclaw/core';
+import { TRANSPARENT, flattenReference, renderFlat, rgbOf, themedPalette, type Doc, type Note, type Theme } from '@pixelclaw/core';
 import type { Pt, Rect } from './editor.ts';
 
 export const ZOOMS = [1, 2, 3, 4, 6, 8, 12, 16, 20, 24, 32, 40, 48, 64];
@@ -47,6 +48,8 @@ export interface Overlay {
   hover: Pt | null;
   /** A note's place waiting for its text. */
   draft: Rect | null;
+  /** Pixels checks flagged, circled in magenta. */
+  marks: readonly Pt[];
 }
 
 export interface PointerHandlers {
@@ -63,6 +66,8 @@ interface Props {
   pixelGrid: boolean;
   cellGrid: boolean;
   ghosts: boolean;
+  /** The preview theme for role entries (null: their own colours). */
+  theme: Theme | null;
   seq: number | null;
   asset: string | null;
   travel: boolean;
@@ -111,15 +116,15 @@ function maskAnts(g: CanvasRenderingContext2D, doc: Doc, m: Uint8Array, z: numbe
 }
 
 /** The document's art (and faded reference layers) at 1x, as a canvas. */
-function oneX(doc: Doc, frame: number): HTMLCanvasElement {
+function oneX(doc: Doc, frame: number, theme: Theme | null): HTMLCanvasElement {
   const one = document.createElement('canvas');
   one.width = doc.width;
   one.height = doc.height;
-  const img = renderFlat(doc, frame);
+  const img = renderFlat(doc, frame, theme);
   const ref = flattenReference(doc, frame);
   if (ref) {
     // Reference pixels under transparent art, half-way to the checkerboard.
-    const pal = doc.palette.entries.map((e) => rgbOf(e.hex));
+    const pal = themedPalette(doc.palette, theme).entries.map((e) => rgbOf(e.hex));
     for (let i = 0; i < ref.length; i++) {
       if (ref[i] === TRANSPARENT || img.data[i * 4 + 3]) continue;
       const c = pal[ref[i]!]!;
@@ -179,7 +184,7 @@ export function CanvasView(p: Props) {
     const g = c.getContext('2d')!;
     g.imageSmoothingEnabled = false;
     checker(g, z, W, H);
-    const one = oneX(doc, p.frame);
+    const one = oneX(doc, p.frame, p.theme);
     g.drawImage(one, 0, 0, W, H);
     if (p.pixelGrid && z >= 4) {
       for (let x = 1; x < doc.width; x++) {
@@ -267,6 +272,19 @@ export function CanvasView(p: Props) {
       o.lasso.forEach(([x, y], i) => (i ? g.lineTo((x + 0.5) * z, (y + 0.5) * z) : g.moveTo((x + 0.5) * z, (y + 0.5) * z)));
       g.stroke();
       g.setLineDash([]);
+    }
+    if (o.marks.length) {
+      // A magenta ring around each flagged pixel (filled below 4x), with a dark edge so it shows on pink.
+      for (const pass of [0, 1]) {
+        g.strokeStyle = pass ? '#ff00c8' : 'rgba(0,0,0,0.55)';
+        g.lineWidth = pass ? 2 : 4;
+        for (const [x, y] of o.marks) {
+          if (z < 4) { if (pass) { g.fillStyle = '#ff00c8'; g.fillRect(x * z, y * z, z, z); } continue; }
+          g.beginPath();
+          g.arc((x + 0.5) * z, (y + 0.5) * z, z * 0.5 + Math.max(2, z * 0.22), 0, Math.PI * 2);
+          g.stroke();
+        }
+      }
     }
     if (o.hover && z >= 4 && !p.travel) {
       const hx = ((o.hover[0] % doc.width) + doc.width) % doc.width;
