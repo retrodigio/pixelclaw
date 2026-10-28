@@ -3,9 +3,11 @@
 // here: every action becomes a command on the tape with their name (plan §1.3).
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { ctxOf } from '@pixelclaw/core';
 import { CanvasView, ZOOMS } from './CanvasView.tsx';
-import { Editor } from './editor.ts';
-import { NotesPanel, PalettePanel, ToolsPanel } from './Panels.tsx';
+import { Editor, PATTERN_NAMES } from './editor.ts';
+import { NotesPanel, PalettePanel, StampsPanel, ToolsPanel } from './Panels.tsx';
+import { TimelinePanel } from './Timeline.tsx';
 import { SPEEDS, type Store } from './store.ts';
 import { TapePanel, authorClass, time } from './TapePanel.tsx';
 
@@ -43,6 +45,7 @@ export function App({ store }: { store: Store }) {
   const [effZoom, setEffZoom] = useState(1);
   const [pixelGrid, setPixelGrid] = useState(true);
   const [cellGrid, setCellGrid] = useState(true);
+  const [ghosts, setGhosts] = useState(true);
   const [eyeOpen, setEyeOpen] = useState(false);
   const [branch, setBranch] = useState<string | null>(null);
   const [naming, setNaming] = useState<string | null>(null);
@@ -59,6 +62,16 @@ export function App({ store }: { store: Store }) {
   const palette = doc?.palette ?? (store.defaultPalette ? store.palettes.get(store.defaultPalette) : undefined);
   const lastBy = a?.tape.at(-1)?.by;
   const editable = ed.editable;
+  const frame = doc ? ed.frameIndex(doc) : 0;
+  const mine = doc ? ctxOf(doc, store.me) : null;
+  const mirrorShown = doc && (ed.mirrorX || ed.mirrorY) ? { x2: ed.mirrorX ? doc.width - 1 : null, y2: ed.mirrorY ? doc.height - 1 : null } : null;
+  const toggle = (f: () => void) => {
+    f();
+    // Shortcuts work again straight after a choice in the options bar.
+    const el = document.activeElement;
+    if (el instanceof HTMLSelectElement || (el instanceof HTMLInputElement && el.type === 'checkbox')) el.blur();
+    store.changed();
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -152,7 +165,8 @@ export function App({ store }: { store: Store }) {
         </ul>
         <div className="panel-title">Tools</div>
         <ToolsPanel ed={ed} disabled={!editable} />
-        {palette && <PalettePanel palette={palette} ed={ed} editable={editable} />}
+        {palette && <PalettePanel palette={palette} ed={ed} editable={editable} locked={!!doc?.paletteLocked} />}
+        {doc && <StampsPanel doc={doc} ed={ed} editable={editable} />}
       </aside>
 
       <main>
@@ -164,21 +178,24 @@ export function App({ store }: { store: Store }) {
           <span className="gap" />
           <label><input type="checkbox" checked={pixelGrid} onChange={(e) => setPixelGrid(e.target.checked)} /> pixel grid</label>
           <label><input type="checkbox" checked={cellGrid} onChange={(e) => setCellGrid(e.target.checked)} /> cell grid</label>
+          {doc?.wrap && (
+            <label title="Show half a tile of the neighbouring copies around a wrap document (draw on them: strokes wrap)">
+              <input type="checkbox" checked={ghosts} onChange={(e) => setGhosts(e.target.checked)} data-testid="ghosts-toggle" /> wrap ghosts
+            </label>
+          )}
           <span className="gap" />
           {doc && editable && (
             <>
-              <span className="colour-now" title="The colour you draw with (I or Alt+click picks one from the canvas)" data-testid="colour">
+              <span className="colour-now" title="Colour A draws (I or Alt+click picks one); colour B (right-click a swatch) ends gradients and grounds dithers. X swaps them." data-testid="colour">
+                <span className="ab">A</span>
                 <span className={`chip-colour${ed.colourName(doc) === 'none' ? ' none' : ''}`}
                   style={{ background: doc.palette.entries.find((e) => e.name === ed.colourName(doc))?.hex }} />
                 {ed.colourName(doc)}
+                <span className="ab b">B</span>
+                <span className={`chip-colour${ed.colourName(doc, true) === 'none' ? ' none' : ''}`} data-testid="colour2"
+                  style={{ background: doc.palette.entries.find((e) => e.name === ed.colourName(doc, true))?.hex }} />
+                <span data-testid="colour2-name">{ed.colourName(doc, true)}</span>
               </span>
-              {(ed.tool === 'rect' || ed.tool === 'ellipse') && (
-                <label title="Filled shapes (F)"><input type="checkbox" checked={ed.filled} onChange={(e) => { ed.filled = e.target.checked; store.changed(); }} /> filled</label>
-              )}
-              {ed.tool === 'pencil' && (
-                <label title="Pixel-perfect pencil: no doubled L-corners"><input type="checkbox" checked={ed.pixelPerfect}
-                  onChange={(e) => { ed.pixelPerfect = e.target.checked; store.changed(); }} /> pixel-perfect</label>
-              )}
             </>
           )}
           <span className="spacer" />
@@ -186,6 +203,65 @@ export function App({ store }: { store: Store }) {
           <button onClick={() => ed.redo()} disabled={!ed.canRedo()} title={`Redo your last undo (Ctrl/⌘+Shift+Z): redo by=${store.me}`} data-testid="redo">↷ Redo</button>
           {doc && seq !== null && <span className="dim">after #{seq}</span>}
         </div>
+        {doc && editable && (
+          <div className="options" data-testid="options">
+            {(ed.tool === 'rect' || ed.tool === 'ellipse') && (
+              <label title="Filled shapes (F)"><input type="checkbox" checked={ed.filled} onChange={(e) => toggle(() => { ed.filled = e.target.checked; })} /> filled</label>
+            )}
+            {ed.tool === 'pencil' && (
+              <label title="Pixel-perfect pencil: no doubled L-corners"><input type="checkbox" checked={ed.pixelPerfect}
+                onChange={(e) => toggle(() => { ed.pixelPerfect = e.target.checked; })} /> pixel-perfect</label>
+            )}
+            {ed.usesBrush() && (
+              <span className="opt" title="The brush pencil, eraser, lines and outlines draw with (brush square|circle <n>)">
+                brush
+                <select value={ed.brushShape} onChange={(e) => toggle(() => { ed.brushShape = e.target.value as 'square' | 'circle'; })} data-testid="brush-shape">
+                  <option value="square">square</option><option value="circle">circle</option>
+                </select>
+                <input type="number" min={1} max={8} value={ed.brushSize} className="num" aria-label="brush size" data-testid="brush-size"
+                  onChange={(e) => toggle(() => { ed.brushSize = Math.max(1, Math.min(8, Number(e.target.value) || 1)); })}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur(); }} />
+              </span>
+            )}
+            {ed.tool === 'wand' && (
+              <label title="Select every pixel of the colour, not only the touching ones (mode=global)"><input type="checkbox" checked={ed.wandGlobal}
+                onChange={(e) => toggle(() => { ed.wandGlobal = e.target.checked; })} data-testid="wand-global" /> whole colour</label>
+            )}
+            {ed.tool === 'gradient' && (
+              <span className="opt">pattern
+                <select value={ed.gradientPattern} onChange={(e) => toggle(() => { ed.gradientPattern = e.target.value; })} data-testid="gradient-pattern">
+                  {['none', ...PATTERN_NAMES].map((n) => <option key={n}>{n}</option>)}
+                </select>
+              </span>
+            )}
+            {ed.tool === 'dither' && (
+              <span className="opt">pattern
+                <select value={ed.ditherPattern} onChange={(e) => toggle(() => { ed.ditherPattern = e.target.value; })} data-testid="dither-pattern">
+                  {PATTERN_NAMES.map((n) => <option key={n}>{n}</option>)}
+                </select>
+                level
+                <select value={String(ed.ditherLevel)} onChange={(e) => toggle(() => { ed.ditherLevel = Number(e.target.value); })} data-testid="dither-level">
+                  {[0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875].map((n) => <option key={n} value={String(n)}>{n}</option>)}
+                </select>
+              </span>
+            )}
+            <span className="opt sym" title="Symmetry: your strokes are mirrored across the middle (mirror … live); the guides show the axes">
+              mirror
+              <button className={ed.mirrorX ? 'on' : ''} onClick={() => toggle(() => { ed.mirrorX = !ed.mirrorX; })} data-testid="mirror-x" title="Mirror left-right">⇹</button>
+              <button className={ed.mirrorY ? 'on' : ''} onClick={() => toggle(() => { ed.mirrorY = !ed.mirrorY; })} data-testid="mirror-y" title="Mirror top-bottom">⇵</button>
+            </span>
+            <span className="spacer" />
+            <span className="opt" title={mine?.sel ? 'These act on your selection' : 'These act on your whole layer (select first to act on part of it)'}>
+              <span className="dim">{mine?.sel ? 'selection:' : 'layer:'}</span>
+              <button onClick={() => ed.act('flip h')} title="Flip left-right (Shift+H): flip h" data-testid="flip-h">⇋</button>
+              <button onClick={() => ed.act('flip v')} title="Flip top-bottom (Shift+V): flip v" data-testid="flip-v">⇵</button>
+              <button onClick={() => ed.act('rotate 90')} title="Rotate 90° clockwise (Shift+R): rotate 90" data-testid="rotate">⟳</button>
+              <button onClick={() => ed.act(`outline c=${ed.colourName(doc)}`)} title="Outline the shapes in colour A: outline" data-testid="outline">◘</button>
+              <button onClick={() => ed.act('clean orphans')} title="Remove lone pixels: clean orphans" data-testid="clean">⌧</button>
+              {mine?.sel && <button onClick={() => ed.deselect()} title="Deselect (Esc)" data-testid="deselect">✕</button>}
+            </span>
+          </div>
+        )}
         {store.travel !== null && a && (
           <div className="banner">
             Viewing the document after #{store.travel} (read-only).
@@ -216,19 +292,27 @@ export function App({ store }: { store: Store }) {
         {a?.problem && <div className="banner error">This tape does not replay: {a.problem}</div>}
         <CanvasView
           doc={doc}
+          frame={frame}
           zoom={zoom}
           pixelGrid={pixelGrid}
           cellGrid={cellGrid}
+          ghosts={ghosts}
           seq={seq}
           asset={a?.name ?? null}
           travel={store.travel !== null}
-          overlay={{ sel: ed.shownSel, marquee: ed.marquee, notes: doc?.notes ?? [], activeNote: ed.activeNote, hover: ed.hover, draft }}
+          overlay={{
+            mySel: mine?.sel ?? null, selOffset: ed.dragOffset,
+            otherSels: doc ? Object.entries(doc.ctx).flatMap(([who, c]) => (who !== store.me && c.sel ? [c.sel] : [])) : [],
+            marquee: ed.marquee, marqueeEllipse: ed.tool === 'select-ellipse', lasso: ed.lassoPath, mirror: editable ? mirrorShown : null,
+            notes: doc?.notes ?? [], activeNote: ed.activeNote, hover: ed.hover, draft,
+          }}
           pointer={editable ? { down: (p, e) => ed.down(p, e), move: (p) => ed.move(p), up: (p) => ed.up(p) } : null}
           cursor={ed.tool === 'move' ? 'move' : ed.tool === 'picker' ? 'copy' : 'crosshair'}
           onNote={(id) => { ed.activeNote = id; store.changed(); }}
           onZoom={setZoom}
           onEffectiveZoom={setEffZoom}
         />
+        {doc && <TimelinePanel doc={doc} ed={ed} editable={editable} />}
       </main>
 
       <aside className="right">

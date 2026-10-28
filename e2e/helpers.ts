@@ -8,7 +8,7 @@ import type { PassThrough } from 'node:stream';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import type { Page } from '@playwright/test';
-import { importPalette, renderFlat, replay, type Doc, type TapeEntry } from '../core/src/index.ts';
+import { TRANSPARENT, flattenReference, importPalette, renderFlat, replay, type Doc, type TapeEntry } from '../core/src/index.ts';
 
 export const REPO = join(import.meta.dirname, '..');
 const BIN = join(REPO, 'cli', 'bin', 'pixelclaw.js');
@@ -64,10 +64,11 @@ export async function serverDoc(url: string, asset: string, upTo?: number): Prom
  * The canvas, read back one sample per document pixel (at the pixel's centre). Grid lines sit on
  * pixel edges, so the centres are the document's colours. Returns RGBA bytes, width*height*4.
  */
-export async function canvasPixels(page: Page): Promise<{ width: number; height: number; zoom: number; data: number[] }> {
+export async function canvasPixels(page: Page): Promise<{ width: number; height: number; zoom: number; frame: number; data: number[] }> {
   return page.evaluate(() => {
     const c = document.querySelector<HTMLCanvasElement>('[data-testid=canvas]')!;
     const z = Number(c.dataset.zoom);
+    const frame = Number(c.dataset.frame ?? 0);
     const w = c.width / z;
     const h = c.height / z;
     const all = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data;
@@ -76,19 +77,24 @@ export async function canvasPixels(page: Page): Promise<{ width: number; height:
       const o = ((y * z + (z >> 1)) * c.width + x * z + (z >> 1)) * 4;
       out.push(all[o]!, all[o + 1]!, all[o + 2]!, all[o + 3]!);
     }
-    return { width: w, height: h, zoom: z, data: out };
+    return { width: w, height: h, zoom: z, frame, data: out };
   });
 }
 
-/** Compare the canvas with the core's render: opaque pixels exactly, transparent ones show the checkerboard. */
-export function mismatches(doc: Doc, got: { width: number; height: number; data: number[] }): string[] {
-  const want = renderFlat(doc).data;
+/**
+ * Compare the canvas (the frame it shows) with the core's render: opaque pixels exactly,
+ * transparent ones show the checkerboard (or, under a visible reference layer, its faded colour).
+ */
+export function mismatches(doc: Doc, got: { width: number; height: number; frame?: number; data: number[] }): string[] {
+  const want = renderFlat(doc, got.frame ?? 0).data;
+  const ref = flattenReference(doc, got.frame ?? 0);
   const bad: string[] = [];
   if (got.width !== doc.width || got.height !== doc.height) return [`size ${got.width}x${got.height}, want ${doc.width}x${doc.height}`];
   for (let i = 0; i < doc.width * doc.height; i++) {
     const g = got.data.slice(i * 4, i * 4 + 4);
     const w = [...want.slice(i * 4, i * 4 + 4)];
-    const ok = w[3] === 0 ? (g[0] === 204 || g[0] === 238) && g[0] === g[1] && g[1] === g[2] : g.join() === w.join();
+    const underRef = !!ref && ref[i] !== TRANSPARENT;
+    const ok = w[3] === 0 ? underRef || ((g[0] === 204 || g[0] === 238) && g[0] === g[1] && g[1] === g[2]) : g.join() === w.join();
     if (!ok) bad.push(`${i % doc.width},${Math.floor(i / doc.width)}: canvas ${g.join()} core ${w.join()}`);
   }
   return bad;

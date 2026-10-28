@@ -111,16 +111,16 @@ test('every tool logs a command that replays to the pixels on the canvas', async
   // Alt+click picks too.
   await drag(page, [[0, 15]], { alt: true });
   await expect(page.getByTestId('colour')).toContainText('soil1');
-  // Rectangle select (M), then drag inside to move: one group of three lines.
+  // Rectangle select (M) is a command of its own (selections are per author); drag inside to move it.
   await key('m');
-  await drag(page, [[4, 7], [9, 11]]);
-  await act(page, 'idol', () => drag(page, [[5, 8], [7, 9]]), ['select rect 4,7 6x5', 'shift 2,1', 'deselect']);
+  await act(page, 'idol', () => drag(page, [[4, 7], [9, 11]]), ['select rect 4,7 6x5']);
+  await act(page, 'idol', () => drag(page, [[5, 8], [7, 9]]), ['shift 2,1']);
   // With a selection, drawing is clipped to it.
   await key('b');
-  await act(page, 'idol', () => drag(page, [[0, 9], [15, 9]]), ['select rect 6,8 6x5', /^stroke pencil c=soil1 pp=on 0,9 .*15,9$/, 'deselect']);
-  // Delete clears the selection; Esc lets it go.
-  await act(page, 'idol', () => key('Delete'), ['rect 6,8 6x5 c=none fill']);
-  await key('Escape');
+  await act(page, 'idol', () => drag(page, [[0, 9], [15, 9]]), [/^stroke pencil c=soil1 pp=on 0,9 .*15,9$/]);
+  // Delete clears the selected pixels; Esc deselects.
+  await act(page, 'idol', () => key('Delete'), ['clear']);
+  await act(page, 'idol', () => key('Escape'), ['deselect']);
   // Move (V) without a selection moves everything; arrow keys nudge.
   await key('v');
   await act(page, 'idol', () => drag(page, [[8, 8], [7, 8]]), ['shift -1,0']);
@@ -144,11 +144,11 @@ test('every tool logs a command that replays to the pixels on the canvas', async
   await expect(page.locator('.note-label[data-note=n1]')).toContainText('gold trim');
   await expect(page.getByTestId('notes')).toContainText('human:chris');
   // Undo and redo (Ctrl+Z, Ctrl+Shift+Z, and the buttons).
-  await act(page, 'idol', () => key('Control+z'), ['undo group=h17']);
+  await act(page, 'idol', () => key('Control+z'), ['undo group=h19']);
   await expect(page.locator('.note-label')).toHaveCount(0);
-  await act(page, 'idol', () => page.getByTestId('redo').click(), ['redo group=h18']);
-  await act(page, 'idol', () => page.getByTestId('undo').click(), ['undo group=h17']);
-  await act(page, 'idol', () => key('Control+Shift+z'), ['redo group=h20']);
+  await act(page, 'idol', () => page.getByTestId('redo').click(), ['redo group=h20']);
+  await act(page, 'idol', () => page.getByTestId('undo').click(), ['undo group=h19']);
+  await act(page, 'idol', () => key('Control+Shift+z'), ['redo group=h22']);
   // Closing a note from the notes panel.
   await act(page, 'idol', () => page.getByTitle('Close this note (note done)').click(), ['note done n1']);
   // The command line runs any command as this person.

@@ -3,7 +3,7 @@
 // Frames are numbered from 1 in the language. Durations, tags and linked cels come with G6.
 
 import { Args, fn, needDoc, registerCommand, type CommandSpec } from './commands.ts';
-import { TRANSPARENT, ctxOf, newLayer, setCtx, type Doc } from './doc.ts';
+import { TRANSPARENT, ctxOf, newLayer, remapCtx, setCtx, type Doc } from './doc.ts';
 import { DiagError, type ParsedCommand, type Token } from './parser.ts';
 
 const LAYER_RE = /^[A-Za-z][A-Za-z0-9_-]*$/;
@@ -26,7 +26,7 @@ function reorder(d: Doc, order: number[]): void {
   const where = new Map(order.map((old, k) => [old, k]));
   d.layers = order.map((i) => d.layers[i]!);
   d.cels = order.map((i) => d.cels[i]!);
-  for (const a of Object.keys(d.ctx)) setCtx(d, a, { layer: where.get(ctxOf(d, a).layer) ?? 0 });
+  remapCtx(d, (i) => where.get(i) ?? 0, (f) => f);
 }
 
 /** Where a layer goes: above=<layer> or below=<layer>, as an index in the list with that layer still in it. */
@@ -151,10 +151,9 @@ const layerCmd: CommandSpec = {
 
 /** Drop a layer; authors on it move to the layer below (or the new bottom one). */
 function removeLayer(d: Doc, i: number): void {
-  const at = Object.keys(d.ctx).map((a) => [a, ctxOf(d, a).layer] as const);
   d.layers.splice(i, 1);
   d.cels.splice(i, 1);
-  for (const [a, l] of at) setCtx(d, a, { layer: l > i ? l - 1 : l === i ? Math.max(0, i - 1) : l });
+  remapCtx(d, (l) => (l > i ? l - 1 : l === i ? Math.max(0, i - 1) : l), (f) => f);
 }
 
 const FRAME_WORDS = new Set(['add', 'remove', 'move']);
@@ -202,7 +201,7 @@ const frameCmd: CommandSpec = {
           for (const fr of d.cels) fr.splice(pos - 1, 0, empty ? new Uint16Array(n).fill(TRANSPARENT) : fr[copy - 1]!.slice());
           d.frameCount++;
           // Authors keep the frame they were on.
-          for (const au of Object.keys(d.ctx)) { const f = ctxOf(d, au).frame; if (f >= pos - 1) setCtx(d, au, { frame: f + 1 }); }
+          remapCtx(d, (l) => l, (f) => (f >= pos - 1 ? f + 1 : f));
         }),
       };
     }
@@ -214,10 +213,9 @@ const frameCmd: CommandSpec = {
       return {
         text: `frame remove ${n}`,
         op: fn((d) => {
-          const at = Object.keys(d.ctx).map((au) => [au, ctxOf(d, au).frame] as const);
           for (const fr of d.cels) fr.splice(n - 1, 1);
           d.frameCount--;
-          for (const [au, f] of at) setCtx(d, au, { frame: f > n - 1 ? f - 1 : Math.min(f, d.frameCount - 1) });
+          remapCtx(d, (l) => l, (f) => (f > n - 1 ? f - 1 : Math.min(f, d.frameCount - 1)));
         }),
       };
     }
@@ -231,7 +229,7 @@ const frameCmd: CommandSpec = {
       op: fn((d) => {
         for (const fr of d.cels) { const [c] = fr.splice(n - 1, 1); fr.splice(to - 1, 0, c!); }
         const map = (f: number) => (f === n - 1 ? to - 1 : n - 1 < f && f <= to - 1 ? f - 1 : to - 1 <= f && f < n - 1 ? f + 1 : f);
-        for (const au of Object.keys(d.ctx)) setCtx(d, au, { frame: map(ctxOf(d, au).frame) });
+        remapCtx(d, (l) => l, map);
       }),
     };
   },

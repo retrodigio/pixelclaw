@@ -77,8 +77,10 @@ export interface Doc {
   frameCount: number;
   /** cels[layer][frame]: width*height palette indices, row-major. */
   cels: Uint16Array[][];
-  /** Editing contexts by author. Authors without one use the default (layer 0, frame 0, nothing else). */
+  /** Editing contexts by author. Authors without one draw on the home layer and frame, with nothing else set. */
   ctx: Record<string, AuthorCtx>;
+  /** Where authors without a context draw: it moves with its layer and frame when others are added or removed. */
+  home: { layer: number; frame: number };
   /** Open notes, in the order they were written. */
   notes: Note[];
   stamps: Record<string, Stamp>;
@@ -97,7 +99,7 @@ export function createDoc(o: {
   return {
     kind: o.kind, name: o.name, width: o.width, height: o.height, cellW: o.cellW, cellH: o.cellH,
     wrap: o.wrap, palette: o.palette, paletteLocked: false, layers: [newLayer('main')], frameCount: 1, cels: [[pixels]],
-    ctx: {}, notes: [], stamps: {}, macros: {},
+    ctx: {}, home: { layer: 0, frame: 0 }, notes: [], stamps: {}, macros: {},
   };
 }
 
@@ -109,24 +111,34 @@ export function cloneDoc(d: Doc): Doc {
   return {
     ...d, layers: d.layers.map((l) => ({ ...l })), cels: d.cels.map((fr) => fr.map((c) => c.slice())),
     ctx: Object.fromEntries(Object.entries(d.ctx).map(([k, v]) => [k, cloneCtx(v)])),
+    home: { ...d.home },
     notes: d.notes.map((n) => ({ ...n })),
     stamps: Object.fromEntries(Object.entries(d.stamps).map(([k, s]) => [k, { ...s, px: s.px.slice() }])),
     macros: Object.fromEntries(Object.entries(d.macros).map(([k, m]) => [k, { params: [...m.params], body: m.body }])),
   };
 }
 
-const DEFAULT_CTX: AuthorCtx = { layer: 0, frame: 0, sel: null, mirror: null, brush: null };
-
-/** An author's editing context (read-only: the default when they have none). */
+/** An author's editing context (read-only: the home layer and frame when they have none). */
 export function ctxOf(d: Doc, by: string): AuthorCtx {
-  return d.ctx[by] ?? DEFAULT_CTX;
+  return d.ctx[by] ?? { layer: d.home.layer, frame: d.home.frame, sel: null, mirror: null, brush: null };
 }
 
 /** Change an author's context; a context back at the default is dropped, so it adds nothing to the state. */
 export function setCtx(d: Doc, by: string, change: Partial<AuthorCtx>): void {
   const c = { ...ctxOf(d, by), ...change };
-  if (c.layer === 0 && c.frame === 0 && !c.sel && !c.mirror && !c.brush) delete d.ctx[by];
+  if (c.layer === d.home.layer && c.frame === d.home.frame && !c.sel && !c.mirror && !c.brush) delete d.ctx[by];
   else d.ctx[by] = c;
+}
+
+/**
+ * Renumber every author's layer and frame (and the home ones) after layers or frames moved:
+ * `layer(i)` and `frame(f)` give the new index of what was at i or f.
+ */
+export function remapCtx(d: Doc, layer: (i: number) => number, frame: (f: number) => number): void {
+  const old = Object.keys(d.ctx).map((a) => [a, ctxOf(d, a)] as const);
+  d.home = { layer: layer(d.home.layer), frame: frame(d.home.frame) };
+  for (const [a, c] of old) d.ctx[a] = { ...c, layer: layer(c.layer), frame: frame(c.frame) };
+  for (const [a] of old) setCtx(d, a, {});
 }
 
 /** The cel an author draws on. */
@@ -206,6 +218,7 @@ export function serializeDoc(d: Doc): Uint8Array {
       ramps: sortedKeys(d.palette.ramps).map((k) => [k, d.palette.ramps[k]]), locked: d.paletteLocked,
     },
     layers: d.layers.map((l) => [l.name, l.hidden, l.locked, l.reference]), frameCount: d.frameCount,
+    home: [d.home.layer, d.home.frame],
     notes: d.notes.map((m) => [m.id, m.x, m.y, m.w, m.h, m.text]),
     ctx: authors.map((a) => {
       const c = d.ctx[a]!;
@@ -240,7 +253,7 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
   type Header = {
     kind: DocKind; name: string; width: number; height: number; cellW: number; cellH: number; wrap: boolean;
     palette: { name: string; entries: [string, string, string][]; ramps: [string, string[]][]; locked: boolean };
-    layers: [string, boolean, boolean, boolean][]; frameCount: number; notes: [string, number, number, number, number, string][];
+    layers: [string, boolean, boolean, boolean][]; frameCount: number; home: [number, number]; notes: [string, number, number, number, number, string][];
     ctx: [string, number, number, boolean, [number | null, number | null] | null, [string, string | number] | null][];
     stamps: [string, number, number][]; macros: [string, string[], string][];
   };
@@ -272,7 +285,7 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
     },
     paletteLocked: h.palette.locked,
     layers: h.layers.map(([name, hidden, locked, reference]) => ({ name, hidden, locked, reference })),
-    frameCount: h.frameCount, cels, ctx,
+    frameCount: h.frameCount, cels, ctx, home: { layer: h.home[0], frame: h.home[1] },
     notes: h.notes.map(([id, x, y, w, nh, text]) => ({ id, x, y, w, h: nh, text })),
     stamps, macros: Object.fromEntries(h.macros.map(([m, params, body]) => [m, { params, body }])),
   };
@@ -285,7 +298,7 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
  */
 export function serializeDocV1(d: Doc): Uint8Array | null {
   const authors = Object.keys(d.ctx);
-  if (d.paletteLocked || d.frameCount !== 1 || d.layers.length !== 1 || Object.keys(d.stamps).length || Object.keys(d.macros).length) return null;
+  if (d.paletteLocked || d.home.layer || d.home.frame || d.frameCount !== 1 || d.layers.length !== 1 || Object.keys(d.stamps).length || Object.keys(d.macros).length) return null;
   const l = d.layers[0]!;
   if (l.hidden || l.locked || l.reference) return null;
   if (authors.length > 1 || authors.some((a) => d.ctx[a]!.mirror || d.ctx[a]!.brush || d.ctx[a]!.layer || d.ctx[a]!.frame)) return null;

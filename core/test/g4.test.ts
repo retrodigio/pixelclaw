@@ -155,6 +155,17 @@ describe('layers', () => {
     expect(flatten(ref.doc!).every((v) => v === 0xffff)).toBe(true);
   });
 
+  it('authors without a context stay on their layer and frame when others are added below or before', () => {
+    let s = build(`${BASE}\nlayer add guide below=main reference\nframe add 1 empty\npx 0,0 c=ink`);
+    expect(s.doc!.layers.map((l) => l.name)).toEqual(['guide', 'main']);
+    expect(s.doc!.home).toEqual({ layer: 1, frame: 1 });
+    expect(s.doc!.cels[1]![1]![0]).toBe(0);
+    s = run(s, 'px 1,0 c=rust', 'human:new');
+    expect(s.doc!.cels[1]![1]![1]).toBe(5);
+    s = run(s, 'layer remove guide');
+    expect(s.doc!.home).toEqual({ layer: 0, frame: 1 });
+  });
+
   it('errors: names, the last layer, merge at the bottom', () => {
     const s = build(BASE);
     const err = (t: string) => { const r = runBatch(s, t, { by: 'test', palettes }); return r.ok ? '' : r.errors[0]!.message; };
