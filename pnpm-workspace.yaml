@@ -1,0 +1,6 @@
+packages:
+  - core
+  - server
+  - ui
+  - cli
+autoInstallPeers: false

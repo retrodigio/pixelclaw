@@ -1,0 +1,18 @@
+{
+  "name": "pixelclaw-monorepo",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.5.1",
+  "engines": { "node": ">=22.18" },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p core && tsc -p cli",
+    "pixelclaw": "node cli/bin/pixelclaw.js"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "^7.0.2",
+    "vite": "^7.3.7",
+    "vitest": "^4.1.12"
+  }
+}
