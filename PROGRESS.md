@@ -37,7 +37,7 @@ Status of plan features touched so far. Steps refer to the build plan (§10).
 | MCP over stdio (official TS SDK v2), server instructions | §8.2 | done | `mcp.test.ts` | Serves both protocol eras (2025 `initialize` checked by hand). Instructions carry a command cheat sheet and ask the agent to share the watch link. |
 | MCP `project` | §8.2 | partial | `mcp.test.ts` | Palettes, assets, watch link; open/create another folder; add palette files. Profiles come with G9. |
 | MCP `run` | §8.2 | done | `mcp.test.ts`, `g5.test.ts` (server) | One undo group; applied lines, pixels changed, warnings, a check summary, an optional view; errors with line:col apply nothing. |
-| MCP `view` | §8.2, §2 | partial | `mcp.test.ts`, `edits.test.ts`, `g5.test.ts`, `g6.test.ts` (server) | `render`, `grid`, `tile3x3`, `diff`, `game`, `recolour`, `anim`; `marks`, `theme`, `ground`, `with`. `map` G7, `density` G9. |
+| MCP `view` | §8.2, §2 | partial | `mcp.test.ts`, `edits.test.ts`, `g5.test.ts`, `g6.test.ts` (server) | `render`, `grid`, `tile3x3`, `diff`, `game`, `recolour`, `anim`, `map`, `family` (G7); `marks`, `theme`, `ground`, `with`, `size`, `seed`. `density` G9. |
 | MCP `history` | §8.2 | done | `mcp.test.ts` | Range by number or last N; undone groups marked. |
 | HTTP + WebSocket on localhost, token | §1.2, §8.1 | done | `mcp.test.ts`, `watch.spec.ts` | 127.0.0.1 only, host-name check, random token for the page, `/api/state` and `/ws`. Port 7417 or the next free one. Small RFC 6455 server side, no dependency. |
 | UI shell: canvas, zoom 1–64x, pixel and cell grids | §8.3, G2 | done | `watch.spec.ts` (canvas equals the core render at two zooms, with and without the grid) | Draws core's `renderFlat`; checkerboard under transparent pixels. Wrap ghosts and onion skin come later. |
@@ -111,3 +111,37 @@ Status of plan features touched so far. Steps refer to the build plan (§10).
 | Review bundle with animations | §5, G6 | done | `g5.test.ts` (no author or method names) | `anim/<asset>.png` and `.gif`, every direction in the scenes, a sixth rubric question. |
 | Stone floor redrawn as a floor | §14, G6 | done | `example.test.ts`; a blind review round (`reviews/2026-10-28-g6/findings.md`) | Flagstones with `voronoi`; the repetition exception stays (its joints are its pattern). |
 | Demo: a 4-direction, 2-frame walking figure and a 4-frame water shimmer, played at game speed; the anim checks green | G6 | done | `example.test.ts` (rebuild from scripts; every check passes), `anim.spec.ts` | `examples/demo-g6.md`, `examples/demo-g6-agent.ts`; GIFs `docs/screenshots/g6-walker.gif`, `g6-water.gif`. |
+| Autotile schemes as data: `blob47`, `wang16-corner`, `path`, `bridge8`, `single`, `face` | §4.2, G7 | done | `schemes.test.ts` (blob47 against a reference table for all 256 neighbourhoods built without the resolver: the published 47 values, keys by weights, quadrants from the 2x2 cells at each corner; face, path, bridge8, wang16 and single keys; every scheme's pieces hold every quadrant; a broken scheme is refused) | `core/schemes/*.json`, written by `scripts/gen-schemes.ts`. Generic names (`ne_ne`); the engine's naming is G9's profile. Project schemes are not read yet (plan question 85). |
+| Family documents: sheet, named cells, live derivation | §4.2, G7 | done | `family.test.ts` (a 1-px band lands exactly on the terrain pixels touching the outside in all 256 blob47 neighbourhoods and all 16 corner Wang tiles; detail on a piece reaches the 5 variants with that quadrant; detach and attach; state bytes and replay) | `new family <n> <T>x<T> scheme= [map=]`; `@cell(<name>)`; layers `ground` and `band`; derived after every command like mirror views. |
+| Route 1: band profile, textures re-projected | §4.2, G7 | done | `family.test.ts` (every variant's ground is the texture at the same pixel; a texture change reaches every variant), golden `g7/blob47.png` | `family band 3:outside 1:foam 2:sand0 radius=3`; `family texture inside from=<tile>` records the pixels in the line. |
+| Route 2: quadrant pieces | §4.2, G7 | done | goldens `g7/path.png`, `g7/wang16.png`, `g7/bridge8.png`, `family.test.ts` | The pieces are variants (blob47: `o`, `nesw`, `ew`, `ns`, interior); drawn on layer band. |
+| Route 3: cut from a painted map | §4.2, G7 | done | `family.test.ts` (cut from a map painted with the derivation gives every variant back; golden `g7/cut.png`), `g7.test.ts` (server) | `family coverage` then paint the map area, then `family cut [textures=on]`: medoids, band only, detached. |
+| Coverage maps from the scheme | §4.2, §7.3, G7 | done | `schemes.test.ts` (every reachable variant on a map for every scheme; same seed same map; too small refused) | Flat template on a reference layer; blob47 needs about 14x12. |
+| Sample maps, the seam score over maps, the `map` view | §2 (4), §4.2, G7 | done | `family.test.ts` (island golden `g7/island.png`, map text, the seam sees a band on the tile border), `g7.test.ts` (server: view map with size, seed, overlays and a GIF) | Random islands (seeded value noise); a family's `seam` check is the score over the 12x10 island of seed 1. |
+| `family` view (each variant among its neighbours) | §4.2, §8.3, G7 | done | golden `g7/blob47.family.png`, `g7.test.ts` | Also lists every cell's place for `@cell`. |
+| Overlay documents (liquids) | §4.3, G7 | done | `family.test.ts` (cycle, pingpong, wave, sparkle play on the map; golden `g7/overlay-wave.gif`), `g7.test.ts` | `new overlay`; `overlay set mode= on= anchor= spread= every= rest= seed=`. Checked as effects. |
+| Animated families | §4.3, §15, G7 | done | `family.test.ts` (a two-frame texture plays on the map), `example.test.ts` (the shore shimmers in four frames) | Frames, `sequences()` and linked cels as in G6. |
+| Family checks: coverage of every variant, seam over the map | §4.2, §5, G7 | done | `family.test.ts`, `example.test.ts` | `jaggies` skips families (plan question 94). |
+| Delta GIFs for maps | G7 | done | `anim-render.test.ts` (a delta GIF decodes to the same pictures, smaller) | Map GIFs: one loop, at most 4 s, in 3-tick steps. |
+| Review bundle with families | §5, G7 | done | `g7.test.ts` (maps, the tile at each place, sets; no author or method names) | `maps/<set>.png` and `.gif`, `maps/<set>.tiles.txt`, `sets/<set>.png`, a seventh rubric question; `--size`, `--seed`. |
+| UI: a family's sheet, variants and map; folding timeline rows | §8.3, §15, G7 | done | `family.spec.ts` (detach, attach, coverage and cut log their commands and core's replay equals the canvas; a stroke on a piece reaches its variants; the views, map controls and folding log nothing) | Screenshots `docs/screenshots/g7-*.png`. |
+| Demo: a shore family (47 variants) from a band profile and three hand-detailed pieces, on a random island with a seam score ≤ 0.5; a blind review round | G7 | done | `example.test.ts` (rebuild from scripts; every check passes), `examples/demo-g7-agent.ts` | `examples/demo-g7.md`; the island (16x12, seed 6) scores 0.18 after the blind review round (`reviews/2026-10-28-g7/findings.md`). |
+
+## Notes for G8
+
+- **Map documents** should reuse `resolveMap`, `composeMap` and `Terrain` (core/src/schemes.ts,
+  family.ts): terrain painting is a terrain grid per layer resolved through the family's scheme.
+  A map that names families by asset reads them at render time (as `view map with=` does for
+  overlays), not on its tape.
+- **Repetition and motifs on maps** (§14): the shore's island shows the sand tile's two pebbles on
+  a 24 px lattice, and every long straight shore repeats the same `ew`/`ns` detail every tile.
+  The map checks' hot spots should catch both; texture variants (`variant add`, §4.1) are the fix.
+- **Islands are blocky**: blob47 coasts follow the tile grid. Map layout helpers (`map gen`) could
+  smooth the terrain (no single-tile spits) and offer other shapes than an island.
+- **Overlays on map documents**: an overlay's `on=` knows outside, terrain and all; a map with
+  several terrains will want `on=<terrain or variant>`.
+- **Project schemes**: a project's `schemes/*.json` is not read yet (plan question 85); a tape that
+  uses one must carry it, like the palette.
+- **bridge8's north-south single** can only be placed by name: map documents' `place` will need it.
+- **Faces** draw in the cell below the terrain; a map's draw order (§4.10 roofs and canopies)
+  should take the face scheme's faces as the first case of art spilling into another cell.

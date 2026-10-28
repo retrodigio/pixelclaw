@@ -43,3 +43,6 @@
 {"seq":42,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"frame set 1-4 ticks=15"}
 {"seq":43,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"frame 1"}
 {"seq":44,"by":"claude","at":"2026-10-28T06:41:01Z","group":"g1","cmd":"layer main"}
+{"seq":45,"by":"claude","at":"2026-10-28T07:47:23Z","group":"g2","cmd":"note 9,4 4x2 \"every crest is the same 2-px stamp, one per even row: diamonds when tiled; vary crest width, drop a few, break the rhythm\" id=n1"}
+{"seq":46,"by":"claude","at":"2026-10-28T07:47:23Z","group":"g2","cmd":"note 10,2 \"a lone water0 pixel left from a dash the crest covered\" id=n2"}
+{"seq":47,"by":"claude","at":"2026-10-28T07:47:23Z","group":"g2","cmd":"note 0,0 24x24 \"all crests jump 6 px right together every 15 ticks while the dashes stay still: a conveyor more than a shimmer; frames 2-4 chop the dashes into specks\" id=n3"}

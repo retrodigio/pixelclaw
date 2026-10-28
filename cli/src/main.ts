@@ -47,7 +47,7 @@ export const USAGE = `pixelclaw: a pixel art editor driven by commands
       Run the quality checks against the style guide (project.json style): scores, pass or fail,
       and the flagged pixels. Exits 1 if any check fails. --marks writes the render (tile3x3 for
       tiles) with the flagged pixels circled.
-  pixelclaw review <project> [<asset>...] [--name <set>]
+  pixelclaw review <project> [<asset>...] [--name <set>] [--size CxR] [--seed N]
       Write a blind review bundle under <project>/reviews/<date>-<set>/ (rubric.md inside).
   pixelclaw upgrade <project> [<asset>...]
       Rewrite language 1 tapes (G1-G4) in the current language: the palette goes into the 'new'
@@ -231,7 +231,13 @@ function cmdCheck(io: Io, p: Parsed): number {
 function cmdReview(io: Io, p: Parsed): number {
   const [dir, ...names] = p.pos;
   if (!dir) throw new UsageError('review: give a project folder');
-  const r = writeReview(new Writer(loadProject(dir), { now: io.now }), { assets: names.length ? names : undefined, name: one(p, 'name') });
+  const size = one(p, 'size');
+  const sm = size ? /^(\d+)x(\d+)$/.exec(size) : null;
+  if (size && !sm) throw new UsageError('--size must look like 16x12 (tiles)');
+  const seed = one(p, 'seed') === undefined ? undefined : Number(one(p, 'seed'));
+  if (seed !== undefined && (!Number.isInteger(seed) || seed < 1)) throw new UsageError('--seed must be a whole number from 1');
+  const map = { ...(sm ? { cols: Number(sm[1]), rows: Number(sm[2]) } : {}), ...(seed ? { seed } : {}) };
+  const r = writeReview(new Writer(loadProject(dir), { now: io.now }), { assets: names.length ? names : undefined, name: one(p, 'name'), map });
   io.out(`wrote ${r.files.length} files to ${r.dir}\n${r.files.map((f) => `  ${f}\n`).join('')}Hand the folder to a fresh reviewer: "Review the art in ${r.dir} by following rubric.md."\n`);
   return 0;
 }
@@ -365,7 +371,7 @@ export function main(argv: string[], io: Io = nodeIo): number {
       case 'check':
         return cmdCheck(io, parseArgs(rest, ['checks', 'frame', 'ground', 'ref'], ['marks']));
       case 'review':
-        return cmdReview(io, parseArgs(rest, ['name'], []));
+        return cmdReview(io, parseArgs(rest, ['name', 'size', 'seed'], []));
       case 'verify':
         return cmdVerify(io, parseArgs(rest, [], []));
       case 'upgrade':

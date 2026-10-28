@@ -251,7 +251,7 @@ export function App({ store }: { store: Store }) {
           <button onClick={() => ed.redo()} disabled={!ed.canRedo()} title={`Redo your last undo (Ctrl/⌘+Shift+Z): redo by=${store.me}`} data-testid="redo">↷ <span className="xwide-only">Redo</span></button>
           {doc && seq !== null && <span className="dim" title={`The canvas shows the document after command #${seq}`}><span className="xwide-only">after </span>#{seq}</span>}
         </div>
-        {doc && editable && (
+        {doc && editable && (!doc.family || famMode === 'sheet') && (
           <div className="options" data-testid="options">
             {(ed.tool === 'rect' || ed.tool === 'ellipse') && (
               <label title="Filled shapes (F)"><input type="checkbox" checked={ed.filled} onChange={(e) => toggle(() => { ed.filled = e.target.checked; })} /> filled</label>

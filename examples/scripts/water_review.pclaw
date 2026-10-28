@@ -1,0 +1,6 @@
+# Mossy ruins, G7 review round (reviews/2026-10-28-g7/findings.md): the G6 water, seen on the
+# shore's island. The reviewer's findings, pinned on the pixels and left open: they are polish for
+# the water tile itself, beyond G7's demo.
+note 9,4 4x2 "every crest is the same 2-px stamp, one per even row: diamonds when tiled; vary crest width, drop a few, break the rhythm"
+note 10,2 "a lone water0 pixel left from a dash the crest covered"
+note 0,0 24x24 "all crests jump 6 px right together every 15 ticks while the dashes stay still: a conveyor more than a shimmer; frames 2-4 chop the dashes into specks"

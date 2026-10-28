@@ -516,3 +516,114 @@ Points where the plan was unclear or silent. Each has the reading that was follo
 80. **`view … all` in the CLI.** docs/commands.md said `all` is the first three views; the code
     wrote every view but the diff (and so, from G6, the anim GIF too). *Reading:* the docs:
     `all` is render, grid and tile3x3.
+
+## G7
+
+81. **What a family document is.** §4.2 has "family documents" and three routes but no layout.
+    *Reading:* `new family <name> <T>x<T> scheme=<s> [map=<C>x<R>]` makes a sheet: row 0 holds the
+    `inside` (the terrain) and `outside` textures, then every variant of the scheme in its order,
+    then an optional coverage map area. Cells have names (`@cell(inside)`, `@cell(ne_ne)`). Two
+    layers: `ground` (the textures, laid again on every variant after every command) and `band`
+    (the band's art: the pieces drawn by hand, the other variants assembled from their quadrants
+    after every command, as mirror views are kept). Detail on a piece therefore propagates live;
+    a variant can be detached to draw it by hand. Authors draw on `band` by default.
+
+82. **Texture re-projection.** "Every variant is assembled from 12x12 quadrants and re-projected
+    onto the shared textures." *Reading:* the textures are never copied with a piece. Each
+    variant's ground layer is, pixel by pixel, the inside or the outside texture *at the same
+    pixel of the tile*, chosen by the band geometry; so every variant tiles with the plain
+    textures and with each other, and changing a texture changes every variant. A cut keeps only
+    the band's pixels for the same reason.
+
+83. **The band profile's syntax and geometry.** The plan writes `band shallow: 6 sand1, 1 foam,
+    fill shal1; radius 4`. *Reading:* `family band <w>:<fill>…` from the terrain's edge inward,
+    each fill a colour, `outside` (the outside texture carries on into the tile, so the edge sits
+    inside it, off the tile border) or `inside`; after the listed widths, the inside texture.
+    Distances are measured per quadrant (in half pixels, integers): along an edge, the distance
+    from it; at an outer corner, concentric arcs whose innermost (the band's inner edge) has
+    `radius`; at an inner corner, the distance from the corner point. Inset, band and radius must
+    fit in half a tile. The profile is stored (for the ground and for cuts); its colours are drawn
+    once on the pieces (`draw=on`), so hand detail is never overwritten by a later command.
+
+84. **Quadrant pieces** (route 2; "the 5 quadrant kinds"). *Reading:* the pieces are themselves
+    variants whose four quadrants are all one kind: blob47's `o` (outer corners), `nesw` (inner),
+    `ew` (horizontal edges), `ns` (vertical) and `nesw_ne_se_sw_nw` (interior); a scheme lists
+    its pieces and the loader proves they hold every quadrant the other variants need (the
+    corner Wang scheme needs seven, found by a greedy cover). Hand-detailing "the band on the 5
+    quadrant kinds" is drawing on these cells.
+
+85. **Schemes as data.** *Reading:* `core/schemes/*.json` (written by `scripts/gen-schemes.ts`,
+    kept so they can be checked): `neighbours` (8 with the corner rule, 4, an axis, the tile's
+    corners, none), each variant's name, reduced key and four quadrant kinds (in, out, outer,
+    inner, horiz, vert, or aliases like bridge ends, each facing a corner), the pieces and the
+    sheet's columns. Names are generic (`ne_ne`); the engine's `root_<letters>_<diagonals>` comes
+    from an export profile's template in G9. Project schemes (`schemes/*.json` in a project) are
+    not read yet: a tape would need the scheme written into it, as the palette is (§13). Left for
+    G9/G10 with profiles and the manifest.
+
+86. **bridge8 and face.** The plan names them without variants. *Reading:* bridge8 is a deck
+    joined along one axis (east-west first): single, both ends and the middle of each axis; the
+    north-south single cannot come from neighbours alone (no bridge beside it reads as the
+    east-west single), so it is placed by name and coverage maps leave it out. face is blob47 plus
+    four south faces (single, west end, middle, east end), drawn in the cell *below* the terrain
+    when that cell is not terrain, joined to the faces beside it; their ground is the outside
+    texture and their art is drawn by hand (pieces `face_o` and `face_ew`).
+
+87. **Coverage maps.** "Generated from the scheme's coverage rules." *Reading:* `family coverage
+    [seed=] [copies=]` lays out the family's map area so every variant the scheme can produce
+    appears `copies` times: each variant's smallest neighbourhood is stamped where it changes the
+    fewest cells and keeps every variant already placed, in a seeded order, then a seeded hill
+    climb finishes what did not fit. blob47 needs about 14x12 tiles (12x10 fails for most
+    seeds); the command refuses, saying so, when no layout is found. The flat template (inside,
+    outside and the band's colours) goes on a reference layer `template`; `fill=on` also paints
+    the map with the current variants to start from.
+
+88. **Cut from a map** (route 3). *Reading:* `family cut` gives each variant the medoid of the
+    map tiles that resolve to it (fewest differing band pixels to the others), keeps its band
+    only and detaches it; `textures=on` also takes the textures from the map's all-inside and
+    all-outside tiles. The painted map lives in the family's own map area, so the tape stays
+    self-contained; painting it from an underlay is G11's.
+
+89. **Copying a texture from another asset.** Route 1 lays "the inside and outside textures",
+    which are tiles of their own. *Reading:* `family texture inside from=sand` copies the tile's
+    pixels into the texture cell, and the line records them (a block of rows), so replay never
+    reads another asset (§13's rule for palettes). Colours are matched by name, else by exact
+    colour; a colour the family's palette lacks is refused.
+
+90. **The map preview and the seam score over maps.** *Reading:* `view map`: a random island
+    (seeded value noise on a 2-tile grid with a fall-off from the middle; the edge always
+    outside) of 12x10 tiles by default, at the draw scale, with the seam score of §13 computed on
+    the composed map (tile size t, no 3x3 tiling) and the variants it used. A family's `seam`
+    check is that score on the 12x10 island of seed 1. Given terrains and map documents are G8.
+
+91. **Overlays** (§4.3). *Reading:* an overlay is its own document (`new overlay`), with frames
+    and ticks as any, and `overlay set mode= on= anchor= spread= every= rest= seed=`: cycle and
+    ping-pong play in step; wave shifts the phase by an eighth of a loop per tile along x+y;
+    sparkle plays once per `rest` ticks at a seeded moment per tile. Instances go on the outside
+    tiles, the terrain, or all, one tile in `every`, offset by a seeded amount within `spread`.
+    They play over `view map` (`with=`), the watch view's map, and the review's map GIF. An
+    overlay's checks treat it as an effect (no outline, readability or stray rule).
+
+92. **Animated families** (§15: "reuse `sequences()` and linked cels"). *Reading:* a family has
+    frames like any document; derivation runs per frame and per layer; the map and its GIF play
+    the family's first sequence. The demo copies each frame of the water into the same frame of
+    the shore and links the band layer's cels, so hand detail shows on every frame.
+
+93. **Map GIFs.** A sparkle overlay with a long rest and a 4-frame family make loops of many
+    seconds; the first map GIF was 13 MB. *Reading:* one loop, at most four seconds, in steps of
+    at least 3 ticks; the GIF encoder writes only the box that changed in each frame after the
+    first (`delta`, used for maps; the G6 anim GIFs are unchanged). The review bundle's map GIF
+    is at 1x.
+
+94. **Checks on a family sheet.** *Reading:* a family is judged on its map: `seam` over the
+    island, `coverage` as every named variant and both textures drawn; `jaggies` is skipped (its
+    textures are tiles, checked as tiles, and its band's curves step unevenly by design: 118
+    "defects" on the demo's shore); `anim` asks only 1 % of the sheet to change (most of it is
+    still terrain).
+
+95. **"A family view showing every variant against its neighbourhood".** *Reading:* the watch
+    view's toolbar switches a family between its sheet, its variants (each in the middle of the
+    3x3 map that resolves to it, neighbours dimmed, with detach and attach) and a map (size, seed
+    and overlays, only for looking); `view family` gives the agent the same picture with the
+    sheet's layout in words. "Collapsible timeline rows" (§15): each timeline row and the whole
+    timeline fold, only for looking.

@@ -110,7 +110,7 @@ applies to the asset, with its score and ✓ or ✗ against the style guide (see
 | Argument | Type | Does |
 |---|---|---|
 | `asset` | string | |
-| `mode` | `render` (default) \| `grid` \| `tile3x3` \| `diff` \| `game` \| `recolour` \| `anim` | See [commands.md, Views](commands.md#views). `game` shows the sprite's other directions beside it. `anim` returns the contact sheet (a row per sequence; each frame with its ticks, the frame before it tinted red underneath, the pivot and ground line in cyan, and the share of pixels changed from the frame before), the numbers as text, and saves `views/<asset>.anim.gif` (every sequence side by side at the project's tick rate) for the person. |
+| `mode` | `render` (default) \| `grid` \| `tile3x3` \| `diff` \| `game` \| `recolour` \| `anim` \| `map` \| `family` | See [commands.md, Views](commands.md#views). `game` shows the sprite's other directions beside it. `anim` returns the contact sheet (a row per sequence; each frame with its ticks, the frame before it tinted red underneath, the pivot and ground line in cyan, and the share of pixels changed from the frame before), the numbers as text, and saves `views/<asset>.anim.gif` (every sequence side by side at the project's tick rate) for the person. `map` puts a family on a random island (a tile: repeated; an overlay: over the first family or `ground=`) at the game's draw scale, with the seam score over the map and the variants it used as text, and saves `views/<asset>.map.gif` (at most four seconds) when its frames or overlays move. `family` shows every variant among the 3x3 neighbours that call for it, and lists where every cell is on the sheet. |
 | `scale` | 1..64, optional | `render` and `diff`. Default: about 192 px on the long side. |
 | `region` | string, optional | `grid` only: `"x,y WxH"`, e.g. `"8,0 12x10"`. |
 | `since` | integer, optional | `diff` only: compare with the document after this command (default: before the latest group). |
@@ -119,7 +119,9 @@ applies to the asset, with its score and ✓ or ✗ against the style guide (see
 | `theme` | string, optional | `render`, `tile3x3`, `game`: show role entries under this preview theme. |
 | `themes` | string[], optional | `recolour`: the themes to show (default: the first six). |
 | `ground` | string, optional | `game`: the ground tile (default: the style guide's, else the first tile). |
-| `with` | string[], optional | `game`: the assets beside this one (default: its set, the same kind and size). |
+| `with` | string[], optional | `game`: the assets beside this one (default: its set, the same kind and size). `map`: overlays to play over the map. |
+| `size` | string, optional | `map`: the map's size in tiles, `"16x12"` (default 12x10). |
+| `seed` | integer, optional | `map`: the random island's seed (default 1). |
 
 Images come back inline (`image/png`) with a line giving their size and the file they were saved
 to (`<project>/views/<asset>.<mode>.png`, overwritten each time). The grid comes back as text and
@@ -156,7 +158,8 @@ glowcap: 5 of 7 checks failing
 ### `review`
 
 Write a blind review bundle under `reviews/<date>-<set>/` (see [checks.md](checks.md#the-review-bundle)):
-`assets` (default all) and `name` (default `all`). Hand the folder to a fresh agent with no other
+`assets` (default all) and `name` (default `all`); for families, `size` and `seed` choose the
+island they are shown on (default 16x12, seed 1). Hand the folder to a fresh agent with no other
 context, ask it to follow `rubric.md`, and pin its findings on the pixels with `note` commands.
 
 ### `history`
@@ -332,6 +335,22 @@ layer or turning symmetry on writes nothing by itself, and never changes what th
 - **Undo / Redo** (buttons, Ctrl/⌘+Z, Ctrl/⌘+Shift+Z or Ctrl+Y) take back only your own groups:
   they write `undo by=human:<you>` and `redo by=human:<you>`, which the tape records as
   `undo group=h3` and `redo group=h7`.
+
+### Families and the timeline
+
+On a family the toolbar switches the middle of the page between **sheet** (the canvas: draw on the
+pieces, layer `band` by default; the toolbar names the cell under the pointer, as `@cell(<name>)`
+takes it), **variants** (every variant in the middle of the neighbours that call for it, pieces
+and detached variants marked, with *detach*/*attach* on each, and *coverage map* and *cut from
+map* when the family has a map area) and **map** (a random island at the game's draw scale, its
+size and seed to choose, the project's overlays to play over it, the seam score and the variants
+used above it). Detach, attach, coverage and cut are commands on the tape; the map's size, seed,
+overlays and playing only change what you see. The preview panel shows a small island for a
+family, and an overlay over the first family.
+
+Every row of the timeline folds (only for looking): click *frame · ticks*, *views*, *tags* or
+*layers* (folded, only the layer you draw on stays), or ▾ at the left of its bar to fold the
+whole timeline away.
 
 ### Security
 

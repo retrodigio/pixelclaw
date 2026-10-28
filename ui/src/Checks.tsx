@@ -6,7 +6,7 @@
 
 import { useLayoutEffect, useRef, useState } from 'react';
 import {
-  drawScaleOf, groundOf, hasRoles, quote, renderGame, renderRecolour, renderTile3x3, setOf, type CheckId, type CheckResult, type Doc, type Pt,
+  renderMap, drawScaleOf, groundOf, hasRoles, quote, renderGame, renderRecolour, renderTile3x3, setOf, type CheckId, type CheckResult, type Doc, type Pt,
   type Rgba,
 } from '@pixelclaw/core';
 import type { Editor } from './editor.ts';
@@ -109,10 +109,10 @@ function RgbaCanvas({ img, testid }: { img: Rgba; testid: string }) {
   return <canvas ref={ref} data-testid={testid} style={{ width: img.width, height: img.height }} />;
 }
 
-type Tab = '3x3' | 'game' | 'themes';
+type Tab = '3x3' | 'game' | 'themes' | 'map';
 
 export function PreviewPanel({ doc, frame, store, marks }: { doc: Doc; frame: number; store: Store; marks: readonly Pt[] }) {
-  const tabs: Tab[] = doc.wrap ? ['3x3', 'themes'] : ['game', 'themes'];
+  const tabs: Tab[] = doc.family || doc.overlay ? ['map', 'themes'] : doc.wrap ? ['3x3', 'themes'] : ['game', 'themes'];
   const [want, setWant] = useState<Tab>('3x3');
   const tab = tabs.includes(want) ? want : tabs[0]!;
   const [open, setOpen] = useState(true);
@@ -120,7 +120,15 @@ export function PreviewPanel({ doc, frame, store, marks }: { doc: Doc; frame: nu
   let img: Rgba | null = null;
   let note = '';
   if (open) {
-    if (tab === '3x3') img = renderTile3x3(doc, frame, { theme: store.themeObj(), marks, scale: doc.width <= 32 ? 2 : 1 });
+    if (tab === 'map') {
+      // A family on a small random island; an overlay over the first family (or the ground tile).
+      const all = store.assetDocs();
+      const under = doc.overlay ? (all.find((a) => a.doc.family) ?? groundOf(name, all, store.style)) : null;
+      if (doc.family || under) {
+        img = renderMap(doc, { cols: 12, rows: 9, seed: 1, scale: 1, theme: store.themeObj(), ground: under?.doc ?? null });
+        note = doc.family ? `a random island; the seam and more in the map view (toolbar)` : `over ${under!.name}`;
+      } else note = 'no family or tile to show it over';
+    } else if (tab === '3x3') img = renderTile3x3(doc, frame, { theme: store.themeObj(), marks, scale: doc.width <= 32 ? 2 : 1 });
     else if (tab === 'game') {
       const all = store.assetDocs();
       const ground = groundOf(name, all, store.style);

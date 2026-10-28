@@ -1,0 +1,14 @@
+The tile at each column and row of maps/shore.png ('-': the plain outside ground).
+
+ 0: - - - - - - - - - - - - - - - -
+ 1: - - - - es_se esw_se_sw esw_se_sw esw_se_sw esw_se_sw esw_sw ew esw_se sw_sw - - -
+ 2: - e ew esw_se nesw_ne_se_sw nesw_ne_se_sw_nw nesw_ne_se_sw_nw nesw_ne_sw_nw new_ne_nw nsw_nw - nes_ne_se nesw_sw_nw w - -
+ 3: - - - ne_ne nesw_ne_se_nw nesw_ne_se_sw_nw nesw_ne_se_sw_nw nsw_sw_nw - nes_se esw_se_sw nesw_ne_se_sw nsw_sw_nw - - -
+ 4: - - - - nes_ne_se nesw_ne_se_sw_nw nesw_ne_se_sw_nw nsw_sw_nw - nes_ne_se nesw_ne_se_sw_nw nesw_ne_se_sw_nw nsw_sw_nw - - -
+ 5: - - - es new_ne nesw_ne_se_nw nesw_ne_se_sw_nw nesw_se_sw_nw esw_se_sw nesw_ne_se_sw nesw_ne_se_sw_nw nesw_ne_se_sw_nw nsw_sw_nw - - -
+ 6: - - e nsw - nes_ne_se nesw_ne_se_sw_nw nesw_ne_se_sw_nw nesw_ne_se_sw_nw nesw_ne_se_sw_nw nesw_ne_se_sw_nw nesw_ne_se_sw_nw nsw_sw_nw - - -
+ 7: - - - ne esw_se nesw_ne_se_sw nesw_ne_se_sw_nw nesw_ne_sw_nw new_ne_nw nesw_ne_se_nw nesw_ne_se_sw_nw nesw_ne_se_sw_nw nesw_se_sw_nw sw_sw - -
+ 8: - - - - nes_ne_se nesw_ne_se_sw_nw nesw_ne_se_sw_nw nsw_sw_nw - nes_ne_se nesw_ne_se_sw_nw nesw_ne_sw_nw new_ne_nw new_nw w -
+ 9: - - - - ne_ne nesw_ne_se_nw nesw_ne_se_sw_nw nsw_sw_nw - nes_ne_se nesw_ne_se_sw_nw nsw_sw_nw - - - -
+10: - - o - - ne_ne new_ne_nw nw_nw - ne_ne new_ne_nw nw_nw - - - -
+11: - - - - - - - - - - - - - - - -

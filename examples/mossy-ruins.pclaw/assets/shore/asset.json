@@ -1,0 +1,48 @@
+{
+  "name": "shore",
+  "kind": "family",
+  "size": [
+    192,
+    168
+  ],
+  "cell": [
+    24,
+    24
+  ],
+  "wrap": false,
+  "palette": "ruins-shore",
+  "layers": [
+    {
+      "name": "ground",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    },
+    {
+      "name": "band",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    }
+  ],
+  "frames": 4,
+  "paletteLocked": false,
+  "stamps": [],
+  "macros": [],
+  "tags": [],
+  "views": [],
+  "links": [],
+  "notes": [],
+  "tape": {
+    "lang": 2,
+    "commands": 61,
+    "groups": 2
+  },
+  "state": {
+    "sha256": "b583430d3bcd514c96c9bb6ab7462f42d3f7b1f928f06515ab7977bf54e6d97f"
+  },
+  "checkpoints": {
+    "every": 200,
+    "files": []
+  }
+}

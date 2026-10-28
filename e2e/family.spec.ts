@@ -42,6 +42,8 @@ async function open(page: Page): Promise<void> {
   await agent.call('run', { asset: 'bank', commands: FAMILY });
   await page.goto(`${agent.url}&name=chris`);
   await expect(page.getByTestId('status')).toContainText('live');
+  // The cell lines cross pixel centres at small zooms; the comparison wants the art alone.
+  await page.locator('.toolbar label', { hasText: 'cell grid' }).locator('input').uncheck();
   await canvasMatches(page);
 }
 

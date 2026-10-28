@@ -1,0 +1,25 @@
+# Mossy ruins: a 24x24 seamless sand tile for the shore (plan §10 G7), the inside texture of the
+# shore family. Warm sand with a few darker grains and lighter glints in small clusters, and two
+# pebbles; every generator works on the tile as a torus (wrap=on), so it tiles by construction.
+new tile sand 24x24 palette=ruins-water wrap=on bg=none
+palette add sand0 hex=#6f5c42 key=s
+palette add sand1 hex=#977f5c key=t
+palette add sand2 hex=#b39b72 key=u
+palette add sand3 hex=#cdb98c key=v
+ramp sand = sand0 sand1 sand2 sand3
+palette save as=ruins-shore
+
+# --- the ground: mid sand with soft patches of the step below and above
+noise ramp=sand weights=0,3,10,2 cluster=2..5 density=0.10 base=sand2 seed=79
+# --- grains: single specks one step either way (texture, not strays)
+noise ramp=sand weights=0,5,0,3 cluster=1..2 density=0.05 base=keep seed=34
+
+# --- two small pebbles in the sand's own colours (a stone-grey pebble shows as a dot on a grid when tiled)
+paint 4,15 <<
+  vt
+  ts
+>>
+paint 17,5 <<
+  vt.
+  tts
+>>

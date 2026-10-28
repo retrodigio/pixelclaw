@@ -30,7 +30,7 @@ You are reviewing pixel art for a game, with fresh eyes. Judge only what you see
   loop), each frame with its length in game ticks (${o.tickRate} a second) and the frame before it
   tinted red underneath; \`anim/<name>.gif\` plays them at the game's speed.
 - \`maps/<name>.png\`: each autotile set laid out as a small map at the game's draw scale (${o.scale}x),
-  the way the game will place its tiles; \`maps/<name>.gif\` plays it when anything moves, and
+  the way the game will place its tiles; \`maps/<name>.gif\` plays it (at 1x) when anything moves, and
   \`maps/<name>.tiles.txt\` says which tile is at each column and row of the map.
 - \`sets/<name>.png\`: every tile of each autotile set, each in the middle of the neighbours that
   call for it (the neighbours dimmed), named.
@@ -137,7 +137,7 @@ export function writeReview(w: Writer, o: { assets?: string[]; name?: string; ma
   for (const a of families) {
     const mo = { cols: o.map?.cols ?? 16, rows: o.map?.rows ?? 12, seed: o.map?.seed ?? 1, overlays, scale };
     save(`maps/${a.name}.png`, encodePng(renderMap(a.doc, mo)));
-    const frames = mapGifFrames(a.doc, { ...mo, tickRate: w.project.json.tickRate ?? 60 });
+    const frames = mapGifFrames(a.doc, { ...mo, scale: 1, tickRate: w.project.json.tickRate ?? 60 });
     if (frames.length > 1) save(`maps/${a.name}.gif`, encodeGif(frames, { delta: true }));
     const s = schemeOf(a.doc.family!);
     const m = composeMap(a.doc, islandTerrain(s, mo.cols, mo.rows, mo.seed), 0);

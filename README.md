@@ -9,7 +9,7 @@ Every edit is a line of a small command language. A document *is* its tape of co
 and replay is deterministic (integer maths, seeded randomness), so the same tape always gives the
 same pixels.
 
-**Status: step G6.** The core library and CLI (G1); the MCP server and the live watch view (G2);
+**Status: step G7.** The core library and CLI (G1); the MCP server and the live watch view (G2);
 editing in the browser, with every action a command on the tape and the agent's `changes` tool
 (G3); the drawing toolkit (G4): layers, frames, selections, transforms, symmetry, curves,
 dithering, gradients, `outline`, `shade`, `clean`, seeded generators, stamps, brushes and macros;
@@ -20,10 +20,15 @@ previews, role palettes and preview themes; a blind review bundle; and tapes tha
 own palette; and animation and sprites (G6): frame durations in game ticks, tags with cycle and
 ping-pong loops, linked cels, directional views with live mirror links, pivots and ground lines,
 the `anim` contact sheet and GIF, the `anim` and `views` checks, checks over every frame, a
-timeline with playback at the game's speed and an onion skin, and `pixelclaw upgrade`. See
+timeline with playback at the game's speed and an onion skin, and `pixelclaw upgrade`; and tile
+sets and autotiling (G7): autotile schemes as data (`blob47`, `wang16-corner`, `path`,
+`bridge8`, `single`, `face`), family documents whose 47 (or 16, or 8) variants are built live from
+a band profile and a few hand-drawn pieces over shared textures, or cut from a painted coverage
+map; sample maps with the seam score over them, overlays (glints, ripples) played over a map, and
+in the watch view each variant among its neighbours and a map to roll. See
 [PROGRESS.md](PROGRESS.md).
 
-![The walking figure in the watch view: the timeline with each frame's ticks, the views (west a live mirror of east), the pivot and ground line, every check green](docs/screenshots/g6-walker.png)
+![A shore family on a random island in the watch view: sand meeting shimmering water through a band of foam and wet sand, the seam score over the map above it, every check green](docs/screenshots/g7-map.png)
 
 ## Use it from Claude Code
 
@@ -142,6 +147,9 @@ checked in:
 - the water: [anim sheet](examples/mossy-ruins.pclaw/views/water.anim.png),
   [GIF](examples/mossy-ruins.pclaw/views/water.anim.gif),
   [3x3 preview](examples/mossy-ruins.pclaw/views/water.tile3x3.png)
+- the shore (a blob47 family of 47 variants, sand meeting the shimmering water):
+  [on an island](docs/screenshots/g7-shore-map.png), [playing with glints](docs/screenshots/g7-shore-map.gif),
+  [every variant among its neighbours](docs/screenshots/g7-shore-family.png)
 
 The G2 demo ([examples/demo-g2.md](examples/demo-g2.md)) draws the same tile through MCP while you
 watch. In the G3 demo ([examples/demo-g3.md](examples/demo-g3.md)) you fix three pixels and leave a
@@ -149,13 +157,17 @@ note, and the agent reads them with `changes` and carries on. The G4 demo
 ([examples/demo-g4.md](examples/demo-g4.md)) draws the grass, its variants and the chest. The G5
 demo ([examples/demo-g5.md](examples/demo-g5.md)) checks them, fixes them by coordinates, and runs
 a blind review. The G6 demo ([examples/demo-g6.md](examples/demo-g6.md)) animates the walker and
-the water and plays them in the watch view at the game's speed.
+the water and plays them in the watch view at the game's speed. The G7 demo
+([examples/demo-g7.md](examples/demo-g7.md)) builds a shore family of 47 variants from a band
+profile and three hand-drawn pieces, puts it on a random island with the seam score over it, and
+runs a blind review on the island.
 
 ## Packages
 
 - `core`: the document (layers, frames, each author's context), palettes, command parser and
   normaliser, raster operations, helpers and generators, tape and replay, a PCG random generator,
-  the checks, renders and previews, and a PNG encoder. It uses no DOM or Node APIs, so it
+  the checks, renders and previews, autotile schemes (data in `core/schemes`), families, maps and
+  overlays, and PNG and GIF encoders. It uses no DOM or Node APIs, so it
   runs anywhere.
 - `server`: the project folder, the single writer (one queue for every command), views, the MCP
   server (stdio) and the HTTP + WebSocket server for the watch view.

@@ -26,8 +26,8 @@ they always agree.
 | `jaggies` | all | defects | ≤ 0 (tiles ≤ 2) | Doubled L-corners (a line zig-zags through a corner a pixel-perfect line would step diagonally past), irregular step runs (a run longer or shorter than both neighbours by 2 or more: 1-2-1-3), and on sprites spikes and notches on the silhouette. On tiles the ground colour between marks is not a line. |
 | `banding` | sprites | pillow share, 0 to 1 | ≤ 0.5 | Pillow shading, per material (ramp): ramp steps that follow the outline and get lighter (or darker) inward on every side alike. Light from one side makes the sides disagree. |
 | `outline` | sprites | share of the silhouette edge in ink | ≥ 0.85 | Edge pixels not in the outline colour (`style.outline`, else entries named ink, outline or black; in role art the `black` role). |
-| `seam` | tiles | the pilot's metric (below) | ≤ 1 | The edge columns or rows that stand out. |
-| `coverage` | all | missing items | ≤ 0 | A size other than the style's (`style.sizes`), a size that is not whole cells, empty frames, empty cells of a sheet. Autotile names come with schemes (G7). |
+| `seam` | tiles, families | the pilot's metric (below) | ≤ 1 | Tiles: the edge columns or rows that stand out. Families: the same metric over a composed map (the 12x10 island of seed 1, the `map` view's default), no pixels flagged; `view map` shows it. |
+| `coverage` | all | missing items | ≤ 0 | A size other than the style's (`style.sizes`), a size that is not whole cells, empty frames, empty cells of a sheet. Families: every variant the scheme names and both textures drawn, on every frame. |
 | `readability` | sprites | edge contrast share | ≥ 0.8 | Edge pixels within ΔL* 15 of the ground under them (the usual ground tile, repeated). Also: the silhouette's IoU with each asset of its set (≤ 0.9), and the lightness spread inside (L* p95 − p5 ≥ 25). |
 | `revert` | with `ref=` | share of pixels unchanged from the reference | ≤ 0.15 | Pixels with the same colour as the reference asset at the same place. |
 | `repetition` | tiles | ΔL* × √width of the worst band | ≤ 3 | The most visible stripe when the tile is repeated: a band of 1 to 6 rows (or columns) lighter or darker than the rest. Flags the marks that make it. |
@@ -36,6 +36,13 @@ they always agree.
 
 Checks that do not apply are skipped (seam on a sprite, outline on a tile, revert without a
 reference), as are checks a style guide turns off.
+
+**Families and overlays** (G7). A family is ground, not a figure: `outline`, `banding` and
+`readability` skip it, and so does `jaggies` (its textures are tiles, checked as tiles, and its
+band's staircases are curves by design); `orphans` uses the tile allowance; `anim` wants at least
+1 % of the sheet to change (most of it is still terrain). An overlay is an effect drawn over
+ground: no `outline`, `readability`, `banding` or `orphans` (its lone pixels are its art), and
+any frame-to-frame change is fine.
 
 ## The seam metric
 
@@ -93,3 +100,10 @@ coordinates in the form `<asset> <x>,<y> [<w>x<h>] "text"`). It names no method 
 holds no tape, so the reviewer judges blind. The tool calls no model: hand the folder to a fresh
 agent with no other context, and pin its findings on the pixels with `note` commands. The demo's
 round is in [examples/demo-g5.md](../examples/demo-g5.md).
+
+Families (G7) are not shown as sheets: each goes on a map (`maps/<set>.png` at game scale, a GIF at
+1x when anything moves, and `maps/<set>.tiles.txt` naming the tile at each column and row), with
+every variant among its neighbours (`sets/<set>.png`). The rubric's seventh question asks whether
+the edge reads as one natural edge without the tile grid showing; map findings come back as
+`<set> map <col>,<row> <x>,<y> "text"`, which the agent turns into notes on that variant's cell.
+`--size CxR --seed N` (MCP `size`, `seed`) choose the island (default 16x12, seed 1).

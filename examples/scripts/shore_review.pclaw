@@ -1,0 +1,40 @@
+# Mossy ruins, G7 review round (reviews/2026-10-28-g7/findings.md): the shore. The reviewer's
+# findings on the island, pinned on the pieces they came from, then fixed and closed.
+note 168,48 24x7 "the north edge repeats pixel for pixel every 24 px (the same foam gaps, flecks and bumps), and the band is ruler-straight: the tile grid shows along long coasts"
+note 144,24 24x24 "the east and west edges: the same straight 2-px wet band with foam gaps always in the same rows"
+note 168,52 24x2 "wet sand is two rows of sand0 straight against sand2 on every side: at game scale a dark outline round the island"
+note 168,51 24x1 "the foam is a nearly unbroken 1-px line; break it into dashes"
+note 0,24 24x24 "stray foam pixels at the square corners, cut off from the rounded foam"
+# --- the sand changed (sand_review): copied in again, and every variant follows (re-projection;
+# on a rebuild from the scripts the sand already has these fixes and this line changes nothing)
+family texture inside from=sand frame=1
+# --- the band again: the waterline (sand0) one pixel, then a wider strip of drying sand (sand1)
+family band 3:outside 1:foam 1:sand0 2:sand1 radius=3
+# --- the long north and south edges: foam in dashes, the waterline dipping and rising, the wet
+# strip in lobes; off the quadrants' edges (columns 0, 11, 12, 23) so the quadrants still join
+px @cell(ew) 2,3 3,3 8,3 9,3 17,3 20,3 14,3 15,3 c=water1
+px @cell(ew) 14,4 15,4 5,2 6,2 c=foam
+px @cell(ew) 5,3 6,3 c=sand0
+px @cell(ew) 3,7 4,7 18,7 19,7 c=sand1
+px @cell(ew) 9,5 21,5 c=sand0
+px @cell(ew) 4,20 5,20 9,20 17,20 18,20 7,20 8,20 c=water1
+px @cell(ew) 7,19 8,19 14,21 15,21 c=foam
+px @cell(ew) 14,20 15,20 c=sand0
+px @cell(ew) 6,16 7,16 20,16 c=sand1
+px @cell(ew) 2,18 15,18 c=sand0
+# --- the long west and east edges: the same ideas in other places, so no edge mirrors another
+px @cell(ns) 3,2 3,3 3,9 3,15 3,16 3,20 3,6 3,7 c=water1
+px @cell(ns) 4,6 4,7 2,17 2,18 c=foam
+px @cell(ns) 3,17 3,18 c=sand0
+px @cell(ns) 7,4 7,5 7,19 c=sand1
+px @cell(ns) 5,10 5,21 c=sand0
+px @cell(ns) 20,4 20,8 20,9 20,14 20,19 20,20 20,6 20,7 c=water1
+px @cell(ns) 19,6 19,7 21,17 21,18 c=foam
+px @cell(ns) 20,17 20,18 c=sand0
+px @cell(ns) 16,3 16,13 16,14 c=sand1
+px @cell(ns) 18,10 18,21 c=sand0
+note done n1
+note done n2
+note done n3
+note done n4
+note done n5

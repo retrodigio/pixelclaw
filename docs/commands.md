@@ -46,11 +46,68 @@ frame 1; they move with their layer and frame when others are added, moved or re
 (and scripts') groups are `g1`, `g2`, …, and people's are `h1`, `h2`, …. One action in the watch
 view (a pencil drag, a fill, a move, a palette edit, a note) is one group.
 
+### Autotile families
+
+A **family** is a sheet of every variant an autotile scheme can produce (plan §4.2), with the two
+textures they share. `new family shore 24x24 scheme=blob47 [map=14x12]` makes one: the size is
+the tile's (square, even); the canvas is the sheet. Row 0 holds the `inside` texture (the
+family's terrain) and the `outside` texture; then the variants, in the scheme's order, so many to
+a row; then, with `map=`, a coverage map of that many tiles to paint. Cells are named:
+`@cell(inside)`, `@cell(outside)`, `@cell(<variant>)` work in every drawing command, and `view
+family` lists where each is.
+
+**Schemes** are data (`core/schemes/*.json`): which neighbours count, each variant's name and the
+reduced neighbourhood it answers to, and how it is built from four 12x12 (half-tile) quadrants.
+
+| Scheme | Neighbours | Variants | Pieces (drawn by hand) |
+|---|---|---|---|
+| `blob47` | 8, a corner counts only when both sides beside it are the terrain | 47 | `o`, `nesw`, `ew`, `ns`, `nesw_ne_se_sw_nw` |
+| `wang16-corner` | the tile's four corners; the edge runs through the middle of the tile | 16 | 7 (see the file) |
+| `path` | 4; a strip through the middle (inset a quarter of the tile) | 16 | `o`, `nesw`, `ew`, `ns` |
+| `bridge8` | along one axis, east-west first | 8 (`v`, the north-south single, is placed by name) | `h`, `h_ew`, `v`, `v_ns` |
+| `single` | none | 1 | `o` |
+| `face` | blob47, plus a south face in the cell below the terrain, joined east and west | 47 + 4 | blob47's and `face_o`, `face_ew` |
+
+Variant names are the joined sides (`n e s w`, `o` for none), then each counted corner:
+`ne_ne` is joined north and east with the corner between them, `nesw_ne_se_sw_nw` the interior.
+
+**How the variants are made.** A family has two layers. `ground` holds the textures; on every
+variant it is laid again after every command: each pixel shows the inside or the outside texture
+*at the same pixel of the tile*, by the band geometry, so every variant tiles with the plain
+textures and with each other (the textures are *re-projected*). `band` holds the band's art: the
+**pieces** are drawn by hand (the agent and people draw on `band` by default), and every other
+variant's band is assembled from the pieces' quadrants after every command, so detail drawn on a
+piece shows at once on every variant that uses that quadrant. A variant can be **detached** to
+draw it by hand.
+
+| Command | Normal form | Notes |
+|---|---|---|
+| `family texture inside\|outside from=<tile> [frame=<n>]` | `family texture inside from=sand frame=1 <<` rows `>>` | Copies a tile asset (the family's tile size; colours matched by name, else by exact colour) into the texture cell on your frame. The line records the pixels, so replay needs no other asset; a block of rows can be given instead of `from=`. |
+| `family band <w>:<fill> ... [radius=] [inset=] [draw=on\|off]` | `family band 3:outside 1:foam 2:sand0 radius=3 inset=0 draw=on` | **Route 1, a band profile**: the band from the terrain's edge inward, each part a width and a colour, `outside` (the outside texture carries on) or `inside`; then the inside texture. `radius` rounds the band's inner edge at outer corners (the outer contours are wider arcs about the same centre); `inset` moves the edge in from the tile's (path and bridge strips; default the scheme's). Inset, band and radius must fit in half a tile. With `draw=on` it draws the colours on every piece's band layer (clearing what was there); `draw=off` only sets the geometry. |
+| `family detach\|attach <variant>\|all` | `family detach ne_ne` | A detached variant's band layer is its own (drawn by hand or cut); attach builds it from the pieces again. Pieces are always drawn by hand. |
+| `family coverage [seed=] [copies=] [fill=on\|off]` | `family coverage seed=7 copies=1 fill=off` | Lays out the coverage map so every variant the scheme can produce appears `copies` times (a seeded search; refused, with what to try, when the map is too small: blob47 needs about 14x12), and draws its flat template (inside, outside and the band's colours) on a reference layer `template`. `fill=on` also paints the map with the current variants, to start from. |
+| `family cut [textures=on\|off]` | `family cut textures=off` | **Route 3, cut from a painted map**: every variant takes the medoid of the map tiles that resolve to it (the tile with the fewest differing band pixels to the others), keeping only its band (`family band … draw=off` says how wide; the textures stay the shared ones), and is detached. `textures=on` also takes the textures from the map's all-inside and all-outside tiles. |
+
+**Route 2, quadrant pieces**: draw the pieces themselves (`paint @cell(o) 0,0 << … >>` on layer
+`band`); every variant follows. Animated families use frames as any document does: copy each
+frame of an animated texture into the same frame of the family, and link the band layer's cels
+(`cel link 1-4 layer=band`) so hand detail shows on every frame.
+
+**Overlays** (plan §4.3) are small sprites played over a map's tiles: `new overlay glint 5x5`, its
+frames and ticks as usual, then
+
+| Command | Normal form | Notes |
+|---|---|---|
+| `overlay set [mode=] [on=] [anchor=] [spread=] [every=] [rest=] [seed=]` | `overlay set mode=sparkle on=outside anchor=centre spread=8x8 every=3 rest=150 seed=11` | `mode`: `cycle` and `pingpong` (every instance in step), `wave` (the phase moves across the map), `sparkle` (each instance plays once, then rests `rest` ticks, at its own moment). `on`: the family's outside tiles, its terrain, or all. `anchor`: the overlay's top-left in the tile (default centred); `spread`: a seeded offset per tile up to that many pixels either way; `every`: one tile in that many. |
+
+`view map` shows a family on a random island (or a tile repeated), with overlays given in
+`with=`; see *Views*.
+
 ## Commands
 
 | Command | Normal form | Notes |
 |---|---|---|
-| `new <kind> <name> <W>x<H> [palette=] [wrap=] [cell=] [bg=] [<< rows >>]` | `new tile floor 24x24 palette=mossy-ruins wrap=on cell=24x24 bg=none <<` palette rows `>>` | First command of a tape only. Kinds: `tile`, `sprite`, `sheet`, `icon`. `wrap` defaults to `on` for tiles, `off` otherwise. `cell` defaults to the canvas size. `palette` defaults to the project's default palette, and the line records the whole palette in a block (see *The palette in the tape*). |
+| `new <kind> <name> <W>x<H> [palette=] [wrap=] [cell=] [bg=] [<< rows >>]` | `new tile floor 24x24 palette=mossy-ruins wrap=on cell=24x24 bg=none <<` palette rows `>>` | First command of a tape only. Kinds: `tile`, `sprite`, `sheet`, `icon`, `family`, `overlay` (see *Autotile families*). `wrap` defaults to `on` for tiles, `off` otherwise. `cell` defaults to the canvas size. `palette` defaults to the project's default palette, and the line records the whole palette in a block (see *The palette in the tape*). |
 | `px <x,y> [<x,y> ...] c=` | `px 3,4 4,4 c=ink` | Single pixels. |
 | `line <x,y> <x,y> [<x,y> ...] c= [pp=on\|off]` | `line 3,10 9,7 c=stone2 pp=on` | A line or polyline. See *Lines* below. |
 | `curve <x,y> <x,y> <x,y> [<x,y>] c= [pp=on\|off]` | `curve 2,20 8,12 16,14 c=soil2 pp=on` | A quadratic (3 points) or cubic (4 points) Bezier. See *Curves and polygons*. |
@@ -478,7 +535,7 @@ changes a branch. `asset.json` records the link: `"links": [{"fork": {"from": "c
 
 ## Views
 
-`pixelclaw view <project> <asset> [render|grid|tile3x3|diff|game|recolour|anim|all]` (`all` is the
+`pixelclaw view <project> <asset> [render|grid|tile3x3|diff|game|recolour|anim|map|family|all]` (`all` is the
 first three):
 
 - **render**: a nearest-neighbour PNG. The default scale gives about 192 px on the long side
@@ -511,6 +568,16 @@ first three):
   speed (tiles 3x3).
 - **recolour**: role art under several preview themes side by side (`--themes a,b,c`, default the
   first six), each with a strip of its role colours.
+- **map**: a sample map built with a family's scheme (plan §2, §4.2): a random island of
+  `--size CxR` tiles (default 12x10) from `--seed N` (default 1), each tile its variant, at the
+  game's draw scale (`--scale`, default 2). The text gives the seam score over the map (the same
+  metric as a tile's, over the composed map) and how often each variant appears. Overlays given
+  with `--with` play over it; when the family's frames or the overlays move it also writes
+  `<asset>.map.gif` (one loop of everything, at most four seconds). A tile's map is the tile
+  repeated; an overlay's is over the first family (or `--ground`).
+- **family**: every variant of a family in the middle of the 3x3 map that resolves to it (the
+  neighbours dimmed), labelled (pieces in cyan, detached variants in amber); the text says where
+  every cell is on the sheet.
 
 `--marks failing` (or check names: `--marks orphans,jaggies`) circles the pixels those checks flag
 in magenta, on `render`, `tile3x3` (the middle copy of the enlarged one) and `game`. `--theme

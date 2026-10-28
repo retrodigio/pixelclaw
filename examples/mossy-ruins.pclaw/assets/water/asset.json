@@ -38,14 +38,39 @@
   "tags": [],
   "views": [],
   "links": [],
-  "notes": [],
+  "notes": [
+    {
+      "id": "n1",
+      "x": 9,
+      "y": 4,
+      "w": 4,
+      "h": 2,
+      "text": "every crest is the same 2-px stamp, one per even row: diamonds when tiled; vary crest width, drop a few, break the rhythm"
+    },
+    {
+      "id": "n2",
+      "x": 10,
+      "y": 2,
+      "w": 1,
+      "h": 1,
+      "text": "a lone water0 pixel left from a dash the crest covered"
+    },
+    {
+      "id": "n3",
+      "x": 0,
+      "y": 0,
+      "w": 24,
+      "h": 24,
+      "text": "all crests jump 6 px right together every 15 ticks while the dashes stay still: a conveyor more than a shimmer; frames 2-4 chop the dashes into specks"
+    }
+  ],
   "tape": {
     "lang": 2,
-    "commands": 44,
-    "groups": 1
+    "commands": 47,
+    "groups": 2
   },
   "state": {
-    "sha256": "5379a4e5ac6317a3128a33891f2abfe148fefb289319631b592b193e1b27e79a"
+    "sha256": "8301cb7da6018e550e9c6c4437c4c311806ff34ab1458b6ba7f424141b470fdb"
   },
   "checkpoints": {
     "every": 200,

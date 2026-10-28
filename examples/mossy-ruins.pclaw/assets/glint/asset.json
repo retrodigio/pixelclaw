@@ -1,0 +1,42 @@
+{
+  "name": "glint",
+  "kind": "overlay",
+  "size": [
+    5,
+    5
+  ],
+  "cell": [
+    5,
+    5
+  ],
+  "wrap": false,
+  "palette": "ruins-water",
+  "layers": [
+    {
+      "name": "main",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    }
+  ],
+  "frames": 3,
+  "paletteLocked": false,
+  "stamps": [],
+  "macros": [],
+  "tags": [],
+  "views": [],
+  "links": [],
+  "notes": [],
+  "tape": {
+    "lang": 2,
+    "commands": 21,
+    "groups": 2
+  },
+  "state": {
+    "sha256": "47542642da88ba77bc00f3ea2691e2d380dc21b65ff6a00ca54fb660a73ed42b"
+  },
+  "checkpoints": {
+    "every": 200,
+    "files": []
+  }
+}

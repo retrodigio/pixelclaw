@@ -1,0 +1,40 @@
+# Mossy ruins: a shore (plan §10 G7). A blob47 family of 47 variants: sand (the terrain) meeting
+# water. Route 1, a band profile: from the water's edge in, 3 px of water, a line of foam, 2 px of
+# wet sand, then dry sand; outer corners round. The textures are copied from the sand tile and,
+# frame by frame, from the shimmering water tile, so the whole family shimmers with it; the band
+# layer's cels are linked, so the hand detail below shows on every frame.
+new family shore 24x24 scheme=blob47 palette=ruins-shore
+family texture inside from=sand frame=1
+frame add copy=1
+frame add copy=1
+frame add copy=1
+frame set all ticks=15
+cel link 1-4 layer=band
+frame 1
+family texture outside from=water frame=1
+frame 2
+family texture outside from=water frame=2
+frame 3
+family texture outside from=water frame=3
+frame 4
+family texture outside from=water frame=4
+frame 1
+family band 3:outside 1:foam 2:sand0 radius=3
+
+# --- Hand detail on three pieces (layer band; every variant built from their quadrants follows).
+# Kept off each quadrant's edges (columns and rows 0, 11, 12 and 23), so the quadrants still join.
+# ew, the long edges north and south: foam spray over the line, breaks in it, wet sand in lobes.
+px @cell(ew) 4,2 5,2 17,2 9,21 10,21 18,21 c=foam
+px @cell(ew) 7,3 15,3 3,20 14,20 c=water1
+px @cell(ew) 3,6 4,6 16,6 17,6 18,6 5,17 6,17 19,17 20,17 c=sand0
+px @cell(ew) 8,5 20,5 2,18 17,18 c=sand1
+px @cell(ew) 8,1 6,22 c=water3
+# ns, the long edges west and east: the same ideas, placed differently so no edge mirrors another.
+px @cell(ns) 2,5 2,6 1,17 21,3 21,14 21,15 c=foam
+px @cell(ns) 3,8 3,19 20,6 20,17 c=water1
+px @cell(ns) 6,4 6,15 6,16 17,8 17,9 17,20 c=sand0
+px @cell(ns) 5,9 18,15 c=sand1
+px @cell(ns) 1,8 22,19 c=water3
+# o, the outer corners: a fleck of spray off each point and the wet sand reaching in.
+px @cell(o) 3,3 20,2 2,20 21,21 c=foam
+px @cell(o) 7,6 6,7 17,6 6,16 16,17 17,16 c=sand0

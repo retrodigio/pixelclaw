@@ -5,7 +5,7 @@ Old stone half taken back by moss, under a soft light from the top left.
 - **Palette.** `mossy-ruins` for ground and stone. Props use `ruins-props`: the same colours
   plus a wood ramp and a brass ramp (so iron straps in the stone ramp are fine). Figures use
   `ruins-folk` (the same colours plus skin and cloth ramps); water uses `ruins-water` (plus a
-  water ramp up to foam). Nothing else.
+  water ramp up to foam); the shore uses `ruins-shore` (water plus a sand ramp). Nothing else.
 - **Light** from the top left. Light the lit side of a shape, shade the far side; never shade
   every side the same way (no pillow shading).
 - **Outline.** Props and figures have a 1-px `ink` outline all round. Tiles have none.
@@ -20,3 +20,6 @@ Old stone half taken back by moss, under a soft light from the top left.
 - **Animation.** Figures walk in four directions, two frames each, 12 ticks a frame; west is east
   mirrored. Feet stay on the ground line (row 22) in every frame and the figure does not slide.
   Each frame changes about a sixth of the figure (8-35 %). Water loops without a seam.
+- **Shore.** Where sand meets water: the water's edge, a broken line of foam, a strip of wet sand,
+  then dry sand. Corners are rounded, never square; the edge should read as one coastline, with
+  no tile grid showing. Glints flash now and then on the water, never in step.
