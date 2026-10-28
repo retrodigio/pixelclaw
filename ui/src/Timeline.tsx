@@ -30,6 +30,14 @@ export function TimelinePanel({ doc, ed, editable, frameShown }: { doc: Doc; ed:
   const [renaming, setRenaming] = useState<{ from: string; to: string } | null>(null);
   const [ticksAt, setTicksAt] = useState<{ f: number; v: string } | null>(null);
   const [tagName, setTagName] = useState('');
+  // Collapsed rows (only for looking): the whole timeline, or its ticks, views, tags or layer rows.
+  const [folded, setFolded] = useState<Set<string>>(() => new Set());
+  const fold = (k: string) => setFolded((x) => { const n = new Set(x); if (n.has(k)) n.delete(k); else n.add(k); return n; });
+  const rowHead = (k: string, label: string, n?: number) => (
+    <th colSpan={4} className="rowhead fold" data-testid={`tl-fold-${k}`} onClick={() => fold(k)} title={`${folded.has(k) ? 'Show' : 'Hide'} the ${label} row${n !== undefined ? 's' : ''} (only for looking)`}>
+      {folded.has(k) ? '▸' : '▾'} {label}{folded.has(k) && n !== undefined ? ` (${n})` : ''}
+    </th>
+  );
   const li = ed.layerIndex(doc);
   const fi = ed.frameIndex(doc);
   const cur = doc.layers[li]!;
@@ -49,8 +57,9 @@ export function TimelinePanel({ doc, ed, editable, frameShown }: { doc: Doc; ed:
   const freeViews = VIEW_NAMES.filter((n) => !doc.views.some((v) => v.name === n));
   const mirrorable = doc.views.filter((v) => !v.mirror && opposite(v.name) && !doc.views.some((w) => w.name === opposite(v.name)));
   return (
-    <div className="timeline" data-testid="timeline">
+    <div className={`timeline${folded.has('all') ? ' folded' : ''}`} data-testid="timeline">
       <div className="tl-bar">
+        <button className="mini" data-testid="tl-fold-all" onClick={() => fold('all')} title={folded.has('all') ? 'Show the timeline' : 'Fold the timeline away (only for looking)'}>{folded.has('all') ? '▸' : '▾'}</button>
         <span className="tl-title">Layers</span>
         <button className="mini" disabled={!editable} onClick={() => ed.addLayer()} title={`New layer above ${cur.name} (layer add)`} data-testid="layer-add">+</button>
         <button className="mini" disabled={!editable || li === doc.layers.length - 1} onClick={() => ed.moveLayer(cur.name, 1)} title={`Move ${cur.name} up (layer move)`} data-testid="layer-up">↑</button>
@@ -65,7 +74,7 @@ export function TimelinePanel({ doc, ed, editable, frameShown }: { doc: Doc; ed:
         <button className="mini" disabled={!editable} onClick={() => ed.addFrame()} title={`New frame after ${fi + 1}, a copy of it (frame add)`} data-testid="frame-add">+</button>
         <button className="mini" disabled={!editable || doc.frameCount < 2} onClick={() => ed.removeFrame()} title={`Remove frame ${fi + 1} (frame remove)`} data-testid="frame-remove">✕</button>
       </div>
-      <div className="tl-bar tl-anim">
+      {!folded.has('all') && <div className="tl-bar tl-anim">
         <button className={`mini play${ed.playing ? ' on' : ''}`} data-testid="play" disabled={doc.frameCount < 2}
           onClick={() => ed.play(ed.playing ? null : playSeq.name)} title={`${ed.playing ? 'Stop' : 'Play'} ${playSeq.name} at the game's speed (Enter); only for looking`}>
           {ed.playing ? '⏸' : '▶'}
@@ -102,19 +111,19 @@ export function TimelinePanel({ doc, ed, editable, frameShown }: { doc: Doc; ed:
           <input value={tagName} disabled={!editable} placeholder="tag" aria-label="tag the chosen frames" data-testid="tag-name" onChange={(e) => setTagName(e.target.value)}
             title={`Name frames ${rangeText} (tag add; Enter)`} />
         </form>
-      </div>
-      <div className="tl-grid">
+      </div>}
+      {!folded.has('all') && <div className="tl-grid">
         <table>
           <thead>
             <tr className="tl-ticks">
-              <th colSpan={4} className="rowhead">frame · ticks</th>
+              {rowHead('ticks', 'frame · ticks')}
               {Array.from({ length: doc.frameCount }, (_, f) => (
                 <th key={f} className={`fhead${f === frameShown ? ' fnow' : ''}${inSel(f) && ed.frameSel ? ' fsel' : ''}`} data-frame-head={f + 1}
                   onClick={(e) => ed.pickFrame(doc, f, e.shiftKey)}
                   onDoubleClick={() => editable && !mirrorOf(f) && setTicksAt({ f, v: String(doc.ticks[f]) })}
                   title={`Frame ${f + 1}: ${doc.ticks[f]} ticks. Click to draw on it, Shift+click to choose frames, double-click to change its ticks (frame set)`}>
                   <div>{f + 1}</div>
-                  {ticksAt?.f === f ? (
+                  {folded.has('ticks') ? null : ticksAt?.f === f ? (
                     <form onSubmit={(e) => {
                       e.preventDefault();
                       const t = Number(ticksAt.v);
@@ -129,8 +138,8 @@ export function TimelinePanel({ doc, ed, editable, frameShown }: { doc: Doc; ed:
               ))}
             </tr>
             <tr className="tl-views">
-              <th colSpan={4} className="rowhead">views</th>
-              {spans(doc.frameCount, doc.views).map((c) => c.r ? (
+              {rowHead('views', 'views', doc.views.length)}
+              {folded.has('views') ? <th colSpan={doc.frameCount} /> : spans(doc.frameCount, doc.views).map((c) => c.r ? (
                 <th key={`v${c.r.name}`} colSpan={c.span} className={`band view${c.r.mirror ? ' mirror' : ''}`} data-view={c.r.name}
                   title={c.r.mirror ? `View ${c.r.name}: a live mirror of ${c.r.mirror}` : `View ${c.r.name}: frames ${c.r.from + 1}-${c.r.to + 1}`}>
                   {c.r.mirror ? `${c.r.name} ⇋ ${c.r.mirror}` : c.r.name}
@@ -139,9 +148,12 @@ export function TimelinePanel({ doc, ed, editable, frameShown }: { doc: Doc; ed:
                 </th>
               ) : <th key={`e${c.at}`} />)}
             </tr>
-            {doc.tags.map((t) => (
+            {doc.tags.length > 0 && folded.has('tags') && (
+              <tr className="tl-tags">{rowHead('tags', 'tags', doc.tags.length)}<th colSpan={doc.frameCount} /></tr>
+            )}
+            {!folded.has('tags') && doc.tags.map((t) => (
               <tr key={t.name} className="tl-tags">
-                <th colSpan={4} className="rowhead">{t === doc.tags[0] ? 'tags' : ''}</th>
+                {t === doc.tags[0] ? rowHead('tags', 'tags', doc.tags.length) : <th colSpan={4} className="rowhead" />}
                 {spans(doc.frameCount, [t]).map((c) => c.r ? (
                   <th key="t" colSpan={c.span} className="band tag" data-tag={t.name} title={`Tag ${t.name}: frames ${t.from + 1}-${t.to + 1}, ${t.loop}`}>
                     {t.name}
@@ -154,7 +166,10 @@ export function TimelinePanel({ doc, ed, editable, frameShown }: { doc: Doc; ed:
             ))}
           </thead>
           <tbody>
-            {order.map((l) => {
+            {doc.layers.length > 1 && (
+              <tr className="tl-layers-head">{rowHead('layers', 'layers', doc.layers.length)}<th colSpan={doc.frameCount} /></tr>
+            )}
+            {(folded.has('layers') ? order.filter((l) => l === li) : order).map((l) => {
               const layer = doc.layers[l]!;
               return (
                 <tr key={layer.name} className={l === li ? 'on' : ''} data-layer={layer.name}>
@@ -199,7 +214,7 @@ export function TimelinePanel({ doc, ed, editable, frameShown }: { doc: Doc; ed:
             })}
           </tbody>
         </table>
-      </div>
+      </div>}
     </div>
   );
 }

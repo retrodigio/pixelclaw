@@ -122,13 +122,15 @@ export function syncFamily(d: Doc): void {
     if (gl >= 0 && !done.has(d.cels[gl]![fr]!)) {
       const cel = d.cels[gl]![fr]!;
       done.add(cel);
+      // The textures as they look (every art layer), so they can be drawn on any layer.
+      const flat = flatten(d, fr);
       const [ix, iy] = L.inside, [ox, oy] = L.outside;
       for (let v = 0; v < s.variants.length; v++) {
         const [cx, cy] = L.cells[v]!;
         const m = maps[v]!;
         for (let y = 0; y < t; y++) for (let x = 0; x < t; x++) {
           const out = showsOutside(f.geometry, m[y * t + x]!);
-          cel[(cy * t + y) * W + cx * t + x] = cel[((out ? oy : iy) * t + y) * W + (out ? ox : ix) * t + x]!;
+          cel[(cy * t + y) * W + cx * t + x] = flat[((out ? oy : iy) * t + y) * W + (out ? ox : ix) * t + x]!;
         }
       }
     }
@@ -429,7 +431,7 @@ export function cutFamily(d: Doc, textures: boolean): CutResult {
       const cel = d.cels[bl]![fr]!;
       const [cx, cy] = L.cells[vi]!;
       for (let y = 0; y < t; y++) for (let x = 0; x < t; x++) cel[(cy * t + y) * W + cx * t + x] = keep(y * t + x) ? blocks[m]![y * t + x]! : TRANSPARENT;
-      detached.add(v.name);
+      if (!s.pieces.includes(v.name)) detached.add(v.name);
     });
     if (textures && gl >= 0) {
       const full = s.variants.findIndex((v) => v.on !== 'face' && v.quads.every((q) => q === 'in' || q.startsWith('in@')));

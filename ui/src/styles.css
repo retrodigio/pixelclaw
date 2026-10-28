@@ -272,3 +272,28 @@ header .crumbs { white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   .narrow-only { display: inline; }
   .toolbar { gap: 6px; padding: 5px 8px; }
 }
+
+/* G7: family views (sheet, variants among their neighbours, a sample map) and folding timeline rows */
+.seg { display: inline-flex; flex: none; }
+.seg button { border-radius: 0; padding: 3px 8px; }
+.seg button:first-child { border-radius: 4px 0 0 4px; }
+.seg button:last-child { border-radius: 0 4px 4px 0; }
+.seg button + button { border-left: none; }
+.family-view { flex: 1; min-height: 0; overflow: auto; padding: 10px 14px; display: flex; flex-direction: column; gap: 8px; }
+.family-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.family-head .num { width: 64px; }
+.family-legend { font-size: 12px; }
+.family-grid { display: flex; flex-wrap: wrap; gap: 10px; align-content: flex-start; }
+.variant { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 5px; display: flex; flex-direction: column; gap: 4px; }
+.variant canvas { image-rendering: pixelated; display: block; }
+.variant.piece { border-color: #4fb7c4; }
+.variant.detached { border-color: #c99a45; }
+.vname { display: flex; align-items: center; gap: 6px; font-size: 11px; justify-content: space-between; }
+.vname .mini { padding: 0 6px; font-size: 11px; }
+.piece-tag, .detached-tag { font-size: 10px; padding: 0 5px; border-radius: 8px; border: 1px solid #4fb7c4; color: #8fdbe4; }
+.detached-tag { border-color: #c99a45; color: #f0c27a; }
+.map-text { white-space: pre-wrap; font-size: 12px; }
+.map-body canvas { image-rendering: pixelated; display: block; }
+.rowhead.fold { cursor: pointer; user-select: none; }
+.rowhead.fold:hover { color: var(--accent); }
+.timeline.folded { flex: none; }

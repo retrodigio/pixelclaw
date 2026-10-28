@@ -73,7 +73,7 @@ describe('families through MCP', () => {
     });
     expect(r.isError).toBeFalsy();
     const c = await call('check', { asset: 'cove', checks: ['coverage'] });
-    expect(texts(c.content)).toMatch(/47 detached/);
+    expect(texts(c.content)).toMatch(/42 detached/);
     // Verify replays every tape (the families' included) against what was saved; it only reads, so it runs beside the server.
     const { execFileSync } = await import('node:child_process');
     const { BIN } = await import('./spawn.ts');

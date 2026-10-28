@@ -776,6 +776,30 @@ export function mapGifFrames(doc: Doc, o: MapViewOptions = {}): GifFrame[] {
   return out;
 }
 
+/** A variant in the middle of the 3x3 map that resolves to it (one placed by name only: among plain outside), the neighbours dimmed. */
+export function renderVariant(doc: Doc, v: number, o: { frame?: number; theme?: Theme | null } = {}): Rgba {
+  const f = doc.family!;
+  const s = schemeOf(f);
+  const t = f.tile;
+  const frame = o.frame ?? 0;
+  const pal = colourTable(doc, o.theme);
+  const nb = neighbourhoodOf(s, v);
+  const m = composeMap(doc, nb ?? { cols: 3, rows: 3, cells: new Uint8Array(s.neighbours === 'corners' ? 16 : 9) }, frame);
+  if (!nb) {
+    const [cx, cy] = layoutOf(f).cells[v]!;
+    const flat = flatten(doc, frame);
+    for (let y = 0; y < t; y++) for (let x = 0; x < t; x++) m.px[(t + y) * m.w + t + x] = flat[(cy * t + y) * doc.width + cx * t + x]!;
+  }
+  const img = createRgba(m.w, m.h);
+  for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) {
+    const c = m.px[y * m.w + x]!;
+    const centre = x >= t && x < 2 * t && y >= t && y < 2 * t;
+    const rgb = c === TRANSPARENT ? CHECK_A : pal[c]!;
+    put(img, x, y, centre ? rgb : [Math.round(rgb[0] * 0.55 + 20), Math.round(rgb[1] * 0.55 + 20), Math.round(rgb[2] * 0.55 + 22)]);
+  }
+  return img;
+}
+
 /**
  * The family view: every variant in the middle of its neighbourhood (the 3x3 map that resolves to
  * it), labelled; pieces' labels in cyan, detached variants' in amber.
@@ -785,7 +809,6 @@ export function renderFamilyView(doc: Doc, o: { scale?: number; frame?: number; 
   const s = schemeOf(f);
   const t = f.tile;
   const k = o.scale ?? 1;
-  const pal = colourTable(doc, o.theme);
   const cols = o.cols ?? Math.min(8, s.variants.length);
   const pad = 6, lh = 9;
   const cw = 3 * t * k, ch = 3 * t * k + lh;
@@ -797,21 +820,10 @@ export function renderFamilyView(doc: Doc, o: { scale?: number; frame?: number; 
   s.variants.forEach((x, v) => {
     const ox = pad + (v % cols) * (cw + pad), oy = pad + Math.floor(v / cols) * (ch + pad);
     text(img, ox, oy, x.name.length > cw / 4 ? x.name.slice(0, Math.floor(cw / 4)) : x.name, pieces.has(x.name) ? PIECE_LABEL : detached.has(x.name) ? DETACHED_LABEL : LABEL_DIM, 1);
-    const nb = neighbourhoodOf(s, v);
-    const m: MapImage = nb ? composeMap(doc, nb, o.frame ?? 0) : (() => {
-      const one = composeMap(doc, { cols: 3, rows: 3, cells: new Uint8Array(s.neighbours === 'corners' ? 16 : 9) }, o.frame ?? 0);
-      const L = layoutOf(f);
-      const flat = flatten(doc, o.frame ?? 0);
-      const [cx, cy] = L.cells[v]!;
-      for (let y = 0; y < t; y++) for (let xx = 0; xx < t; xx++) one.px[(t + y) * one.w + t + xx] = flat[(cy * t + y) * doc.width + cx * t + xx]!;
-      return one;
-    })();
-    for (let y = 0; y < m.h; y++) for (let xx = 0; xx < m.w; xx++) {
-      const c = m.px[y * m.w + xx]!;
-      const centre = xx >= t && xx < 2 * t && y >= t && y < 2 * t;
-      const rgb = c === TRANSPARENT ? CHECK_A : pal[c]!;
-      // The neighbours are dimmed so the variant in the middle stands out.
-      rect(img, ox + xx * k, oy + lh + y * k, k, k, centre ? rgb : [Math.round(rgb[0] * 0.55 + 20), Math.round(rgb[1] * 0.55 + 20), Math.round(rgb[2] * 0.55 + 22)]);
+    const one = renderVariant(doc, v, o);
+    for (let y = 0; y < one.height; y++) for (let xx = 0; xx < one.width; xx++) {
+      const i = (y * one.width + xx) * 4;
+      rect(img, ox + xx * k, oy + lh + y * k, k, k, [one.data[i]!, one.data[i + 1]!, one.data[i + 2]!]);
     }
   });
   return img;

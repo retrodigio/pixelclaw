@@ -129,7 +129,7 @@ describe('family derivation (§4.2)', () => {
     const cut = run(st, 'family cut textures=on').doc!;
     const s = BUILTIN_SCHEMES.get('blob47')!;
     const pieces = new Set(s.pieces);
-    expect(cut.family!.detached).toEqual(s.variants.map((v) => v.name));
+    expect(cut.family!.detached).toEqual(s.variants.map((v) => v.name).filter((n) => !pieces.has(n)));
     // Cut from a map painted with the derivation itself, every variant comes back the same.
     const L = layoutOf(f);
     const a = flatten(d, 0), b = flatten(cut, 0);

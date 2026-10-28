@@ -437,6 +437,8 @@ function thinChains(img: Img, min: number): Pt[][] {
 }
 
 function checkJaggies(img: Img, p: Params): CheckResult {
+  // A family's sheet is its textures (tiles, checked as tiles) and the band the geometry draws: its staircases are curves by design.
+  if (img.doc.family) return skip('jaggies', 'a family is judged on its map (its textures are checked as tiles)');
   // A doubled L-corner: a pixel whose only same-colour 4-neighbours are one horizontal and one
   // vertical, with the corner between them empty, where the line zig-zags through it (it steps
   // the same way before and after, as a staircase does): a pixel-perfect line steps diagonally

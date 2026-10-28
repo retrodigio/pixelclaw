@@ -34,9 +34,9 @@ function intOpt(a: Args, key: string, lo: number, hi: number, dflt: number): num
 
 const layerIndex = (d: Doc, name: string): number => d.layers.findIndex((l) => l.name === name);
 
-/** The most common colour of a cell on a layer (for the flat template). */
-function modeColour(d: Doc, layer: number, frame: number, cx: number, cy: number, t: number): number {
-  const cel = d.cels[layer]![frame]!;
+/** The most common colour of a cell as it looks (for the flat template). */
+function modeColour(d: Doc, frame: number, cx: number, cy: number, t: number): number {
+  const cel = flatten(d, frame);
   const n = new Map<number, number>();
   for (let y = 0; y < t; y++) for (let x = 0; x < t; x++) {
     const v = cel[(cy * t + y) * d.width + cx * t + x]!;
@@ -236,8 +236,8 @@ const familyCmd: CommandSpec = {
           const maps = bandMaps(s, t, fam.geometry);
           const g = fam.geometry;
           for (let fr = 0; fr < d.frameCount; fr++) {
-            const inC = gl >= 0 ? modeColour(d, gl, fr, L.inside[0], L.inside[1], t) : TRANSPARENT;
-            const outC = gl >= 0 ? modeColour(d, gl, fr, L.outside[0], L.outside[1], t) : TRANSPARENT;
+            const inC = modeColour(d, fr, L.inside[0], L.inside[1], t);
+            const outC = modeColour(d, fr, L.outside[0], L.outside[1], t);
             const img = composeMap(d, terrain, fr);
             const cel = d.cels[tl]![fr]!;
             img.variants.forEach((v, i) => {

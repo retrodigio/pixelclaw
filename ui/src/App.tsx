@@ -3,12 +3,13 @@
 // here: every action becomes a command on the tape with their name (plan §1.3).
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { ctxOf, flaggedOn, frameAtTick, sequences } from '@pixelclaw/core';
+import { ctxOf, familyCellAt, flaggedOn, frameAtTick, sequences } from '@pixelclaw/core';
 import { CanvasView, ZOOMS } from './CanvasView.tsx';
 import { Editor, PATTERN_NAMES } from './editor.ts';
 import { CheckChips, CheckDetails, PreviewPanel } from './Checks.tsx';
 import { NotesPanel, PalettePanel, StampsPanel, ToolsPanel } from './Panels.tsx';
 import { TimelinePanel } from './Timeline.tsx';
+import { FamilyMap, FamilyVariants, type FamilyMode } from './Family.tsx';
 import { SPEEDS, type Store } from './store.ts';
 import { TapePanel, authorClass, time } from './TapePanel.tsx';
 
@@ -51,6 +52,7 @@ export function App({ store }: { store: Store }) {
   const [branch, setBranch] = useState<string | null>(null);
   const [naming, setNaming] = useState<string | null>(null);
   const [cmdLine, setCmdLine] = useState('');
+  const [famMode, setFamMode] = useState<FamilyMode>('sheet');
   const [noteText, setNoteText] = useState('');
   const noteInput = useRef<HTMLInputElement>(null);
 
@@ -217,6 +219,18 @@ export function App({ store }: { store: Store }) {
               <input type="checkbox" checked={ghosts} onChange={(e) => setGhosts(e.target.checked)} data-testid="ghosts-toggle" /> <span className="wide-only">wrap ghosts</span><span className="narrow-only">ghosts</span>
             </label>
           )}
+          {doc?.family && famMode === 'sheet' && ed.hover && (
+            <span className="dim mono" data-testid="family-cell" title="The family cell under the pointer (@cell(<name>) in commands)">
+              {familyCellAt(doc.family, ed.hover[0], ed.hover[1]) ?? ''}
+            </span>
+          )}
+          {doc?.family && (
+            <span className="seg" data-testid="family-mode" title="A family: its sheet (draw here), every variant among its neighbours, or a sample map (only for looking)">
+              {(['sheet', 'variants', 'map'] as const).map((m) => (
+                <button key={m} className={famMode === m ? 'on' : ''} data-mode={m} onClick={() => setFamMode(m)}>{m}</button>
+              ))}
+            </span>
+          )}
           <span className="gap" />
           {doc && editable && (
             <>
@@ -325,7 +339,9 @@ export function App({ store }: { store: Store }) {
         {openCheck && <CheckDetails result={openCheck} ed={ed} editable={editable} onClose={() => store.closeChecks()} />}
         {store.error && <div className="banner error" data-testid="error">{store.error}</div>}
         {a?.problem && <div className="banner error">This tape does not replay: {a.problem}</div>}
-        <CanvasView
+        {doc?.family && famMode === 'variants' && <FamilyVariants doc={doc} ed={ed} editable={editable} frame={frameShown} theme={store.themeObj()} />}
+        {doc?.family && famMode === 'map' && <FamilyMap doc={doc} store={store} frame={frameShown} />}
+        {(!doc?.family || famMode === 'sheet') && <CanvasView
           doc={doc}
           frame={frameShown}
           onion={onion}
@@ -349,7 +365,7 @@ export function App({ store }: { store: Store }) {
           onNote={(id) => { ed.activeNote = id; store.changed(); }}
           onZoom={setZoom}
           onEffectiveZoom={setEffZoom}
-        />
+        />}
         {doc && <TimelinePanel doc={doc} ed={ed} editable={editable} frameShown={frameShown} />}
       </main>
 

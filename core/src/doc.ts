@@ -178,7 +178,8 @@ export function createDoc(o: {
   return {
     kind: o.kind, name: o.name, width: o.width, height: o.height, cellW: o.cellW, cellH: o.cellH,
     wrap: o.wrap, palette: o.palette, paletteLocked: false, layers, frameCount: 1, cels,
-    ctx: {}, home: { layer: 0, frame: 0 }, notes: [], stamps: {}, macros: {},
+    // A family's authors draw on its band layer unless they choose another.
+    ctx: {}, home: { layer: o.family ? 1 : 0, frame: 0 }, notes: [], stamps: {}, macros: {},
     ticks: [DEFAULT_TICKS], tags: [], views: [], pivot: null, ground: null,
     family: o.family ? cloneFamily(o.family) : null, overlay: o.overlay ? cloneOverlay(o.overlay) : null,
   };
