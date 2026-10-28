@@ -89,8 +89,10 @@ node cli/bin/pixelclaw.js verify my-art.pclaw
 | `pixelclaw new <project> [--palette <file>]...` | Create a project folder. Palettes can be `.json`, Lospec `.json`, `.hex` or `.gpl`. |
 | `pixelclaw new <project> <kind> <name> <W>x<H> [opts]` | Create an asset (a `new` command). |
 | `pixelclaw run <project> <script.pclaw>\|-\|-e "..." [--asset <name>] [--replace] [--by <who>] [--view <mode>]` | Apply commands as one undo group. Any error applies nothing. |
-| `pixelclaw view <project> <asset> [render\|grid\|tile3x3\|diff\|game\|recolour\|anim\|all] [--scale N] [--region x,y,WxH] [--frame N] [--marks failing] [--theme t]` | Write views and print the text grid (or the diff's list of changes). |
+| `pixelclaw view <project> <asset> [render\|grid\|tile3x3\|diff\|game\|recolour\|anim\|map\|family\|density\|all] [--scale N] [--region x,y,WxH] [--frame N] [--marks failing] [--theme t]` | Write views and print the text grid (or the diff's list of changes). |
 | `pixelclaw check <project> [<asset>...] [--checks a,b] [--marks]` | Run the quality checks against the style guide; exits 1 if any fails. See [docs/checks.md](docs/checks.md). |
+| `pixelclaw export <project> [<asset>...] [--profile <name>] [--out <dir>]` | Write assets through an export profile (built-in `png`, `atlas`, `tiled`, `godot`, `aseprite-json`, `aseprite`, or the project's own). See [docs/profiles.md](docs/profiles.md). |
+| `pixelclaw import <project> <file.png\|file.aseprite\|folder> [--profile <name>] [--as <name>] [--grid WxH] [--palette <p>\|--build]` | Make a new asset from an image (quantised, sliced by a grid) or an `.aseprite` file, or read a profile's export back and compare. |
 | `pixelclaw review <project> [<asset>...] [--name set]` | Write a blind review bundle (images, palette, style guide, rubric). |
 | `pixelclaw verify <project> [<asset>...]` | Replay every tape and compare it with the saved state, the preview and the checkpoints. |
 | `pixelclaw upgrade <project> [<asset>...]` | Rewrite tapes from tape language 1 (G1-G4) in language 2 (the palette in the `new` line); written only if the replay gives the same pixels, then verified. |
@@ -152,7 +154,10 @@ checked in:
   [every variant among its neighbours](docs/screenshots/g7-shore-family.png)
 - the village (a 40x30 map: the shore, a meadow and lanes, four 48x48 houses, 24x48 trees and a
   well): [whole at 1x](docs/screenshots/g8-village.png), [a screen at game scale](docs/screenshots/g8-village-camera.png),
-  [the hot spots before the variants](docs/screenshots/g8-hotspots.png), [in Tiled's format](examples/mossy-ruins.pclaw/exports/tmx/village.tmx)
+  [the hot spots before the variants](docs/screenshots/g8-hotspots.png), [in Tiled's format](examples/mossy-ruins.pclaw/exports/tiled/village.tmx);
+  since G9 with rounder corners and its notes closed: [whole](docs/screenshots/g9-village.png), [a screen on the beach](docs/screenshots/g9-village-camera.png)
+- the house at 2x, a density copy: [the levels and the reduction](docs/screenshots/g9-house-density.png); the walker,
+  house and glints through the sample profile: [atlas page and CSV](examples/mossy-ruins.pclaw/exports/bramble/)
 
 The G2 demo ([examples/demo-g2.md](examples/demo-g2.md)) draws the same tile through MCP while you
 watch. In the G3 demo ([examples/demo-g3.md](examples/demo-g3.md)) you fix three pixels and leave a
@@ -167,6 +172,10 @@ runs a blind review on the island. The G8 demo ([examples/demo-g8.md](examples/d
 a coastal village map from those families plus a house, a tree and a well bigger than a cell,
 finds where it repeats with the map checks and fixes it with texture variants; you move the well
 in the watch view and the agent reads the move; then a blind review of the village at game scale.
+The G9 demo ([examples/demo-g9.md](examples/demo-g9.md)) exports the G6-G8 art through a sample
+export profile into a scratch game folder and reads it back exactly, writes the village for Tiled,
+re-imports a sheet and edits it, and shows the village with its review notes closed and the house
+at twice the density. Export profiles, import and densities: [docs/profiles.md](docs/profiles.md).
 
 ## Packages
 

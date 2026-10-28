@@ -162,7 +162,7 @@ console.log(indent((await call('view', { asset: 'village', mode: 'map', camera: 
 
 console.log('\n9. Every check on the new assets, and a Tiled export of the village');
 for (const a of ['house', 'tree', 'tree_b', 'well', 'meadow', 'lane', 'village']) console.log(indent((await call('check', { asset: a })).split('\n')[0]!, 2));
-console.log(indent((await call('export', { asset: 'village', format: 'tmx' })).split('\n')[0]!, 2));
+console.log(indent((await call('export', { assets: ['village'], profile: 'tiled' })).split('\n')[0]!, 2));
 console.log(indent((await call('export', { asset: 'house', format: 'split' })).split('\n')[0]!, 2));
 
 console.log(`\nDone. The project is ${project}. In the watch view, pick the village: paint, place, move, or stand the camera somewhere.`);

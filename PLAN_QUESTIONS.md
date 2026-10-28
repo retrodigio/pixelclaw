@@ -723,3 +723,111 @@ Points where the plan was unclear or silent. Each has the reading that was follo
      for G8 (the sea is G6's tile and is checked as a tile), noted on the village for water
      variants; a lighter weight for open ground rather than none is a choice for A1. The reviewer
      also asked whether lanes may use the sand ramp: the style guide now says lanes are beaten sand.
+
+## G9
+
+110. **What a profile is** (§4.9, §7, §17). *Reading:* one JSON file per target, with one `layout`
+     (loose, atlas, sheet, tiled, godot, aseprite-json, aseprite) and data for naming, numbering,
+     views, variants, oversized assets, roles, densities, records and snippets; reference in
+     docs/profiles.md. §4.9 also lists GIFs and contact sheets as profile outputs; they are not in
+     §10's G9 list and the `anim` view already writes both, so they are left out.
+
+111. **Density pages "with optional @2x and @1x reduced levels"** (§7.4). *Reading:* `density.levels`
+     lists the levels written, each exactly d times the base frame; file names carry `suffix`
+     (`@{d}x`) except at the `plain` level. A level uses the authored copy at that level if there
+     is one (`density of=`), else (with `reduce`) the highest authored copy above it reduced with
+     the profile's reducer, else the 1x art scaled up; the export's notes say how many were reduced
+     or scaled. Levels are relative to the 1x copy; a project's `grid` stays its native grid.
+
+112. **Role encoding.** *Reading:* `roles` maps each role to the colour it is written as; import reads
+     those colours back as the role entries. Two entries written as one colour are reported (the
+     import takes the first). §5's encoding margin (no exported colour within 10 levels of an
+     engine threshold) needs the engine's thresholds, so it waits for the engine profile.
+
+113. **Mirror views "baked or flagged"** (§4.4, §15). *Reading:* `bake` writes a mirror view's frames
+     flipped; `flag` leaves them out and marks the source's images (`mirror` column, `{mirror}` in
+     snippets as `W=E`). Import rebuilds the left-out frames by flipping the source's, so the round
+     trip is exact either way.
+
+114. **Variants on export** (G8's notes). *Reading:* `variants: frames` numbers an asset's texture
+     variants after its own frames (`moss_1`, `moss_2`, then `moss_b` as `moss_3`, `moss_4`); a
+     family's variants number each cell the same way; `names` exports each under its own name. An
+     export of named assets brings their texture variants and density copies; a map brings what it
+     draws.
+
+115. **Oversized assets.** *Reading:* `oversized: sprite` writes one image with its frame size,
+     pivot and footprint (records `cols`, `rows`, `anchorX`, `anchorY`, `flags`; snippets); `split`
+     writes one-cell pieces named by `names.piece`. G8's `export format=split` (with its stamp
+     JSON) and `format=png` stay as single-asset exports.
+
+116. **Tiled `.tsx` wang sets "replacing G8's baked tileset".** *Reading:* the `tiled` profile writes
+     a `.tsx` per family (its sheet with frames stacked as tile animations, each tile's name and
+     variant as properties, a wang set: `mixed` for 8-neighbour schemes, `corner` for wang16-corner,
+     `edge` for path; fillet and face variants are tiles but not in the wang set), every other image
+     in a collection `tiles.tsx`, and a `.tmx` per map whose ground layers hold each cell's family
+     tile (texture variants of a family are families of their own, so their own `.tsx`). G8's
+     `mapToTmx` and `format=tmx` are removed.
+
+117. **Godot terrains.** *Reading:* one `TileSet` `.tres` per family: one atlas source (frames side by
+     side as tile animations with `animation_separation`), one terrain set (mode 0 for 8-neighbour
+     schemes, 1 for corners, 2 for sides), peering bits from each variant's key, the image's name
+     as custom data so it reads back. Other assets are left out (noted). Written from Godot 4's
+     resource format; not opened in Godot here.
+
+118. **`.aseprite` read and write.** *Reading:* files are written indexed (8 bits), file index 0
+     transparent and entry i as i+1, so at most 255 colours; layers with hidden and reference
+     flags, frame durations in ms (ticks at the project's tick rate, rounded both ways), linked cels,
+     tags (forward, ping-pong) and views as tags named `view S` / `view W mirror E`. Reading also
+     takes RGBA and greyscale files (quantised); group and tilemap layers, cel opacity and blend
+     modes, slices and user data are ignored.
+
+119. **"Re-import a sheet and edit it".** *Reading:* imports make new assets (a PNG sliced by a grid
+     into frames, or kept whole with that cell grid; an `.aseprite`), whose tapes start with the
+     palette in the `new` line and an `import` command per layer and frame carrying the pixels
+     (keys, `.` transparent) with the file's name and blob hash for the record; the file is kept in
+     `blobs/`, and replay never reads it. A profile import reads a game folder back and reports
+     which assets match exactly; it does not write into existing tapes (a person can `fork` and
+     replace).
+
+120. **Quantising.** *Reading:* exact colour first, else the nearest entry by a weighted ("redmean")
+     RGB distance in integers; alpha below 128 is transparent; the result says how many pixels were
+     off-palette and the worst distance. A locked palette is the target palette (imports always
+     quantise to it, §3.1). `build` makes a palette of the image's colours in first-seen order (the
+     256 most used when there are more).
+
+121. **Density sets.** *Reading:* a higher copy is an asset of its own: `fork`, `scale <n>` (every
+     layer, frame and stamp, the cell grid, pivot, ground and notes; the footprint keeps its cells)
+     and `density of=<base> d=<n>`, then detailed. The `density` check reduces it and compares with
+     the base (share of the base's pixels that differ, default ≤ 25 %, the copy's blocks flagged);
+     reducers `ink-vote` (ink wins at a quarter, §4.7), `mode`, `nearest`, registrable;
+     `style.density` chooses. The `density` view and a watch-view preview tab show the levels and
+     the reduction. Coverage holds a copy to d times the style's sizes.
+
+122. **Project schemes "written into the tape like the palette"** (§16). *Reading:* `schemes/*.json`
+     are found by name when a `new family` line is first run, and the line records the scheme as
+     `def="<canonical JSON>"`; the family's state keeps it, so replay, maps and exports never read
+     the file.
+
+123. **"A scheme option for rounder inner corners"** (§17). A blob47 inner corner can only be as
+     round as the band is wide: the edges beside it cannot see the corner (the corner rule drops a
+     diagonal when a side next to it is not terrain). *Reading:* the option is `cornerRule:
+     "either"` (a diagonal counts when either side is terrain) plus `fillets: true`: edges with
+     terrain on that diagonal bend into the corner (quadrant kinds `vround`, `hround`), the inner
+     corner's arcs widen, and the outside cell gets the rounding's tip (15 fillet variants keyed by
+     corners, drawn in outside cells; a terrain layer that does not fill its outside draws only
+     their terrain pixels). `family band … fillet=<px>` sets how much wider. 161 + 15 variants.
+     Built-in schemes are unchanged; `blob47-round` ships as the example project's own scheme (it
+     also exercises project schemes). Its coverage map is not tried.
+
+124. **The open sea and the village's notes** (§17). *Reading:* the motif windows now count a filling
+     layer's outside ground. Water and sand variants are the tiles with their layers moved round
+     the torus by different amounts (the colour mix is the base's exactly; the motif and seam
+     checks judge the borders); four looks of the shore mix them. Lanes reach the beach by leaving
+     the lane's outside empty (it is drawn over the ground below; coverage accepts an empty outside
+     over a drawn inside). The straight coast and meadow edge were broken with `terrain` edits.
+
+125. **The sample profile.** *Reading:* `examples/mossy-ruins.pclaw/profiles/bramble.json`, for an
+     invented engine "Bramble" (no names from any real engine): atlas plus CSV in §7.4's column
+     order, levels 1/2/4 with reduction, five role colours (not the engine's), autotile naming in
+     the style of `root_<letters>_<diagonals>`, numbered sets from 1, flagged mirrors, Lua-like
+     snippets.

@@ -1,0 +1,4 @@
+-- Bramble entries written by PixelClaw: paste them into the game's data files.
+overlay "glint" { frames = { "glint_1", "glint_2", "glint_3" }, ticks = { 6, 6, 6 } }
+object "house" { image = "house", size = { 48, 48 }, footprint = { 2, 2 }, anchor = { 0, 1 }, variants = 1 }
+sprite "walker" { frames = { "walker_s1", "walker_s2", "walker_n1", "walker_n2", "walker_e1", "walker_e2" }, ticks = { 12, 12, 12, 12, 12, 12 }, directions = 4, mirror = "W=E", pivot = { 11, 22 } }

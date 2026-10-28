@@ -29,15 +29,15 @@ Status of plan features touched so far. Steps refer to the build plan (§10).
 | Render: `tile3x3` at 1x and 4x | §2 (4) | done | golden `wrap.tile3x3.png` | |
 | Project folder (§7.1): project.json, palettes/, assets/<name>/ | §7.1 | done | `cli.test.ts` | style.md, manifest, schemes, profiles, blobs, exports and reviews come in later steps. |
 | Checkpoints | §7.1, G3 notes | done | `checkpoints.test.ts` (written every 200, loaded from, damaged and stale ones fail verify, removed on restart) | `NNNNNN.gwc`: a header with the tape prefix's SHA-256, then the state bytes. See G4 below. |
-| CLI `new`, `run`, `view`, `check`, `review`, `verify` | §8.1, G1, G5 | done | `cli.test.ts`, `check.test.ts`, `example.test.ts` | `check` exits 1 when a check fails. `export` and `import` come with G9. |
+| CLI `new`, `run`, `view`, `check`, `review`, `verify`, `export`, `import` | §8.1, G1, G5, G9 | done | `cli.test.ts`, `check.test.ts`, `example.test.ts`, `g9.test.ts` | `check` exits 1 when a check fails; `import --profile` exits 1 when an asset reads back differently. |
 | Demo: 24x24 seamless stone floor from a script | G1 | done | `example.test.ts` (verify, plus a rebuild from the script) | `examples/mossy-ruins.pclaw`, script `examples/scripts/stone_floor.pclaw`. |
 | Server package: project I/O moved from the CLI; the single writer (one queue, in-memory states) | §8.1, G2 | done | `mcp.test.ts`, `cli.test.ts` | Every batch from MCP, the CLI or (G3) a page goes through `Writer.run`. |
 | Single writer across processes: `.pixelclaw.lock` | §8.1 | done | `mcp.test.ts` (CLI refuses; lock released on exit) | Pid and URL without the token. CLI `new`/`run` refuse while a live server holds it. |
 | `pixelclaw serve --project <dir> [--port] [--no-mcp]` | §8.2, G2 | done | `mcp.test.ts`, `pack.test.ts` | Creates the project if missing. Stops when stdin closes or on a signal. |
 | MCP over stdio (official TS SDK v2), server instructions | §8.2 | done | `mcp.test.ts` | Serves both protocol eras (2025 `initialize` checked by hand). Instructions carry a command cheat sheet and ask the agent to share the watch link. |
-| MCP `project` | §8.2 | partial | `mcp.test.ts` | Palettes, assets, watch link; open/create another folder; add palette files. Profiles come with G9. |
+| MCP `project` | §8.2 | done | `mcp.test.ts`, `g9.test.ts` | Palettes, assets, watch link; open/create another folder; add palette files; project schemes and export profiles (G9). |
 | MCP `run` | §8.2 | done | `mcp.test.ts`, `g5.test.ts` (server) | One undo group; applied lines, pixels changed, warnings, a check summary, an optional view; errors with line:col apply nothing. |
-| MCP `view` | §8.2, §2 | partial | `mcp.test.ts`, `edits.test.ts`, `g5.test.ts`, `g6.test.ts` (server) | `render`, `grid`, `tile3x3`, `diff`, `game`, `recolour`, `anim`, `map`, `family` (G7); `marks`, `theme`, `ground`, `with`, `size`, `seed`. `density` G9. |
+| MCP `view` | §8.2, §2 | done | `mcp.test.ts`, `edits.test.ts`, `g5.test.ts`, `g6.test.ts` (server) | `render`, `grid`, `tile3x3`, `diff`, `game`, `recolour`, `anim`, `map`, `family` (G7); `marks`, `theme`, `ground`, `with`, `size`, `seed`; `density` (G9). |
 | MCP `history` | §8.2 | done | `mcp.test.ts` | Range by number or last N; undone groups marked. |
 | HTTP + WebSocket on localhost, token | §1.2, §8.1 | done | `mcp.test.ts`, `watch.spec.ts` | 127.0.0.1 only, host-name check, random token for the page, `/api/state` and `/ws`. Port 7417 or the next free one. Small RFC 6455 server side, no dependency. |
 | UI shell: canvas, zoom 1–64x, pixel and cell grids | §8.3, G2 | done | `watch.spec.ts` (canvas equals the core render at two zooms, with and without the grid) | Draws core's `renderFlat`; checkerboard under transparent pixels. Wrap ghosts and onion skin come later. |
@@ -136,10 +136,23 @@ Status of plan features touched so far. Steps refer to the build plan (§10).
 | Texture variants | §4.1, G8 | done | `map.test.ts` (variants break an edge run; the `variant` check), `example.test.ts` | `variant of=<base>`; maps pick per cell. `variant` check (L1 < 0.3, ΔL* < 2). |
 | Map checks: seam, repetition hot spots (edge runs, motifs), footprint, draw order, coverage | §4.11, §14, G8 | done | `map.test.ts`, `g8.test.ts`, `example.test.ts` (the village passes) | Hot spots are cells; `marks=failing` outlines them. |
 | Map views at game scale: whole, region, camera; an object on its ground; map diffs | §4.11, §4.10, G8 | done | `g8.test.ts` | `view map [region=] [camera=x,y]`; `style.camera` (384x216). `changes` on a map: what moved, before and after. |
-| Tiled `.tmx` export | §4.11, G8 | done | `map.test.ts` (every gid is the composed cell's tile; objects with footprints), `g8.test.ts` | MCP `export`, `pixelclaw export`. Godot and `.tsx` wang sets are G9's. |
+| Tiled `.tmx` export | §4.11, G8, G9 | done | `map.test.ts` (every gid is the family tile of the composed cell; objects with footprints), `g8.test.ts` | Since G9 through the `tiled` profile: the ground layers point at the families' `.tsx` wang sets (G8's baked tileset is gone). |
 | Review bundle with scenes | §5, G8 | done | `g8.test.ts` (no method names) | `scenes/<map>.png`, screens at game scale, `cells.txt`; an eighth rubric question. |
 | UI: the map editor (paint terrain, place, move, remove; camera, zoom, hot spots) | §8.3, G8 | done | `map.spec.ts` (each control's logged line; core's composition of the replayed tape equals the canvas; looking logs nothing) | Screenshots `docs/screenshots/g8-*.png`. |
 | Demo: a 40x30 coastal village from the G7 shore plus a meadow and a lane, a 48x48 house, a 24x48 tree and a well; viewed at game scale; repetition hot spots found and fixed with texture variants; a person moves the well in the UI and `changes` reads it; a blind review round | G8 | done | `example.test.ts` (rebuild from scripts, the person's move included; every check passes), `examples/demo-g8-agent.ts` (a headless browser plays the person) | `examples/demo-g8.md`; repetition run 12 · 16/16 → run 4 · 10/16, seam 0.07; review findings in `reviews/2026-10-28-g8/findings.md`, five scene notes left open (sea, sand, straight coast, square corners, lanes short of the beach). |
+| The profile format and engine | §4.9, §7, §17, G9 | done | `profile.test.ts` (round trip through every built-in profile and the sample; names, numbering, mirrors flagged, roles, density pages, snippets; duplicate names refused) | `core/src/profile.ts`; reference in docs/profiles.md. Naming templates, autotile naming per scheme, numbered sets, views, texture variants as frames, oversized as sprites or pieces, role encoding, density levels (authored, reduced or scaled), records CSV or JSON, snippets. |
+| Layouts: loose PNGs, atlas page plus CSV or JSON, sheets, Tiled `.tsx` wang sets and `.tmx`, Godot terrains, Aseprite JSON, `.aseprite` | §4.9, G9 | done | `profile.test.ts` (each built-in profile round-trips; Tiled wang sets and map gids), `map.test.ts`, `g8.test.ts` | Built-in profiles in `core/profiles/`. Godot writes families only (terrains); untested in Godot itself. |
+| The CSV page layout | §7.4, G9 | done | `profile.test.ts` (a hand-worked page: trimmed boxes, crops, frame sizes, pivots at 1x and 2x, shelf packing) | docs/profiles.md "The CSV page layout". |
+| Sample profile with invented names exercising every feature | §17, G9 | done | `profile.test.ts`, `g9.test.ts`, `example.test.ts` | `examples/mossy-ruins.pclaw/profiles/bramble.json` (an invented engine, Bramble). The engine's own profile (§7.4) is for a reader to write. |
+| Import: PNG (quantised, sliced by a grid), `.aseprite`, a profile's export read back by name | §4.9, G9 | done | `g9.test.ts` (a sheet with an off-palette pixel; an .aseprite with layers, ticks and a tag; the sample profile's folder reads back exactly), `profile.test.ts` | New assets start from `import` commands carrying the pixels (`cmd-io.ts`); files kept as `blobs/<sha256>.<ext>`. Profile imports compare, not overwrite. |
+| `.aseprite` read and write | §4.9, §9, G9 | done | `profile.test.ts` (layers, frames, durations, linked cels, tags, views back exactly) | Indexed; index 0 transparent, so 255 colours. Reads RGBA and greyscale too. |
+| PNG reader and inflate in core; quantising | §4.9, G9 | done | `profile.test.ts` (encoder round trip, zlib streams of every block type) | Exact match, then nearest by a weighted RGB distance; palettes built from images. |
+| Density sets: `scale`, `density of=`, the `density` check, a pluggable reducer, the density view | §4.7, §5, G9 | done | `profile.test.ts` (ink-vote, mode and nearest against a hand-made fixture; the check flags the right block), `g9.test.ts`, `density.spec.ts` | Reducers `ink-vote` (default), `mode`, `nearest`; `registerReducer`. `style.density` in project.json. The preview panel's density tab. |
+| Project schemes read and written into the tape | §16, §17, G9 | done | `profile.test.ts` (def= in the line; replays without the file), `g9.test.ts` | `schemes/*.json`; `new family … scheme=<s> def="<json>"`. |
+| Rounder inner corners: a scheme option | §17, G9 | done | `profile.test.ts` (fillet variants resolve), `example.test.ts` | `blob47-round` (cornerRule `either`, vround/hround quadrants, 15 fillets; `family band … fillet=`). Shipped as the example's own scheme; the shore and the meadow use it. |
+| The open sea in the repetition check's motif windows; water and sand variants | §17, G9 | done | `example.test.ts` (the village passes) | `water_b/c/d`, `sand_b/c`, `shore_c/d`. |
+| The village's five open notes closed | §17, G9 | done | `example.test.ts` | Sea, sand stripes, straight coast, square corners, lanes to the beach (the lanes' outside left empty). |
+| Demo: the G6-G8 art through the sample profile into a scratch game folder, read back; the village for Tiled; a sheet re-imported and edited | G9 | done | `examples/demo-g9-agent.ts` (run by hand) | `examples/demo-g9.md`; screenshots `docs/screenshots/g9-*.png`. |
 
 ## Notes for G8
 
@@ -189,3 +202,30 @@ Status of plan features touched so far. Steps refer to the build plan (§10).
   Water and sand variants, and a scheme option for rounder inner corners, would close them.
 - **Objects as variants**: `tree_b` is a variant of `tree`, so a map mixes them per cell; an
   export must write both (and say which cell got which, for a `.tmx` this is baked already).
+
+## Notes for G10
+
+- **Speed**: every CLI call replays every asset (tapes under 200 commands have no checkpoints), and
+  the `blob47-round` families are heavy (176 cells, four frames, four looks of the shore): a CLI
+  run on the example takes about 1.6 s and the example test 50 s. A state cache (the last state
+  bytes beside each tape, checked against the tape's hash) would make the manifest and dashboard
+  of G10 cheap.
+- **Manifest and statuses**: `exported` can be recorded by `export` (the profile and the folder);
+  the `plan` tool can list assets whose last export is older than their tape.
+- **Style-guide defaults**: `style.density` (reducer, ink, share) and the sizes per density level
+  are in place; the master density per project is still `grid` with levels relative to 1x; a
+  4x-first workflow (author 4x, reduce to 1x as a draft) would want an `import` of the reduction.
+- **Consistency** (§5, G10): a recolour shares its source's silhouette (the demo's `walker_sheet`
+  fails readability with IoU 1); palette-swap variants (§4.8) should be recognised as such.
+- **Exports at scale**: the whole example through an atlas profile is one 384-px-wide page 5,700 px
+  tall (the shore's four looks are 2,848 images). Pages per family or a page height limit, and
+  leaving fillet cells out for engines that do not round corners, are profile options to add when a
+  real engine profile asks.
+- **Not built in G9**: GIF and contact-sheet layouts in profiles (§4.9 lists them; the `anim` view
+  writes both), writing an import back into an existing asset's tape (imports create assets;
+  profile imports compare), the encoding margin of §5's palette check (needs the engine's
+  thresholds, so the engine profile), a coverage map for `blob47-round` (161 variants need a large
+  one), Godot and Tiled files opened in the real applications.
+- **The engine's own profile** (§7.4) is for a reader to write outside the repo, from the sample
+  `bramble.json`: CSV columns, `@2x` and `@1x` levels, five-tone `roles`, autotile names (`root`,
+  `root_surrounded`, `root_<letters>_<diagonals>`), numbered sets, Lua snippets.

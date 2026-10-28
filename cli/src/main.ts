@@ -35,7 +35,7 @@ export const USAGE = `pixelclaw: a pixel art editor driven by commands
   pixelclaw run <project> (<script.pclaw> | - | -e "<commands>") [--asset <name>] [--replace] [--by <author>] [--view <mode>]
       Apply commands as one undo group. Any error applies nothing.
       A script that starts with 'new' creates the asset (--replace starts its tape again).
-  pixelclaw view <project> <asset> [render|grid|tile3x3|diff|game|recolour|anim|map|family|all]... [--scale N] [--region x,y,WxH] [--frame N] [--out <dir>]
+  pixelclaw view <project> <asset> [render|grid|tile3x3|diff|game|recolour|anim|map|family|density|all]... [--scale N] [--region x,y,WxH] [--frame N] [--out <dir>]
          [--marks failing|<check>,...] [--theme <name>] [--themes a,b,c] [--ground <tile>] [--with <asset>]... [--size CxR] [--seed N] [--camera x,y]
       Write views (default: <project>/views/<asset>.<mode>.png|txt). The grid is also printed.
       diff shows what the latest group changed; game shows a sprite on its ground at 1x and the
