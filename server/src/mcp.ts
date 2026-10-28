@@ -363,16 +363,19 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
   server.registerTool('review', {
     title: 'Write a blind review bundle',
     description: 'Write a review bundle for a fresh-context reviewer (plan §5): each asset at game scale and with rulers for coordinates, tiles repeated 3x3, ' +
-      'sprites on their ground beside their set, the palette, the style guide and a rubric (readability, cohesion, seams, style-guide fit, defects with coordinates). ' +
+      'sprites on their ground beside their set, autotile families on a map (size and seed choose it) and every variant among its neighbours, the palette, the style guide and a rubric (readability, cohesion, seams, style-guide fit, defects with coordinates). ' +
       'It names no method and no author, so the reviewer judges blind. Hand the folder to a new agent with no other context, ask it to follow rubric.md, ' +
       'then pin its findings on the pixels with note commands.',
     inputSchema: z.object({
       assets: z.array(z.string()).optional().describe('The assets to review (default: all)'),
       name: z.string().regex(/^[a-z0-9][a-z0-9_-]*$/).optional().describe('A name for the set, used in the folder name (default: all)'),
+      size: z.string().regex(/^\d+x\d+$/).optional().describe('Families: the map\'s size in tiles (default 16x12)'),
+      seed: z.number().int().min(1).optional().describe('Families: the random island\'s seed (default 1)'),
     }),
   }, (a) => w.enqueue(() => {
     try {
-      const r = writeReview(w, { assets: a.assets, name: a.name });
+      const [cols, rows] = a.size ? a.size.split('x').map(Number) : [undefined, undefined];
+      const r = writeReview(w, { assets: a.assets, name: a.name, map: { cols, rows, seed: a.seed } });
       return { content: [text(`review bundle: ${r.dir}\n${r.files.length} files: ${r.files.join(', ')}\nGive the folder to a fresh agent: "Review the art in ${r.dir} by following rubric.md in it."`)] };
     } catch (e) {
       return errorResult(e);

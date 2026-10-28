@@ -67,6 +67,19 @@ describe('families through MCP', () => {
     expect(notOverlay.isError).toBe(true);
   });
 
+  it('a review bundle puts each family on a map, with the tile at each place, and every variant among its neighbours', async () => {
+    const r = await call('review', { assets: ['bank', 'glint', 'soil'], name: 'shore', size: '10x8', seed: 3 });
+    const t = texts(r.content);
+    for (const f of ['maps/bank.png', 'maps/bank.gif', 'maps/bank.tiles.txt', 'sets/bank.png', 'tiles/soil.3x3.png', 'rubric.md']) expect(t).toContain(f);
+    expect(t).not.toContain('assets/bank.png');
+    const dir = /review bundle: (\S+)/.exec(t)![1]!;
+    const { readFileSync } = await import('node:fs');
+    const tiles = readFileSync(`${dir}/maps/bank.tiles.txt`, 'utf8');
+    expect(tiles.split('\n').filter((l) => /^ ?\d+: /.test(l)).length).toBe(8);
+    expect(readFileSync(`${dir}/rubric.md`, 'utf8')).toMatch(/<set> map <col>,<row> <x>,<y>/);
+    for (const f of ['rubric.md', 'maps/bank.tiles.txt']) expect(readFileSync(`${dir}/${f}`, 'utf8')).not.toMatch(/claude|pixelclaw|tape|derive|band profile/i);
+  });
+
   it('cuts from a coverage map, and the tapes replay', async () => {
     const r = await call('run', {
       asset: 'cove', commands: 'new family cove 24x24 scheme=blob47 map=14x12\nfamily texture inside from=soil\nfamily texture outside from=pond\nfamily band 3:outside 1:stone4 radius=2 draw=off\nfamily coverage seed=2 fill=on\nfamily cut',

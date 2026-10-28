@@ -7,12 +7,13 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  animGifFrames, drawScaleOf, encodeGif, encodePng, flatten, groundOf, renderAnimSheet, renderGame, renderScaled, renderTile3x3, setOf, type AssetDoc, type Doc,
+  animGifFrames, composeMap, drawScaleOf, encodeGif, encodePng, flatten, groundOf, islandTerrain, mapGifFrames, renderAnimSheet, renderFamilyView, renderGame, renderMap,
+  renderScaled, renderTile3x3, schemeOf, setOf, type AssetDoc, type Doc,
 } from '@pixelclaw/core';
 import { ProjectError } from './project.ts';
 import type { Writer } from './writer.ts';
 
-function rubric(o: { project: string; tiles: string[]; sprites: string[]; animated: string[]; scale: number; tickRate: number; style: string | null }): string {
+function rubric(o: { project: string; tiles: string[]; sprites: string[]; animated: string[]; families: string[]; scale: number; tickRate: number; style: string | null }): string {
   const list = (xs: string[]) => (xs.length ? xs.map((x) => `- ${x}`).join('\n') : '- (none)');
   return `# Review: ${o.project}
 
@@ -28,6 +29,11 @@ You are reviewing pixel art for a game, with fresh eyes. Judge only what you see
 - \`anim/<name>.png\`: each animated asset's frames, one row per sequence (a direction or a named
   loop), each frame with its length in game ticks (${o.tickRate} a second) and the frame before it
   tinted red underneath; \`anim/<name>.gif\` plays them at the game's speed.
+- \`maps/<name>.png\`: each autotile set laid out as a small map at the game's draw scale (${o.scale}x),
+  the way the game will place its tiles; \`maps/<name>.gif\` plays it when anything moves, and
+  \`maps/<name>.tiles.txt\` says which tile is at each column and row of the map.
+- \`sets/<name>.png\`: every tile of each autotile set, each in the middle of the neighbours that
+  call for it (the neighbours dimmed), named.
 - \`palette.md\`: the colours the art uses.${o.style ? '\n- `style.md`: the style guide.' : ''}
 
 Tiles:
@@ -38,6 +44,9 @@ ${list(o.sprites)}
 
 Animated:
 ${list(o.animated)}
+
+Autotile sets (judge them on their maps):
+${list(o.families)}
 
 ## How to judge
 
@@ -56,6 +65,9 @@ Score each part from 1 (poor) to 5 (excellent) and say why in a sentence or two:
 6. **Animation.** Does the motion read (a walk, a shimmer)? Does a figure slide, float or jump
    from frame to frame? Does each loop join its end to its start without a hitch? Do the
    directions of a figure look like one figure, and different enough to tell apart?
+7. **Autotiling.** On each map, does the edge between the two grounds read as one natural edge
+   (a shore, a border), with convincing outer and inner corners? Does the map show the tile grid
+   (lines or blocks every tile), or the same corner piece repeating too obviously?
 
 ## How to report
 
@@ -67,6 +79,13 @@ End with a list of defects, one per line, each pinned to pixels in the asset's o
 <asset> <x>,<y> <w>x<h> "for a region"
 \`\`\`
 
+For a map, point at the tile by its column and row on the map (from 0 at the top left; each
+tile is the set's tile size at 1x), and at the pixel inside that tile:
+
+\`\`\`
+<set> map <col>,<row> <x>,<y> "what is wrong and what to do"
+\`\`\`
+
 Only list what you can point at. If an asset is fine, say so.
 `;
 }
@@ -75,7 +94,7 @@ Only list what you can point at. If an asset is fine, say so.
  * Write a review bundle for some assets (default: all) under reviews/<date>-<name>/ and return
  * its folder and the files written.
  */
-export function writeReview(w: Writer, o: { assets?: string[]; name?: string } = {}): { dir: string; files: string[] } {
+export function writeReview(w: Writer, o: { assets?: string[]; name?: string; map?: { cols?: number; rows?: number; seed?: number } } = {}): { dir: string; files: string[] } {
   const all = w.assetDocs();
   const names = o.assets ?? all.map((a) => a.name);
   const chosen: AssetDoc[] = names.map((n) => {
@@ -95,8 +114,11 @@ export function writeReview(w: Writer, o: { assets?: string[]; name?: string } =
   const style = w.project.json.style;
   const scale = drawScaleOf(style);
   const tiles = chosen.filter((a) => a.doc.wrap);
-  const sprites = chosen.filter((a) => !a.doc.wrap);
+  const families = chosen.filter((a) => a.doc.family);
+  const overlays = chosen.filter((a) => a.doc.overlay).map((a) => a.doc);
+  const sprites = chosen.filter((a) => !a.doc.wrap && !a.doc.family && !a.doc.overlay);
   for (const a of chosen) {
+    if (a.doc.family) continue;
     save(`assets/${a.name}.png`, encodePng(renderScaled(a.doc, { scale: Math.max(4, Math.min(16, Math.floor(256 / Math.max(a.doc.width, a.doc.height)))) })));
     save(`assets/${a.name}.game.png`, encodePng(renderGame([{ doc: a.doc }], { scale })));
   }
@@ -110,7 +132,23 @@ export function writeReview(w: Writer, o: { assets?: string[]; name?: string } =
     const dirs = a.doc.views.length ? a.doc.views.map((v) => ({ doc: a.doc, frame: v.from })) : [{ doc: a.doc }];
     save(`scenes/${a.name}.png`, encodePng(renderGame([...dirs, ...set.map((d) => ({ doc: d }))], { ground: ground?.doc ?? null, scale })));
   }
-  const animated = chosen.filter((a) => a.doc.frameCount > 1);
+  // Autotile sets on a map (their own overlays and the chosen ones playing over it), and every tile among its neighbours.
+  if (families.length) { mkdirSync(join(dir, 'maps'), { recursive: true }); mkdirSync(join(dir, 'sets'), { recursive: true }); }
+  for (const a of families) {
+    const mo = { cols: o.map?.cols ?? 16, rows: o.map?.rows ?? 12, seed: o.map?.seed ?? 1, overlays, scale };
+    save(`maps/${a.name}.png`, encodePng(renderMap(a.doc, mo)));
+    const frames = mapGifFrames(a.doc, { ...mo, tickRate: w.project.json.tickRate ?? 60 });
+    if (frames.length > 1) save(`maps/${a.name}.gif`, encodeGif(frames));
+    const s = schemeOf(a.doc.family!);
+    const m = composeMap(a.doc, islandTerrain(s, mo.cols, mo.rows, mo.seed), 0);
+    const rows = Array.from({ length: mo.rows }, (_, r) => `${String(r).padStart(2)}: ` + Array.from({ length: mo.cols }, (_, c) => {
+      const v = m.variants[r * mo.cols + c];
+      return v === undefined || v === null ? '-' : s.variants[v]!.name;
+    }).join(' '));
+    save(`maps/${a.name}.tiles.txt`, `The tile at each column and row of maps/${a.name}.png ('-': the plain outside ground).\n\n${rows.join('\n')}\n`);
+    save(`sets/${a.name}.png`, encodePng(renderFamilyView(a.doc, { scale: 1 })));
+  }
+  const animated = chosen.filter((a) => a.doc.frameCount > 1 && !a.doc.family);
   const tickRate = w.project.json.tickRate ?? 60;
   if (animated.length) mkdirSync(join(dir, 'anim'), { recursive: true });
   for (const a of animated) {
@@ -129,7 +167,8 @@ export function writeReview(w: Writer, o: { assets?: string[]; name?: string } =
   const styleText = existsSync(styleFile) ? readFileSync(styleFile, 'utf8') : null;
   if (styleText) save('style.md', styleText);
   save('rubric.md', rubric({
-    project: w.project.json.name, tiles: tiles.map((a) => a.name), sprites: sprites.map((a) => a.name), animated: animated.map((a) => a.name), scale, tickRate, style: styleText,
+    project: w.project.json.name, tiles: tiles.map((a) => a.name), sprites: sprites.map((a) => a.name), animated: animated.map((a) => a.name),
+    families: families.map((a) => a.name), scale, tickRate, style: styleText,
   }));
   return { dir, files };
 }
