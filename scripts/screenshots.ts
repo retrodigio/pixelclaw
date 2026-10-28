@@ -1,4 +1,4 @@
-// Screenshots of the watch view for the docs (docs/screenshots/g2-*.png and g3-*.png). Starts a
+// Screenshots of the watch view for the docs (docs/screenshots/g2-*, g3-* and g4-*.png). Starts a
 // server on a temporary project, drives it over MCP like an agent and with the mouse like a
 // person, and photographs the page at a few moments. Nothing is left running.
 //   node scripts/screenshots.ts
@@ -100,9 +100,10 @@ line 37,4 43,11 c=pool ; line 43,4 37,11 c=pool`,
   await drag(page, [[5, 4], [6, 4], [6, 5], [7, 5], [8, 5], [9, 5], [9, 4], [10, 4]], false);
   await page.screenshot({ path: out('g3-pencil') });
   await page.mouse.up();
-  // A rectangle selection moved: one group of three lines on the tape.
+  // A rectangle selection (a select line), moved (a shift line).
   await page.keyboard.press('m');
   await drag(page, [[3, 10], [12, 13]]);
+  await page.waitForTimeout(200);
   await drag(page, [[6, 11], [6, 12]]);
   await page.waitForTimeout(200);
   await page.mouse.move(5, 5);
@@ -156,7 +157,94 @@ line 37,4 43,11 c=pool ; line 43,4 37,11 c=pool`,
   await settled(page);
   await (await tapeRow(page, 6_000)).click();
   await page.screenshot({ path: out('g3-long-tape') });
-  console.log('wrote docs/screenshots/g2-*.png and g3-*.png');
+  await page.close();
+
+  // --- G4: the drawing toolkit.
+  const g4 = await browser.newPage({ viewport: { width: 1400, height: 860 }, deviceScaleFactor: 1 });
+  await g4.goto(`${agent.url}&name=chris`);
+  await g4.getByTestId('status').getByText('live').waitFor();
+  await g4.getByTestId('speed').selectOption('Infinity');
+  const g4script = (f: string) => readFileSync(join(REPO, 'examples', 'scripts', f), 'utf8');
+  // The grass tile, seamless by construction: wrap ghosts show its neighbours.
+  await agent.call('run', { asset: 'grass', commands: g4script('grass.pclaw') });
+  await agent.call('view', { asset: 'grass', mode: 'tile3x3' });
+  await g4.locator('.assets li', { hasText: /^○grass\d/ }).click();
+  await settled(g4);
+  await g4.mouse.move(5, 5);
+  await g4.screenshot({ path: out('g4-grass') });
+  // Two variants: forks before the texture, the same macro with other seeds.
+  for (const f of ['grass_b.pclaw', 'grass_c.pclaw']) {
+    const text = g4script(f);
+    await agent.call('run', { asset: /fork grass (\S+)/.exec(text)![1]!, commands: text });
+  }
+  await agent.call('view', { asset: 'grass_c', mode: 'tile3x3' });
+  await g4.locator('.assets li', { hasText: 'grass_c' }).click();
+  await settled(g4);
+  await g4.locator('[data-testid=eye] img').click();
+  await g4.screenshot({ path: out('g4-variants') });
+  await g4.locator('.modal').click();
+  // The chest: everything up to the merge, so the metal layer is still its own, then the rest.
+  const chest = g4script('chest.pclaw');
+  const cut = chest.indexOf('layer merge metal');
+  await agent.call('run', { asset: 'chest', commands: chest.slice(0, cut) });
+  await g4.locator('.assets li', { hasText: 'chest' }).click();
+  await settled(g4);
+  await g4.mouse.move(5, 5);
+  await g4.screenshot({ path: out('g4-chest-layers') });
+  await agent.call('run', { asset: 'chest', commands: chest.slice(cut), view: 'render' });
+  await settled(g4);
+  await g4.screenshot({ path: out('g4-chest') });
+  // A person on a sprite of their own: a reference layer to trace over, symmetry while drawing.
+  await agent.call('run', { asset: 'mask', commands: `new sprite mask 16x16
+layer add sketch below=main reference
+layer sketch
+ellipse 7,7 r=6x7 c=pool fill
+layer main
+frame add 2 copy=1
+frame add 3 copy=1` });
+  await g4.locator('.assets li', { hasText: 'mask' }).click();
+  await settled(g4);
+  await g4.locator('[data-colour=stone3]').click();
+  await g4.keyboard.press('b');
+  await g4.getByTestId('mirror-x').click();
+  await drag(g4, [[3, 3], [4, 6], [5, 9], [6, 12]]);
+  await g4.waitForTimeout(200);
+  await g4.locator('[data-colour=ink]').click();
+  await drag(g4, [[4, 5], [5, 5], [6, 6]], false);
+  await g4.screenshot({ path: out('g4-symmetry') });
+  await g4.mouse.up();
+  await g4.getByTestId('mirror-x').click();
+  // Selections: a wand selection plus a lasso being drawn (Shift adds).
+  await g4.keyboard.press('w');
+  await drag(g4, [[3, 3]]);
+  await g4.waitForTimeout(200);
+  await g4.keyboard.press('q');
+  await g4.keyboard.down('Shift');
+  await drag(g4, [[9, 2], [14, 3], [13, 9], [9, 8], [10, 5]], false);
+  await g4.screenshot({ path: out('g4-lasso') });
+  await g4.mouse.up();
+  await g4.keyboard.up('Shift');
+  await g4.waitForTimeout(200);
+  // A gradient through the selection, colour A to colour B along the stone ramp.
+  await g4.locator('[data-colour=stone1]').click();
+  await g4.locator('[data-colour=stone5]').click({ button: 'right' });
+  await g4.keyboard.press('Shift+G');
+  await g4.getByTestId('gradient-pattern').selectOption('bayer4');
+  await drag(g4, [[8, 2], [8, 13]]);
+  await g4.waitForTimeout(300);
+  await g4.mouse.move(5, 5);
+  await g4.screenshot({ path: out('g4-gradient') });
+  // Stamps: save the selection as one, and the timeline with frames and layers.
+  await g4.getByTestId('stamp-save').click();
+  await g4.getByTestId('stamp-save-ok').click();
+  await g4.keyboard.press('Escape');
+  await g4.locator('[data-cel="main:2"]').click();
+  await g4.keyboard.press('s');
+  await drag(g4, [[11, 10]]);
+  await g4.waitForTimeout(300);
+  await g4.mouse.move(5, 5);
+  await g4.screenshot({ path: out('g4-stamps-frames') });
+  console.log('wrote docs/screenshots/g2-*.png, g3-*.png and g4-*.png');
 } finally {
   await browser.close();
   await agent.close();

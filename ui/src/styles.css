@@ -197,3 +197,7 @@ input[type='text'], input:not([type]) { font: inherit; color: var(--text); backg
 .tools { grid-template-columns: repeat(6, 1fr); }
 .colour-now .ab { font-size: 10px; font-weight: 700; color: var(--accent); }
 .colour-now .ab.b { color: var(--human); margin-left: 6px; }
+.toolbar { flex-wrap: wrap; row-gap: 4px; }
+.toolbar label, .toolbar button, .toolbar .colour-now, .toolbar .dim { white-space: nowrap; }
+aside.left .swatches { flex: 1 1 auto; min-height: 80px; }
+aside.left .stamps { max-height: 120px; overflow: auto; }
