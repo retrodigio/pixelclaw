@@ -71,11 +71,15 @@ try {
   for (const v of VARIANTS) await agent.call('run', { asset: v, commands: 'variant off' });
   await agent.call('view', { asset: 'village', mode: 'map', marks: 'failing' });
   copyFileSync(join(agent.dir, 'views', 'village.map.png'), out('g8-hotspots'));
+  await page.reload();
+  await page.getByTestId('status').getByText('live').waitFor();
+  await page.locator('.follow input').uncheck();
   await page.locator('.assets li').filter({ has: page.locator('.name', { hasText: /^village$/ }) }).click();
+  await page.getByTestId('map-editor').waitFor();
+  await settled(page);
   await page.getByTestId('map-marks').check();
   await page.mouse.move(5, 5);
-  await settled(page);
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(500);
   await page.screenshot({ path: out('g8-hotspots-ui') });
 } finally {
   await browser.close();

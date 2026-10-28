@@ -427,12 +427,20 @@ export function paintComposed(c: ComposedMap, o: MapDocView = {}): Rgba {
     for (let cy = 0; cy <= r.h; cy++) for (let x = 0; x < w; x++) put(x, Math.min(h - 1, cy * t * s), [0, 0, 0], 0.18);
     for (let cx = 0; cx <= r.w; cx++) for (let y = 0; y < h; y++) put(Math.min(w - 1, cx * t * s), y, [0, 0, 0], 0.18);
   }
+  // Marked cells: the outline of each group of them (edges between a marked and an unmarked cell).
+  const marked = new Set((o.marks ?? []).map(([x, y]) => `${x},${y}`));
+  const on = (x: number, y: number) => marked.has(`${x},${y}`);
+  const th = Math.max(1, s);
   for (const [mx, my] of o.marks ?? []) {
     const x0 = (mx - r.x) * t * s, y0 = (my - r.y) * t * s, e = t * s;
-    for (let k = 0; k < e; k++) for (let d = 0; d < Math.max(1, s); d++) {
-      put(x0 + k, y0 + d, [255, 0, 200]); put(x0 + k, y0 + e - 1 - d, [255, 0, 200]);
-      put(x0 + d, y0 + k, [255, 0, 200]); put(x0 + e - 1 - d, y0 + k, [255, 0, 200]);
+    for (let k = 0; k < e; k++) for (let d = 0; d < th; d++) {
+      if (!on(mx, my - 1)) put(x0 + k, y0 + d, [255, 0, 200]);
+      if (!on(mx, my + 1)) put(x0 + k, y0 + e - 1 - d, [255, 0, 200]);
+      if (!on(mx - 1, my)) put(x0 + d, y0 + k, [255, 0, 200]);
+      if (!on(mx + 1, my)) put(x0 + e - 1 - d, y0 + k, [255, 0, 200]);
     }
+    // A light tint inside, so a large hot spot reads as an area.
+    for (let y = 0; y < e; y += 2) for (let x = (y / 2) % 2 ? 2 : 0; x < e; x += 4) put(x0 + x, y0 + y, [255, 0, 200], 0.7);
   }
   return { width: w, height: h, data };
 }

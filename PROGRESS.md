@@ -126,6 +126,19 @@ Status of plan features touched so far. Steps refer to the build plan (§10).
 | Review bundle with families | §5, G7 | done | `g7.test.ts` (maps, the tile at each place, sets; no author or method names) | `maps/<set>.png` and `.gif`, `maps/<set>.tiles.txt`, `sets/<set>.png`, a seventh rubric question; `--size`, `--seed`. |
 | UI: a family's sheet, variants and map; folding timeline rows | §8.3, §15, G7 | done | `family.spec.ts` (detach, attach, coverage and cut log their commands and core's replay equals the canvas; a stroke on a piece reaches its variants; the views, map controls and folding log nothing) | Screenshots `docs/screenshots/g7-*.png`. |
 | Demo: a shore family (47 variants) from a band profile and three hand-detailed pieces, on a random island with a seam score ≤ 0.5; a blind review round | G7 | done | `example.test.ts` (rebuild from scripts; every check passes), `examples/demo-g7-agent.ts` | `examples/demo-g7.md`; the island (16x12, seed 6) scores 0.18 after the blind review round (`reviews/2026-10-28-g7/findings.md`). |
+| Map documents: a grid of cells holding names; terrain, tiles, objects and overlay layers | §4.11, G8 | done | `map.test.ts` (replay byte-identical with map gen, road, scatter and a note; state bytes round-trip) | `new map <n> <C>x<R> tile=<T>`; `layer add <n> terrain=<family> [outside=on] \| tiles \| objects \| overlay=<o> on=<where>`. The art is read from the named assets when drawn (`MapWorld`), never on the tape. |
+| Terrain painting through the autotile schemes | §4.11, G8 | done | `map.test.ts` (six random terrains: every cell's pixels are the variant `resolveVariant` gives, from the family's sheet) | `terrain <layer> rect\|ellipse\|brush\|fill\|paint\|clear [erase]`; reuses `resolveMap`. Terrains stack (meadow over shore). |
+| Placing tiles and multi-cell objects by name, with footprint collision | §4.10, §4.11, G8 | done | `map.test.ts` (overlaps on one and on two objects layers, off the map, move and remove; replay needs no other asset), `g8.test.ts` (refused through MCP) | `place`, `move`, `remove`; the footprint goes into the line (`cells= anchor=`). A family's variant by name (`shore.ns`). |
+| `map gen`, `road`, `scatter` on maps | §4.11, G8 | done | `map.test.ts` (smoothed land: no one-cell spits, the edge clear) | island, village, dungeon; `scatter <assets> on= off= minDist= fp=`. |
+| Footprints, anchors, block and roof flags | §4.10, G8 | done | `map.test.ts` (normal form; `fit`) | `footprint <C>x<R> [at=] [anchor=] << . b r x >>`; kind `object`. |
+| Draw order: objects by base row, roofs last | §4.10, G8 | done | `map.test.ts` (an overhang that is not a roof; a roof hiding a pole in front) | `draworder` check. |
+| `split` into one-cell pieces and reassembly | §4.10, G8 | done | `map.test.ts` (identity for three assets; flags on the stamp), `g8.test.ts` | `export format=split`: `<name>_<cx>_<cy>.png` + `<name>.stamp.json`. |
+| Texture variants | §4.1, G8 | done | `map.test.ts` (variants break an edge run; the `variant` check), `example.test.ts` | `variant of=<base>`; maps pick per cell. `variant` check (L1 < 0.3, ΔL* < 2). |
+| Map checks: seam, repetition hot spots (edge runs, motifs), footprint, draw order, coverage | §4.11, §14, G8 | done | `map.test.ts`, `g8.test.ts`, `example.test.ts` (the village passes) | Hot spots are cells; `marks=failing` outlines them. |
+| Map views at game scale: whole, region, camera; an object on its ground; map diffs | §4.11, §4.10, G8 | done | `g8.test.ts` | `view map [region=] [camera=x,y]`; `style.camera` (384x216). `changes` on a map: what moved, before and after. |
+| Tiled `.tmx` export | §4.11, G8 | done | `map.test.ts` (every gid is the composed cell's tile; objects with footprints), `g8.test.ts` | MCP `export`, `pixelclaw export`. Godot and `.tsx` wang sets are G9's. |
+| Review bundle with scenes | §5, G8 | done | `g8.test.ts` (no method names) | `scenes/<map>.png`, screens at game scale, `cells.txt`; an eighth rubric question. |
+| UI: the map editor (paint terrain, place, move, remove; camera, zoom, hot spots) | §8.3, G8 | done | `map.spec.ts` (each control's logged line; core's composition of the replayed tape equals the canvas; looking logs nothing) | Screenshots `docs/screenshots/g8-*.png`. |
 
 ## Notes for G8
 
@@ -145,3 +158,25 @@ Status of plan features touched so far. Steps refer to the build plan (§10).
 - **bridge8's north-south single** can only be placed by name: map documents' `place` will need it.
 - **Faces** draw in the cell below the terrain; a map's draw order (§4.10 roofs and canopies)
   should take the face scheme's faces as the first case of art spilling into another cell.
+
+## Notes for G9
+
+- **Export profiles** should take over G8's two stopgap exports: `split` names pieces
+  `<name>_<cx>_<cy>` and writes a stamp JSON; `tmx` bakes every distinct composed tile into one
+  tileset. A profile's naming template (`root_<letters>_<diagonals>`) and the engine's footprint
+  fields (block, roof, anchor, pivot) are already on the assets (`footprint`, `pivot`) and on the
+  split stamp; Tiled `.tsx` wang sets from families and Godot terrains are G9's list.
+- **Variants on export**: a map picks among an asset and its variants per cell (`variant of=`);
+  an engine profile must either export each variant as a numbered frame of one tile
+  (`<name>_<n>`) or bake the map. The `variant` check's border report says which variants keep
+  their base's edges (safe to mix in any order).
+- **Density**: objects are 24-px-grid art (house 48x48, tree 24x48); the `density` check and
+  2x/4x copies should handle oversized assets and their footprints (a 2x house is 96x96 with the
+  same footprint in cells).
+- **Maps and palettes**: a map composes many palettes (merged by name and colour, `MapPalette`);
+  an export of a scene PNG uses that merged palette. Role art on maps is drawn in its own colours
+  (no theme yet).
+- **Project schemes** are still not read (plan question 85); a map's terrain layer reads its
+  family's scheme when drawn, so a project scheme would only need the family's tape to carry it.
+- **Readability of objects on each ground and screen-wide consistency** (§4.11's last map
+  checks) are left for G10's `consistency`.

@@ -197,17 +197,17 @@ export function App({ store }: { store: Store }) {
           })}
           {store.assets.size === 0 && <li className="none">none yet</li>}
         </ul>
-        <div className="panel-title">Tools</div>
-        {!doc?.map && <ToolsPanel ed={ed} disabled={!editable} />}
-        {palette && (
+        {!doc?.map && <><div className="panel-title">Tools</div><ToolsPanel ed={ed} disabled={!editable} /></>}
+        {palette && !doc?.map && (
           <PalettePanel palette={palette} ed={ed} editable={editable} locked={!!doc?.paletteLocked}
             theme={store.theme} themes={store.themes} onTheme={(t) => store.setTheme(t)} />
         )}
-        {doc && <StampsPanel doc={doc} ed={ed} editable={editable} />}
+        {doc && !doc.map && <StampsPanel doc={doc} ed={ed} editable={editable} />}
       </aside>
 
       <main>
         <div className="toolbar">
+          {!doc?.map && (<>
           <button onClick={() => step(-1)} disabled={!doc} title="Zoom out (Ctrl/⌘ + wheel)">−</button>
           <span className="zoom" data-testid="zoom">{doc ? `${effZoom}×` : ''}</span>
           <button onClick={() => step(1)} disabled={!doc} title="Zoom in (Ctrl/⌘ + wheel)">+</button>
@@ -247,6 +247,7 @@ export function App({ store }: { store: Store }) {
               </span>
             </>
           )}
+          </>)}
           <span className="spacer" />
           <button onClick={() => ed.undo()} disabled={!ed.canUndo()} title={`Undo your last edit (Ctrl/⌘+Z): undo by=${store.me}`} data-testid="undo">↶ <span className="xwide-only">Undo</span></button>
           <button onClick={() => ed.redo()} disabled={!ed.canRedo()} title={`Redo your last undo (Ctrl/⌘+Shift+Z): redo by=${store.me}`} data-testid="redo">↷ <span className="xwide-only">Redo</span></button>
@@ -394,7 +395,7 @@ export function App({ store }: { store: Store }) {
           <span className="spacer" />
           <span className="dim" data-testid="waiting">{pending > 0 ? `${pending} to play` : waiting > 0 ? `${waiting} waiting` : ''}</span>
         </div>
-        {shown && <PreviewPanel doc={shown} frame={frame} store={store} marks={marks} />}
+        {shown && !shown.map && <PreviewPanel doc={shown} frame={frame} store={store} marks={marks} />}
         {doc && a && (
           <NotesPanel doc={doc} tape={a.tape} ed={ed} editable={editable} active={ed.activeNote}
             onActive={(id) => { ed.activeNote = id; store.changed(); }} />
