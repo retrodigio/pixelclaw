@@ -14,6 +14,8 @@ in, colours by name), so replaying the tape gives the same pixels even if a defa
 - Options are `key=value`; flags are bare words (`fill`, `outline`).
 - `@cell(cx,cy)` after the command name offsets every coordinate to that cell of the cell grid.
 - On a `wrap=on` document, coordinates past an edge wrap around; otherwise they are clipped.
+- Fractions (`level=`, `density=`) are written `0.25`, `3/16` or `25%`. Ranges are `2..4`.
+- `{ ... }` holds a macro's body (see *Macros*); it may span lines and hold `;`.
 
 ### Colours
 
@@ -35,7 +37,12 @@ floor.pclaw:3:10: error: line: expected an end point x,y
 ### Authors and groups
 
 Every tape line records its author (`by`): `claude` for the agent, `human:<name>` for a person in
-the watch view. Groups are numbered per kind of author, each with its own counter: the agent's
+the watch view. Each author has their own **editing context** in the document: the layer and
+frame they draw on, their selection, their live symmetry and their brush. `layer`, `frame`,
+`select`, `mirror` and `brush` change only the author's own context, so the agent's selection
+never clips a person's strokes, and a person choosing a layer never moves the agent. An author
+who has not chosen draws on the *home* layer and frame (at first the bottom layer, `main`, and
+frame 1; they move with their layer and frame when others are added, moved or removed). Groups are numbered per kind of author, each with its own counter: the agent's
 (and scripts') groups are `g1`, `g2`, …, and people's are `h1`, `h2`, …. One action in the watch
 view (a pencil drag, a fill, a move, a palette edit, a note) is one group.
 
@@ -46,23 +53,64 @@ view (a pencil drag, a fill, a move, a palette edit, a note) is one group.
 | `new <kind> <name> <W>x<H> [palette=] [wrap=] [cell=] [bg=]` | `new tile floor 24x24 palette=mossy-ruins wrap=on cell=24x24 bg=none` | First command of a tape only. Kinds: `tile`, `sprite`, `sheet`, `icon`. `wrap` defaults to `on` for tiles, `off` otherwise. `cell` defaults to the canvas size. `palette` defaults to the project's default palette. |
 | `px <x,y> [<x,y> ...] c=` | `px 3,4 4,4 c=ink` | Single pixels. |
 | `line <x,y> <x,y> [<x,y> ...] c= [pp=on\|off]` | `line 3,10 9,7 c=stone2 pp=on` | A line or polyline. See *Lines* below. |
+| `curve <x,y> <x,y> <x,y> [<x,y>] c= [pp=on\|off]` | `curve 2,20 8,12 16,14 c=soil2 pp=on` | A quadratic (3 points) or cubic (4 points) Bezier. See *Curves and polygons*. |
 | `rect <x,y> <W>x<H> c= [outline\|fill]` | `rect 2,2 20x6 c=stone3 outline` | Outline by default. |
 | `ellipse <cx,cy> r=<RX>x<RY> c= [outline\|fill]` | `ellipse 12,12 r=5x3 c=moss2 outline` | Centre and radii (`r=5` means `r=5x5`); spans `2*RX+1` pixels. |
 | `ellipse <x,y> <W>x<H> c= [outline\|fill]` | `ellipse 2,2 6x4 c=moss2 fill` | Inscribed in a box, so even sizes work. |
+| `polygon <x,y> <x,y> <x,y> [...] c= [outline\|fill]` | `polygon 1,1 14,4 10,14 c=moss2 fill` | Closed. See *Curves and polygons*. |
 | `fill <x,y> c= [mode=contiguous\|global] [conn=4\|8]` | `fill 7,9 c=stone3 mode=contiguous conn=4` | Flood fill (crosses edges on wrap documents). `mode=global` replaces every pixel of that colour. |
 | `paint <x,y> <<` rows `>>` | see below | An ASCII block of palette keys. |
 | `stroke pencil c= [pp=on\|off] <x,y> ...` | `stroke pencil c=ink pp=on 12,4 12,5 13,6` | One freehand drag through the sampled points. See *Strokes*. |
 | `stroke eraser <x,y> ...` | `stroke eraser 3,3 4,4` | The same, clearing to transparent. |
-| `select rect <x,y> <W>x<H>` | `select rect 2,2 6x4` | Select a rectangle. See *Selections*. |
-| `select all`, `select none`, `deselect` | `select all`, `select none`, `deselect` | |
-| `shift <dx,dy>` | `shift 2,-1` | Move the selected pixels (or the whole canvas). |
+| `layer add <name> [above=\|below=<layer>] [reference]` | `layer add rim above=main` | A new empty layer, by default above yours. See *Layers and frames*. |
+| `layer <name>` | `layer rim` | Draw on that layer from now on (you only). |
+| `layer set <name> [hidden=] [locked=] [reference=]` | `layer set rim locked=on` | Each `on` or `off`; only the flags given change. |
+| `layer rename <name> <new>`, `layer move <name> above=\|below=<layer>`, `layer merge <name>`, `layer remove <name>` | `layer move rim below=main` | `merge` draws the layer onto the one below, in every frame, and removes it. |
+| `frame add [<n>] [copy=<m>\|empty]` | `frame add 2 copy=1` | A new frame at position n (default: last), a copy of frame m (default: yours) or empty. Frames count from 1. |
+| `frame <n>` | `frame 2` | Draw on (and see) that frame from now on (you only). |
+| `frame remove <n>`, `frame move <n> to=<m>` | `frame move 3 to=1` | |
+| `select rect <x,y> <W>x<H> [add\|sub\|and]` | `select rect 2,2 6x4` | Select a rectangle. See *Selections*. |
+| `select ellipse <cx,cy> r=<RX>x<RY>`, `select ellipse <x,y> <W>x<H>` | `select ellipse 8,8 r=6x4` | |
+| `select lasso <x,y> <x,y> <x,y> ...` | `select lasso 1,1 14,3 9,14` | A polygon (pixel centres inside, and its edge). |
+| `select wand <x,y> [mode=contiguous\|global] [conn=4\|8]` | `select wand 2,2 mode=contiguous conn=4` | Touching pixels of that palette index on your layer (or all of them). |
+| `select colour c=<colour>` | `select colour c=moss2` | Every pixel of that colour on your layer. |
+| `select layer [<name>]` | `select layer main` | The opaque pixels of a layer (default: yours). |
+| `select all`, `select none`, `select invert`, `deselect` | | |
+| `clear` | `clear` | Clear the selected pixels of your layer (or all of it) to transparent. |
+| `shift <dx,dy> [sel] [wrap]` | `shift 2,-1`, `shift 5,0 wrap` | Move the selected pixels (or your whole layer). See *Transforms*. |
+| `flip h\|v [sel]` | `flip h` | Mirror them within their box. |
+| `rotate 90\|180\|270 [sel]` | `rotate 90` | Clockwise, about the middle of their box. |
+| `mirror [x=<a>] [y=<b>] live` | `mirror x=11.5 live` | Live symmetry: later strokes are mirrored until `mirror off`. See *Symmetry*. |
+| `mirror x=<a> from=left\|right`, `mirror y=<b> from=top\|bottom` | `mirror x=11.5 from=left` | Copy one side over the other, once. |
+| `dither <x,y> <W>x<H> a= b= [pattern=] [level=]` | `dither 0,0 24x8 a=pool b=moss1 pattern=bayer4 level=0.25` | See *Dithering and gradients*. |
+| `gradient <x,y> <W>x<H> ramp= [dir=] [steps=] [pattern=]` | `gradient 0,0 24x24 ramp=moss dir=down steps=5 pattern=none` | |
+| `ramp <name> = <entry> <entry> ...` | `ramp wood = wood0 wood1 wood2` | Define or replace a ramp of this document's palette, darkest first. |
+| `outline c= [mode=outer\|inner] [corners=on\|off] [from=<layer>]` | `outline c=ink mode=outer corners=off` | See *Helpers*. |
+| `shade light= [ramp=<ramp>\|all] [edge=<n>]` | `shade light=nw ramp=wood edge=1` | |
+| `clean orphans [size=<n>] [keep=none\|texture]` | `clean orphans size=1 keep=none` | |
+| `noise [<x,y> <W>x<H>] ramp= ...` | `noise 0,0 24x24 ramp=moss weights=0,3,12,1,0 cluster=1..2 density=0.07 base=moss2 wrap=on seed=7` | See *Generators*. |
+| `scatter [<x,y> <W>x<H>] stamp=\|c= count= ...` | `scatter 0,0 24x24 stamp=tuft count=3 minDist=10 flip=on wrap=on seed=3` | |
+| `voronoi [<x,y> <W>x<H>] cells= ramp= ...` | `voronoi 0,0 24x24 cells=7 ramp=stone weights=1,1,1,1,1,1 gap=ink relax=1 wrap=on seed=5` | |
+| `bricks [<x,y> <W>x<H>] size=<W>x<H> ramp= ...` | `bricks 0,0 24x24 size=8x4 ramp=stone weights=1,1,1,1,1,1 gap=ink offset=4 seed=4` | |
+| `stamp save <name> <x,y> <W>x<H>`, `stamp save <name> <<` rows `>>` | `stamp save tuft 4,4 3x3` | See *Stamps and brushes*. |
+| `stamp <name> <x,y> [flip=none\|h\|v\|hv]` | `stamp tuft 10,12 flip=none` | Placed by its top-left corner. |
+| `stamp remove <name>` | | |
+| `brush square <n>`, `brush circle <n>`, `brush stamp <name>`, `brush off` | `brush circle 3` | |
+| `def <name>(<param>,...) { ... }` | `def tuft(x,y) { px $x,$y c=moss3 }` | A macro. See *Macros*. |
+| `call <name> <args...> [seed=<n>]` | `call tuft 5,18` | |
 | `palette set <entry> hex=#rrggbb` | `palette set stone3 hex=#7a8a80` | Change a colour of this asset's palette. See *Palette edits*. |
-| `palette add [<name>] hex=#rrggbb [key=<k>]` | `palette add gold hex=#e0b040 key=g` | Add a colour to this asset's palette. |
+| `palette add [<name>] hex=#rrggbb [key=<k>]` | `palette add gold hex=#e0b040 key=G` | Add a colour to this asset's palette. |
+| `palette lock`, `palette unlock` | | See *Palette locking*. |
+| `palette save as=<name>` | `palette save as=ruins-props` | Write this asset's palette to the project as a new palette. |
 | `note <x,y> [<W>x<H>] "text"` | `note 12,5 "beak too long" id=n1` | Pin a note to a pixel or a region. See *Notes*. |
 | `note done <id>` | `note done n1` | Close a note. |
 | `undo [group=<g>] [by=<author>]` | `undo group=g4` | See *Undo and redo* below. |
 | `redo [group=<g>] [by=<author>]` | `redo group=h5` | Take back an undo. |
 | `fork <from> <to> [at=<n>]` | `fork chest chest_b at=20` | Start asset `<to>` as a branch of `<from>`. See *Forks*. |
+
+Commands that draw (everything that writes pixels) draw on your layer and frame, clipped by your
+selection, and are refused while your layer is locked: `layer 'rim' is locked (layer set rim
+locked=off to draw on it)`.
 
 ### Lines
 
@@ -111,27 +159,174 @@ Unlike `line`'s polylines, no right angle is kept. `pp=off` keeps every pixel. `
 takes no colour and never drops pixels. A stroke may run past the canvas: it clips, or wraps on a
 `wrap=on` document.
 
+### Layers and frames
+
+Layers are listed bottom to top. The flat image (what views, previews and exports show) takes the
+topmost non-transparent pixel of the **art layers**: those that are neither hidden nor
+`reference`. A reference layer is a guide or an underlay for tracing: views and the watch view
+show it faded underneath the art, and it is never exported. `layer add` puts a new empty layer
+above yours (or `above=`/`below=` another); the normal form always names the place. Layer names
+are letters, digits, `_` and `-` (not `add`, `set`, `rename`, `move`, `merge` or `remove`).
+
+Frames are the animation scaffolding (durations, tags and linked cels come with G6): every layer
+has a cel per frame. `frame add` inserts a copy of your frame (or `copy=m`, or `empty`) and
+`frame <n>` chooses the frame you draw on. Views show the frame the agent draws on (`frame=` in
+the MCP `view`, `--frame` in the CLI); `preview.png` shows frame 1.
+
 ### Selections
 
-`select rect` selects a rectangle (on a `wrap=on` document it may cross an edge and wrap).
-While something is selected, **every drawing command is clipped to it**, flood fills included
-(`fill` starts only inside the selection and never leaves it; `mode=global` replaces only
-selected pixels). `deselect` (or `select none`) ends it; `select all` selects everything.
+Every author has their own selection. While it exists, **every drawing command that author
+writes is clipped to it**, flood fills and generators included (`fill` starts only inside the
+selection and never leaves it; `mode=global` replaces only selected pixels). Nobody else's drawing
+is clipped by it. `deselect` (or `select none`) ends it.
 
-`shift dx,dy` moves the selected pixels by dx,dy, and the selection with them. The pixels left
-behind become transparent; pixels moved past an edge clip, or wrap on a `wrap=on` document. With
-nothing selected, `shift` moves the whole canvas.
+- `select rect`, `select ellipse` (centre and radii, or a box) and `select lasso` (a polygon:
+  pixel centres inside it, plus its edge) select shapes; on a `wrap=on` document they may cross an
+  edge and wrap.
+- `select wand x,y` selects the pixels of that palette index touching x,y on your layer, as it is
+  when the line runs (`conn=8` counts diagonals; `mode=global` takes every pixel of the index).
+  `select colour c=…` is the same as a global wand by colour. `select layer` takes a layer's
+  opaque pixels in your frame.
+- A trailing `add`, `sub` or `and` combines the new shape with your current selection (union,
+  difference, intersection). `select invert` swaps selected and unselected; `select all` selects
+  everything. A selection that ends up empty is no selection.
+- `clear` sets the selected pixels of your layer to transparent.
 
-The watch view's rectangle select stays in the page until it is used. Moving it writes one group:
+The watch view's selection tools write these commands as soon as a selection is made, so a
+selection is undone and redone like any edit.
+
+### Transforms
+
+`shift dx,dy`, `flip h|v` and `rotate 90|180|270` act on the selected pixels of your layer, or, with
+nothing selected, on all of it. The pixels move (transparent ones too); the places they leave
+become transparent; the selection moves with them. Past an edge they clip, or wrap on a `wrap=on`
+document.
+
+- `flip` mirrors them within their bounding box; `rotate` turns them clockwise about the middle of
+  the box (a quarter turn swaps the box's sides, keeping its middle, rounded up and left).
+- `shift dx,dy wrap` wraps within the selection's box, or within the canvas with nothing selected,
+  on any document: `shift 12,0 wrap` moves a tile's seam into its middle, where you can see and
+  fix it, and `shift -12,0 wrap` moves it back.
+- The word `sel` (`shift 0,-1 sel`, `flip h sel`) insists on a selection: with none, the command
+  is refused instead of moving the whole layer.
+
+### Symmetry
+
+`mirror x=11.5 live` turns on live symmetry for you: every later drawing command you write that
+places shapes (`px`, `line`, `curve`, `rect`, `ellipse`, `polygon`, `stroke`, `paint`, `stamp`, and
+`fill`, which starts again at each mirrored point) is drawn again mirrored across the axis, until
+`mirror off`. The axis is a pixel position: `x=11.5` lies between pixels 11 and 12 (the middle of a
+24 px canvas), `x=12` runs through pixel 12. `y=` adds a horizontal axis; with both, strokes are
+drawn four times. `mirror live` alone means the vertical middle. Generators and helpers are not
+mirrored.
+
+`mirror x=11.5 from=left` copies the left half over the right once (`from=right` the other way;
+`y=… from=top|bottom` for a horizontal axis), inside your selection if you have one.
+
+### Curves and polygons
+
+`curve` draws a quadratic Bezier through its first and last points, pulled by the middle one, or a
+cubic with two middle points. It is sampled in exact integer arithmetic (each sample rounded to
+the nearest pixel), joined by pixel-perfect segments, and, with `pp=on`, its doubled L-corners are
+dropped as on a pencil stroke.
+
+`polygon` closes its points. The outline is the closed polyline (pixel-perfect, right angles kept);
+`fill` adds every pixel whose centre is inside (even-odd rule), so the filled shape and its outline
+always agree. With a brush, outlines (`rect`, `ellipse`, `polygon` outline, and lines, curves and
+strokes) draw with it; filled shapes do not.
+
+### Dithering and gradients
+
+Patterns are ordered threshold matrices anchored to the canvas, not to the box, so dithered areas
+line up across a tile's edges and between boxes: `checker`, `bayer2`, `bayer4`, `bayer8`, `hlines`,
+`vlines`.
+
+- `dither x,y WxH a=<colour> b=<colour> pattern=… level=…` paints the box in `a`, with `b` on the
+  share `level` of its pixels (0 to 1; default 0.5; `bayer4` by default).
+- `gradient x,y WxH ramp=<ramp> dir=down|up|right|left|radial steps=<n> pattern=…` runs along a
+  ramp from its first colour to its last (`radial`: from the middle of the box out to its corners).
+  `steps` colours of the ramp are used, spread evenly from first to last (default: all of them).
+  With `pattern=none` (the default) the bands meet with a hard edge; with a pattern, each band
+  dithers into the next. `ramp=` names a palette ramp, or lists entries: `ramp=stone1,stone2,stone4`.
+
+### Ramps
+
+A ramp is an ordered run of palette entries, darkest first (plan §3.1). Palette files define
+ramps; `ramp <name> = <entry> ...` defines or replaces one in this document's palette (entries by
+name or key). Ramps drive `gradient`, `shade`, `noise`, `voronoi`, `bricks` and `clean ...
+keep=texture`, and the watch view's gradient tool.
+
+### Helpers
+
+- `outline c=<colour>` draws a 1-px outline around the shapes on your layer: `mode=outer` (the
+  default) colours the transparent pixels next to a shape; `mode=inner` colours the shape's own
+  edge pixels. `corners=off` (the default) looks at the four side neighbours, `on` at all eight.
+  `from=<layer>` outlines the shapes on another layer, onto yours (an outline layer under the art).
+- `shade light=<n|ne|e|se|s|sw|w|nw>` lights each shape: a pixel whose colour is in a ramp, within
+  `edge` pixels (default 1) of the shape's boundary on the lit side, goes a ramp step lighter; on
+  the far side, a step darker. A shape is a run of pixels of the same ramp; anything else is its
+  boundary. With a diagonal light, both of its sides count (nw: north and west are lit). A pixel
+  lit from one side and shaded from the other (a 1-px part) stays. `ramp=all` (the default) shades
+  each colour along the first ramp it is in.
+- `clean orphans` replaces each pixel whose colour no 4-neighbour shares (a lone pixel; transparent
+  counts as a colour) with the colour most common around it. `size=n` takes clusters of up to n
+  pixels. `keep=texture` keeps a stray that is one ramp step from its surroundings: specks within
+  a material are texture, not mistakes.
+
+### Generators
+
+Every generator writes its seed into the line: give `seed=` to choose one, or leave it out and the
+normaliser picks one (from the command's place on the tape) and records it. The same seed always
+gives the same pixels; another seed is another variant. The box is optional (default: the whole
+canvas). With `wrap=on` (the default on `wrap=on` documents) a generator treats the box as a torus,
+so a texture fills a tile seamlessly by construction.
+
+- `noise ramp=<ramp> weights=<w,...> cluster=a..b density=<share> base=<entry>|keep`: fills the box
+  with `base` (default: the entry with the largest weight; `keep` leaves the pixels as they are),
+  then grows clusters of a..b pixels (default 1..3) in the other ramp colours, chosen by weight,
+  until about `density` of the box is covered (default 0.15).
+- `scatter stamp=<name>[,<name>...] count=<n> minDist=<d>`: places stamps (chosen at random from
+  the list) at points at least `minDist` apart (on a torus with wrap), each by its middle;
+  `flip=on` flips some of them left-right. `c=<colour>` scatters single pixels instead.
+- `voronoi cells=<n> ramp=<ramp> weights=… gap=<colour>|none relax=<n>`: stones. Each pixel
+  belongs to the nearest of n spread-out points (moved `relax` times to their cell's centre,
+  default 1); each cell takes a ramp colour by weight, and `gap` draws 1-px joints between cells.
+  Follow it with `shade` for bevelled stones.
+- `bricks size=<W>x<H> ramp=<ramp> weights=… gap=<colour>|none offset=<n>`: courses of bricks
+  W by H with 1-px joints (included in the size), every other course shifted by `offset` (default
+  half a brick). A box a whole number of bricks wide repeats seamlessly.
+
+### Stamps and brushes
+
+A stamp is a piece of art kept in the document. `stamp save <name> x,y WxH` copies a box of your
+layer (with a selection, unselected pixels are left out); `stamp save <name> <<` takes a paint
+block (`.` and space are transparent). `stamp <name> x,y` draws it with its top-left at x,y; its
+transparent pixels leave the canvas alone; `flip=h|v|hv` mirrors it. `scatter` places stamps
+procedurally, and `brush stamp <name>` draws with one's shape.
+
+`brush square <n>` and `brush circle <n>` (1 to 32 px) make lines, curves, strokes, single pixels
+and outlines draw a square or round dot at every pixel; `brush stamp <name>` draws the stamp's
+opaque shape, in the command's colour; `brush off` (or size 1) goes back to single pixels. The
+brush is yours alone and stays until you change it.
+
+### Macros
 
 ```
-select rect 4,7 6x5
-shift 2,1
-deselect
+def tuft(x,y) { px $x,$y $x+1,$y-1 c=moss3 ; px $x+2,$y c=moss2 }
+call tuft 5,18
 ```
 
-and drawing inside it wraps the drawing command in `select rect …` / `deselect` the same way.
-More selection kinds (ellipse, lasso, wand, by colour) come in G4.
+`def` keeps a body of commands in the document; `call` runs it with values for its parameters (a
+point `5,18` fills two). In the body, `$x` is a parameter, `$x+1` is arithmetic on it (`+ - * /`,
+left to right, `/` rounding down), and `$(x*2+y)` is any integer expression of the parameters.
+Words work too: `def row(y,c) { line 0,$y 23,$y c=$c }` then `call row 4 moss1`. A body may span
+lines and call other macros (8 deep at most); it may not hold `new`, `fork`, `undo`, `redo`, `note`
+or `def`. The `def` is checked when it is written (its body must parse).
+
+The tape records the `def` (body normalised: shared indentation removed) and each `call` as one
+line, not its expansion; replay expands it again. A generator in a body without `seed=` takes
+its seed from the call's: the call's line then records `seed=<n>`, and `call … seed=<n>` with
+another number gives another variant of the whole macro.
 
 ### Palette edits
 
@@ -147,6 +342,19 @@ reordered (pixels store entry numbers); the names on the tape stay valid.
   punctuation). The normal form always records both.
 
 `#` would start a comment after a space, so colours are written as `hex=#…`.
+
+### Palette locking
+
+`palette lock` locks this document's palette: `palette set`, `palette add` and `ramp` are refused
+(`palette 'mossy-ruins' is locked (palette unlock to change it)`) until `palette unlock`. Colours
+outside the palette are always refused (`c=#ff00ff is not in palette 'mossy-ruins'`), locked or
+not. Importing images (G9) will quantise to a locked palette.
+
+`palette save as=<name>` writes this document's palette, as it is at that line, to the project as
+`palettes/<name>.json`, for other assets to use (`new ... palette=<name>`). It is refused if the
+project already has a different palette of that name, because every tape made with that palette
+would then replay differently; saving an identical one again is fine. The line stays on the tape
+as a record; replay does not write the file again, and undoing it does not remove the file.
 
 ### Notes
 
@@ -223,7 +431,9 @@ changes a branch. `asset.json` records the link: `"links": [{"fork": {"from": "c
   up to 60 changes as `x,y from→to` by entry name. By default it shows what the latest group
   changed; the MCP `view` takes `since=<n>` and `changes` uses the agent's read position.
 
-Views are written to `<project>/views/<asset>.<mode>.png` (or `.txt`), or to `--out <dir>`.
+Views show the art layers of one frame (`--frame N`, default 1 in the CLI; the agent's frame in
+MCP), with visible reference layers faded underneath in `render`. Views are written to
+`<project>/views/<asset>.<mode>.png` (or `.txt`), or to `--out <dir>`.
 
 ## The tape
 
@@ -237,15 +447,26 @@ Views are written to `<project>/views/<asset>.<mode>.png` (or `.txt`), or to `--
 `by` is the author (the CLI's `--by`, default `claude`; `human:<name>` from the watch view), and
 `at` is stamped by the writer. Replay ignores both, except that `undo by=` and `redo by=` are
 resolved by author when first written (the tape records the group they chose).
-`pixelclaw verify` checks four things:
+`pixelclaw verify` checks five things:
 
 - every line replays and is still in normal form;
 - two replays give the same bytes;
-- the result matches the state hash in `asset.json`;
-- the result re-renders to the committed `preview.png`.
+- the result matches the state hash in `asset.json` (a hash written before G4, in the older state
+  format, is accepted until the asset is saved again);
+- the result re-renders to the committed `preview.png`;
+- every checkpoint matches the replay at its point, byte for byte, and none is missing.
+
+### Checkpoints
+
+Every 200 commands the writer saves `checkpoints/NNNNNN.gwc`: the document after the first N
+commands. The file is a header line, `PCLAWCKPT 1 <N> <sha256 of those N tape lines>`, then the
+document's state bytes (the same bytes the state hash in `asset.json` is taken of: palette, layers,
+frames, every cel, each author's context, notes, stamps and macros). Loading an asset starts from
+the newest checkpoint whose tape lines still match and replays only the rest. Starting a tape
+again removes its checkpoints.
 
 ## Seeds
 
-Commands that use randomness (the generators from G4 on) take `seed=<n>`. If it is left out, the
-normaliser picks one from the command's tape position and writes it into the logged line, so a
-replay never depends on a default.
+Commands that use randomness (`noise`, `scatter`, `voronoi`, `bricks`, and `call` when its macro
+uses them) take `seed=<n>`. If it is left out, the normaliser picks one from the command's tape
+position and writes it into the logged line, so a replay never depends on a default.

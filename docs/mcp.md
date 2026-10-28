@@ -113,6 +113,7 @@ when the checks exist (G5).
 | `scale` | 1..64, optional | `render` and `diff`. Default: about 192 px on the long side. |
 | `region` | string, optional | `grid` only: `"x,y WxH"`, e.g. `"8,0 12x10"`. |
 | `since` | integer, optional | `diff` only: compare with the document after this command (default: before the latest group). |
+| `frame` | integer from 1, optional | `render`, `grid`, `tile3x3`: the frame to show. Default: the frame the agent draws on (`frame <n>`). |
 
 Images come back inline (`image/png`) with a line giving their size and the file they were saved
 to (`<project>/views/<asset>.<mode>.png`, overwritten each time). The grid comes back as text and
@@ -189,9 +190,15 @@ Open the link (with its token). The page shows:
   and their source). With **follow** on (the default), the view moves to whichever asset the
   agent is drawing on once the current one has caught up. Follow turns off when you start editing,
   so the canvas never switches away under you.
-- **Tools** and the **palette** (left), for editing; see below.
+- **Tools**, the **palette** and the document's **stamps** (left), for editing; see below.
 - **The canvas**: zoom 1–64x (−/+, Fit, or Ctrl/⌘ + wheel), a pixel grid from 4x (stronger every
-  8 px) and the cell grid (magenta) on sheets. Transparent pixels show as a grey checkerboard.
+  8 px) and the cell grid (magenta) on sheets. Transparent pixels show as a grey checkerboard;
+  visible reference layers show faded underneath. On wrap documents, **wrap ghosts** show half a
+  tile of the neighbouring copies all round (you can draw on them; the strokes wrap). Your
+  selection has marching ants, other authors' selections are tinted, and live symmetry shows
+  its axes as dashed guides.
+- **The timeline** (under the canvas): layers (top first) by frames. Click a cel to draw on that
+  layer and frame; the flags beside a layer toggle hidden, locked and reference.
 - **The tape** (right): every command, grouped by undo group and coloured by author (the agent in
   orange, people in blue). The list is virtualised, so a tape of 10,000 lines scrolls freely. Each batch plays command by command at the chosen speed
   (1–60 commands a second, or instant); the line being drawn is highlighted and lines still to play
@@ -224,14 +231,45 @@ travelling.
 | Rectangle | U | `rect x,y WxH c=… outline` (F toggles `fill`) |
 | Ellipse | Shift+U | `ellipse x,y WxH c=… outline` (F toggles `fill`) |
 | Fill | G | `fill x,y c=…` |
-| Colour picker | I, or Alt+click | nothing: it picks the colour you draw with |
-| Rectangle select | M | nothing until used: drag inside it to move (`select rect …; shift dx,dy; deselect`), Delete clears it (`rect … c=none fill`), Esc lets go; drawing inside it is clipped to it |
-| Move | V | `shift dx,dy` (the selection, or everything); arrow keys nudge by 1 |
+| Gradient | Shift+G | drag from where colour A starts to where colour B ends: `gradient <your selection's box, or the canvas> ramp=<A to B along their ramp> dir=… pattern=…` |
+| Dither | D | drag a box: `dither x,y WxH a=<B> b=<A> pattern=… level=…` |
+| Colour picker | I, or Alt+click | nothing: it picks colour A |
+| Rectangle select | M | `select rect x,y WxH`; drag inside it to move it (`shift dx,dy`) |
+| Ellipse select | Shift+M | `select ellipse x,y WxH` |
+| Lasso | Q | `select lasso x,y x,y …` (the drag, straight runs merged) |
+| Magic wand | W | `select wand x,y mode=contiguous\|global conn=4` (on your layer; **whole colour** in the options bar is `global`) |
+| Move | V | `shift dx,dy` (your selection, or your whole layer); arrow keys nudge by 1 |
+| Stamp | S | click: `stamp <name> x,y` (the stamp chosen in **Stamps**, centred on the click) |
 | Note | N | click a pixel or drag a region, write, **Pin note**: `note x,y [WxH] "text"` |
 
-- **Palette**: click a swatch to draw with it (`none` draws transparent). Double-click a swatch to
-  change its colour (`palette set`), or **+** to add one (`palette add`). These edit the shown
-  asset's palette, on its tape.
+With the selection tools, Shift adds to your selection and Alt subtracts (`… add`, `… sub`).
+Selections are commands at once and they are yours alone: they clip only your drawing, and
+Ctrl/⌘+Z takes them back like any edit (as in Aseprite). Esc or Ctrl/⌘+D writes `deselect`,
+Ctrl/⌘+A `select all`, Ctrl/⌘+Shift+I `select invert`; Delete clears the selected pixels (`clear`).
+
+The **options bar** under the toolbar holds the tool's options (filled, pixel-perfect, the brush
+shape and size, whole colour, the gradient and dither patterns and level), **mirror** ⇹ ⇵ (live
+symmetry across the middle, with guides on the canvas), and actions on your selection or, with
+nothing selected, your whole layer: flip ⇋ (Shift+H) and ⇵ (Shift+V), rotate 90° (Shift+R),
+outline in colour A (`outline c=…`), and `clean orphans`.
+
+Your **layer, frame, symmetry and brush** are kept in the page. When they differ from yours in the
+document, your next edit starts with the lines that set them (`layer rim`, `frame 2`, `mirror
+x=11.5 live`, `brush square 2`, or `mirror off`, `brush off`), in the same group. So choosing a
+layer or turning symmetry on writes nothing by itself, and never changes what the agent draws on.
+
+- **Palette**: click a swatch for colour A (drawing), right-click for colour B (the end of a
+  gradient, the ground of a dither); X swaps them. `none` draws transparent. Double-click a swatch
+  to change its colour (`palette set`), or **+** to add one (`palette add`). **lock** writes
+  `palette lock` (then editing is off until **unlock**).
+- **Stamps**: the document's stamps; click one, then click the canvas (S). **+ from selection**
+  saves your selection's box as a new stamp (`stamp save <name> x,y WxH`; unselected pixels are
+  left out).
+- **Timeline**: **+** adds a layer above yours (`layer add <name> above=…`), ↑ ↓ move yours
+  (`layer move`), ⤓ merges it into the one below (`layer merge`), ✕ removes it; the flags write
+  `layer set <name> hidden=|locked=|reference=on|off`; double-click a name to rename it. Frames:
+  ◀ ▶ (or [ and ]) step through them, **+** adds a copy of yours after it (`frame add n copy=m`),
+  ✕ removes it.
 - **Undo / Redo** (buttons, Ctrl/⌘+Z, Ctrl/⌘+Shift+Z or Ctrl+Y) take back only your own groups:
   they write `undo by=human:<you>` and `redo by=human:<you>`, which the tape records as
   `undo group=h3` and `redo group=h7`.

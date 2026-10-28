@@ -241,3 +241,102 @@ Points where the plan was unclear or silent. Each has the reading that was follo
     *Reading:* an in-memory `Timeline` in core (a snapshot every 100 commands, checked against the
     tape) serves time travel in the page and earlier states in the writer (`changes`, the diff,
     forks). Checkpoint files stay a stub until load time needs them.
+
+## G4
+
+41. **Selections per author** (G3 item 30's open point).
+    *Reading:* every author has their own editing context in the document: the layer and frame
+    they draw on, their selection, their live symmetry and their brush. `layer`, `frame`, `select`,
+    `mirror` and `brush` change only the author's own; drawing uses the author's. An author with no
+    context draws on a *home* layer and frame (at first layer 1 `main`, frame 1), which move with
+    their layer and frame when others are inserted, moved or removed, so adding a reference layer
+    below does not move anyone onto it. Replay uses each line's `by` for this (before G4 it ignored
+    `by` except when `undo by=` was first written).
+
+42. **Layer order, and what "reference" means for views.** §3.2: "composited top-first";
+    reference layers are "never exported; used for underlays and guides".
+    *Reading:* layers are listed bottom to top; the flat art is the topmost opaque pixel of the
+    visible non-reference layers. Views and the watch view show visible reference layers faded
+    under the art (the agent traces over them, §3.4); the grid view, `preview.png` and the state
+    show only art. A locked layer refuses drawing commands (an error, nothing applied); hidden ones
+    may still be drawn on.
+
+43. **Frames scaffolding.** §3.3 has `frame add 2 copy=1 ; frame 2`.
+    *Reading:* frames count from 1 in the language. `frame add [<n>] [copy=<m>|empty]` defaults to
+    the end and to a copy of the author's frame; `frame <n>` chooses the author's frame. Views take
+    a frame (MCP `frame`, default the agent's; CLI `--frame`); `preview.png` is frame 1. Durations,
+    tags, linked cels and onion skin are G6.
+
+44. **What transforms act on.** `flip h sel ; rotate 90 ; shift 5,0 wrap`.
+    *Reading:* the author's selection, or with none their whole layer (not every layer). The word
+    `sel` insists on a selection. `shift … wrap` wraps within the selection's box, or the canvas,
+    on any document (on wrap documents a plain shift already wraps at the canvas edge). `rotate`
+    is clockwise about the middle of the box, rounded up and left.
+
+45. **`mirror … live` and a mirror without `live`.**
+    *Reading:* `live` turns on symmetry for the author's later commands that place shapes (px,
+    lines, curves, shapes, strokes, paint, stamps; fill starts again at the mirrored point), not
+    generators or helpers, until `mirror off`. Without `live`, `mirror x=… from=<side>` copies one
+    side over the other once. Axes are whole or half pixel positions; `mirror live` alone means the
+    vertical middle (written into the line).
+
+46. **What palette locking adds**, since every colour already had to be in the palette (G1).
+    *Reading:* `palette lock` refuses `palette set`, `palette add` and `ramp` until `palette
+    unlock`; the "not in palette" refusal is as before. Quantising imports to a locked palette comes
+    with import (G9). `palette save as=<name>` (G3 notes: save a palette back) writes a new project
+    palette and refuses to replace a different one: `new … palette=<name>` reads the project's
+    palette again on every replay, so changing a palette file changes every tape made with it.
+    *For later:* snapshotting the palette into the tape's `new` line would make tapes independent of
+    palette files; it changes the `new` normal form, so it is left as a question.
+
+47. **The generators' parameters.** §3.3 sketches `noise … weights=1,6,2 cluster=2..4
+    density=0.12`, `scatter stamp=… count=5 minDist=6`, and §3.4 "Voronoi stones and bricks".
+    *Reading:* `noise` fills the box with a base colour (the heaviest-weighted entry, or `base=`,
+    or `keep`) and grows clusters of the other ramp colours, by weight, until `density` of the box
+    is covered. `scatter` places stamps (or single pixels, `c=`) by their middle at points at
+    least `minDist` apart (Poisson-like rejection). `voronoi` is cells of the nearest of n
+    spread-out points (one Lloyd relaxation by default), each a ramp colour, with optional 1-px
+    gaps; `bricks` is courses with joints. All take `wrap=on|off` (default: the document's) and
+    work on a torus when on. Wave and ripple bands (§3.4) are not in G4's list and are left for later.
+
+48. **`shade` and `clean`.** `shade light=nw ramp=wood edge=1`, `clean orphans keep=texture`.
+    *Reading:* `shade` treats a run of pixels of one ramp as a shape; within `edge` pixels of its
+    boundary on the lit side a pixel goes one ramp step lighter, on the far side one darker (a
+    diagonal light counts both its sides; a pixel lit and shaded at once stays). `clean orphans`
+    gives each pixel (or cluster up to `size=`) that shares no 4-neighbour's colour the colour most
+    common around it; `keep=texture` keeps strays one ramp step from that colour.
+
+49. **Brushes.** G4 lists "stamps and brushes"; the plan does not define brushes.
+    *Reading:* `brush square|circle <n>` and `brush stamp <name>` give the author a brush that
+    outline-like commands draw with (px, line, curve, stroke, and the outlines of rect, ellipse
+    and polygon); filled shapes and generators ignore it. Stamps are kept in the document.
+
+50. **Macros on the tape.** `def tuft(x,y) { … }`, `call tuft 5,18`.
+    *Reading:* `def` is a line on the tape (body normalised) and the macro is document state; each
+    `call` is one line, expanded again on replay. `$x`, `$x+1` (left to right) and `$(…)` integer
+    expressions; words are allowed as values. Generators inside take seeds from the call's
+    `seed=`, which is then written into the call's line (so another seed is another variant of
+    the whole macro). Macros cannot hold `new`, `fork`, `undo`, `redo`, `note` or `def`.
+
+51. **Selections and context in the watch view** (changes G3 item 30).
+    *Reading:* since selections are now per author, the page writes them at once (`select …`;
+    Shift adds, Alt subtracts; Esc `deselect`), so they undo like any edit, as in Aseprite. Moving
+    writes `shift`, Delete writes `clear`. The layer, frame, symmetry and brush chosen in the page
+    are sent with the person's next edit, only when they differ from theirs in the document, so
+    choosing them writes nothing by itself.
+
+52. **Checkpoint files** (G1 item 9, G3 item 40).
+    *Reading:* every 200 commands (the count of tape lines), `checkpoints/NNNNNN.gwc` holds a
+    header line with N and the SHA-256 of those N tape lines, then the state bytes. The writer
+    loads from the newest one whose prefix matches, and `verify` compares each with the replay.
+    The state bytes became complete (`PCLAWDOC 2`: ramps, lock, layers' flags, contexts, home,
+    stamps, macros) so a checkpoint can be loaded; `verify` still accepts an `asset.json` hash in
+    the G1-G3 format until the asset is saved again. Undo now replays from in-memory snapshots
+    kept as the tape is written (G3 notes), not from the start.
+
+53. **"A seamless grass tile with two variants".** §4.1 has `variant add from=sand seed=…` and an
+    acceptance rule on colour mix; G4 does not list variants.
+    *Reading:* the demo makes variants with what G4 has: the texture is a macro, and each variant
+    forks the tape after the macro is defined and calls it with another seed. The demo prints the
+    three colour mixes side by side; `variant add` and its acceptance rule are left for G5/G7 with
+    the seam and consistency checks.
