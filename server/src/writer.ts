@@ -7,7 +7,7 @@ import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   CHECK_IDS, TapeCursor, Timeline, activeGroups, checkContextFor, drawScaleOf, groundOf, paletteToJson, parse, projectThemes, replay, runBatch,
-  runChecks, setOf, type AssetDoc, type AssetState, type CheckId, type CheckResult, type Diag, type Doc, type Note, type Palette, type Pt,
+  flaggedOn, runChecks, setOf, type AssetDoc, type AssetState, type CheckId, type CheckResult, type Diag, type Doc, type Note, type Palette, type Pt,
   type TapeEntry, type Theme, type Token,
 } from '@pixelclaw/core';
 import {
@@ -31,10 +31,16 @@ export interface ViewRequest extends Omit<ViewOptions, 'marks' | 'theme' | 'them
   with?: string[];
 }
 
+/** Run summaries check every frame up to this many pixels (width x height x frames), else only the frame being drawn on. */
+export const SUMMARY_BUDGET = 1 << 18;
+
 export interface CheckRequest {
   checks?: CheckId[];
-  /** 0-based frame (default the first). */
+  /** 0-based frame (default: every frame). */
   frame?: number;
+  /** Over this many pixels (width x height x frames), check only the `focus` frame (run summaries). */
+  budget?: number;
+  focus?: number;
   ground?: string;
   ref?: string;
   set?: string[];
@@ -421,7 +427,7 @@ export class Writer {
     const doc = this.doc(asset);
     if (o.frame !== undefined && (o.frame < 0 || o.frame >= doc.frameCount)) throw new ProjectError(`frame ${o.frame + 1} does not exist (frames 1..${doc.frameCount})`);
     const { ctx, problems } = checkContextFor(asset, doc, this.assetDocs(), this.project.json.style, (n) => this.project.palettes.get(n), o);
-    return { results: runChecks(doc, o.checks ?? CHECK_IDS, ctx), problems };
+    return { results: runChecks(doc, o.checks ?? CHECK_IDS, { ...ctx, budget: o.budget, focus: o.focus }), problems };
   }
 
   /**
@@ -437,12 +443,12 @@ export class Writer {
     if (req.theme) o.theme = this.themeNamed(req.theme);
     if (req.marks) {
       const ids = req.marks === 'failing' ? undefined : req.marks;
-      const rs = this.checks(asset, { checks: ids, frame: req.frame }).results;
+      const rs = this.checks(asset, { checks: ids }).results;
       const seen = new Set<string>();
       const marks: Pt[] = [];
       for (const r of rs) {
         if (req.marks === 'failing' && r.status !== 'fail') continue;
-        for (const p of r.flagged) if (!seen.has(String(p))) { seen.add(String(p)); marks.push(p); }
+        for (const p of flaggedOn(r, req.frame ?? 0)) if (!seen.has(String(p))) { seen.add(String(p)); marks.push(p); }
       }
       o.marks = marks;
     }

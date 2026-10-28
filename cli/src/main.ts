@@ -7,6 +7,7 @@ import {
   AssetExistsError, NoAssetError, ProjectError, VIEW_MODES, Writer, assetDir, checkpointNames, createProject, formatChecks, isViewMode, listAssets,
   loadProject, lockHolder, paletteSource, parseRegion, prefixHash, previewPng, readAssetJson, readCheckpoints, readPaletteFile,
   readTape, sha256, writeReview, type Project, type ViewMode,
+  SUMMARY_BUDGET,
 } from '@pixelclaw/server';
 
 export interface Io {
@@ -120,7 +121,7 @@ function apply(io: Io, proj: Project, text: string, source: string, o: { asset?:
   io.out(`${r.asset}: applied ${r.added.length} command${r.added.length === 1 ? '' : 's'} as group ${r.group}; ${r.changed} px changed\n`);
   io.out(`  tape: ${r.commands} commands in ${r.groups} group${r.groups === 1 ? '' : 's'}; preview: ${join(r.dir!, 'preview.png')}\n`);
   for (const wn of r.warnings) io.out(`  warning: ${wn}\n`);
-  io.out(`  ${checkSummary(w.checks(r.asset).results)}\n`);
+  io.out(`  ${checkSummary(w.checks(r.asset, { budget: SUMMARY_BUDGET }).results)}\n`);
   return { code: 0, doc: r.doc };
 }
 
@@ -206,7 +207,7 @@ function cmdCheck(io: Io, p: Parsed): number {
     if (bad.length) failing++;
     io.out(formatChecks(name, results, problems, frame) + '\n');
     if (p.flags.has('marks') && bad.length) {
-      const v = w.view(name, w.doc(name).wrap ? 'tile3x3' : 'render', { frame, marks: bad });
+      const v = w.view(name, w.doc(name).wrap ? 'tile3x3' : 'render', { frame: frame ?? results.find((r) => r.status === 'fail')?.frame, marks: bad });
       io.out(`  wrote ${v.path}\n`);
     }
   }

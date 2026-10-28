@@ -3,13 +3,14 @@
 // guide), and the pixels it flags. Checks never change the document; they are pure functions of
 // the art, so the server, the CLI and the watch view all get the same answers.
 
+import { opposite, sequences } from './anim.ts';
 import { TRANSPARENT, flatten, type Doc } from './doc.ts';
 import { rgbOf, type Palette } from './palette.ts';
 import type { Pt } from './raster.ts';
 import { hasRoles } from './themes.ts';
 import { rampsOf } from './values.ts';
 
-export const CHECK_IDS = ['palette', 'orphans', 'jaggies', 'banding', 'outline', 'seam', 'coverage', 'readability', 'revert', 'repetition'] as const;
+export const CHECK_IDS = ['palette', 'orphans', 'jaggies', 'banding', 'outline', 'seam', 'coverage', 'readability', 'revert', 'repetition', 'anim', 'views'] as const;
 export type CheckId = (typeof CHECK_IDS)[number];
 
 export function isCheckId(s: string): s is CheckId {
@@ -29,6 +30,8 @@ export interface CheckPart {
 export interface FlagGroup {
   label: string;
   pts: Pt[];
+  /** The frame (0-based) the pixels are on, when the check looked at more than one. */
+  frame?: number;
 }
 
 export interface CheckResult {
@@ -45,6 +48,20 @@ export interface CheckResult {
   groups: FlagGroup[];
   detail: string;
   parts?: CheckPart[];
+  /** Checked over several frames: the frame (0-based) the score and detail come from. */
+  frame?: number;
+}
+
+/** The flagged pixels on one frame (groups without a frame are on every frame). */
+export function flaggedOn(r: CheckResult, frame: number): Pt[] {
+  if (!r.groups.some((g) => g.frame !== undefined)) return r.flagged;
+  const seen = new Set<number>();
+  const out: Pt[] = [];
+  for (const g of r.groups) {
+    if (g.frame !== undefined && g.frame !== frame) continue;
+    for (const p of g.pts) { const k = p[1] * 65536 + p[0]; if (!seen.has(k)) { seen.add(k); out.push(p); } }
+  }
+  return out;
 }
 
 /** The style guide's part in checking: allowed colours, the outline colours and thresholds. */
@@ -65,8 +82,15 @@ export interface CheckStyle {
 }
 
 export interface CheckContext {
-  /** The frame to check (0-based; default the first). */
+  /** The frame to check (0-based). Unset: every frame (the checks of one image run on each). */
   frame?: number;
+  /**
+   * Checking every frame costs width x height x frames; above this many pixels only the `focus`
+   * frame is checked (the run summary on large canvases). Unset: no limit.
+   */
+  budget?: number;
+  /** The frame to check when over the budget (default the first). */
+  focus?: number;
   style?: CheckStyle;
   /** readability: the ground the sprite usually stands on (a tile, repeated under it). */
   ground?: Doc | null;
@@ -95,6 +119,11 @@ const DEFAULTS: Record<CheckId, { all: Params } & Partial<Record<string, Params>
   // The most visible stripe when tiled: a band of rows or columns lighter or darker than the
   // rest, ΔL* times the square root of its width.
   repetition: { all: { max: 3 } },
+  // Frame diff share (changed pixels over the silhouette; the pilot's good pairs changed 16-19 %),
+  // pivot drift and ground drift in pixels, silhouette area jumps, and the loop seam.
+  anim: { all: { minDiff: 0.08, maxDiff: 0.35, maxPivot: 1, maxGround: 0, maxArea: 0.15 }, tile: { minDiff: 0.03 } },
+  // Views must differ from each other (by colour, over both silhouettes) by at least this share.
+  views: { all: { min: 0.2 } },
 };
 
 /** A check's thresholds for a document kind: defaults, then the style guide's. */
@@ -901,10 +930,158 @@ function checkRepetition(img: Img, p: Params, ctx: CheckContext): CheckResult {
 
 // --- all together
 
+// --- anim
+
+const pct = (v: number): string => `${fmt(v * 100, 1)}%`;
+
+function checkAnim(img: Img, p: Params): CheckResult {
+  const d = img.doc;
+  if (d.frameCount < 2) return skip('anim', 'one frame');
+  const seqs = sequences(d).filter((s) => !s.mirror && s.frames.length >= 2);
+  if (!seqs.length) return skip('anim', 'no sequence of two frames or more (mirror views follow their source)');
+  const tile = isTile(d);
+  const flat: Uint16Array[] = [];
+  const px = (f: number) => (flat[f] ??= flatten(d, f));
+  const opaque = (f: number) => px(f).reduce((n, v) => n + (v !== TRANSPARENT ? 1 : 0), 0);
+  const ptsWhere = (f: number, keep: (i: number) => boolean): Pt[] => {
+    const out: Pt[] = [];
+    for (let i = 0; i < d.width * d.height; i++) if (keep(i)) out.push(ptOf(img, i));
+    return out;
+  };
+  const [minD, maxD, maxPivot, maxGround, maxArea] = [p.minDiff, p.maxDiff, p.maxPivot, p.maxGround, p.maxArea].map(Number) as [number, number, number, number, number];
+  const groups: FlagGroup[] = [];
+  const shares: { s: string; a: number; b: number; v: number; seam: boolean }[] = [];
+  let pivot = 0, pivotAt = '', ground = 0, groundAt = '', area = 0, areaAt = '';
+  for (const s of seqs) {
+    const fs = s.frames;
+    const pairs = fs.slice(1).map((b, k) => ({ a: fs[k]!, b, seam: false }));
+    if (s.loop === 'cycle' && fs.length >= 3) pairs.push({ a: fs.at(-1)!, b: fs[0]!, seam: true });
+    for (const { a, b, seam } of pairs) {
+      const A = px(a);
+      const B = px(b);
+      let changed = 0, union = 0;
+      for (let i = 0; i < A.length; i++) {
+        if (A[i] !== TRANSPARENT || B[i] !== TRANSPARENT) union++;
+        if (A[i] !== B[i]) changed++;
+      }
+      const v = union ? changed / union : 0;
+      shares.push({ s: s.name, a, b, v, seam });
+      if (v < minD || v > maxD) {
+        const what = v < minD ? (changed ? 'too little changes (it barely moves)' : 'the frames are the same (a held frame: give it more ticks instead)') : 'too much changes (it jumps)';
+        groups.push({ label: `${s.name} ${seam ? 'loop seam ' : ''}${a + 1}→${b + 1}: ${pct(v)} of the pixels change; ${what}`, pts: ptsWhere(b, (i) => A[i] !== B[i]), frame: b });
+      }
+      if (!tile) {
+        const na = opaque(a), nb = opaque(b);
+        const j = Math.max(na, nb) ? Math.abs(na - nb) / Math.max(na, nb) : 0;
+        if (j > area) { area = j; areaAt = `${s.name} ${a + 1}→${b + 1}`; }
+        if (j > maxArea) groups.push({ label: `${s.name} ${a + 1}→${b + 1}: the silhouette ${nb > na ? 'grows' : 'shrinks'} by ${pct(j)}`, pts: ptsWhere(b, (i) => (A[i] === TRANSPARENT) !== (B[i] === TRANSPARENT)), frame: b });
+      }
+    }
+    if (tile) continue;
+    // Pivot drift: the silhouette's centre column, frame to frame. Ground drift: the lowest row.
+    const cx = fs.map((f) => {
+      let sx = 0, n = 0;
+      px(f).forEach((v, i) => { if (v !== TRANSPARENT) { sx += i % d.width; n++; } });
+      return n ? sx / n : 0;
+    });
+    const low = fs.map((f) => {
+      const a = px(f);
+      for (let y = d.height - 1; y >= 0; y--) for (let x = 0; x < d.width; x++) if (a[y * d.width + x] !== TRANSPARENT) return y;
+      return -1;
+    });
+    const mean = cx.reduce((x, y) => x + y, 0) / cx.length;
+    const drift = Math.max(...cx) - Math.min(...cx);
+    if (drift > pivot) { pivot = drift; pivotAt = s.name; }
+    if (drift > maxPivot) {
+      const k = cx.reduce((best, v, j) => (Math.abs(v - mean) > Math.abs(cx[best]! - mean) ? j : best), 0);
+      const F = px(fs[k]!), first = px(fs[k === 0 ? 1 : 0]!);
+      groups.push({ label: `${s.name} frame ${fs[k]! + 1}: the sprite sits ${fmt(cx[k]! - mean, 1)} px off the sequence's centre (it slides; drift ${fmt(drift, 1)} px)`, pts: ptsWhere(fs[k]!, (i) => F[i] !== TRANSPARENT && first[i] === TRANSPARENT), frame: fs[k]! });
+    }
+    const ref = d.ground ?? low[0]!;
+    fs.forEach((f, k) => {
+      const g = Math.abs(low[k]! - ref);
+      if (low[k]! < 0) return;
+      if (g > ground) { ground = g; groundAt = `${s.name} frame ${f + 1}`; }
+      if (g > maxGround) {
+        const F = px(f);
+        groups.push({ label: `${s.name} frame ${f + 1}: the lowest row is ${low[k]}, the ground is ${ref} (${low[k]! < ref ? 'it floats' : 'it sinks'})`, pts: ptsWhere(f, (i) => Math.floor(i / d.width) === low[k] && F[i] !== TRANSPARENT), frame: f });
+      }
+    });
+  }
+  const inner = shares.filter((x) => !x.seam);
+  const lo = Math.min(...inner.map((x) => x.v));
+  const hi = Math.max(...inner.map((x) => x.v));
+  const seams = shares.filter((x) => x.seam);
+  const parts: CheckPart[] = [
+    { name: 'frame diff', value: hi, limit: `${pct(minD)}–${pct(maxD)}`, pass: lo >= minD && hi <= maxD, detail: `pairs change ${pct(lo)}..${pct(hi)} of their pixels` },
+  ];
+  if (seams.length) {
+    const bad = seams.filter((x) => x.v < minD || x.v > maxD);
+    const w = bad[0] ?? seams[0]!;
+    parts.push({ name: 'loop seam', value: w.v, limit: `${pct(minD)}–${pct(maxD)}`, pass: !bad.length, detail: `${w.s} ${w.a + 1}→${w.b + 1} changes ${pct(w.v)}` });
+  }
+  if (!tile) {
+    parts.push({ name: 'pivot drift', value: pivot, limit: `≤ ${maxPivot} px`, pass: pivot <= maxPivot, detail: `${fmt(pivot, 1)} px${pivotAt ? ` (${pivotAt})` : ''}` });
+    parts.push({ name: 'ground drift', value: ground, limit: `≤ ${maxGround} px`, pass: ground <= maxGround, detail: `${ground} px${groundAt ? ` (${groundAt})` : ''} from ${d.ground !== null ? `the ground line ${d.ground}` : 'the first frame\'s lowest row'}` });
+    parts.push({ name: 'area jump', value: area, limit: `≤ ${pct(maxArea)}`, pass: area <= maxArea, detail: `${pct(area)}${areaAt ? ` (${areaAt})` : ''}` });
+  }
+  const worst = shares.reduce((w, x) => (Math.max(minD - x.v, x.v - maxD) > Math.max(minD - w.v, w.v - maxD) ? x : w), shares[0]!);
+  const fail = parts.some((x) => !x.pass);
+  return result('anim', {
+    status: fail ? 'fail' : 'pass', score: worst.v, shown: pct(worst.v), limit: `${pct(minD)}–${pct(maxD)}`, groups, parts,
+    detail: `${seqs.map((s) => s.name).join(', ')}: ` + parts.map((x) => `${x.name} ${x.detail}${x.pass ? '' : ` (limit ${x.limit})`}`).join('; '),
+  });
+}
+
+// --- views
+
+function checkViews(img: Img, p: Params): CheckResult {
+  const d = img.doc;
+  const vs = d.views.filter((v) => !v.mirror);
+  if (vs.length < 2) return skip('views', 'fewer than two views (a mirror view counts as its source)');
+  const min = Number(p.min);
+  const pairs: { a: string; b: string; v: number }[] = [];
+  for (let i = 0; i < vs.length; i++) for (let j = i + 1; j < vs.length; j++) {
+    const a = vs[i]!, b = vs[j]!;
+    if (opposite(a.name) === b.name) continue;
+    const A = flatten(d, a.from), B = flatten(d, b.from);
+    let diff = 0, union = 0;
+    for (let k = 0; k < A.length; k++) {
+      if (A[k] !== TRANSPARENT || B[k] !== TRANSPARENT) union++;
+      if (A[k] !== B[k]) diff++;
+    }
+    pairs.push({ a: a.name, b: b.name, v: union ? diff / union : 0 });
+  }
+  if (!pairs.length) return skip('views', 'only views facing each other (they are meant to be mirror images)');
+  const worst = pairs.reduce((w, x) => (x.v < w.v ? x : w));
+  return result('views', {
+    status: worst.v >= min ? 'pass' : 'fail', score: worst.v, shown: pct(worst.v), limit: `≥ ${pct(min)}`,
+    detail: pairs.map((x) => `${x.a}/${x.b} differ by ${pct(x.v)}`).join(', ') + (worst.v < min ? `; ${worst.a} and ${worst.b} look too alike` : ''),
+  });
+}
+
 const RUNNERS: Record<CheckId, (img: Img, p: Params, ctx: CheckContext) => CheckResult> = {
   palette: checkPalette, orphans: checkOrphans, jaggies: checkJaggies, banding: checkBanding, outline: checkOutline,
   seam: checkSeam, coverage: checkCoverage, readability: checkReadability, revert: checkRevert, repetition: checkRepetition,
+  anim: checkAnim, views: checkViews,
 };
+
+/** Checks of the whole document (every frame at once); the others read one frame's image. */
+const WHOLE = new Set<CheckId>(['coverage', 'anim', 'views']);
+
+/** One check's results on several frames as one: the worst frame's score, every frame's pixels. */
+function mergeFrames(id: CheckId, rs: { f: number; r: CheckResult }[], note: string): CheckResult {
+  const live = rs.filter((x) => x.r.status !== 'skip');
+  if (!live.length) return rs[0]!.r;
+  const low = live[0]!.r.limit.startsWith('≥');
+  const bad = live.filter((x) => x.r.status === 'fail');
+  const pool = bad.length ? bad : live;
+  const w = pool.reduce((a, b) => ((b.r.score ?? 0) * (low ? -1 : 1) > (a.r.score ?? 0) * (low ? -1 : 1) ? b : a));
+  const groups = live.flatMap((x) => x.r.groups.map((g) => ({ ...g, label: `frame ${x.f + 1}: ${g.label}`, frame: x.f })));
+  const failing = bad.length > 1 ? ` (fails on frames ${bad.map((x) => x.f + 1).join(', ')})` : '';
+  const out = result(id, { ...w.r, groups, detail: `frame ${w.f + 1}: ${w.r.detail}${failing}${note}`, frame: w.f });
+  return out;
+}
 
 /**
  * Run checks on one frame of a document (all of them by default). A check that does not apply
@@ -912,11 +1089,25 @@ const RUNNERS: Record<CheckId, (img: Img, p: Params, ctx: CheckContext) => Check
  * off (`"off": true`) comes back as `skip`.
  */
 export function runChecks(doc: Doc, ids: readonly CheckId[] = CHECK_IDS, ctx: CheckContext = {}): CheckResult[] {
-  const img = image(doc, ctx.frame ?? 0);
+  let frames = ctx.frame !== undefined ? [ctx.frame] : Array.from({ length: doc.frameCount }, (_, f) => f);
+  let note = '';
+  if (frames.length > 1 && ctx.budget !== undefined && doc.width * doc.height * doc.frameCount > ctx.budget) {
+    const f = Math.min(ctx.focus ?? 0, doc.frameCount - 1);
+    frames = [f];
+    note = ` (frame ${f + 1} of ${doc.frameCount} only: a large canvas; \`check\` covers every frame)`;
+  }
+  const imgs = new Map<number, Img>();
+  const img = (f: number) => imgs.get(f) ?? imgs.set(f, image(doc, f)).get(f)!;
   return ids.map((id) => {
     const p = checkParams(id, doc.kind, ctx.style, doc.name);
     if (p.off === true) return skip(id, 'turned off in the style guide');
-    return RUNNERS[id](img, p, ctx);
+    if (WHOLE.has(id)) return RUNNERS[id](img(frames[0]!), p, ctx);
+    if (frames.length === 1 && doc.frameCount === 1) return RUNNERS[id](img(frames[0]!), p, ctx);
+    if (frames.length === 1) {
+      const r = RUNNERS[id](img(frames[0]!), p, { ...ctx, frame: frames[0] });
+      return r.status === 'skip' ? r : mergeFrames(id, [{ f: frames[0]!, r }], note);
+    }
+    return mergeFrames(id, frames.map((f) => ({ f, r: RUNNERS[id](img(f), p, { ...ctx, frame: f }) })), note);
   });
 }
 

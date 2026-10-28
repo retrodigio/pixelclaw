@@ -14,7 +14,7 @@ export function formatPoints(pts: readonly Pt[], limit = COORDS_SHOWN): string {
 export function formatChecks(asset: string, results: CheckResult[], problems: string[] = [], frame?: number): string {
   const run = results.filter((r) => r.status !== 'skip');
   const failing = run.filter((r) => r.status === 'fail');
-  const out = [`${asset}${frame ? ` frame ${frame + 1}` : ''}: ${failing.length ? `${failing.length} of ${run.length} checks failing` : `all ${run.length} checks pass`}`];
+  const out = [`${asset}${frame !== undefined ? ` frame ${frame + 1}` : ''}: ${failing.length ? `${failing.length} of ${run.length} checks failing` : `all ${run.length} checks pass`}`];
   for (const r of results) {
     if (r.status === 'skip') { out.push(`  –  ${r.id.padEnd(11)} skipped: ${r.detail}`); continue; }
     out.push(`  ${r.status === 'pass' ? '✓' : '✗'}  ${r.id.padEnd(11)} ${r.shown.padEnd(6)} ${r.limit.padEnd(7)} ${r.detail}`);

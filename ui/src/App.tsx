@@ -3,7 +3,7 @@
 // here: every action becomes a command on the tape with their name (plan §1.3).
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { ctxOf } from '@pixelclaw/core';
+import { ctxOf, flaggedOn } from '@pixelclaw/core';
 import { CanvasView, ZOOMS } from './CanvasView.tsx';
 import { Editor, PATTERN_NAMES } from './editor.ts';
 import { CheckChips, CheckDetails, PreviewPanel } from './Checks.tsx';
@@ -68,7 +68,7 @@ export function App({ store }: { store: Store }) {
   const mirrorShown = doc && (ed.mirrorX || ed.mirrorY) ? { x2: ed.mirrorX ? doc.width - 1 : null, y2: ed.mirrorY ? doc.height - 1 : null } : null;
   // Checks run on the document as shown (not on a drag's preview), with the project's style guide.
   const checks = shown ? store.checksFor(shown, frame) : [];
-  const marks = checks.filter((r) => store.marked.has(r.id)).flatMap((r) => r.flagged);
+  const marks = checks.filter((r) => store.marked.has(r.id)).flatMap((r) => flaggedOn(r, frame));
   const openCheck = checks.find((r) => r.id === store.openCheck && store.marked.has(r.id));
   const toggle = (f: () => void) => {
     f();

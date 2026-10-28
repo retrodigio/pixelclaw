@@ -8,7 +8,7 @@ import { ProjectError, listAssets, readPaletteFile } from './project.ts';
 import { formatChecks } from './report.ts';
 import { writeReview } from './review.ts';
 import { VIEW_MODES, parseRegion, type View, type ViewMode } from './views.ts';
-import type { AssetChanges, Writer } from './writer.ts';
+import { SUMMARY_BUDGET, type AssetChanges, type Writer } from './writer.ts';
 
 /** The author name every MCP batch is written with, and whose read position `changes` keeps. */
 export const AGENT = 'claude';
@@ -191,7 +191,8 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
         out.push(`tape: ${r.commands} commands in ${r.groups} groups`);
       }
       out.push(r.warnings.length ? `warnings: ${r.warnings.join('; ')}` : 'warnings: none');
-      if (r.doc) out.push(checkSummary(w.checks(r.asset, { frame: ctxOf(r.doc, AGENT).frame }).results));
+      // Every frame, unless the canvas is large: then the frame being drawn on (`check` covers all).
+      if (r.doc) out.push(checkSummary(w.checks(r.asset, { budget: SUMMARY_BUDGET, focus: ctxOf(r.doc, AGENT).frame }).results));
       const content: CallToolResult['content'] = [text(out.join('\n'))];
       if (a.view && r.doc) {
         const v = w.view(r.asset, a.view, { frame: ctxOf(r.doc, AGENT).frame });
@@ -305,7 +306,7 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
     inputSchema: z.object({
       asset: z.string().optional().describe('The asset to check (default: every asset, one summary line each)'),
       checks: z.array(z.enum(CHECK_IDS)).optional().describe('Only these checks (default: all)'),
-      frame: z.number().int().min(1).optional().describe('The frame to check (default: the frame you are drawing on)'),
+      frame: z.number().int().min(1).optional().describe('Only this frame (default: every frame; flagged pixels name their frame)'),
       ground: z.string().optional().describe('readability: the ground tile (default: the style guide\'s, else the first tile)'),
       ref: z.string().optional().describe('revert: the reference asset the art must not simply copy'),
       set: z.array(z.string()).optional().describe('readability: the assets its silhouette must differ from (default: same kind and size)'),
@@ -323,11 +324,13 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
         });
         return { content: [text(lines.length ? lines.join('\n') : 'no assets yet')] };
       }
-      const frame = a.frame !== undefined ? a.frame - 1 : ctxOf(w.doc(a.asset), AGENT).frame;
-      const { results, problems } = w.checks(a.asset, { checks: a.checks, frame, ground: a.ground, ref: a.ref, set: a.set });
-      const content: CallToolResult['content'] = [text(formatChecks(a.asset, results, problems, w.doc(a.asset).frameCount > 1 ? frame : undefined))];
+      const only = a.frame !== undefined ? a.frame - 1 : undefined;
+      const { results, problems } = w.checks(a.asset, { checks: a.checks, frame: only, ground: a.ground, ref: a.ref, set: a.set });
+      const content: CallToolResult['content'] = [text(formatChecks(a.asset, results, problems, w.doc(a.asset).frameCount > 1 ? only : undefined))];
       const failing = results.filter((r) => r.status === 'fail').map((r) => r.id);
       if (a.image ?? failing.length > 0) {
+        // The image shows the frame of the first failing check (or the one asked for).
+        const frame = only ?? results.find((r) => r.status === 'fail')?.frame ?? ctxOf(w.doc(a.asset), AGENT).frame;
         const v = w.view(a.asset, w.doc(a.asset).wrap ? 'tile3x3' : 'render', { frame, marks: failing.length ? failing : undefined });
         w.showEye(a.asset, v);
         content.push(...viewContent(v));

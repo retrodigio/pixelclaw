@@ -39,6 +39,9 @@ function initialAuthor(): string {
 
 export type Status = 'connecting' | 'open' | 'closed';
 
+/** The page checks every frame up to this many pixels (width x height x frames), as the run summary does. */
+export const CHECK_BUDGET = 1 << 18;
+
 /** Commands per second; Infinity plays a batch at once. */
 export const SPEEDS = [1, 2, 4, 8, 16, 32, 60, Infinity] as const;
 
@@ -70,7 +73,7 @@ export class Store {
   /** The check whose details are open under the toolbar. */
   openCheck: CheckId | null = null;
   private styleVersion = 0;
-  private checkCache: { key: string; results: CheckResult[] } | null = null;
+  private checkCache: { key: string; asset: string; at: number; results: CheckResult[] } | null = null;
   /** Assets in the order their batches arrived and have not played yet. */
   private queue: string[] = [];
   private travelCache: { key: string; doc: Doc | null } | null = null;
@@ -376,18 +379,24 @@ export class Store {
   }
 
   /**
-   * The checks of the shown document, with the project's style guide (the same answers the
-   * agent's `check` gets). Kept until the document, the other assets or the style change.
+   * The checks of the shown document over every frame, with the project's style guide (the same
+   * answers the agent's `check` gets). Kept until the document, the other assets or the style
+   * change. On large canvases only the frame shown is checked (as in the agent's run summary), and
+   * while commands play they are worked out again at most twice a second.
    */
   checksFor(doc: Doc, frame: number): CheckResult[] {
     const a = this.current;
     if (!a) return [];
     let total = 0;
     for (const x of this.assets.values()) total += x.cursor.done.length;
-    const key = `${a.name}:${this.travel}:${a.cursor.done.length}:${frame}:${total}:${this.styleVersion}`;
+    const large = doc.width * doc.height * doc.frameCount > CHECK_BUDGET;
+    const key = `${a.name}:${this.travel}:${a.cursor.done.length}:${large ? frame : ''}:${total}:${this.styleVersion}`;
     if (this.checkCache?.key !== key) {
-      const { ctx } = checkContextFor(a.name, doc, this.assetDocs(), this.style, (n) => this.palettes.get(n), { frame });
-      this.checkCache = { key, results: runChecks(doc, CHECK_IDS, ctx) };
+      const now = performance.now();
+      const busy = this.pending(a) > 0 && this.checkCache?.asset === a.name;
+      if (large && busy && now - this.checkCache!.at < 500) return this.checkCache!.results;
+      const { ctx } = checkContextFor(a.name, doc, this.assetDocs(), this.style, (n) => this.palettes.get(n));
+      this.checkCache = { key, asset: a.name, at: now, results: runChecks(doc, CHECK_IDS, { ...ctx, budget: CHECK_BUDGET, focus: frame }) };
     }
     return this.checkCache.results;
   }
