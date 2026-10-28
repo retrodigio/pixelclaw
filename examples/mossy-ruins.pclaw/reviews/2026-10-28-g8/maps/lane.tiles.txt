@@ -1,0 +1,14 @@
+The tile at each column and row of maps/lane.png ('-': the plain outside ground).
+
+ 0: - - - - - - - - - - - - - - - -
+ 1: - - - - - - - - - - - - - - - -
+ 2: - - - - - - - es esw sw - - s - - -
+ 3: - - - - es esw esw nesw nesw nsw - es nsw - - -
+ 4: - - - e nesw nesw nesw nesw nesw nsw - nes nesw w - -
+ 5: - - - - ne nesw nesw nesw new nesw esw nesw nw - - -
+ 6: - - - - - nes nesw nsw - nes nesw nsw - - - -
+ 7: - - - - - nes nesw nsw - ne nesw nesw sw - - -
+ 8: - - - - - nes nesw nsw - - nes nesw nesw ew w -
+ 9: - - - - - ne nesw nesw esw esw nesw new nw - - -
+10: - - - - - - ne new new new nw - - - - -
+11: - - - - - - - - - - - - - - - -

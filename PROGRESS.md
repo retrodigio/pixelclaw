@@ -139,6 +139,7 @@ Status of plan features touched so far. Steps refer to the build plan (§10).
 | Tiled `.tmx` export | §4.11, G8 | done | `map.test.ts` (every gid is the composed cell's tile; objects with footprints), `g8.test.ts` | MCP `export`, `pixelclaw export`. Godot and `.tsx` wang sets are G9's. |
 | Review bundle with scenes | §5, G8 | done | `g8.test.ts` (no method names) | `scenes/<map>.png`, screens at game scale, `cells.txt`; an eighth rubric question. |
 | UI: the map editor (paint terrain, place, move, remove; camera, zoom, hot spots) | §8.3, G8 | done | `map.spec.ts` (each control's logged line; core's composition of the replayed tape equals the canvas; looking logs nothing) | Screenshots `docs/screenshots/g8-*.png`. |
+| Demo: a 40x30 coastal village from the G7 shore plus a meadow and a lane, a 48x48 house, a 24x48 tree and a well; viewed at game scale; repetition hot spots found and fixed with texture variants; a person moves the well in the UI and `changes` reads it; a blind review round | G8 | done | `example.test.ts` (rebuild from scripts, the person's move included; every check passes), `examples/demo-g8-agent.ts` (a headless browser plays the person) | `examples/demo-g8.md`; repetition run 12 · 16/16 → run 4 · 10/16, seam 0.07; review findings in `reviews/2026-10-28-g8/findings.md`, five scene notes left open (sea, sand, straight coast, square corners, lanes short of the beach). |
 
 ## Notes for G8
 
@@ -180,3 +181,11 @@ Status of plan features touched so far. Steps refer to the build plan (§10).
   family's scheme when drawn, so a project scheme would only need the family's tape to carry it.
 - **Readability of objects on each ground and screen-wide consistency** (§4.11's last map
   checks) are left for G10's `consistency`.
+- **Open notes from the G8 review** (on the village): the open sea is one water tile (the
+  `repetition` motif measure leaves out a filling layer's outside ground, plan question 109; the
+  reviewer saw its diagonal weave), the sand's darkest mark lines up on the beach, the coast and
+  the meadow's edges run straight with near-square inner corners (blob47's inner corner is as
+  round as the band is wide), and the lanes stop short of the beach (a lane's outside is grass).
+  Water and sand variants, and a scheme option for rounder inner corners, would close them.
+- **Objects as variants**: `tree_b` is a variant of `tree`, so a map mixes them per cell; an
+  export must write both (and say which cell got which, for a `.tmx` this is baked already).

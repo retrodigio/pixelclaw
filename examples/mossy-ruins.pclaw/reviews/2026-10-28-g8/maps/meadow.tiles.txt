@@ -1,0 +1,14 @@
+The tile at each column and row of maps/meadow.png ('-': the plain outside ground).
+
+ 0: - - - - - - - - - - - - - - - -
+ 1: - - - - - - - - - - - - - - - -
+ 2: - - - - - - - es_se esw_se_sw sw_sw - - s - - -
+ 3: - - - - es_se esw_se_sw esw_se_sw nesw_ne_se_sw nesw_ne_se_sw_nw nsw_sw_nw - es_se nsw_sw - - -
+ 4: - - - e nesw_ne_se nesw_ne_se_sw_nw nesw_ne_se_sw_nw nesw_ne_se_sw_nw nesw_ne_se_sw_nw nsw_sw_nw - nes_ne_se nesw_sw_nw w - -
+ 5: - - - - ne_ne nesw_ne_se_nw nesw_ne_se_sw_nw nesw_ne_sw_nw new_ne_nw nesw_se_nw esw_se_sw nesw_ne_sw nw_nw - - -
+ 6: - - - - - nes_ne_se nesw_ne_se_sw_nw nsw_sw_nw - nes_ne_se nesw_ne_se_sw_nw nsw_sw_nw - - - -
+ 7: - - - - - nes_ne_se nesw_ne_se_sw_nw nsw_sw_nw - ne_ne nesw_ne_se_nw nesw_se_sw_nw sw_sw - - -
+ 8: - - - - - nes_ne_se nesw_ne_se_sw_nw nsw_sw_nw - - nes_ne_se nesw_ne_se_sw_nw nesw_sw_nw ew w -
+ 9: - - - - - ne_ne nesw_ne_se_nw nesw_se_sw_nw esw_se_sw esw_se_sw nesw_ne_sw new_ne_nw nw_nw - - -
+10: - - - - - - ne_ne new_ne_nw new_ne_nw new_ne_nw nw_nw - - - - -
+11: - - - - - - - - - - - - - - - -

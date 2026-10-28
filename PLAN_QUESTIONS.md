@@ -716,3 +716,10 @@ Points where the plan was unclear or silent. Each has the reading that was follo
      rectangle, erase, place, move, remove; camera, zoom and hot spots only for looking); layers
      are added with the command line (`layer add …`), and the timeline is hidden for maps. A map's
      `changes` diff shows the composed cells before and after and says what moved.
+
+109. **What the blind review found that the checks did not.** The reviewer saw the open sea's
+     single water tile as a woven lattice; `repetition` leaves a filling layer's outside ground out
+     of its motif windows (so the sea, one tile everywhere, does not fail every map). *Reading:* kept
+     for G8 (the sea is G6's tile and is checked as a tile), noted on the village for water
+     variants; a lighter weight for open ground rather than none is a choice for A1. The reviewer
+     also asked whether lanes may use the sand ramp: the style guide now says lanes are beaten sand.

@@ -440,7 +440,7 @@ export function paintComposed(c: ComposedMap, o: MapDocView = {}): Rgba {
       if (!on(mx + 1, my)) put(x0 + e - 1 - d, y0 + k, [255, 0, 200]);
     }
     // A light tint inside, so a large hot spot reads as an area.
-    for (let y = 0; y < e; y += 2) for (let x = (y / 2) % 2 ? 2 : 0; x < e; x += 4) put(x0 + x, y0 + y, [255, 0, 200], 0.7);
+    for (let y = 0; y < e; y += 2) for (let x = (y >> 1) % 2; x < e; x += 2) put(x0 + x, y0 + y, [255, 0, 200], 0.3);
   }
   return { width: w, height: h, data };
 }
@@ -536,26 +536,35 @@ export function mapAscii(d: Doc, c?: ComposedMap): string {
   const W = d.width, H = d.height;
   const g = Array.from({ length: W * H }, () => '.');
   const legend: string[] = [];
+  const taken = new Set(['.', '+']);
+  /** A letter for a name: its first letter not yet used, else any free one. */
+  const letter = (name: string, upper: boolean): string => {
+    const cands = [...name.replace(/[^a-z]/gi, ''), ...'abcdefghijklmnopqrstuvwxyz'].map((c) => (upper ? c.toUpperCase() : c.toLowerCase()));
+    const ch = cands.find((c) => !taken.has(c)) ?? '?';
+    taken.add(ch);
+    return ch;
+  };
   d.layers.forEach((l, li) => {
     if (l.map?.kind !== 'terrain' || l.hidden) return;
-    const ch = l.name[0]!.toLowerCase();
+    const ch = letter(l.name, false);
     legend.push(`${ch} ${l.name}`);
     const cel = d.cels[li]![0]!;
     for (let i = 0; i < cel.length; i++) if (cel[i] === 1) g[i] = ch;
   });
-  const names = new Set<string>();
+  const names = new Map<string, string>();
   for (const p of placements(d)) {
     const e = d.map!.entries[p.entry]!;
+    const full = `${e.name}${e.variant ? `.${e.variant}` : ''}`;
+    if (!names.has(full)) names.set(full, letter(e.name, true));
     const b = entryBox(e, p.x, p.y);
     for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) if (x >= 0 && y >= 0 && x < W && y < H) g[y * W + x] = '+';
-    if (p.x >= 0 && p.y >= 0 && p.x < W && p.y < H) g[p.y * W + p.x] = e.name[0]!.toUpperCase();
-    names.add(`${e.name[0]!.toUpperCase()} ${e.name}${e.variant ? `.${e.variant}` : ''}`);
+    if (p.x >= 0 && p.y >= 0 && p.x < W && p.y < H) g[p.y * W + p.x] = names.get(full)!;
   }
   void c;
   const tens = '     ' + Array.from({ length: W }, (_, x) => (x % 10 === 0 ? String(Math.floor(x / 10) % 10) : ' ')).join('');
   const ones = '     ' + Array.from({ length: W }, (_, x) => String(x % 10)).join('');
   const rows = Array.from({ length: H }, (_, y) => `${String(y).padStart(3)}  ${g.slice(y * W, y * W + W).join('')}`);
-  return [`cells (${[...legend, ...names, '+ under an object, . nothing'].join(', ')}):`, tens, ones, ...rows].join('\n');
+  return [`cells (${[...legend, ...[...names].map(([n, ch]) => `${ch} ${n}`), '+ under an object, . nothing'].join(', ')}):`, tens, ones, ...rows].join('\n');
 }
 
 /** The tile at each cell, as rows of short labels (the topmost ground tile; objects' anchors marked). */

@@ -1,0 +1,10 @@
+# Mossy ruins, G8 review round: the meadow. "The moss rim runs ruler-straight along every edge":
+# more tufts cross it on the pieces, so the edge wobbles. (Its inner corners are as round as the
+# band's width allows: noted on the village, for the scheme's geometry.)
+note 0,24 24x24 "the moss1 rim runs ruler-straight; let more tufts cross it"
+px @cell(ew) 9,1 10,1 19,1 2,22 13,22 22,22 c=moss2
+px @cell(ew) 9,0 2,23 c=moss1
+px @cell(ns) 1,9 1,10 1,20 22,2 22,13 c=moss2
+px @cell(ns) 0,9 23,13 c=moss1
+px @cell(o) 9,2 2,9 21,14 14,21 c=moss2
+note done n1

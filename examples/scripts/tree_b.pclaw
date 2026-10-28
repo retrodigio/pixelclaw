@@ -1,0 +1,28 @@
+# Mossy ruins, G8 review round ("the 22 trees are one identical sprite"): a second tree, a texture
+# variant of the first: the same size, footprint and light, a taller, narrower crown in two
+# masses. The village picks between them cell by cell.
+new object tree_b 24x48 cell=24x24 palette=ruins-props
+variant of=tree
+# --- trunk
+rect 10,32 4x14 c=soil1 fill
+line 10,32 10,45 c=soil2
+line 13,34 13,45 c=soil0
+# --- the crown: an upper and a lower mass, lit from the top left
+ellipse 4,1 16x18 c=moss1 fill
+ellipse 2,13 20x22 c=moss1 fill
+ellipse 5,2 11x12 c=moss2 fill
+ellipse 3,14 14x15 c=moss2 fill
+ellipse 6,3 6x6 c=moss3 fill
+ellipse 5,16 7x7 c=moss3 fill
+select ellipse 2,1 20x34
+noise 2,1 20x34 ramp=moss weights=0,3,4,2,0 cluster=2..4 density=0.08 base=keep seed=44
+deselect
+line 6,17 10,18 14,18 c=moss1
+line 5,30 9,32 15,31 c=moss0
+px 7,4 8,4 6,17 7,17 c=lichen
+clean orphans
+outline c=ink mode=outer
+footprint 1x1 <<
+  r
+  b
+>>

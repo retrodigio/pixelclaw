@@ -2,10 +2,10 @@
 # and the meadow and lane families: the sea all round, a beach, a meadow, two lanes crossing, four
 # houses, a well at the crossroads and trees; glints on the water.
 new map village 40x30 tile=24 palette=ruins-shore
-layer add sea terrain=shore outside=on above=floor
-layer add meadow terrain=meadow above=sea
+layer add land terrain=shore outside=on above=floor
+layer add meadow terrain=meadow above=land
 layer add lanes terrain=lane above=meadow
-layer add glints overlay=glint on=sea:out above=lanes
+layer add glints overlay=glint on=land:out above=lanes
 layer add props objects above=glints
 
 # --- the land: an island with a meadow two cells in from the beach and lanes crossing it

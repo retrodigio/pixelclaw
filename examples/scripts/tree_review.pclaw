@@ -1,0 +1,31 @@
+# Mossy ruins, G8 review round: the tree. The reviewer's findings, pinned on the pixels, then fixed
+# and closed.
+note 1,14 1x8 "a moss1 rim inside the outline on the lit left side: with the dark right and bottom it shades every side (pillow)"
+note 7,20 6x1 "a straight 6 px moss1 dash across the crown reads as a scratch"
+note 13,22 2x2 "a bright moss3 square in the shaded lower half reads as a hole of light"
+note 14,9 2x1 "the lichen highlight sits right of centre, against the top-left light"
+note 3,42 18x6 "the ground shadow is ringed in ink and centred: a dark plate"
+# --- the lit left edge one step lighter
+line 1,14 1,21 c=moss2
+px 2,19 2,20 2,21 c=moss2
+# --- the dash broken into two cluster undersides
+px 9,20 10,20 c=moss2
+px 12,21 c=moss1
+# --- the light square back into the shade, the highlight up and left
+px 13,22 14,22 13,23 14,23 c=moss2
+px 14,9 15,9 c=moss2
+px 8,5 9,5 c=lichen
+# --- no painted shadow: the trunk stands on the ground (the engine draws shadows)
+paint 3,42 <<
+  |      khggfk      |
+  |      khggfk      |
+  |      khggfk      |
+  |      khggfk      |
+  |      khggfk      |
+  |      kkkkkk      |
+>>
+note done n1
+note done n2
+note done n3
+note done n4
+note done n5

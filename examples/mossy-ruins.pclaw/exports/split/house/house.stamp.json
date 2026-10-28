@@ -1,0 +1,53 @@
+{
+  "asset": "house",
+  "cellW": 24,
+  "cellH": 24,
+  "cols": 2,
+  "rows": 2,
+  "pieces": [
+    {
+      "name": "house_0_0",
+      "dx": 0,
+      "dy": 0,
+      "block": false,
+      "roof": true,
+      "footprint": true
+    },
+    {
+      "name": "house_1_0",
+      "dx": 1,
+      "dy": 0,
+      "block": false,
+      "roof": true,
+      "footprint": true
+    },
+    {
+      "name": "house_0_1",
+      "dx": 0,
+      "dy": 1,
+      "block": true,
+      "roof": false,
+      "footprint": true
+    },
+    {
+      "name": "house_1_1",
+      "dx": 1,
+      "dy": 1,
+      "block": true,
+      "roof": false,
+      "footprint": true
+    }
+  ],
+  "anchor": [
+    0,
+    1
+  ],
+  "footprint": [
+    2,
+    2
+  ],
+  "at": [
+    0,
+    0
+  ]
+}

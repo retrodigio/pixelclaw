@@ -71,6 +71,8 @@ try {
   for (const v of VARIANTS) await agent.call('run', { asset: v, commands: 'variant off' });
   await agent.call('view', { asset: 'village', mode: 'map', marks: 'failing' });
   copyFileSync(join(agent.dir, 'views', 'village.map.png'), out('g8-hotspots'));
+  await agent.call('view', { asset: 'village', mode: 'map', marks: 'failing', camera: '19,15' });
+  copyFileSync(join(agent.dir, 'views', 'village.map.camera.png'), out('g8-hotspots-camera'));
   await page.reload();
   await page.getByTestId('status').getByText('live').waitFor();
   await page.locator('.follow input').uncheck();

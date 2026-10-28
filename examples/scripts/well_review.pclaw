@@ -1,0 +1,17 @@
+# Mossy ruins, G8 review round: the well. The reviewer's findings, pinned on the pixels, then fixed
+# and closed.
+note 2,14 2x6 "the basin is shaded stone2 on the left as well as the right and bottom: pillow shading"
+note 5,12 14x6 "the pool is one flat colour"
+note 11,9 3x3 "the bucket is a flat wood2 square with no rim or shade"
+# --- the basin lit from the left
+px 2,14 2,15 2,16 3,17 3,18 c=stone3
+px 3,14 3,15 3,16 c=stone4
+# --- the pool: a shadow under the back rim, a glint at its upper left
+line 7,12 16,12 c=stone1
+px 7,13 8,13 c=stone4
+# --- the bucket: a dark rim, its right side shaded
+line 11,9 13,9 c=wood0
+px 13,10 13,11 c=wood1
+note done n1
+note done n2
+note done n3

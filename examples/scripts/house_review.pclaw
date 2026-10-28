@@ -1,0 +1,25 @@
+# Mossy ruins, G8 review round (reviews/2026-10-28-g8/findings.md): the house. The reviewer's
+# findings, pinned on the pixels, then fixed and closed.
+note 6,6 24x17 "nine lone roof3 pixels: stray single pixels on a prop; pair each into a 2 px shingle highlight"
+note 34,3 "lone stone1 pixel in the chimney face; make it a mortar joint"
+note 34,7 1x19 "the lit/shaded roof split is a dead-vertical line; step it out with the roof's slanted edge"
+note 5,44 38x3 "the foundation is a flat stone2 band; add block joints"
+# --- shingle highlights two pixels long
+px 12,6 27,7 13,10 20,10 9,14 24,14 16,18 7,22 30,22 c=roof3
+# --- the chimney: one mortar joint across it
+line 33,3 36,3 c=stone1
+px 36,5 c=stone2
+# --- the shaded plane widens toward the eave: a column more at the top, two fewer at the bottom
+px 33,5 33,6 33,7 33,9 33,10 33,11 c=roof1
+px 33,8 33,12 c=roof0
+px 34,21 35,21 34,22 35,22 34,23 35,23 34,25 35,25 c=roof2
+px 34,20 35,20 34,24 35,24 c=roof1
+# --- block joints in the plinth
+line 11,44 11,46 c=stone1
+line 16,44 16,46 c=stone1
+line 32,44 32,46 c=stone1
+line 37,44 37,46 c=stone1
+note done n1
+note done n2
+note done n3
+note done n4

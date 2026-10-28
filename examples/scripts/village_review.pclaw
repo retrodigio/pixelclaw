@@ -1,0 +1,17 @@
+# Mossy ruins, G8 review round: the village. The reviewer's findings on the scene, pinned on the
+# cells; the ones fixed here are closed, the rest stay open (the sea's and the sand's repetition
+# belong to their tiles, G6's water and G7's sand; the corners' roundness to the schemes).
+note 21,16 "a tree's crown within a pixel of the house's eave"
+note 18,6 "every lane ends 1-3 cells short of the beach"
+note 15,11 "the houses at 15,10 and 23,21 face no lane"
+note 0,27 "the open sea is one water tile in every cell: its diagonal weave shows; water variants"
+note 6,8 1x10 "identical sand cells in a column line the sand's '+' marks up into stripes; sand variants"
+note 34,14 1x7 "the east coast is dead straight for 7 cells and the corners are near-square; the coastline should wander"
+note 7,9 1x8 "the meadow's west edge is one straight line for 8 cells with square steps"
+# --- the tree moved off the house
+move 21,16 20,16 layer=props
+# --- paths to the doors of the two houses that faced none
+road lanes 15,11 18,11
+road lanes 18,22 24,22
+note done n1
+note done n3

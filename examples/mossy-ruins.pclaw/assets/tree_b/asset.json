@@ -1,0 +1,42 @@
+{
+  "name": "tree_b",
+  "kind": "object",
+  "size": [
+    24,
+    48
+  ],
+  "cell": [
+    24,
+    24
+  ],
+  "wrap": false,
+  "palette": "ruins-props",
+  "layers": [
+    {
+      "name": "main",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    }
+  ],
+  "frames": 1,
+  "paletteLocked": false,
+  "stamps": [],
+  "macros": [],
+  "tags": [],
+  "views": [],
+  "links": [],
+  "notes": [],
+  "tape": {
+    "lang": 2,
+    "commands": 20,
+    "groups": 1
+  },
+  "state": {
+    "sha256": "46b9f92d421230b881064fa7ca75efcc13ed35fbe5dc6c91ce3dae87f74b854e"
+  },
+  "checkpoints": {
+    "every": 200,
+    "files": []
+  }
+}

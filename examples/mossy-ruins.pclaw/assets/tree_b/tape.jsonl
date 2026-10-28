@@ -1,0 +1,21 @@
+{"pclaw":"tape","lang":2}
+{"seq":1,"by":"claude","at":"2026-10-28T08:43:19Z","group":"g1","cmd":"new object tree_b 24x48 palette=ruins-props wrap=off cell=24x24 bg=none <<\n  k ink #17181d\n  0 stone0 #272a30\n  1 stone1 #3b4044\n  2 stone2 #535a5b\n  3 stone3 #6c7570\n  4 stone4 #8b9489\n  5 stone5 #afb6a5\n  a moss0 #1c2e21\n  b moss1 #2c4729\n  c moss2 #486a32\n  d moss3 #6c8c3a\n  e lichen #a2ab52\n  f soil0 #2a211c\n  g soil1 #44352a\n  h soil2 #65503a\n  w pool #34566a\n  W wood0 #3a2418\n  X wood1 #603c22\n  Y wood2 #8a5a30\n  Z wood3 #b58044\n  B brass0 #6a4f1f\n  C brass1 #b08a35\n  D brass2 #efd47c\n  ramp stone stone0 stone1 stone2 stone3 stone4 stone5\n  ramp moss moss0 moss1 moss2 moss3 lichen\n  ramp soil soil0 soil1 soil2\n  ramp wood wood0 wood1 wood2 wood3\n  ramp brass brass0 brass1 brass2\n>>"}
+{"seq":2,"by":"claude","at":"2026-10-28T08:43:19Z","group":"g1","cmd":"variant of=tree"}
+{"seq":3,"by":"claude","at":"2026-10-28T08:43:19Z","group":"g1","cmd":"rect 10,32 4x14 c=soil1 fill"}
+{"seq":4,"by":"claude","at":"2026-10-28T08:43:19Z","group":"g1","cmd":"line 10,32 10,45 c=soil2 pp=on"}
+{"seq":5,"by":"claude","at":"2026-10-28T08:43:19Z","group":"g1","cmd":"line 13,34 13,45 c=soil0 pp=on"}
+{"seq":6,"by":"claude","at":"2026-10-28T08:43:19Z","group":"g1","cmd":"ellipse 4,1 16x18 c=moss1 fill"}
+{"seq":7,"by":"claude","at":"2026-10-28T08:43:19Z","group":"g1","cmd":"ellipse 2,13 20x22 c=moss1 fill"}
+{"seq":8,"by":"claude","at":"2026-10-28T08:43:19Z","group":"g1","cmd":"ellipse 5,2 11x12 c=moss2 fill"}
+{"seq":9,"by":"claude","at":"2026-10-28T08:43:19Z","group":"g1","cmd":"ellipse 3,14 14x15 c=moss2 fill"}
+{"seq":10,"by":"claude","at":"2026-10-28T08:43:19Z","group":"g1","cmd":"ellipse 6,3 6x6 c=moss3 fill"}
+{"seq":11,"by":"claude","at":"2026-10-28T08:43:19Z","group":"g1","cmd":"ellipse 5,16 7x7 c=moss3 fill"}
+{"seq":12,"by":"claude","at":"2026-10-28T08:43:19Z","group":"g1","cmd":"select ellipse 2,1 20x34"}
+{"seq":13,"by":"claude","at":"2026-10-28T08:43:19Z","group":"g1","cmd":"noise 2,1 20x34 ramp=moss weights=0,3,4,2,0 cluster=2..4 density=0.08 base=keep wrap=off seed=44"}
+{"seq":14,"by":"claude","at":"2026-10-28T08:43:19Z","group":"g1","cmd":"deselect"}
+{"seq":15,"by":"claude","at":"2026-10-28T08:43:19Z","group":"g1","cmd":"line 6,17 10,18 14,18 c=moss1 pp=on"}
+{"seq":16,"by":"claude","at":"2026-10-28T08:43:19Z","group":"g1","cmd":"line 5,30 9,32 15,31 c=moss0 pp=on"}
+{"seq":17,"by":"claude","at":"2026-10-28T08:43:19Z","group":"g1","cmd":"px 7,4 8,4 6,17 7,17 c=lichen"}
+{"seq":18,"by":"claude","at":"2026-10-28T08:43:19Z","group":"g1","cmd":"clean orphans size=1 keep=none"}
+{"seq":19,"by":"claude","at":"2026-10-28T08:43:19Z","group":"g1","cmd":"outline c=ink mode=outer corners=off"}
+{"seq":20,"by":"claude","at":"2026-10-28T08:43:19Z","group":"g1","cmd":"footprint 1x1 at=0,1 anchor=0,0 <<\n  r\n  b\n>>"}

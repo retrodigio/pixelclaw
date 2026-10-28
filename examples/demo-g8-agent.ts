@@ -151,15 +151,15 @@ console.log(indent(failing(await call('check', { asset: 'village', checks: ['foo
 
 console.log('\n7. A blind review bundle with the village at game scale, for a fresh reviewer with no other context');
 console.log(indent(await call('review', { assets: ['village', 'house', 'tree', 'well', 'meadow', 'lane', 'shore'], name: 'g8' }), 2));
-for (const a of ['village', 'house', 'tree', 'well', 'meadow', 'lane']) {
-  if (existsSync(join(REPO, 'examples', 'scripts', `${a}_review.pclaw`))) {
-    if (a === 'village') console.log('\n8. The reviewer\'s findings (reviews/2026-10-28-g8/findings.md), back as notes and fixed');
-    await apply(a, `${a}_review.pclaw`);
-  }
-}
+console.log('\n8. The reviewer\'s findings (reviews/2026-10-28-g8/findings.md), back as notes and fixed: the house\'s strays and roof,');
+console.log('   the tree\'s shading and painted shadow, the well\'s basin, the meadow\'s rim; a second tree, a variant of the first;');
+console.log('   on the village a tree moved off a house and paths to two doors (the sea\'s, the sand\'s and the corners\' notes stay open)');
+await apply('tree_b', 'tree_b.pclaw');
+for (const a of ['house', 'tree', 'well', 'meadow', 'village']) await apply(a, `${a}_review.pclaw`);
+console.log(indent((await call('view', { asset: 'village', mode: 'map', camera: '19,13' })).split('\n').filter((l) => l.startsWith('showing')).join('\n'), 2));
 
 console.log('\n9. Every check on the new assets, and a Tiled export of the village');
-for (const a of ['house', 'tree', 'well', 'meadow', 'lane', 'village']) console.log(indent((await call('check', { asset: a })).split('\n')[0]!, 2));
+for (const a of ['house', 'tree', 'tree_b', 'well', 'meadow', 'lane', 'village']) console.log(indent((await call('check', { asset: a })).split('\n')[0]!, 2));
 console.log(indent((await call('export', { asset: 'village', format: 'tmx' })).split('\n')[0]!, 2));
 console.log(indent((await call('export', { asset: 'house', format: 'split' })).split('\n')[0]!, 2));
 

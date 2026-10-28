@@ -24,7 +24,7 @@ function cli(args: string[]): { code: number; out: string; err: string } {
 
 // In order: the shore copies its textures from the sand and the water.
 const ASSETS = ['stone_floor', 'grass', 'grass_b', 'grass_c', 'chest', 'glowcap', 'walker', 'water', 'sand', 'glint', 'shore',
-  'house', 'tree', 'well', 'meadow', 'lane', 'village', 'lane_b', 'lane_c', 'meadow_b', 'meadow_c', 'shore_b'];
+  'house', 'tree', 'well', 'meadow', 'lane', 'village', 'lane_b', 'lane_c', 'meadow_b', 'meadow_c', 'shore_b', 'tree_b'];
 const SAVED = ['ruins-props', 'ruins-folk', 'ruins-water', 'ruins-shore', 'ruins-village'];
 
 const cmds = (tape: string) => tape.trim().split('\n').slice(1).map((l) => JSON.parse(l).cmd as string);

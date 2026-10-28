@@ -29,6 +29,8 @@ Old stone half taken back by moss, under a soft light from the top left.
 - Objects sit on the 24 px grid: a house is 48x48 (2x2 cells), a tree 24x48 (one cell on the
   ground, its crown over the cell above), small props 24x24. Their footprints say which cells block
   and which are roofs or canopies (drawn above actors).
-- A tree's crown is leaf clusters: its clusters' steps are texture, so jaggies allows up to 12.
+- A tree's crown is leaf clusters: its clusters' steps (and the waist between two masses) are
+  texture, so jaggies allows up to 12 on the trees.
+- Lanes are beaten sand: they use the shore's sand ramp.
 - Scenes are judged at game scale: no straight edge repeats one tile more than 4 times, and no
   textured tile fills more than 10 cells of any 4x4 window (texture variants break both up).
