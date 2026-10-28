@@ -1,16 +1,25 @@
 {
-  "name": "@pixelclaw/cli",
-  "version": "0.1.0",
+  "name": "pixelclaw",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Pixel Claw command line: new, run, view, verify.",
+  "description": "Pixel Claw: a pixel art editor driven by commands, with an MCP server and a live watch view.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
   "bin": {
     "pixelclaw": "./bin/pixelclaw.js"
   },
-  "exports": {
-    ".": "./src/index.ts"
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "bin": {
+      "pixelclaw": "./dist/pixelclaw.js"
+    }
   },
-  "dependencies": {
+  "devDependencies": {
     "@pixelclaw/core": "workspace:*",
     "@pixelclaw/server": "workspace:*"
   }
