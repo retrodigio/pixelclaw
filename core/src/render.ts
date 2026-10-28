@@ -191,7 +191,7 @@ export function renderGrid(doc: Doc, region?: Region): string {
   const t = { width: doc.width, height: doc.height, wrap: doc.wrap, pixels: px };
   const lastY = r.y + r.h - 1;
   const lastX = r.x + r.w - 1;
-  const rowW = Math.max(String(lastY).length, String(r.y).length);
+  const rowW = Math.max(2, String(lastY).length);
   const margin = ' '.repeat(rowW + 2);
   const lines: string[] = [];
   const header = (digitAt: (x: number) => string): string => {
