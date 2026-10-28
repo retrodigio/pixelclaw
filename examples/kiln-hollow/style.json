@@ -14,28 +14,5 @@
     "object": "24x48|48x24|48x48",
     "icon": "16x16"
   },
-  "camera": "384x216",
-  "assets": {
-    "urn": {
-      "checks": {
-        "jaggies": {
-          "max": 2
-        }
-      }
-    },
-    "urn_blue": {
-      "checks": {
-        "jaggies": {
-          "max": 2
-        }
-      }
-    },
-    "urn_green": {
-      "checks": {
-        "jaggies": {
-          "max": 2
-        }
-      }
-    }
-  }
+  "camera": "384x216"
 }

@@ -18,5 +18,5 @@ Red clay, sage and smoke under a warm morning sun from the top left.
   pebbles.
 - **Readability.** Everything that stands on the clay keeps its edge at least 15 L* from it.
 - **Round pots** step their shading bands with the curve of the belly (the blind review asked
-  for the lit and far sides 2-3 px deep): `jaggies` allows 2 such steps on the urns; their
+  for the lit and far sides 2-3 px deep): `jaggies` counts steps between neighbouring entries of one ramp as shading; their
   outline stays clean.

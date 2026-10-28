@@ -463,9 +463,33 @@ function thinChains(img: Img, min: number): Pt[][] {
   return out;
 }
 
-function checkJaggies(img: Img, p: Params): CheckResult {
+/**
+ * Shading, not a line (plan §19): two colours that are neighbouring entries of one ramp, neither
+ * an outline colour. Steps between them inside a shape follow the form; outlines and lines of one
+ * colour on anything else are judged as lines.
+ */
+function shadingPair(img: Img, c: number, u: number, ink: Set<number>): boolean {
+  return c !== TRANSPARENT && u !== TRANSPARENT && !ink.has(c) && !ink.has(u) && rampSteps(img.doc.palette, c, u) === 1;
+}
+
+/** A pixel of a thin run that lies inside a shape between steps of its own ramp (outline pixels beside it allowed). */
+function shadingPixel(img: Img, x: number, y: number, ink: Set<number>): boolean {
+  const c = img.get(x, y);
+  let step = false;
+  for (const [dx, dy] of N8) {
+    const u = img.get(x + dx, y + dy);
+    if (u === c || (ink.has(u) && !ink.has(c))) continue;
+    if (!shadingPair(img, c, u, ink)) return false;
+    step = true;
+  }
+  return step;
+}
+
+function checkJaggies(img: Img, p: Params, ctx: CheckContext = {}): CheckResult {
   // A family's sheet is its textures (tiles, checked as tiles) and the band the geometry draws: its staircases are curves by design.
   if (img.doc.family) return skip('jaggies', 'a family is judged on its map (its textures are checked as tiles)');
+  const ink = inkSet(img, ctx.style);
+  let shading = 0;
   // A doubled L-corner: a pixel whose only same-colour 4-neighbours are one horizontal and one
   // vertical, with the corner between them empty, where the line zig-zags through it (it steps
   // the same way before and after, as a staircase does): a pixel-perfect line steps diagonally
@@ -483,7 +507,12 @@ function checkJaggies(img: Img, p: Params): CheckResult {
     const v = n4.find(([dx]) => dx === 0);
     if (!h || !v || img.get(x + h[0] + v[0], y + v[1]) === c) continue;
     const zig = img.get(x + v[0] - h[0], y + v[1]) === c || img.get(x + h[0], y - v[1]) === c;
-    if (zig) elbows.push([x, y]);
+    // The corner the L turns round: inside a shape, another step of the same ramp (or the outline
+    // the band runs along, which is judged on its own) makes it a shading band's edge.
+    const turn = img.get(x + h[0], y + v[1]);
+    const inside = !ink.has(c) && N4.every(([dx, dy]) => img.get(x + dx, y + dy) !== TRANSPARENT);
+    if (zig && inside && (shadingPair(img, c, turn, ink) || (ink.has(turn) && N8.some(([dx, dy]) => shadingPair(img, c, img.get(x + dx, y + dy), ink))))) shading++;
+    else if (zig) elbows.push([x, y]);
   }
   // Touching elbows are one doubled corner.
   let corners = 0;
@@ -508,7 +537,12 @@ function checkJaggies(img: Img, p: Params): CheckResult {
   // silhouette) counts once.
   const runSets = new Map<string, Pt[]>();
   const addRuns = (runs: Pt[][]) => { for (const r of runs) runSets.set(r.map((q) => img.at(q[0], q[1])).sort((a, b) => a - b).join(','), r); };
-  for (const chain of thinChains(img, 6)) if (img.get(chain[0]![0], chain[0]![1]) !== ground) addRuns(irregularRuns(chain, img.w, img.h, img.wrap));
+  for (const chain of thinChains(img, 6)) {
+    if (img.get(chain[0]![0], chain[0]![1]) === ground) continue;
+    // A thin run of one ramp step between its neighbours is a shading band, not a line.
+    if (chain.every(([x, y]) => shadingPixel(img, x, y, ink))) { shading++; continue; }
+    addRuns(irregularRuns(chain, img.w, img.h, img.wrap));
+  }
   if (!isTile(img.doc)) for (const path of contours(img)) addRuns(irregularRuns(path, img.w, img.h, false));
   const irregular = [...runSets.values()].flat();
   const spikes: Pt[] = [];
@@ -544,7 +578,8 @@ function checkJaggies(img: Img, p: Params): CheckResult {
   const max = Number(p.max);
   return result('jaggies', {
     status: n <= max ? 'pass' : 'fail', score: n, shown: String(n), limit: `≤ ${max}`, groups,
-    detail: n === 0 ? 'lines and outlines step evenly' : `${corners} doubled L-corners, ${runs} irregular step runs, ${spikes.length} spikes, ${notches.length} notches`,
+    detail: (n === 0 ? 'lines and outlines step evenly' : `${corners} doubled L-corners, ${runs} irregular step runs, ${spikes.length} spikes, ${notches.length} notches`) +
+      (shading ? `; ${shading} steps between neighbouring entries of one ramp are shading, not counted` : ''),
   });
 }
 
