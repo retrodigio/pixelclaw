@@ -1,0 +1,9 @@
+# A variant of the lane (plan §4.1): the band drawn again, the ruts and stones elsewhere, so a long
+# straight lane stops repeating one tile. The map picks among the lane and its variants cell by cell.
+fork lane lane_b
+variant of=lane
+family band 1:moss1 1:sand0 radius=2
+px @cell(ew) 1,9 2,9 7,9 8,9 12,9 13,9 4,14 5,14 10,14 11,14 18,14 19,14 c=sand1
+px @cell(ns) 9,1 9,2 9,7 9,8 9,13 9,14 14,4 14,5 14,10 14,11 14,18 14,19 c=sand1
+px @cell(ew) 20,8 c=stone3
+px @cell(ns) 8,17 c=stone3

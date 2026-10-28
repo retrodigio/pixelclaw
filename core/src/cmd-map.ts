@@ -325,7 +325,7 @@ const roadCmd: CommandSpec = {
 const FP_RE = /^(\d+)x(\d+):(\d+),(\d+)$/;
 
 function mapScatter(cmd: ParsedCommand, ctx: NormaliseContext, doc: Doc) {
-  const a = new Args(cmd, ['count', 'on', 'minDist', 'layer', 'seed', 'fp']);
+  const a = new Args(cmd, ['count', 'on', 'off', 'minDist', 'layer', 'seed', 'fp']);
   const what = a.take('word', 'the assets to scatter (house or tree,bush)');
   const names = what.v.split(',');
   for (const n of names) if (!/^[a-z][a-z0-9_-]*$/.test(n)) throw new DiagError(what.line, what.col, `'${n}' is not an asset name`);
@@ -339,6 +339,8 @@ function mapScatter(cmd: ParsedCommand, ctx: NormaliseContext, doc: Doc) {
   const minDist = mo ? intOf(mo, 0, 512) : 1;
   const on = a.opts.get('on');
   const onLayer = on ? layerNamed(doc, { v: on.value, line: on.line, col: on.vcol }, ['terrain']) : -1;
+  const off = a.opts.get('off');
+  const offLayer = off ? layerNamed(doc, { v: off.value, line: off.line, col: off.vcol }, ['terrain']) : -1;
   const fo = a.opts.get('fp');
   let fps: { cols: number; rows: number; anchor: [number, number] }[];
   if (fo) {
@@ -363,6 +365,7 @@ function mapScatter(cmd: ParsedCommand, ctx: NormaliseContext, doc: Doc) {
   const rng = new Pcg32(seed, 0x5ca7);
   const work: Doc = { ...doc, cels: doc.cels.map((fr, i) => (i === li ? [fr[0]!.slice()] : fr)), map: { tile: doc.map!.tile, entries: doc.map!.entries.map((e) => ({ ...e })) } };
   const terr = onLayer >= 0 ? doc.cels[onLayer]![0]! : null;
+  const not = offLayer >= 0 ? doc.cels[offLayer]![0]! : null;
   const spots: { x: number; y: number; k: number }[] = [];
   for (let tries = 0; spots.length < count && tries < count * 40; tries++) {
     const k = rng.nextInt(names.length);
@@ -371,7 +374,7 @@ function mapScatter(cmd: ParsedCommand, ctx: NormaliseContext, doc: Doc) {
     const b = entryBox({ name: names[k]!, variant: null, ...fp }, x, y);
     if (b.x < bx || b.y < by || b.x + b.w > bx + bw || b.y + b.h > by + bh || b.x < 0 || b.y < 0 || b.x + b.w > doc.width || b.y + b.h > doc.height) continue;
     let ok = true;
-    for (let yy = b.y; yy < b.y + b.h && ok; yy++) for (let xx = b.x; xx < b.x + b.w; xx++) if (terr && terr[yy * doc.width + xx] !== 1) { ok = false; break; }
+    for (let yy = b.y; yy < b.y + b.h && ok; yy++) for (let xx = b.x; xx < b.x + b.w; xx++) if ((terr && terr[yy * doc.width + xx] !== 1) || (not && not[yy * doc.width + xx] === 1)) { ok = false; break; }
     if (!ok) continue;
     if (spots.some((s) => Math.max(Math.abs(s.x - x), Math.abs(s.y - y)) < minDist)) continue;
     const { grid } = occupancy(work, li);
@@ -381,7 +384,7 @@ function mapScatter(cmd: ParsedCommand, ctx: NormaliseContext, doc: Doc) {
     spots.push({ x, y, k });
   }
   return {
-    text: `scatter ${what.v}${box ? ` ${box.p.x},${box.p.y} ${box.s.w}x${box.s.h}` : ''} count=${count}${on ? ` on=${on.value}` : ''} minDist=${minDist} layer=${doc.layers[li]!.name} fp=${fps.map((f) => `${f.cols}x${f.rows}:${f.anchor[0]},${f.anchor[1]}`).join('/')} seed=${seed}`,
+    text: `scatter ${what.v}${box ? ` ${box.p.x},${box.p.y} ${box.s.w}x${box.s.h}` : ''} count=${count}${on ? ` on=${on.value}` : ''}${off ? ` off=${off.value}` : ''} minDist=${minDist} layer=${doc.layers[li]!.name} fp=${fps.map((f) => `${f.cols}x${f.rows}:${f.anchor[0]},${f.anchor[1]}`).join('/')} seed=${seed}`,
     op: fn((d: Doc) => {
       for (const s of spots) d.cels[li]![0]![s.y * d.width + s.x] = entryIndex(d, { name: names[s.k]!, variant: null, ...fps[s.k]! });
     }),
@@ -488,10 +491,11 @@ export function genLayout(kind: string, W: number, H: number, seed: number, laye
   const inner = erode(land, W, H, 2);
   smoothCells(inner, W, H, 1, true);
   const lanes = new Uint8Array(W * H);
-  // Lanes: one across and one down through the middle of the inner ground, kept on it.
+  // Lanes: one across and one down through the middle of the inner ground, a cell in from its edge.
+  const lanesOn = erode(inner, W, H, 1);
   const mx = Math.floor(W / 2) + rng.nextInt(5) - 2, my = Math.floor(H / 2) + rng.nextInt(5) - 2;
-  for (let x = 0; x < W; x++) if (inner[my * W + x]) lanes[my * W + x] = 1;
-  for (let y = 0; y < H; y++) if (inner[y * W + mx]) lanes[y * W + mx] = 1;
+  for (let x = 0; x < W; x++) if (lanesOn[my * W + x]) lanes[my * W + x] = 1;
+  for (let y = 0; y < H; y++) if (lanesOn[y * W + mx]) lanes[y * W + mx] = 1;
   return [land, inner, lanes, ...Array.from({ length: Math.max(0, layers - 3) }, () => new Uint8Array(W * H))].slice(0, Math.max(1, layers));
 }
 
@@ -596,7 +600,7 @@ for (const c of [terrainCmd, placeCmd, moveCmd, removeCmd, roadCmd, mapCmd, foot
 const pixelScatter = COMMANDS.get('scatter')!;
 registerCommand({
   name: 'scatter',
-  summary: `${pixelScatter.summary}   |   (maps) scatter <asset>[,<asset>..] [<x,y> <W>x<H>] count=<n> [on=<terrain layer>] [minDist=<n>] [layer=<objects layer>] [seed=<n>]`,
+  summary: `${pixelScatter.summary}   |   (maps) scatter <asset>[,<asset>..] [<x,y> <W>x<H>] count=<n> [on=<terrain layer>] [off=<terrain layer>] [minDist=<n>] [layer=<objects layer>] [seed=<n>]`,
   normalise(cmd, ctx) {
     return ctx.doc?.map ? mapScatter(cmd, ctx, ctx.doc) : pixelScatter.normalise(cmd, ctx);
   },

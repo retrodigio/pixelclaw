@@ -1,0 +1,30 @@
+# Mossy ruins: a 24x48 tree (plan §4.10): one cell on the ground, its crown overhanging the cell
+# above. A round crown of moss-green leaves in clumps, lit from the top left; a short trunk and a
+# soft shadow. The crown's cell is a canopy (drawn above actors walking behind the tree).
+new object tree 24x48 cell=24x24 palette=ruins-props
+
+# --- shadow and trunk
+ellipse 4,43 16x4 c=moss0 fill
+rect 10,30 4x16 c=soil1 fill
+line 10,30 10,45 c=soil2
+line 13,32 13,45 c=soil0
+
+# --- the crown: a dark mass, a lighter body up and left, leaf clusters
+ellipse 1,3 22x30 c=moss1 fill
+ellipse 2,4 17x23 c=moss2 fill
+ellipse 4,5 10x12 c=moss3 fill
+select ellipse 1,3 22x30
+noise 1,3 22x30 ramp=moss weights=0,3,4,2,0 cluster=2..4 density=0.08 base=keep seed=12
+deselect
+# clump edges: darker arcs under each clump, a few lit leaves on top
+line 4,18 8,20 12,20 c=moss1
+line 13,13 17,15 20,14 c=moss1
+line 6,26 11,28 16,27 c=moss0
+px 6,7 7,7 11,6 12,6 5,10 5,11 14,9 15,9 c=lichen
+clean orphans
+
+outline c=ink mode=outer
+footprint 1x1 <<
+  r
+  b
+>>

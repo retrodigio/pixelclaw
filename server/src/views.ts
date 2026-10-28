@@ -9,7 +9,8 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   animGifFrames, animText, diffPixels, diffText, encodeGif, encodePng, mapGifFrames, mapText, renderAnimSheet, renderDiff, renderFamilyView, renderGame, renderGrid, renderMap,
-  renderRecolour, renderScaled, renderTile3x3, layoutOf, schemeOf, type Doc, type Pt, type Region, type Theme,
+  renderRecolour, renderScaled, renderTile3x3, layoutOf, schemeOf, cameraRegion, composeMapDoc, mapAscii, mapDocGifFrames, mapDocText, paintComposed,
+  type Doc, type MapWorld, type Pt, type Region, type Theme,
 } from '@pixelclaw/core';
 import { ProjectError } from './project.ts';
 
@@ -35,6 +36,11 @@ export interface ViewOptions {
   themes?: Theme[];
   /** map: its size in tiles, the island's seed, overlays played over it, and (for an overlay) the tile or family under it. */
   map?: { cols?: number; rows?: number; seed?: number; overlays: Doc[]; ground: Doc | null };
+  /**
+   * map of a map document (or of an object, set on its ground): the assets it names, the cells to
+   * show (a region, or the camera's screen around a cell), and the game's draw scale.
+   */
+  mapDoc?: { doc: Doc; world: MapWorld; region?: Region; camera?: [number, number]; screen: [number, number]; drawScale: number; note?: string };
 }
 
 export type View =
@@ -92,6 +98,7 @@ export function makeView(doc: Doc, mode: ViewMode, o: ViewOptions, outDir: strin
     writeFileSync(path, text);
     return { mode, kind: 'text', text, path };
   }
+  if (mode === 'map' && o.mapDoc) return mapDocView(doc, o, outDir);
   if (mode === 'map') {
     const mo = { cols: o.map?.cols, rows: o.map?.rows, seed: o.map?.seed, overlays: o.map?.overlays, ground: o.map?.ground, scale: o.scale, theme: o.theme, tickRate: o.tickRate };
     const img = renderMap(doc, mo);
@@ -134,6 +141,49 @@ export function makeView(doc: Doc, mode: ViewMode, o: ViewOptions, outDir: strin
   const path = join(outDir, `${doc.name}.${mode}.png`);
   writeFileSync(path, png);
   return { mode, kind: 'image', png, width: img.width, height: img.height, path };
+}
+
+/**
+ * A map document: the whole map at 1x, a region of cells or the camera's screen at the game's
+ * draw scale, with cells the checks flag outlined in magenta; and a GIF when anything moves.
+ */
+function mapDocView(doc: Doc, o: ViewOptions, outDir: string): View {
+  const md = o.mapDoc!;
+  const m = md.doc;
+  const c = composeMapDoc(m, md.world);
+  let region = md.region ? { ...md.region } : undefined;
+  let where = '';
+  if (md.camera) {
+    const r = cameraRegion(c, md.camera[0], md.camera[1], md.screen[0], md.screen[1]);
+    region = { x: r.x, y: r.y, w: r.w, h: r.h };
+    where = `the camera at ${md.camera[0]},${md.camera[1]}: a ${md.screen[0]}x${md.screen[1]} px screen, cells ${r.x},${r.y} ${r.w}x${r.h}`;
+  } else if (region) {
+    if (region.x + region.w > c.cols || region.y + region.h > c.rows) throw new ProjectError(`region runs past the ${c.cols}x${c.rows} cells of the map`);
+    where = `cells ${region.x},${region.y} ${region.w}x${region.h}`;
+  }
+  const scale = o.scale ?? (region || md.note ? md.drawScale : 1);
+  const vo = { scale, region, marks: o.marks };
+  const img = paintComposed(c, vo);
+  const png = encodePng(img);
+  const tag = md.camera ? '.camera' : region ? `.${region.x}-${region.y}-${region.w}x${region.h}` : '';
+  const path = join(outDir, `${doc.name}.map${tag}.png`);
+  writeFileSync(path, png);
+  let text = md.note ?? mapDocText(m, md.world, c);
+  if (!md.note && m.width <= 80) text += `\n${mapAscii(m)}`;
+  text += `
+showing ${where || 'the whole map'} at ${scale}x${o.marks?.length ? `; ${o.marks.length} flagged cells outlined in magenta` : ''}`;
+  let gif: string | undefined;
+  // A GIF of what moves (families' frames, overlays), when the picture is not too big to play.
+  if (img.width * img.height <= 1200 * 900) {
+    const frames = mapDocGifFrames(m, md.world, { ...vo, tickRate: o.tickRate });
+    if (frames.length > 1) {
+      gif = join(outDir, `${doc.name}.map${tag}.gif`);
+      writeFileSync(gif, encodeGif(frames, { delta: true }));
+      text += `
+animated GIF at game speed: ${gif}`;
+    }
+  }
+  return { mode: 'map', kind: 'image', png, width: img.width, height: img.height, path, text, ...(gif ? { gif } : {}) };
 }
 
 /** A family's sheet in words: where every cell is (for @cell and coordinates), which are pieces and which detached. */

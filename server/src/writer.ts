@@ -7,7 +7,7 @@ import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   CHECK_IDS, TapeCursor, Timeline, activeGroups, checkContextFor, drawScaleOf, groundOf, paletteToJson, parse, projectThemes, replay, runBatch,
-  VIEW_NAMES, flaggedOn, runChecks, setOf, type AssetDoc, type AssetState, type CheckId, type CheckResult, type Diag, type Doc, type Note, type Palette, type Pt,
+  VIEW_NAMES, cameraOf, flaggedOn, footprintOf, mapWorld, runChecks, setOf, type AssetDoc, type AssetState, type CheckId, type CheckResult, type Diag, type Doc, type Note, type Palette, type Pt,
   type TapeEntry, type Theme, type Token,
 } from '@pixelclaw/core';
 import {
@@ -32,6 +32,8 @@ export interface ViewRequest extends Omit<ViewOptions, 'marks' | 'theme' | 'them
   /** map: its size in tiles and the island's seed. */
   size?: { cols: number; rows: number };
   seed?: number;
+  /** map of a map document: the camera's view around this cell. */
+  camera?: [number, number];
 }
 
 /** Run summaries check every frame up to this many pixels (width x height x frames), else only the frame being drawn on. */
@@ -470,7 +472,17 @@ export class Writer {
       const dirs = [f, ...[...doc.views].sort((x, y) => VIEW_NAMES.indexOf(x.name as never) - VIEW_NAMES.indexOf(y.name as never)).flatMap((v) => (v === here ? [] : [v.from]))];
       o.game = { ground: ground?.doc ?? null, with: others.map((x) => x.doc), scale: drawScaleOf(style), frames: [...new Set(dirs)] };
     }
-    if (mode === 'map') {
+    if (mode === 'map' && (doc.map || doc.kind === 'object' || doc.footprint)) {
+      const all = this.assetDocs();
+      const world = mapWorld(all);
+      const base = { world, region: req.region, camera: req.camera, screen: cameraOf(style), drawScale: drawScaleOf(style) };
+      if (doc.map) o.mapDoc = { doc, ...base };
+      else {
+        if (req.camera) throw new ProjectError('camera= is for a map document');
+        o.mapDoc = { ...this.objectScene(asset, doc, all, req.ground), ...base, region: undefined };
+      }
+      if (o.marks && !doc.map) o.marks = undefined;
+    } else if (mode === 'map') {
       const overlays = (req.with ?? []).map((n) => {
         const d = this.doc(n);
         if (!d.overlay) throw new ProjectError(`'${n}' is not an overlay (with= takes overlays for the map view)`);
@@ -494,6 +506,32 @@ export class Writer {
       since = (entries.find((e) => e.group === g)?.seq ?? 1) - 1;
     }
     return makeView(doc, mode, o, dir, since > 0 ? this.docAt(asset, since) : null);
+  }
+
+  /**
+   * An object on its ground, among plain tiles (plan §4.10): a 7x6 map of the ground (a tile, or a
+   * family's inside) with the object placed by its anchor near the middle.
+   */
+  private objectScene(asset: string, doc: Doc, all: AssetDoc[], given?: string): { doc: Doc; note: string } {
+    const style = this.project.json.style;
+    const g = given ? all.find((a) => a.name === given) : groundOf(asset, all, style, undefined) ?? all.find((a) => a.doc.family);
+    if (!g) throw new ProjectError(given ? `no asset '${given}' to use as ground` : 'no ground tile or family to stand the object on (ground=<asset>)');
+    const t = doc.cellW;
+    const fp = footprintOf(doc);
+    const [ac, ar] = [Math.ceil(doc.width / t), Math.ceil(doc.height / doc.cellH)];
+    const cols = Math.max(7, ac + 4), rows = Math.max(6, ar + 3);
+    const ax = Math.floor((cols - fp.cols) / 2) + fp.anchor[0], ay = rows - 2 - (fp.rows - 1) + fp.anchor[1];
+    const lines = [`new map scene ${cols}x${rows} tile=${t}`];
+    if (g.doc.family) lines.push(`layer add ground terrain=${g.name} outside=on above=floor`, `terrain ground rect 0,0 ${cols}x${rows}`);
+    else for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) lines.push(`place ${g.name} ${x},${y} layer=floor cells=1x1 anchor=0,0`);
+    lines.push(`layer add props objects`, `place ${asset} ${ax},${ay} layer=props`);
+    const r = runBatch({ doc: null, entries: [] }, lines.join('\n'), { by: 'scene', palettes: paletteSource(this.project), assets: (n) => all.find((a) => a.name === n)?.doc });
+    if (!r.ok) throw new ProjectError(`the scene: ${r.errors.map((e) => e.message).join('; ')}`);
+    const flags = fp.flags.map((row) => row.replace(/\./g, '·')).join(' / ');
+    return {
+      doc: r.state.doc!,
+      note: `${asset} on ${g.name} at the game's scale: ${doc.width}x${doc.height} px, ${ac}x${ar} cells; footprint ${fp.cols}x${fp.rows} at art cell ${fp.at.join(',')}, anchor ${fp.anchor.join(',')} (placed at ${ax},${ay}); cell flags by art row (b blocks, r roof): ${flags}`,
+    };
   }
 
   /** Record an image view as the last one shown to the agent, and tell the watchers. */

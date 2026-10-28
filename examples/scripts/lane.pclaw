@@ -1,0 +1,13 @@
+# Mossy ruins: a lane (plan §10 G8), a path family of sand through grass, for the village's roads.
+# Route 1: inside the sand tile, outside the grass tile; from the grass in, a rim of trodden soil,
+# then sand. Wheel ruts run along the straight pieces.
+new family lane 24x24 scheme=path palette=ruins-shore
+family texture inside from=sand
+family texture outside from=grass
+family band 1:moss1 1:sand0 radius=2
+
+# --- ruts along the straight pieces, a few stones kicked to the side
+px @cell(ew) 3,9 4,9 5,9 9,9 10,9 15,14 16,14 17,14 20,14 21,14 c=sand1
+px @cell(ns) 9,3 9,4 9,5 9,10 9,11 14,15 14,16 14,17 14,20 14,21 c=sand1
+px @cell(ew) 13,8 c=stone3
+px @cell(ns) 15,7 c=stone3

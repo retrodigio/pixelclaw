@@ -1,0 +1,16 @@
+# Mossy ruins: a meadow (plan §10 G8), a blob47 family of grass on sand, for the village above the
+# beach. Route 1: the textures are the grass tile (inside) and the sand tile (outside); from the
+# sand in, 2 px of sand, a dark rim of moss, then the grass. Tufts reach over the rim on the three
+# pieces, so the edge reads as grass growing out into the sand, not a cut line.
+new family meadow 24x24 scheme=blob47 palette=ruins-shore
+family texture inside from=grass
+family texture outside from=sand
+family band 2:outside 1:moss1 radius=3
+
+# --- tufts over the rim (ew: north and south edges; ns: west and east; o: the outer corners)
+px @cell(ew) 5,1 6,1 15,1 9,22 18,22 19,22 c=moss2
+px @cell(ew) 5,0 15,0 c=moss1
+px @cell(ew) 9,23 19,23 c=moss1
+px @cell(ns) 1,4 1,15 22,7 22,18 c=moss2
+px @cell(ns) 0,4 0,15 23,7 23,18 c=moss1
+px @cell(o) 6,2 2,17 21,6 17,21 c=moss2

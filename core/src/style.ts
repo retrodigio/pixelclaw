@@ -23,6 +23,8 @@ export interface StyleJson {
   outline?: string[];
   ground?: string;
   drawScale?: number;
+  /** The engine's screen in art pixels ("384x216"): the map camera's view. */
+  camera?: string;
   sizes?: Record<string, string>;
   checks?: Record<string, unknown>;
   assets?: Record<string, { checks?: Record<string, unknown>; ground?: string; set?: string[] }>;
@@ -63,6 +65,12 @@ export interface AssetDoc {
 export function drawScaleOf(json: StyleJson | undefined): number {
   const k = json?.drawScale;
   return typeof k === 'number' && Number.isInteger(k) && k >= 1 && k <= 16 ? k : 2;
+}
+
+/** The camera's screen size in art pixels (default 384x216: 16x9 cells of 24). */
+export function cameraOf(json: StyleJson | undefined): [number, number] {
+  const m = /^(\d+)x(\d+)$/.exec(json?.camera ?? '');
+  return m && Number(m[1]) > 0 && Number(m[2]) > 0 ? [Number(m[1]), Number(m[2])] : [384, 216];
 }
 
 /**

@@ -7,6 +7,8 @@ import { BUILTIN_SCHEMES, CHECK_IDS, checkSummary, ctxOf, diffPixels, diffText, 
 import { ProjectError, listAssets, readPaletteFile } from './project.ts';
 import { formatChecks } from './report.ts';
 import { writeReview } from './review.ts';
+import { EXPORT_FORMATS, exportAsset } from './export.ts';
+import { join } from 'node:path';
 import { VIEW_MODES, parseRegion, type View, type ViewMode } from './views.ts';
 import { SUMMARY_BUDGET, type AssetChanges, type Writer } from './writer.ts';
 
@@ -60,9 +62,19 @@ Autotile families (a sheet of every variant of a scheme: blob47, wang16-corner, 
   layer band ; paint @cell(o) 0,0 << ... >>   hand-detail a piece (cells by name: @cell(inside), @cell(nesw)); every other variant is built from the pieces' quadrants, live
   family detach|attach <variant>|all   draw a variant by hand instead   |   family coverage [seed=] [copies=] [fill=on] (a coverage map to paint)   |   family cut [textures=on]
   new overlay <name> <W>x<H> ; overlay set mode=cycle|pingpong|wave|sparkle on=outside|inside|all [anchor=x,y] [spread=4x2] [every=3]   sub-tile sprites over a map (view map with=)
+Oversized tiles and objects (48x48, 24x48, …; cell= the grid): new object house 48x48 cell=24x24 ; footprint 2x1 [at=<cx,cy>] [anchor=<x,y>] << a row per art cell row: . b (blocks) r (roof, drawn above actors) x (both) >>
+  variant of=<asset>   this asset is a texture variant of another (fork it, change the inside, keep the border): maps pick among them cell by cell
+Maps (plan §4.11: cells of tile px holding names; a map redraws itself when a tile changes):
+  new map <name> <C>x<R> tile=24   layer add <name> terrain=<family> [outside=on] | tiles | objects | overlay=<overlay> on=<terrain layer>[:out]|all
+  terrain <layer> rect <x,y> <W>x<H> | ellipse … | brush <x,y>... [size=n] | fill <x,y> | paint <x,y> << # terrain, - not, . leave >> | clear   [erase]   the scheme picks the edge tiles
+  place <asset>|<family>.<variant> <x,y> [layer=]   by its anchor cell; footprints may not overlap   |   move <x,y> <x,y>   |   remove <x,y>
+  road <terrain layer> <x,y> <x,y>... [width=n]   |   scatter <asset>[,<asset>] count=<n> [on=<terrain layer>] [minDist=n] [layer=] [seed=]   |   map gen island|village|dungeon [layers=a,b,c] [seed=]
+  view map: the whole map at 1x; region="x,y WxH" (cells) or camera="x,y" (the engine's screen around a cell) at game scale; marks="failing" outlines hot spots. export: tmx (Tiled), split (one-cell pieces + stamp), png.
 Colours: an entry name (c=stone3), its key (c=3), its exact hex, or none. Coordinates wrap on wrap=on documents (tiles by default). @cell(cx,cy) after a command name offsets it to a cell of the cell grid. Generators write their seed into the tape line; give seed= to choose one (another seed is another variant). Your layer, frame, selection, symmetry and brush are yours alone: people in the watch view have their own.
 
 Habits: after each meaningful batch, look once at an image (render or tile3x3), and use the grid to check exact pixels. Never judge a tile alone when it will be seen tiled; judge a sprite in the game view, on its ground. Keep the checks green, but do not stop at green: look at the 3x3 or the game view and judge it as a player would.
+
+Map checks: seam (over the composed ground), repetition (hot spots: the same edge tile in a long straight run, one textured tile filling a 4x4 window; fix with texture variants), footprint (overlaps, off the map, standing on an edge or the outside ground), draworder (overhangs not marked roof, roofs hiding what stands in front), coverage (missing assets or undrawn variants). Assets: fit (footprint cells drawn, overhangs are roofs), variant (colour mix against the base).
 
 Checks: palette (colours in the style palettes; role art uses only roles), orphans (stray pixels per 100), jaggies (doubled L-corners, irregular step runs, spikes, notches), banding (pillow shading), outline (share of the silhouette edge in ink), seam (tiles: the border vs the interior; families: over a random island map; about 1 or less reads as no seam), coverage (sizes, empty frames or cells; families: every variant and texture drawn), readability (edge contrast against the ground in ΔL*, silhouette distinct from the set, lightness spread), revert (share copied from a reference: ref=), repetition (tiles: the most visible stripe when tiled, ΔL*·√width). Thresholds come from project.json style.checks.`;
 
@@ -225,6 +237,8 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
       'anim: a contact sheet of every sequence (tags, views): each frame with its ticks, the frame before it as a tinted onion skin, the pivot and ground line, and the share of pixels changed from the frame before; plus an animated GIF at the game\'s speed saved for the person, and the numbers as text. ' +
       'map: a sample map built with a family\'s autotile scheme (a random island; size and seed choose another), at the game\'s draw scale, with the seam score over it and the variants it used; overlays given in with= play over it (a GIF when anything moves). ' +
       'family: every variant of a family in the middle of the 3x3 map that resolves to it, plus where each cell is on the sheet (for @cell(<name>)). ' +
+      'map of a map document: the whole map at 1x (its layers and placements as text), a region of cells or the camera (the engine\'s screen around a cell) at the game\'s draw scale; marks="failing" outlines the cells the map checks flag. ' +
+      'map of an object: it stands on its ground among plain tiles at game scale, with its footprint in words. ' +
       'marks="failing" circles every pixel a failing check flags. ' +
       'Images come back inline and are also saved as files; the person watching sees the last image you were shown.',
     annotations: { readOnlyHint: true },
@@ -232,7 +246,8 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
       asset: z.string(),
       mode: z.enum(VIEW_MODES).default('render'),
       scale: z.number().int().min(1).max(64).optional().describe('render only: pixels per pixel'),
-      region: z.string().optional().describe('grid only: part of the canvas, "x,y WxH" (e.g. "8,0 12x10")'),
+      region: z.string().optional().describe('grid: part of the canvas, "x,y WxH" (e.g. "8,0 12x10"); map of a map document: cells to show at game scale'),
+      camera: z.string().regex(/^\d+,\d+$/).optional().describe('map of a map document: the camera\'s view around this cell, "x,y" (the screen size is project.json style.camera, default 384x216)'),
       since: z.number().int().min(0).optional().describe('diff only: compare with the document after this command number (default: before the latest group)'),
       frame: z.number().int().min(1).optional().describe('render, grid, tile3x3, game, recolour: the frame to show (default: the frame you are drawing on)'),
       marks: z.string().optional().describe('render, tile3x3, game: circle the pixels checks flag in magenta: "failing", or check names ("orphans,jaggies")'),
@@ -253,7 +268,8 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
       const sz = a.size ? /^(\d+)x(\d+)$/.exec(a.size) : null;
       if (a.size && (!sz || Number(sz[1]) < 1 || Number(sz[2]) < 1 || Number(sz[1]) > 128 || Number(sz[2]) > 128)) return fail(`error: size must look like "16x12" (tiles, up to 128 each way)`);
       const size = sz ? { cols: Number(sz[1]), rows: Number(sz[2]) } : undefined;
-      const v = w.view(a.asset, a.mode as ViewMode, { scale: a.scale, region, since: a.since, frame, marks, theme: a.theme, themes: a.themes, ground: a.ground, with: a.with, size, seed: a.seed });
+      const camera = a.camera ? (a.camera.split(',').map(Number) as [number, number]) : undefined;
+      const v = w.view(a.asset, a.mode as ViewMode, { scale: a.scale, region, since: a.since, frame, marks, theme: a.theme, themes: a.themes, ground: a.ground, with: a.with, size, seed: a.seed, camera });
       w.showEye(a.asset, v);
       return { content: viewContent(v) };
     } catch (e) {
@@ -355,6 +371,24 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
         content.push(...viewContent(v));
       }
       return { content };
+    } catch (e) {
+      return errorResult(e);
+    }
+  }));
+
+  server.registerTool('export', {
+    title: 'Export an asset',
+    description: 'Write an asset out (export profiles come later). tmx: a map document as a Tiled map (a tile layer per ground layer, objects as tile objects with footprint, anchor and cell flags), with its tileset image and one image per object. ' +
+      'split: an oversized tile or object as one-cell pieces <name>_<cx>_<cy>.png plus <name>.stamp.json that puts them back (with each cell\'s block and roof flags). png: a map composed at 1x, or an asset\'s first frame.',
+    inputSchema: z.object({
+      asset: z.string(),
+      format: z.enum(EXPORT_FORMATS),
+      dest: z.string().optional().describe('The folder to write into (default: <project>/exports/<format>)'),
+    }),
+  }, (a) => w.enqueue(() => {
+    try {
+      const files = exportAsset(w.doc(a.asset), w.assetDocs(), a.format, a.dest ?? join(w.project.dir, 'exports', a.format));
+      return { content: [text(`${a.format}: wrote ${files.length} files\n${files.map((f) => `  ${f}`).join('\n')}`)] };
     } catch (e) {
       return errorResult(e);
     }

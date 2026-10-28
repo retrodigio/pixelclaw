@@ -1,0 +1,11 @@
+# A variant of the meadow (plan §4.1): the grass variant grass_b inside, the band drawn again and
+# the tufts elsewhere, so the meadow's middle and its long edges stop repeating one tile.
+fork meadow meadow_b
+variant of=meadow
+family texture inside from=grass_b
+family band 2:outside 1:moss1 radius=3
+px @cell(ew) 3,1 11,1 12,1 20,1 6,22 14,22 15,22 c=moss2
+px @cell(ew) 11,0 20,0 6,23 14,23 c=moss1
+px @cell(ns) 1,8 1,19 22,3 22,12 22,13 c=moss2
+px @cell(ns) 0,8 0,19 23,3 23,12 c=moss1
+px @cell(o) 4,3 3,20 20,4 20,20 c=moss2

@@ -75,6 +75,7 @@ const layerCmd: CommandSpec = {
       const name = a.take('word', 'a name for the new layer');
       a.done();
       checkNewName(doc, name);
+      if (doc.map && (name.v === 'tiles' || name.v === 'objects')) throw new DiagError(name.line, name.col, `'${name.v}' says what a map layer holds; name the layer something else (layer add props objects)`);
       let info: MapLayerInfo | undefined;
       let what = '';
       if (doc.map) {

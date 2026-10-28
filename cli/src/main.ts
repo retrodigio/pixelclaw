@@ -1,4 +1,4 @@
-// pixelclaw: new | run | view | check | review | verify | upgrade. A thin layer over @pixelclaw/core and the project folder.
+// pixelclaw: new | run | view | check | review | export | verify | upgrade. A thin layer over @pixelclaw/core and the project folder.
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -9,7 +9,7 @@ import {
 import {
   AssetExistsError, NoAssetError, ProjectError, VIEW_MODES, Writer, assetDir, checkpointNames, createProject, formatChecks, isViewMode, listAssets,
   loadProject, lockHolder, paletteSource, parseRegion, prefixHash, previewPng, readAssetJson, readCheckpoints, readPaletteFile,
-  readTape, saveAsset, sha256, writeReview, SUMMARY_BUDGET, type Project, type ViewMode,
+  readTape, saveAsset, sha256, writeReview, SUMMARY_BUDGET, EXPORT_FORMATS, exportAsset, type ExportFormat, type Project, type ViewMode,
 } from '@pixelclaw/server';
 
 export interface Io {
@@ -31,24 +31,29 @@ export const USAGE = `pixelclaw: a pixel art editor driven by commands
   pixelclaw new <project> [--name <name>] [--palette <file.json|.hex|.gpl>]...
       Create a project folder. The first palette becomes the default.
   pixelclaw new <project> <kind> <name> <W>x<H> [palette=..] [wrap=on|off] [cell=WxH] [bg=..] [--replace]
-      Create an asset (kinds: tile, sprite, sheet, icon). Same as running a 'new' command.
+      Create an asset (kinds: tile, sprite, sheet, icon, object, map, …). Same as running a 'new' command.
   pixelclaw run <project> (<script.pclaw> | - | -e "<commands>") [--asset <name>] [--replace] [--by <author>] [--view <mode>]
       Apply commands as one undo group. Any error applies nothing.
       A script that starts with 'new' creates the asset (--replace starts its tape again).
   pixelclaw view <project> <asset> [render|grid|tile3x3|diff|game|recolour|anim|map|family|all]... [--scale N] [--region x,y,WxH] [--frame N] [--out <dir>]
-         [--marks failing|<check>,...] [--theme <name>] [--themes a,b,c] [--ground <tile>] [--with <asset>]... [--size CxR] [--seed N]
+         [--marks failing|<check>,...] [--theme <name>] [--themes a,b,c] [--ground <tile>] [--with <asset>]... [--size CxR] [--seed N] [--camera x,y]
       Write views (default: <project>/views/<asset>.<mode>.png|txt). The grid is also printed.
       diff shows what the latest group changed; game shows a sprite on its ground at 1x and the
       draw scale beside its set; recolour shows role art under preview themes; map puts a family
       on a random island (--size, --seed; overlays --with) with the seam score; family shows each
       variant among its neighbours; all is render, grid and tile3x3. --marks circles the pixels
-      checks flag.
+      checks flag. map of a map document: the whole map at 1x, --region x,y,WxH (cells) or
+      --camera x,y (the engine's screen around a cell) at game scale; of an object: on its ground.
   pixelclaw check <project> [<asset>...] [--checks a,b] [--frame N] [--ground <tile>] [--ref <asset>] [--marks]
       Run the quality checks against the style guide (project.json style): scores, pass or fail,
       and the flagged pixels. Exits 1 if any check fails. --marks writes the render (tile3x3 for
       tiles) with the flagged pixels circled.
   pixelclaw review <project> [<asset>...] [--name <set>] [--size CxR] [--seed N]
       Write a blind review bundle under <project>/reviews/<date>-<set>/ (rubric.md inside).
+  pixelclaw export <project> <asset> [--format tmx|split|png] [--out <dir>]
+      tmx: a map as a Tiled map with its tileset and object images; split: an oversized asset as
+      one-cell pieces plus a stamp; png: a map at 1x or an asset's first frame.
+      Default folder: <project>/exports/<format>/.
   pixelclaw upgrade <project> [<asset>...]
       Rewrite language 1 tapes (G1-G4) in the current language: the palette goes into the 'new'
       line. Each is replayed before and after; it is written only if the pixels are the same.
@@ -173,6 +178,10 @@ function writeViews(io: Io, proj: Project, doc: Doc, modesIn: string[], p: Parse
   const region = regionS ? parseRegion(regionS) : undefined;
   if (region === null) throw new UsageError(`--region must look like 8,0,12x10 or "8,0 12x10"`);
   if (region && (region.w < 1 || region.h < 1)) throw new UsageError('--region size must be at least 1x1');
+  const camS = one(p, 'camera');
+  const cm = camS ? /^(\d+),(\d+)$/.exec(camS) : null;
+  if (camS && !cm) throw new UsageError('--camera must look like 12,9 (a cell)');
+  const camera = cm ? [Number(cm[1]), Number(cm[2])] as [number, number] : undefined;
   if (region && !doc.wrap && (region.x + region.w > doc.width || region.y + region.h > doc.height)) {
     throw new UsageError(`--region runs past the ${doc.width}x${doc.height} canvas`);
   }
@@ -194,7 +203,7 @@ function writeViews(io: Io, proj: Project, doc: Doc, modesIn: string[], p: Parse
     const out = one(p, 'out') ?? join(proj.dir, 'views');
     const v = w.view(doc.name, m, {
       scale, region, frame, marks: marks as CheckId[] | 'failing' | undefined, theme: one(p, 'theme'), themes: one(p, 'themes')?.split(','),
-      ground: one(p, 'ground'), with: p.flags.get('with'), size, seed,
+      ground: one(p, 'ground'), with: p.flags.get('with'), size, seed, camera,
     }, out);
     if (v.kind === 'text') {
       io.out(v.text);
@@ -249,6 +258,18 @@ function cmdView(io: Io, p: Parsed): number {
   const { doc } = loadState(proj, name);
   if (!doc) throw new ProjectError(`asset '${name}' has an empty tape`);
   return writeViews(io, proj, doc, modes, p);
+}
+
+function cmdExport(io: Io, p: Parsed): number {
+  const [dir, name] = p.pos;
+  if (!dir || !name) throw new UsageError('export: give a project folder and an asset name');
+  const format = (one(p, 'format') ?? 'png') as ExportFormat;
+  if (!(EXPORT_FORMATS as readonly string[]).includes(format)) throw new UsageError(`--format must be one of ${EXPORT_FORMATS.join(', ')}`);
+  const proj = loadProject(dir);
+  const w = new Writer(proj);
+  const files = exportAsset(w.doc(name), w.assetDocs(), format, one(p, 'out') ?? join(proj.dir, 'exports', format));
+  io.out(`${format}: wrote ${files.length} files\n${files.map((f) => `  ${f}\n`).join('')}`);
+  return 0;
 }
 
 function cmdUpgrade(io: Io, p: Parsed): number {
@@ -365,9 +386,11 @@ export function main(argv: string[], io: Io = nodeIo): number {
         return p.pos.length === 1 ? cmdNewProject(io, p.pos[0], p) : cmdNewAsset(io, p.pos[0], p);
       }
       case 'run':
-        return cmdRun(io, parseArgs(rest, ['asset', 'by', 'e', 'view', 'scale', 'region', 'out', 'frame', 'marks', 'theme', 'themes', 'ground', 'with', 'size', 'seed'], ['replace']));
+        return cmdRun(io, parseArgs(rest, ['asset', 'by', 'e', 'view', 'scale', 'region', 'out', 'frame', 'marks', 'theme', 'themes', 'ground', 'with', 'size', 'seed', 'camera'], ['replace']));
       case 'view':
-        return cmdView(io, parseArgs(rest, ['scale', 'region', 'out', 'frame', 'marks', 'theme', 'themes', 'ground', 'with', 'size', 'seed'], []));
+        return cmdView(io, parseArgs(rest, ['scale', 'region', 'out', 'frame', 'marks', 'theme', 'themes', 'ground', 'with', 'size', 'seed', 'camera'], []));
+      case 'export':
+        return cmdExport(io, parseArgs(rest, ['format', 'out'], []));
       case 'check':
         return cmdCheck(io, parseArgs(rest, ['checks', 'frame', 'ground', 'ref'], ['marks']));
       case 'review':

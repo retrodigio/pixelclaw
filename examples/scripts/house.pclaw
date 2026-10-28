@@ -1,0 +1,77 @@
+# Mossy ruins: a 48x48 house (plan §4.10), two cells wide and two tall on the 24 px grid. A pitched
+# roof of red tiles over a plastered front with a timber frame, a door and two windows; lit from the
+# top left, a 1-px ink outline. Its footprint is all four cells: the wall row blocks, the roof row
+# is a roof (drawn above actors walking behind the house).
+new object house 48x48 cell=24x24 palette=ruins-props
+palette add roof0 hex=#4e2620 key=R
+palette add roof1 hex=#7a3a2a key=S
+palette add roof2 hex=#a5553a key=T
+palette add roof3 hex=#c77a50 key=U
+palette add wall0 hex=#8f7a5e key=P
+palette add wall1 hex=#c2ad86 key=Q
+ramp roof = roof0 roof1 roof2 roof3
+palette save as=ruins-village
+
+# --- the front wall, its timber frame and a darker plinth
+rect 5,26 38x21 c=wall1 fill
+rect 5,43 38x4 c=stone2 fill
+line 5,43 42,43 c=stone3
+rect 5,26 2x17 c=wood1 fill
+rect 41,26 2x17 c=wood0 fill
+rect 23,26 2x8 c=wood1 fill
+line 7,27 40,27 c=wall0
+line 39,28 39,42 c=wall0
+
+# --- the door, planked, with a brass latch; a step of stone
+rect 19,32 10x12 c=wood0 fill
+rect 20,33 8x11 c=wood2 fill
+line 22,33 22,43 c=wood1
+line 25,33 25,43 c=wood1
+px 26,38 c=brass1
+rect 19,44 10x3 c=stone3 fill
+
+# --- two windows: dark panes with a cross and a lit corner, sills below
+rect 9,31 8x7 c=wood0 fill
+rect 10,32 6x5 c=pool fill
+line 13,32 13,36 c=wood1
+line 10,34 15,34 c=wood1
+px 10,32 14,32 c=stone4
+line 8,38 17,38 c=wood2
+rect 31,31 8x7 c=wood0 fill
+rect 32,32 6x5 c=pool fill
+line 35,32 35,36 c=wood1
+line 32,34 37,34 c=wood1
+px 32,32 36,32 c=stone4
+line 30,38 39,38 c=wood2
+
+# --- the roof: a trapezoid of tiles over the wall, rows of darker joints, a lit ridge, shadow under the eave
+polygon 1,26 7,4 40,4 46,26 c=roof2 fill
+select lasso 1,26 7,4 40,4 46,26
+rect 34,4 14x23 c=roof1 fill
+line 0,8 33,8 c=roof1
+line 0,12 33,12 c=roof1
+line 0,16 33,16 c=roof1
+line 0,20 33,20 c=roof1
+line 0,24 33,24 c=roof1
+line 34,8 47,8 c=roof0
+line 34,12 47,12 c=roof0
+line 34,16 47,16 c=roof0
+line 34,20 47,20 c=roof0
+line 34,24 47,24 c=roof0
+px 11,6 19,10 8,14 26,7 15,18 23,14 6,22 29,22 12,10 c=roof3
+deselect
+line 7,4 40,4 c=roof3
+line 2,26 45,26 c=roof0
+line 7,28 40,28 c=wall0
+
+# --- a stone chimney at the back right
+rect 32,0 6x7 c=stone2 fill
+line 32,0 37,0 c=stone4
+line 32,1 32,6 c=stone3
+px 34,3 36,5 c=stone1
+
+outline c=ink mode=outer
+footprint 2x2 anchor=0,1 <<
+  rr
+  bb
+>>

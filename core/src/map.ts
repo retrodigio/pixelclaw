@@ -7,10 +7,11 @@
 // (seams, repetition hot spots, footprints, draw order, coverage), Tiled `.tmx` export and the
 // `split` of an oversized asset into one-cell pieces.
 
-import { frameAtTick, playOrder, sequences } from './anim.ts';
+import { frameAtTick, loopTicks, playOrder, sequences } from './anim.ts';
 import { TRANSPARENT, flatten, type Doc, type Footprint, type MapEntry, type MapLayerInfo } from './doc.ts';
 import { drawOverlayAt, hash32, layoutOf, mapSeam, overlayFrameAt, schemeOf, type MapImage } from './family.ts';
 import { luma601, lstar } from './checks.ts';
+import type { Rgba } from './png.ts';
 import type { Pt } from './raster.ts';
 import { resolveMap, type Scheme, type Terrain } from './schemes.ts';
 
@@ -157,6 +158,8 @@ export interface CellTile {
   variant: string | null;
   /** A family's edge tile (not the plain inside or outside). */
   edge: boolean;
+  /** Drawn by a terrain layer that fills the map with its outside ground (the land against the sea). */
+  base?: boolean;
 }
 
 export interface PlacedObject extends Placed {
@@ -243,8 +246,22 @@ export function composeMapDoc(d: Doc, world: MapWorld, o: ComposeOptions = {}): 
     if (!fam.length && !missing.has(name)) { missing.add(name); problems.push(`no asset '${name}'`); }
     return fam;
   };
-  /** Pick among an asset and its variants by the cell's place. */
-  const pick = (fam: Doc[], x: number, y: number, li: number): Doc => fam[fam.length > 1 ? hash32(x, y, li, 0x5a) % fam.length : 0]!;
+  /**
+   * Pick among an asset and its variants by the cell's place: a hash of the cell, moved on when it
+   * would repeat both the cell to the left and the one above (so clumps of one look are rare).
+   */
+  const choice = new Map<number, Int16Array>();
+  const pick = (fam: Doc[], x: number, y: number, li: number): Doc => {
+    if (fam.length < 2) return fam[0]!;
+    let ch = choice.get(li);
+    if (!ch) choice.set(li, (ch = new Int16Array(cols * rows).fill(-1)));
+    const h = hash32(x, y, li, 0x5a);
+    let k = h % fam.length;
+    const left = x > 0 ? ch[y * cols + x - 1]! : -1, up = y > 0 ? ch[(y - 1) * cols + x]! : -1;
+    if (k === left && k === up) k = (k + 1 + ((h >>> 16) % (fam.length - 1))) % fam.length;
+    if (x >= 0 && y >= 0 && x < cols && y < rows) ch[y * cols + x] = k;
+    return fam[k]!;
+  };
   const objects: PlacedObject[] = [];
 
   d.layers.forEach((l, li) => {
@@ -265,7 +282,7 @@ export function composeMapDoc(d: Doc, world: MapWorld, o: ComposeOptions = {}): 
         const L = layoutOf(f.family!);
         const [cx, cy] = v === null ? L.outside : L.cells[v]!;
         blit(flat(f), f.width, cx * t, cy * t, t, t, x * t, y * t);
-        top[i] = { asset: f.name, variant: v === null ? 'outside' : s.variants[v]!.name, edge: v !== null && !fullInside(s, v) };
+        top[i] = { asset: f.name, variant: v === null ? 'outside' : s.variants[v]!.name, edge: v !== null && !fullInside(s, v), ...(info.outside ? { base: true } : {}) };
         variants[i] = v;
       });
       return;
@@ -385,12 +402,12 @@ export interface MapDocView {
 const rgb = (hex: string): [number, number, number] => [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
 
 /** A composed map (or a region of it) as RGBA at a scale, with marked cells outlined. */
-export function paintComposed(c: ComposedMap, o: MapDocView = {}): { width: number; height: number; data: Uint8ClampedArray } {
+export function paintComposed(c: ComposedMap, o: MapDocView = {}): Rgba {
   const s = o.scale ?? 1;
   const r = o.region ?? { x: 0, y: 0, w: c.cols, h: c.rows };
   const t = c.t;
   const w = r.w * t * s, h = r.h * t * s;
-  const data = new Uint8ClampedArray(w * h * 4);
+  const data = new Uint8Array(w * h * 4);
   const cols = c.palette.map((e) => rgb(o.hex ? o.hex(e.name, e.hex) : e.hex));
   for (let y = 0; y < r.h * t; y++) for (let x = 0; x < r.w * t; x++) {
     const X = r.x * t + x, Y = r.y * t + y;
@@ -418,6 +435,53 @@ export function paintComposed(c: ComposedMap, o: MapDocView = {}): { width: numb
     }
   }
   return { width: w, height: h, data };
+}
+
+/** Ticks before everything a map draws repeats (families' and objects' first sequences, overlays), capped. */
+export function mapDocPeriod(d: Doc, world: MapWorld, cap: number): number {
+  const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
+  let p = 1;
+  const add = (l: number) => { if (l > 1) p = Math.min(cap, (p / gcd(p, l)) * l); };
+  const seen = new Set<Doc>();
+  const docs: Doc[] = [];
+  for (const l of d.layers) {
+    const info = l.map;
+    if (!info || l.hidden) continue;
+    if (info.kind === 'terrain') docs.push(...world.family(info.family));
+    if (info.kind === 'overlay') { const o = world.get(info.overlay); if (o) docs.push(o); }
+  }
+  for (const pl of placements(d)) docs.push(...world.family(d.map!.entries[pl.entry]!.name));
+  for (const x of docs) {
+    if (seen.has(x)) continue;
+    seen.add(x);
+    if (x.overlay) add(overlayPeriodOf(x));
+    else if (x.frameCount > 1) add(loopOf(x));
+  }
+  return p;
+}
+
+const loopOf = (x: Doc): number => { const q = sequences(x)[0]!; return Math.max(1, loopTicks(x, q)); };
+const overlayPeriodOf = (x: Doc): number => (x.overlay!.mode === 'sparkle' ? loopOf(x) + x.overlay!.rest : loopOf(x));
+
+/** A map (or a region) playing at the game's speed: one loop, at most `seconds`, in steps of at least 3 ticks. */
+export function mapDocGifFrames(d: Doc, world: MapWorld, o: MapDocView & { tickRate?: number; seconds?: number } = {}): { img: Rgba; delay: number }[] {
+  const rate = o.tickRate ?? 60;
+  const period = mapDocPeriod(d, world, rate * (o.seconds ?? 4));
+  if (period <= 1) return [];
+  const cs = (t: number) => Math.round((t * 100) / rate);
+  const out: { img: Rgba; delay: number }[] = [];
+  let prev: Uint16Array | null = null;
+  let start = 0;
+  for (let t = 0; t <= period; t += t === period ? 1 : Math.min(3, period - t)) {
+    const c = t < period ? composeMapDoc(d, world, { tick: t }) : null;
+    if (c && prev && c.px.every((v, i) => v === prev![i])) continue;
+    if (prev && out.length) out[out.length - 1]!.delay = Math.max(1, cs(t) - cs(start));
+    if (!c) break;
+    out.push({ img: paintComposed(c, { ...o, tick: t }), delay: 1 });
+    prev = c.px;
+    start = t;
+  }
+  return out.length > 1 ? out : [];
 }
 
 /** The camera: what a player standing at cell x,y sees, a screen of w x h art pixels, kept on the map. */
@@ -453,6 +517,37 @@ export function mapDocText(d: Doc, world: MapWorld, c: ComposedMap = composeMapD
   });
   if (c.problems.length) lines.push(`problems: ${c.problems.join('; ')}`);
   return lines.join('\n');
+}
+
+/**
+ * The map as a grid of characters, a row per map row, with column numbers: each terrain layer by
+ * the first letter of its name where its terrain is (the topmost wins), '.' elsewhere; objects by
+ * the first letter of their name in capitals at their anchor and '+' over the rest of the footprint.
+ */
+export function mapAscii(d: Doc, c?: ComposedMap): string {
+  const W = d.width, H = d.height;
+  const g = Array.from({ length: W * H }, () => '.');
+  const legend: string[] = [];
+  d.layers.forEach((l, li) => {
+    if (l.map?.kind !== 'terrain' || l.hidden) return;
+    const ch = l.name[0]!.toLowerCase();
+    legend.push(`${ch} ${l.name}`);
+    const cel = d.cels[li]![0]!;
+    for (let i = 0; i < cel.length; i++) if (cel[i] === 1) g[i] = ch;
+  });
+  const names = new Set<string>();
+  for (const p of placements(d)) {
+    const e = d.map!.entries[p.entry]!;
+    const b = entryBox(e, p.x, p.y);
+    for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) if (x >= 0 && y >= 0 && x < W && y < H) g[y * W + x] = '+';
+    if (p.x >= 0 && p.y >= 0 && p.x < W && p.y < H) g[p.y * W + p.x] = e.name[0]!.toUpperCase();
+    names.add(`${e.name[0]!.toUpperCase()} ${e.name}${e.variant ? `.${e.variant}` : ''}`);
+  }
+  void c;
+  const tens = '     ' + Array.from({ length: W }, (_, x) => (x % 10 === 0 ? String(Math.floor(x / 10) % 10) : ' ')).join('');
+  const ones = '     ' + Array.from({ length: W }, (_, x) => String(x % 10)).join('');
+  const rows = Array.from({ length: H }, (_, y) => `${String(y).padStart(3)}  ${g.slice(y * W, y * W + W).join('')}`);
+  return [`cells (${[...legend, ...names, '+ footprint, . nothing'].join(', ')}):`, tens, ones, ...rows].join('\n');
 }
 
 /** The tile at each cell, as rows of short labels (the topmost ground tile; objects' anchors marked). */
@@ -577,7 +672,8 @@ export function mapChecks(d: Doc, world: MapWorld, limits: Partial<typeof MAP_LI
     const n = new Map<number, number>();
     for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
       const k = (y + j) * cols + x + i;
-      if (flat[k] || !c.top[k]) continue;
+      // The open ground a map is filled with (the sea) is a backdrop, judged as its own tile.
+      if (flat[k] || !c.top[k] || c.top[k]!.variant === 'outside') continue;
       n.set(keys[k]!, (n.get(keys[k]!) ?? 0) + 1);
     }
     let best = 0, bk = -1;
@@ -642,8 +738,9 @@ export function mapChecks(d: Doc, world: MapWorld, limits: Partial<typeof MAP_LI
       const i = y * cols + x;
       if (objCells.has(i)) clash.push([x, y]); else objCells.set(i, k);
       const g = c.top[i];
+      // Only the ground a map is filled with stops an object: its outside (the sea) and its edge tiles.
       if (!g) bad.push([x, y]);
-      else if (g.edge || g.variant === 'outside') bad.push([x, y]);
+      else if (g.variant === 'outside' || (g.edge && g.base)) bad.push([x, y]);
     }
     if (clash.length) fpGroups.push({ label: `${at}: overlaps ${c.objects[objCells.get(clash[0]![1] * cols + clash[0]![0])!]!.name}`, cells: clash });
     if (bad.length) {

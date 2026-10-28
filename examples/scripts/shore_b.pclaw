@@ -1,0 +1,15 @@
+# A variant of the shore (plan §4.1): the band drawn again with its spray, breaks and wet-sand lobes
+# in other places, so a long straight beach stops repeating one tile.
+fork shore shore_b
+variant of=shore
+family band 3:outside 1:foam 2:sand0 radius=3
+px @cell(ew) 2,2 11,2 12,2 20,2 4,21 13,21 21,21 c=foam
+px @cell(ew) 10,3 19,3 8,20 20,20 c=water1
+px @cell(ew) 6,6 7,6 13,6 21,6 2,17 10,17 11,17 15,17 c=sand0
+px @cell(ew) 15,5 4,18 c=sand1
+px @cell(ns) 2,10 2,11 1,20 21,1 21,8 21,9 c=foam
+px @cell(ns) 3,14 20,11 20,21 c=water1
+px @cell(ns) 6,9 6,10 6,20 17,3 17,14 17,15 c=sand0
+px @cell(ns) 5,2 18,9 c=sand1
+px @cell(o) 4,2 19,3 3,19 20,21 c=foam
+px @cell(o) 6,6 16,7 7,17 17,17 c=sand0

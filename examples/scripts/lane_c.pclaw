@@ -1,0 +1,8 @@
+# A second variant of the lane: one long rut on each side and a puddle-dark patch.
+fork lane lane_c
+variant of=lane
+family band 1:moss1 1:sand0 radius=2
+px @cell(ew) 3,9 4,9 5,9 6,9 7,9 8,9 13,14 14,14 15,14 16,14 17,14 c=sand1
+px @cell(ns) 9,12 9,13 9,14 9,15 9,16 9,17 14,2 14,3 14,4 14,5 14,6 c=sand1
+px @cell(ew) 16,10 17,10 16,11 c=sand0
+px @cell(ns) 10,6 11,6 11,7 c=sand0
