@@ -42,8 +42,8 @@ the manifest was not written; 2 problems:
 | Field | For | Meaning |
 |---|---|---|
 | `name` | all | a-z, 0-9, `_`, `-`; unique |
-| `kind` | all | tile, sprite, sheet, icon, family, overlay, object, map |
-| `size` | all | pixels `WxH` (a family: its tile, square and even; a map: cells `CxR`) |
+| `kind` | all | tile, sprite, sheet, icon, family, overlay, object, map, font |
+| `size` | all | pixels `WxH` (a family: its tile, square and even; a map: cells `CxR`; a font: a glyph cell) |
 | `set` | all | the group it is judged, reviewed and shown with (default: its kind); one of `sets` when `sets` is given |
 | `description` | all | what it is meant to read as (the review's brief shows it) |
 | `palette` | all | a project palette (default: the project's default) |
@@ -55,6 +55,7 @@ the manifest was not written; 2 problems:
 | `variantOf`, `recolourOf` | all | a texture variant or a palette-swap recolour of another planned asset of the same kind |
 | `uses` | map | the planned assets it is built from |
 | `flat` | all | its colour in the flat templates: a palette entry name or `#rrggbb` |
+| `chars` | font | the characters, as `new font … chars=` takes them: the characters themselves, or code points and ranges (`"32-126"`, `"U+0041-U+005A"`) |
 
 Top level: `format` and `version` (required), `theme` (a paragraph, required), `sets`
 (`{ "<set>": { "description": "…" } }`), `export` (`{ "profile": "<name>", "dest": "<folder>" }`),
@@ -64,7 +65,17 @@ Top level: `format` and `version` (required), `theme` (a paragraph, required), `
 family) scheme: `new sprite urn` becomes `new sprite urn 24x24 palette=… …` on the tape, so replay
 never reads the manifest. Without a manifest entry the style guide's size for the kind
 (`style.sizes`, the first of `a|b`) fills in. `consistency` compares an asset with the rest of its
-set and with its planned `height`; `review(set=…)` reviews a set; templates come from it.
+set and with its planned `height` (only like with like: ground tiles, figures, icons; a font is
+never a peer); `review(set=…)` reviews a set; templates come from it. `new font <name>` takes the
+cell size and `chars` from its entry.
+
+**Mockup first** (plan §6, G11). The flat templates are the layout an image provider follows:
+`underlay generate "<prompt>" layout=templates/mockup.png` on a sheet the size of the scene puts
+a generated mockup under it; a person approves the look in the watch view; `snap` reads it into a
+draft layer (block R² and the material match against the layout say whether to reroll); tiles
+are cut from the draft with `import 0,0 asset=<sheet> region=… layer=draft` and cleaned with
+commands until their checks pass. Or skip the snap and trace over the underlay at 24 px. See
+[commands.md](commands.md#underlays-and-snap) and [examples/demo-g11.md](../examples/demo-g11.md).
 
 ## Style-guide defaults and thresholds
 

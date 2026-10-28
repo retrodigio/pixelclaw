@@ -210,6 +210,13 @@ text; `export` writes a map for Tiled (the `tiled` profile) and splits an oversi
 | `undo [group=<g>] [by=<author>]` | `undo group=g4` | See *Undo and redo* below. |
 | `redo [group=<g>] [by=<author>]` | `redo group=h5` | Take back an undo. |
 | `fork <from> <to> [at=<n>]` | `fork chest chest_b at=20` | Start asset `<to>` as a branch of `<from>`. See *Forks*. |
+| `underlay generate "<prompt>" [layout=] [image=] [provider=] [model=] [quality=] [cap=] [layer=]`, `underlay import <file.png> [layout=] [layer=]` | `underlay mockup blob=<sha256> image=1536x1024 at=0,0 size=144x96 layout=<sha256> prompt="…" provider=openai model=gpt-image-1.5 quality=medium cost=0.05` | An image under the art on a reference layer; resolved by the server. See *Underlays and snap*. |
+| `snap [from=<layer>] [into=<layer>]` | `snap from=mockup into=draft at=0,0 grid=144x96 pitch=5.333x5.334 offset=0.66,0.65 r2=0.97 material=0.98 <<` | The underlay quantised into a new draft layer. |
+| `import <x,y> asset=<name> region=<x,y,WxH> [layer=]` | `import 0,0 from="yard:draft 120,0,24x24" <<` | A region of another asset, its pixels in the line. |
+| `new font <name> <W>x<H> [chars=] [cols=] [baseline=] [line=] [spacing=]` | `new font hud 5x7 palette=… wrap=off cell=5x7 bg=none chars=65-90,48-57 cols=16 baseline=6 line=8 spacing=1 <<` | A glyph sheet. See *Fonts*. |
+| `glyph <char> [advance=<n>\|auto] [<< rows >>]` | `glyph U+0021 <<` | One glyph's cell (and its advance). |
+| `font set [baseline=] [line=] [spacing=]` | `font set baseline=6 line=9 spacing=1` | |
+| `icon mode=tone\|full\|channel` | `icon mode=full` | How an icon is exported. See *Icons*. |
 
 Commands that draw (everything that writes pixels) draw on your layer and frame, clipped by your
 selection, and are refused while your layer is locked: `layer 'rim' is locked (layer set rim
@@ -476,6 +483,72 @@ the block yourself. A tape in language 1 (made before G5: its `new` line has no 
 replays, reading the project palette as it did; a branch of such a tape stays in language 1. Its
 header says which (`{"pclaw":"tape","lang":1}`), and `verify` refuses a header that does not match
 the tape. So changing or saving a project palette (`palette save`) affects only assets made later.
+
+### Underlays and snap
+
+An **underlay** is a full-colour image under the art (plan §6): a generated mockup, a sketch, a
+photo of a drawing. It sits on a reference layer, stretched over a rectangle of the document, is
+shown faded under transparent pixels (the `render` view, the watch view) and is never part of the
+art or an export. Images are kept as content-addressed blobs (`blobs/<sha256>.png`).
+
+- `underlay generate "<prompt>" [layout=<template.png>|<layer>] [image=1536x1024] [provider=openai|fake] [model=<m>] [quality=low|medium|high] [cap=<usd>] [layer=mockup] [at=x,y] [size=WxH]`
+  asks an image provider for one image. `layout=` is the flat template it should follow (a PNG in
+  the project such as `templates/mockup.png`, or a layer of the asset drawn in flat colours): it
+  is sent as the image to edit, and kept as a blob for snap's material match. `image=` is the size
+  to ask for (default: the one of 1024x1024, 1536x1024 and 1024x1536 nearest the document's
+  shape). The default provider is `openai` (model `gpt-image-1.5`, quality `medium`; project.json
+  `underlay` changes the defaults); `fake` draws an offline draft of the layout (tests and demos).
+  The key, the cost cap and the cost log are described in [mcp.md](mcp.md#underlays-and-the-openai-provider).
+- `underlay import <file.png> [layout=<template.png>|<layer>] [layer=underlay] [at=x,y] [size=WxH]`
+  takes any PNG (relative to the project, or an absolute path).
+- Both run through the server (the MCP `run` tool, the watch view's command line, `pixelclaw run`)
+  before the batch, and are written as **`underlay <layer> blob=<sha256> image=<W>x<H> at=<x,y> size=<W>x<H> [layout=<sha256>] [from="…"] [prompt="…" provider=… model=… quality=… cost=…]`**:
+  the tape holds only the image's hash, where it was placed and where it came from. The layer is
+  made at the bottom as a reference layer (or an empty reference layer of that name is reused).
+  Each such command goes on a line of its own.
+- `snap [from=<underlay layer>] [into=draft]` reads the underlay back into pixel art on a **new
+  draft layer** (on top): it fits the image's pixel grid (the pitch and offset on each axis: the
+  edge profile's strongest period within ±15 % of the pitch the placement implies, and its phase),
+  takes each block's colour (the median of its middle), quantises it to the palette, and reports
+  **block R²** (how much of the image's colour the blocks explain) and, when the underlay has a
+  layout, the **material match** (the share of blocks nearest the mean colour of their own layout
+  colour's blocks). The line records the result:
+  `snap from=mockup into=draft at=0,0 grid=144x96 pitch=5.333x5.334 offset=0.66,0.65 r2=0.97 material=0.98 << rows >>`,
+  so replay never reads the image. Below R² 0.8 or material 0.85 the run warns: reroll the
+  underlay, or trace over it instead.
+- `import <x,y> asset=<name> region=<x,y,WxH> [layer=<layer>]` copies a region of another asset (one
+  of its layers, or its flat art) onto your layer: a tile cut from a snapped scene. The line
+  records the pixels (`import 0,0 from="yard:draft 120,0,24x24" << rows >>`).
+
+### Fonts
+
+A **font** is a glyph sheet (plan §4.6): one cell per character, in the order given.
+
+- `new font <name> <W>x<H> [chars="ABC…"|32-126,160] [cols=16] [baseline=<row>] [line=<px>] [spacing=1]`:
+  `W`x`H` is a glyph cell; the canvas is `cols` cells across and as many rows as the characters
+  need. `chars=` is the characters themselves (quoted), or code points and ranges (decimal or
+  `U+hex`); the normal form writes code points and ranges in the given order
+  (`chars=65-90,48-57,32`). `baseline` is the cell row glyphs stand on (default the last), `line`
+  the line height (default the cell height + 1), `spacing` the pixels after each advance.
+- `glyph <char> [advance=<n>|auto] [<< rows >>]` draws one glyph: the rows (palette keys, `.` or a
+  space for nothing) replace its cell from the top-left, on your layer and frame. Letters and
+  digits are written as themselves; anything else as `U+0021` (or quoted, `"!"`). A glyph's
+  advance is its ink width (the rightmost drawn column + 1) unless `advance=` sets it; an empty
+  glyph (a space) is half a cell unless set.
+- `font set [baseline=] [line=] [spacing=]` changes the metrics.
+- Any drawing command works on the sheet too (`paint @cell(3,1) …`).
+- Exports: the **glyph strip** and **BMFont** (see [profiles.md](profiles.md#fonts)), with
+  `pixelclaw export <project> <font> --format strip|bmfont`, MCP `export(asset, format)`, or a
+  profile's `fonts`.
+
+### Icons
+
+`icon mode=tone|full|channel` sets how an icon is exported (plan §4.5): **tone** art is recoloured
+by the game (role entries, written through the profile's role colours), **full** art is drawn as
+is (often a white silhouette), **channel** art is pure-RGB channel masks (every colour's channels
+0 or 255, written exactly). Without it an icon is `tone` when its palette has roles, else `full`.
+The `palette` check holds the art to its mode; `consistency` holds an icon set to one stroke
+weight, box fill and optical centre ([checks.md](checks.md)).
 
 ### Palette edits
 

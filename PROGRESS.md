@@ -165,7 +165,23 @@ Status of plan features touched so far. Steps refer to the build plan (§10).
 | The MCP `plan` tool | §7.3, §8.2, G10 | done | `g10.test.ts` (server), `mcp.test.ts` | By set; writes a manifest; draws templates; the dashboard's link. |
 | `review` bundles of a manifest set, with a brief; no author or method names | §5, G10 | done | `g10.test.ts` (server: every text file free of author and method names, no PNG text chunks) | `review(set=)`, `pixelclaw review --set`; `brief.md`. |
 | The Claude Code skill and its install | §8.1, G10 | done | `g10.test.ts` (server: installs, holds the workflows and the hand-off) | `skill/SKILL.md`, `skill/manifest.md`; `pixelclaw skill install [--dest\|--project]`; bundled in `cli/dist/skill`. |
-| Demo: a theme, a manifest and style guide, 20 planned assets on the dashboard, three end to end | G10 | done | `kiln-hollow.test.ts` (verify, rebuild from the scripts, 3 exported and 17 planned, every check passes) | `examples/demo-g10.md`, `examples/demo-g10-agent.ts`, `examples/kiln-hollow/`, `examples/kiln-hollow.pclaw`; a real blind review (`findings.md`). |
+| Demo: a theme, a manifest and style guide, 20 planned assets on the dashboard, three end to end | G10 | done | `kiln-hollow.test.ts` (verify, rebuild from the scripts, 3 exported and 17 planned (since G11: 8 checked and 15 planned of 26), every check passes) | `examples/demo-g10.md`, `examples/demo-g10-agent.ts`, `examples/kiln-hollow/`, `examples/kiln-hollow.pclaw`; a real blind review (`findings.md`). |
+| `jaggies` judges outlines and one-colour lines; steps between neighbouring entries of one ramp inside a shape are shading | §19 (question 138), G11 | done | `g11.test.ts` (core: a shaded ball passes; the same bands with no shared ramp, or two steps apart, fail; an ink doubled corner still fails) | The urns' allowance dropped; the example's urns pass at 0. The detail counts the steps left out. |
+| `underlay` command: an image on a reference layer, never art | §6, G11 | done | `g11.test.ts` (core: layer at the bottom, state round trip, art hash unchanged, generate refused in core), `g11.test.ts` (server: the render view shows it) | `underlay <layer> blob=<sha256> image=WxH at= size= [layout=] [from= prompt= provider= model= quality= cost=]`; blobs in `blobs/`. |
+| `underlay generate` with an OpenAI image provider; the key from the environment; a cost cap and a cost log per call; a fake provider | §6, §19, G11 | done | `g11.test.ts` (server: a planted fake key never in any project file, log line or result, also when the error echoes it; the request carries it only in its header; the cap refuses before any request; no price refused; usage priced by tokens) | `server/src/underlay.ts`; `/v1/images/edits` with a layout, else `/generations`; `gpt-image-1.5` medium by default ($0.05 est.); cap $0.25 (`cap=`, `PIXELCLAW_UNDERLAY_CAP`, project.json `underlay`); `logs/underlay-costs.jsonl`. Not run live (no key, §19). |
+| `underlay import` (any PNG, with a layout) | §6, G11 | done | `g11.test.ts` (server), `kiln-hollow.test.ts` | Resolved by the server (MCP `run`, watch view, `pixelclaw run`) before the batch. |
+| `snap`: grid fit, layout match, palette quantise into a draft layer | §6, G11 | done | `g11.test.ts` (core: synthetic grids of known pitch and offset, blurred and noisy, recovered within 0.03 px pitch and 0.35 px offset, ≥ 99 % of pixels back, with and without a hint; noise gives a low R²; the material match; replay without the image), `g11.test.ts` (server: a fake draft of a layout snaps to its materials; the reroll warning) | Pitch from the edge profile's spectrum (mean removed), offset from its phase; block medians; R² ≥ 0.8 and material ≥ 0.85 or a warning. The line records the rows. |
+| `import … asset= region= [layer=]`: a tile cut from another asset | §6 workflow, G11 | done | `g11.test.ts` (core) | The pixels go into the line, so replay reads no other asset. |
+| Glyph-sheet documents (`new font … chars= cols= baseline= line= spacing=`, `glyph`, `font set`) | §4.6, G11 | done | `g11.test.ts` (core: normal forms, cells in chars order, advances) | Kind `font`; a cell per character; advances by ink unless set. |
+| The glyph strip | §4.6, §7.4, G11 | done | `g11.test.ts` (core: the format spec: separator columns before, between and after, every pixel of them `#ff0000`, the top-left pixel the separator, widths the advances, glyph pixels exactly the cells', a glyph in the separator colour refused) | docs/profiles.md "Fonts". With `{asset}.txt` (the characters). |
+| BMFont export | §4.6, G11 | done | `g11.test.ts` (core: info/common/page/chars lines, a char line per glyph with box, offsets and advance, the page holds each box), `g11.test.ts` (server) | Text format; ink boxes packed in rows. |
+| The `font` check | §4.6, G11 | done | `g11.test.ts` (core: cap height, baseline, advance, line height, maxLine; sprite checks skip fonts) | Cap height, x-height, baseline, drawn glyphs, advances, line height (`maxLine` the profile's limit). |
+| `font` in the manifest (`chars`) | §4.6, §7.3, G11 | done | `kiln-hollow.test.ts` (a valid manifest with a font), demo | `new font <name>` takes the cell and chars from the manifest. |
+| Icon export modes (`icon mode=tone\|full\|channel`) | §4.5, G11 | done | `g11.test.ts` (core: tone through roles, full and channel as drawn; the palette check per mode; the `mode` record column) | Profiles: `exportColours`; `{mode}` in snippets. |
+| Icon-set checks in `consistency`: stroke weight, box fill, optical centre | §4.5, §5, G11 | done | `g11.test.ts` (core: a consistent set passes; a thick, small, off-centre icon fails all three; alone it is still held to the centre), demo | Like with like within a set (tiles, figures, icons; fonts never peers). |
+| Fonts in profiles (`fonts.format strip\|bmfont\|both\|sheet`, `separator`, `maxLine`) and `export --format strip\|bmfont` | §4.6, §7.4, G11 | done | `g11.test.ts` (core and server) | docs/profiles.md. |
+| UI: underlays drawn faded under the art; a font's sheet on a dark checkerboard and its text preview | §8.3, G11 | done | screenshots `docs/screenshots/g11-*.png`; the Playwright suite unchanged and green | `/api/blob/<sha>.png` (token). |
+| Demo: an offline mockup underlay for a 6x4-tile scene, snapped and cleaned into tiles; a 5x7 font as a strip and BMFont; an icon set checked | G11 | done | `kiln-hollow.test.ts` (verify; rebuild the G11 work from the scripts and the mockup; 3 exported, 8 checked, 15 planned of 26; every check passes) | `examples/demo-g11.md`, `examples/demo-g11-agent.ts`, `examples/kiln-hollow/make-yard-mockup.ts`; how to run a live underlay is in the demo. |
 
 ## Notes for G8
 
@@ -259,5 +275,35 @@ Status of plan features touched so far. Steps refer to the build plan (§10).
 - **Cost of the plan**: `plan` runs every check on every drawn asset (2 s on the mossy-ruins
   example; kept in the server until something they read changes). The state cache is 8 MB there,
   uncompressed.
+- **Cost of this step**: not measured.
+
+## Notes for A1
+
+What the acceptance project (§10 A1) will need, from G11's side:
+
+- **A live underlay.** Arm (b) needs real mockups: the user's `OPENAI_API_KEY` in the environment
+  of the server (or of `pixelclaw run`); how is in `examples/demo-g11.md` ("A live underlay with
+  your own key"). Not run by the builder (no key, §19). The default is `gpt-image-1.5` at medium,
+  1536x1024, about $0.05 an image by the price table plus the layout's input tokens; the cap is
+  $0.25 a call; every call is in `logs/underlay-costs.jsonl`, which is how A1 records its image
+  cost. Check the price table against OpenAI's page first (`DEFAULT_PRICES` in
+  `server/src/underlay.ts`, or project.json `underlay.prices`).
+- **Snap on real drafts is the open risk.** Snap was proven on synthetic grids and on the offline
+  fake draft (R² 0.97, material 0.98). A generated image seldom keeps a crisp pixel grid at the
+  document's resolution; expect low R² and rerolls. Things to try in A1, in this order: a prompt
+  that names the grid ("crisp square pixels, 24 px tiles, 144x96 pixels"); `quality=low` for
+  cheap rerolls; snapping a scene sheet whose size matches what the image really shows; tracing at
+  24 px over the underlay instead (§6 allows both; A1 compares them).
+- **Cleaning snapped tiles.** Cut tiles need `clean orphans size=2` and stripe fixes before they
+  pass `repetition`, `seam` and `consistency` (the demo's `*_clean.pclaw`). A cell with a low seam
+  is worth picking before cleaning (the demo tried several). For families, cut a snapped
+  coverage map with `family cut` (G7) rather than tiles one by one; not tried with an underlay yet.
+- **Fonts and icons** are ready for the engine profile: the strip with `#ff0000` separators (§7.4)
+  is the default for fonts in every profile (`fonts.separator`, `fonts.maxLine` carry the
+  engine's rule); icons export in their mode, `tone` through the profile's `roles`. The engine's
+  own profile (§7.4) still has to be written by a reader.
+- **jaggies** now leaves ramp shading alone; A1's round forms need no per-asset allowances.
+- **Time and cost.** The full suite takes about 30 s (vitest) plus 75 s (Playwright); a snap of a
+  1536x1024 image takes about 1-2 s. `plan` still runs every check on every drawn asset.
 - **Cost of this step**: not measured.
 

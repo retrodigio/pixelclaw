@@ -928,3 +928,100 @@ Points where the plan was unclear or silent. Each has the reading that was follo
 140. **The demo's theme.** *Reading:* an original one, *Kiln Hollow* (a potters' hamlet in a clay
      valley), with an original 29-colour palette; it lives beside the mossy-ruins example as a
      second project, `examples/kiln-hollow.pclaw`, whose tapes carry the stand-in run's times.
+
+## G11
+
+141. **Where an underlay lives** (§6 "saved as a blob and placed on a reference layer"). *Reading:*
+     the image is a blob (`blobs/<sha256>.png`); the layer is a reference layer whose cels stay
+     empty, carrying the blob's hash, its size and the document rectangle it is stretched over
+     (state only when present, so old hashes are unchanged). Views compose it under transparent
+     pixels (faded like reference pixels). The tape line holds the hash, the placement and where
+     the image came from (`from=`, or `prompt= provider= model= quality= cost=`), never pixels;
+     the art, checks and exports never see it.
+
+142. **Generate and import in the tape** (core is deterministic and calls no network). *Reading:*
+     `underlay generate` and `underlay import` are resolved by the server (MCP `run`, the watch
+     view's command line, `pixelclaw run`) before the batch: the provider is called or the file
+     read, the blob saved, and the line rewritten as `underlay <layer> blob=…`. Core refuses the
+     two forms with a message. If resolving fails, nothing is applied. Each such command must be
+     on a line of its own.
+
+143. **The OpenAI provider** (§19: key from the environment, a cost cap and a cost log per
+     call). *Reading:* `OPENAI_API_KEY`; with a layout the Images API's edit endpoint (the layout
+     stretched to the request size as the image), else generations; default `gpt-image-1.5`,
+     `medium`, the size of 1024x1024, 1536x1024 and 1024x1536 nearest the document's shape. The
+     cap is checked against an estimate from a price table before the call (default $0.25;
+     `cap=`, `PIXELCLAW_UNDERLAY_CAP`, project.json `underlay.cap`); a model without a price is
+     refused rather than run uncapped. The log is `logs/underlay-costs.jsonl` in the project, one
+     line per call, refused or made. Provider errors are scrubbed of the key. The price table
+     holds the per-image prices published for gpt-image-1.5, gpt-image-1 and gpt-image-1-mini as
+     far as the builder could find them (not verified against OpenAI's page); project.json
+     `underlay.prices` overrides it.
+
+144. **The fake provider and the demo's mockup** (§19: "an original image the builder makes
+     itself"). *Reading:* one function draws both: the layout resampled to the art grid, each art
+     pixel the nearest palette colour moved a ramp step lighter or darker in patches (seeded by
+     the prompt), enlarged with a sub-pixel offset, blurred 3x3, with noise. The demo's mockup
+     (`examples/kiln-hollow/yard-mockup.png`, 768x512, checked in) was made with it by
+     `make-yard-mockup.ts` and is brought in with `underlay import`; `provider=fake` is for tests.
+
+145. **"The ported snap"** (the pilot's `snap.py`, which the builder cannot read). *Reading:*
+     written from §6's description: grid pitch and offset per axis from the edge profile (its
+     strongest period within ±15 % of the pitch the underlay's placement implies, its phase for
+     the offset; without a hint, the longest strong period); each block's colour the median of
+     its middle half; **block R²** = the share of the image's colour variance the blocks explain;
+     **material match** = the share of blocks whose colour is nearest the mean colour of their own
+     layout colour's blocks (a nearest-centroid test, so a generator's restyled colours still
+     match); thresholds 0.8 and 0.85 from §6; quantised with the import's colour distance. The
+     result rows go into the line (`snap … << rows >>`), so replay never needs the image. A draft
+     layer is new (`into=`, default `draft`), on top.
+
+146. **"Cleaned into tiles"**. *Reading:* tiles are cut from the snapped scene with a new form of
+     `import` (`asset= region= [layer=]`, the pixels written into the line) and cleaned with
+     ordinary commands until every check passes; the demo's cleaning is `clean orphans size=2`
+     plus coordinate fixes of the repetition check's stripe. The scene sheet stays as a working
+     document (its draft turned into a reference layer; its coverage turned off in the style
+     guide with the reason).
+
+147. **The glyph strip format** (§4.6 "separator columns marked by the top-left pixel's colour").
+     *Reading:* one row as tall as a cell; a separator column before the first glyph, between
+     glyphs and after the last, every pixel of it the separator colour (default `#ff0000`, §7.4),
+     which is the top-left pixel's; each glyph its advance wide from its cell's left edge;
+     transparent elsewhere; no glyph pixel may be the separator colour. The characters go beside
+     it in `{asset}.txt`. This is the image-font layout LÖVE reads; the line-height rule is the
+     font check's `maxLine` (and the profile's `fonts.maxLine`, noted at export).
+
+148. **Glyph sheets** (§4.6 "a grid of cells, one per code point, with baseline and line
+     height"). *Reading:* kind `font`; `new font <name> <W>x<H> chars=…` (the size is the cell);
+     `glyph <c> << rows >>` draws a cell; advances are the ink width unless set (`advance=`), a
+     space half a cell; `baseline` (the cell row glyphs stand on), `line` and `spacing` in the
+     state. Letters and digits are written bare, other characters as `U+XXXX`. A TTF via an
+     outline tracer is "later" in §4.6 and not built.
+
+149. **Font checks** (§4.6: cap height, x-height, advance widths, the line height against a
+     limit). *Reading:* the `font` check: one cap height (A-Z but Q, from the baseline), one
+     x-height (lowercase letters without ascenders), letters and digits standing on the baseline
+     (descenders exempt), every non-space glyph drawn, nothing drawn past its advance, and the
+     line height no less than the glyphs' rows and within `maxLine`. Sprite checks that read
+     letters as defects skip fonts.
+
+150. **Icon export modes** (§4.5). *Reading:* `icon mode=tone|full|channel` on an icon (default:
+     tone when the palette has roles, else full). Tone art is role art written through the
+     profile's role colours; full and channel art are written exactly as drawn (roles are not
+     encoded); the palette check holds each mode (tone: roles only; full: no roles; channel: every
+     channel 0 or 255). The mode is a record column and a snippet variable.
+
+151. **The icon-set checks** (§4.5: stroke weight, bounding-box fill, optical centre; "extending
+     consistency"). *Reading:* stroke weight = the median over drawn pixels of the shorter drawn
+     run through it (across and down), ± 1 px of the set's median; box fill = the drawn box's
+     share of the canvas, ± 0.2; optical centre = the drawn pixels' centre of mass within 1.5 px
+     of the canvas centre (held even without a set). "Legibility at 1x on the HUD background" is
+     left to `readability` (its ground is the style guide's). Within a manifest set only like is
+     compared with like (ground tiles, figures, icons): the HUD set mixes icons and a font.
+
+152. **`jaggies` and shading** (§19). *Reading:* a doubled corner is shading when the pixel is not
+     an outline colour, touches no transparency across its sides, and its inner corner is the next
+     or previous step of the same ramp (or the outline the band runs along, with a ramp neighbour
+     beside it); a thin one-colour run is shading when every other-coloured neighbour is a
+     neighbouring step of its ramp (outline pixels allowed). Outlines and lines on anything else
+     are judged as before. The urns' allowance is gone.

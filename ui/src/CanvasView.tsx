@@ -6,7 +6,8 @@
 // your selection (marching ants), other authors' selections, symmetry guides, the marquee or lasso
 // being dragged, notes, the pixels checks flagged (circled in magenta) and the hovered pixel.
 // Notes also get a label with their id and text. Role entries show in the chosen preview theme.
-// Underlays (full-colour images on reference layers, plan §6) are drawn faded under the art.
+// Underlays (full-colour images on reference layers, plan §6) are drawn faded under the art. A
+// font's glyph sheet sits on a dark checkerboard (HUD lettering is usually light).
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { TRANSPARENT, flattenReference, renderFlat, rgbOf, themedPalette, type Doc, type Note, type Theme } from '@pixelclaw/core';
@@ -154,15 +155,15 @@ function oneX(doc: Doc, frame: number, theme: Theme | null): HTMLCanvasElement {
   return one;
 }
 
-function checker(g: CanvasRenderingContext2D, z: number, w: number, h: number): void {
+function checker(g: CanvasRenderingContext2D, z: number, w: number, h: number, dark = false): void {
   // Squares of half a pixel (at least 2 px), as in the core's render.
   const sq = Math.max(2, z >> 1);
   const tile = document.createElement('canvas');
   tile.width = tile.height = sq * 2;
   const tg = tile.getContext('2d')!;
-  tg.fillStyle = CHECK_B;
+  tg.fillStyle = dark ? '#2a2c33' : CHECK_B;
   tg.fillRect(0, 0, sq * 2, sq * 2);
-  tg.fillStyle = CHECK_A;
+  tg.fillStyle = dark ? '#33363e' : CHECK_A;
   tg.fillRect(sq, 0, sq, sq);
   tg.fillRect(0, sq, sq, sq);
   g.fillStyle = g.createPattern(tile, 'repeat')!;
@@ -203,7 +204,8 @@ export function CanvasView(p: Props) {
     if (c.height !== H) c.height = H;
     const g = c.getContext('2d')!;
     g.imageSmoothingEnabled = false;
-    checker(g, z, W, H);
+    // A glyph sheet on a dark checkerboard: HUD lettering is usually light.
+    checker(g, z, W, H, !!doc.font);
     for (const l of doc.layers) {
       if (!l.underlay || l.hidden) continue;
       const u = l.underlay;

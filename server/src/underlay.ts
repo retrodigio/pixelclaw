@@ -90,7 +90,7 @@ const openai: Provider = {
   async generate(req, e) {
     const env = e.env ?? process.env;
     const key = env.OPENAI_API_KEY;
-    if (!key) throw new ProjectError('underlay generate: OPENAI_API_KEY is not set in the environment of the PixelClaw server (or use provider=fake)');
+    if (!key) throw new ProjectError('underlay generate: OPENAI_API_KEY is not set in the environment of the PixelClaw process (the server, or the CLI running this; or use provider=fake)');
     const f = e.fetch ?? (globalThis.fetch as unknown as FetchLike);
     const size = `${req.size[0]}x${req.size[1]}`;
     let res: Awaited<ReturnType<FetchLike>>;

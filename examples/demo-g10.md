@@ -48,7 +48,7 @@ theme, the palette, the style guide, the manifest, and the scripts for the three
 review round. The blind review was run once for real (a fresh agent given only the bundle); its
 report is [kiln-hollow/findings.md](kiln-hollow/findings.md), and the stand-in hands it back in
 place of starting an agent. A headless browser plays the person who approves. The result is
-checked in as [kiln-hollow.pclaw](kiln-hollow.pclaw) (`--keep` writes it). Below is what it
+checked in as [kiln-hollow.pclaw](kiln-hollow.pclaw) (`--keep` writes it; since G11 the example also holds the G11 work, so run demo-g11-agent.ts with `--keep` after it). Below is what it
 printed.
 
 ## 1. The theme

@@ -101,6 +101,32 @@ band layer (`paint @cell(o) …`); every variant follows. Judge on `view map` (s
 repetition hot spots with texture variants; consistency on a map compares the objects standing on
 it.
 
+### A mockup underlay, snapped (optional; costs money with a real provider)
+
+On a sheet the size of the scene (`new sheet yard 144x96 cell=24x24`):
+`underlay generate "<the theme, the scene, top-down pixel art>" layout=templates/mockup.png`
+(OpenAI, the person's `OPENAI_API_KEY`; about $0.05 an image at the default; a cost cap per call,
+every call in `logs/underlay-costs.jsonl`; ask before spending) or `underlay import <file.png>
+layout=…`. Show the person the underlay; then `snap`. Read its line: block R² ≥ 0.8 and material
+≥ 0.85, else reroll (another prompt) or trace over the underlay by hand instead. Cut tiles from the
+draft (`new tile <t>` then `import 0,0 asset=yard region=<x,y>,24x24 layer=draft`), clean them by
+coordinates (`clean orphans size=2`, then what `check` flags) until every check passes, and hold
+them to the set (`consistency`). Never ship a snapped draft unchecked; small fixes are commands,
+not another generation.
+
+### A font
+
+`new font <name> 5x7 chars="ABC…"` (or the manifest's), a `glyph <c> << rows >>` per character
+(letters and digits as themselves, others as `U+0021`), `font set line= spacing=`. The `font` check
+holds cap height, x-height, the baseline and advances; the preview's text tab sets it. Export with
+`export(asset, format=strip|bmfont)` or the profile's `fonts`.
+
+### Icons
+
+`new icon <name> 16x16`, `icon mode=tone|full|channel` (tone: roles, recoloured by the game; full:
+as drawn; channel: pure-RGB masks), then as a small sprite. Plan the icons as one manifest set:
+`consistency` holds them to one stroke weight and box fill, each optically centred.
+
 ## The blind review hand-off
 
 The tool calls no model. You hand its bundle to a fresh agent and bring the findings back:

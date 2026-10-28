@@ -62,7 +62,12 @@ Only `name` and `layout` are required.
 | `page` | Atlas: the page's name and file, its width at 1x (times d per level), padding between images, and whether images are trimmed to their opaque pixels. Sheets: `columns` (a family keeps its own sheet layout). | `atlas`, `{page}.png`, 256, 1, trim on |
 | `records` | `csv` or `json` beside a page (or a sheet, or loose files), the file template and the columns. | atlas: CSV, `{page}.csv`, the columns below |
 | `image` | Loose and sheet file names: `{name}` (loose) or `{asset}` (sheet). | `{name}.png`, `{asset}.png` |
-| `snippets` | One text file; a template per asset kind (`sprite`, `tile`, `object`, `overlay`, `icon`, `sheet`), `family`, or `default`. | none |
+| `fonts` | Fonts (G11): `format` `strip` (a glyph strip `{asset}.png` and its characters `{asset}.txt`), `bmfont` (`{asset}.fnt` and `{asset}_0.png`), `both`, or `sheet` (the glyph sheet as an ordinary image); `separator`, the strip's separator colour; `maxLine`, the line-height limit (an export over it is noted). | `strip`, `#ff0000` |
+| `snippets` | One text file; a template per asset kind (`sprite`, `tile`, `object`, `overlay`, `icon`, `sheet`, `font`), `family`, or `default`. | none |
+
+Icons are written in their export mode (G11): `tone` icons through `roles` like any role art,
+`full` and `channel` icons in their palette colours exactly as drawn. The record column `mode` and
+the snippet variable `{mode}` give an icon's mode (empty for other kinds).
 
 ### Templates
 
@@ -185,6 +190,26 @@ Reducers (`style.density` in `project.json`, or a profile's `density`):
 | `nearest` | the pixel at the block's centre |
 
 More reducers can be registered in code (`registerReducer(name, fn)`).
+
+## Fonts
+
+A font (a glyph sheet, [commands.md](commands.md#fonts)) is written in one of two formats.
+
+**The glyph strip** is one row of glyphs as tall as a cell. Each glyph is its advance wide, drawn
+from its cell's left edge, and a **separator column** stands before the first glyph, between every
+two and after the last: `width = 1 + Σ (advance + 1)`. The separator colour is the top-left
+pixel's (default `#ff0000`); every pixel of a separator column is that colour and no glyph pixel
+may be (the export refuses one that is). Anything not drawn is transparent. A reader takes the top-left pixel's colour and splits the
+strip at the columns of that colour; the glyphs are the characters in the sheet's order, written
+beside the strip in `{asset}.txt` (UTF-8, one line). This is the image-font format several engines
+read (LÖVE's `newImageFont`, for one).
+
+**BMFont** is the AngelCode text format: `{asset}.fnt` with an `info` line (face, size = the cell
+height), `common` (`lineHeight` = the font's line, `base` = baseline row + 1, the page size),
+`page id=0 file="{asset}_0.png"`, `chars count=N` and a `char` line per glyph: its ink box on the
+page (`x y width height`), the box's offset from the cell's top-left (`xoffset yoffset`) and
+`xadvance` = advance + spacing; then `kernings count=0`. The page packs the ink boxes in rows a
+pixel apart. A space has a zero box and its advance.
 
 ## Project schemes
 

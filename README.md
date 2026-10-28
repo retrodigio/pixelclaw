@@ -9,7 +9,7 @@ Every edit is a line of a small command language. A document *is* its tape of co
 and replay is deterministic (integer maths, seeded randomness), so the same tape always gives the
 same pixels.
 
-**Status: step G10.** The core library and CLI (G1); the MCP server and the live watch view (G2);
+**Status: step G11 (the last builder step; the acceptance project A1 is next).** The core library and CLI (G1); the MCP server and the live watch view (G2);
 editing in the browser, every action a command on the tape, and the agent's `changes` tool (G3);
 the drawing toolkit (G4); checks and in-context previews against the project's style guide, with
 flagged pixels circled, and a blind review bundle (G5); animation and sprites (G6); autotile
@@ -19,7 +19,10 @@ and densities (G9); and the project pipeline (G10): a manifest of the assets a g
 asset's status worked out from the project (planned, drafted, checked, reviewed, approved,
 exported), style-guide defaults, the `consistency` check across a set, flat templates (a mockup
 screen and coverage maps) from the plan, a dashboard where a person approves work, the MCP `plan`
-tool, a state cache, and a Claude Code skill. See [PROGRESS.md](PROGRESS.md).
+tool, a state cache, and a Claude Code skill; and G11: AI image underlays (an OpenAI provider with
+the key from the environment, a cost cap and a cost log; any PNG imported) and `snap`, which fits
+an underlay's pixel grid and quantises it into a draft layer; glyph-sheet fonts exported as a glyph
+strip and BMFont; icon export modes and the icon-set checks. See [PROGRESS.md](PROGRESS.md).
 
 ![The dashboard: the kiln-hollow example's 20 planned assets by set, three of them drawn, reviewed, approved and exported](docs/screenshots/g10-dashboard.png)
 
@@ -89,10 +92,11 @@ node cli/bin/pixelclaw.js verify my-art.pclaw
 |---|---|
 | `pixelclaw new <project> [--palette <file>]...` | Create a project folder. Palettes can be `.json`, Lospec `.json`, `.hex` or `.gpl`. |
 | `pixelclaw new <project> <kind> <name> <W>x<H> [opts]` | Create an asset (a `new` command). |
-| `pixelclaw run <project> <script.pclaw>\|-\|-e "..." [--asset <name>] [--replace] [--by <who>] [--view <mode>]` | Apply commands as one undo group. Any error applies nothing. |
+| `pixelclaw run <project> <script.pclaw>\|-\|-e "..." [--asset <name>] [--replace] [--by <who>] [--view <mode>]` | Apply commands as one undo group. Any error applies nothing. `underlay generate`/`underlay import` lines are resolved first (an image provider or a file; the key from `OPENAI_API_KEY`). |
 | `pixelclaw view <project> <asset> [render\|grid\|tile3x3\|diff\|game\|recolour\|anim\|map\|family\|density\|all] [--scale N] [--region x,y,WxH] [--frame N] [--marks failing] [--theme t]` | Write views and print the text grid (or the diff's list of changes). |
 | `pixelclaw check <project> [<asset>...] [--checks a,b] [--marks]` | Run the quality checks against the style guide; exits 1 if any fails. See [docs/checks.md](docs/checks.md). |
 | `pixelclaw export <project> [<asset>...] [--profile <name>] [--out <dir>]` | Write assets through an export profile (built-in `png`, `atlas`, `tiled`, `godot`, `aseprite-json`, `aseprite`, or the project's own). See [docs/profiles.md](docs/profiles.md). |
+| `pixelclaw export <project> <asset> --format split\|png\|strip\|bmfont [--out <dir>]` | One asset on its own: one-cell pieces, a PNG, or a font as a glyph strip or BMFont. |
 | `pixelclaw import <project> <file.png\|file.aseprite\|folder> [--profile <name>] [--as <name>] [--grid WxH] [--palette <p>\|--build]` | Make a new asset from an image (quantised, sliced by a grid) or an `.aseprite` file, or read a profile's export back and compare. |
 | `pixelclaw review <project> [<asset>...] [--set s] [--name n]` | Write a blind review bundle (images, palette, style guide, brief, rubric). |
 | `pixelclaw plan <project> [--set s] [--json] [--manifest <file>] [--templates]` | The asset plan and each asset's status; write a manifest (checked first); draw the flat templates. See [docs/pipeline.md](docs/pipeline.md). |
@@ -188,6 +192,13 @@ The G10 demo ([examples/demo-g10.md](examples/demo-g10.md)) starts a new game, *
 palette, a style guide and a manifest of 20 assets, flat templates, then the clay tile, an urn and
 a bottle kiln taken end to end (drawn, checked, reviewed blind, approved in the dashboard,
 exported). The pipeline: [docs/pipeline.md](docs/pipeline.md).
+The G11 demo ([examples/demo-g11.md](examples/demo-g11.md)) carries Kiln Hollow on: a mockup of a
+6x4-tile yard (made offline, no key) as an **underlay**, **snapped** into a draft layer and three
+tiles cut from it and cleaned by coordinates; a 5x7 **font** exported as a glyph strip and BMFont;
+four HUD **icons** held to each other by the icon-set check. It also says how to run a live
+underlay with your own OpenAI key ([how](examples/demo-g11.md#a-live-underlay-with-your-own-key)).
+Screenshots: [the underlay](docs/screenshots/g11-yard-underlay.png), [the snapped draft](docs/screenshots/g11-yard-draft.png),
+[the font](docs/screenshots/g11-font-editor.png), [its strip](docs/screenshots/g11-font-strip.png).
 
 ## Packages
 

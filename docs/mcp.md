@@ -102,8 +102,40 @@ If any line has an error, nothing is applied and every error is listed with its 
 1 error; nothing was applied.
 ```
 
-Warnings so far: `the batch changed no pixels`. The last line is the check summary: every check that
-applies to the asset, with its score and ✓ or ✗ against the style guide (see [checks.md](checks.md)).
+Warnings so far: `the batch changed no pixels`, and after a `snap` below block R² 0.8 or material
+match 0.85, `snap: … the draft is unreliable: reroll the underlay (a new prompt or seed) or trace
+over it instead`. The last line is the check summary: every check that applies to the asset, with
+its score and ✓ or ✗ against the style guide (see [checks.md](checks.md)).
+
+#### Underlays and the OpenAI provider
+
+`underlay generate` and `underlay import` lines (see [commands.md](commands.md#underlays-and-snap))
+are resolved by the server before the batch runs: it calls the provider or reads the file, keeps
+the image under `blobs/`, and writes the line as `underlay <layer> blob=<sha256> …`. If that fails
+(no key, over the cap, the provider's error), nothing is applied.
+
+- **The key** is read from `OPENAI_API_KEY` in the environment of the PixelClaw server (the
+  process Claude Code starts with `pixelclaw serve`, or the CLI for `pixelclaw run`). It is
+  never stored in the project, written to the tape, the cost log, a result or an error: it goes
+  only into the request's `Authorization` header, and any provider message that echoes it is
+  scrubbed to `[key]`. Without it, `underlay generate` with `provider=openai` is refused before
+  any request; `provider=fake` needs nothing.
+- **Requests**: with a `layout=` the flat template is sent to `POST /v1/images/edits` (stretched
+  to the requested size, so the image follows its composition); without one, `POST
+  /v1/images/generations`. One image (`n: 1`), the answer's `b64_json`.
+- **The cost cap**: before the call the cost is estimated from a price table (US dollars per
+  image by model, quality and size: `gpt-image-1.5`, `gpt-image-1`, `gpt-image-1-mini`, as
+  published when this was written; check https://openai.com/api/pricing/). Over the cap the call
+  is refused; a model with no price is refused too, since the cap cannot be checked. The cap is
+  $0.25 a call unless `cap=` on the line, `PIXELCLAW_UNDERLAY_CAP`, or project.json
+  `underlay.cap` says otherwise. project.json `underlay` also sets `provider`, `model`, `quality`,
+  `size` and `prices` (`{ "<model>": { "image": { "<quality>": { "1536x1024": 0.05 } }, "tokens": { "textIn": 5, "imageIn": 10, "imageOut": 40 } } }`; token prices
+  are per million and price the answer's reported usage when given).
+- **The cost log**: every call, refused or made, is a line in `logs/underlay-costs.jsonl`: the
+  time, provider, model, quality, size, the layout's blob, the prompt, the estimate and the cap,
+  whether it was made, the image's blob, the usage the provider reported and its cost by tokens
+  when the table has token prices, or the error. The tape line's `cost=` is that cost (the
+  estimate when there is no usage price).
 
 ### `view`
 
@@ -183,11 +215,13 @@ recorded in `exported.json` for its status: `profile` is a built-in
 the families, tiles and objects it draws, and every asset its texture variants and density
 copies); `dest` (a game folder; default `<project>/exports/<profile>/`). The result lists the
 files and notes (levels scaled or reduced for want of an authored copy, two entries written as one
-colour). `format=split|png` with `asset` writes one asset G8's way instead: `split`, an oversized
+colour). `format=split|png|strip|bmfont` with `asset` writes one asset on its own instead: `split`, an oversized
 tile or object as one-cell pieces `<name>_<cx>_<cy>.png` plus `<name>.stamp.json` (each cell's
-block, roof and footprint flags); `png`, a map composed at 1x or an asset's first frame. CLI:
+block, roof and footprint flags); `png`, a map composed at 1x or an asset's first frame; `strip`
+and `bmfont`, a font as a glyph strip (plus its characters) or as BMFont
+([profiles.md](profiles.md#fonts)), into `exports/<format>/`. CLI:
 `pixelclaw export <project> [<asset>...] [--profile <name>] [--out <dir>]`, or
-`pixelclaw export <project> <asset> --format split|png`.
+`pixelclaw export <project> <asset> --format split|png|strip|bmfont`.
 
 ### `import`
 
@@ -393,6 +427,17 @@ family, and an overlay over the first family.
 Every row of the timeline folds (only for looking): click *frame · ticks*, *views*, *tags* or
 *layers* (folded, only the layer you draw on stays), or ▾ at the left of its bar to fold the
 whole timeline away.
+
+### Underlays, fonts and icons
+
+An underlay (plan §6) is drawn under the art on the canvas, faded half-way to the checkerboard as
+reference pixels are, stretched over its rectangle; the image comes from `/api/blob/<sha256>.png`
+(the token is required; blobs are content-addressed, so the browser caches them). Hiding the
+underlay's layer in the timeline hides it (that is a `layer set … hidden=on` command). A snapped
+draft is an ordinary layer above it. A font's glyph sheet is shown on a dark checkerboard (HUD
+lettering is usually light), and its preview tab **text** sets a pangram (the letters the font
+has) and its digits in the font at 2x, on a dark and on a light ground, with the line height,
+baseline and spacing. Screenshots: `docs/screenshots/g11-*.png`.
 
 ### Maps
 

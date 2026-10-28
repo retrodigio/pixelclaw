@@ -29,8 +29,8 @@ nothing when it has problems (each reported with its path, like `assets[3].size`
 | Field | For | Meaning |
 |---|---|---|
 | `name` | all | a-z, 0-9, `_`, `-`; unique; the asset's name |
-| `kind` | all | tile, sprite, sheet, icon, family, overlay, object, map |
-| `size` | all | pixels `WxH` (a family: its tile, square and even; a map: cells `CxR`) |
+| `kind` | all | tile, sprite, sheet, icon, family, overlay, object, map, font |
+| `size` | all | pixels `WxH` (a family: its tile, square and even; a map: cells `CxR`; a font: a glyph cell) |
 | `set` | all | the group it is judged, reviewed and shown with (default: its kind); must be in `sets` when `sets` is given |
 | `description` | all | what it is meant to read as (the reviewer's brief shows it) |
 | `palette` | all | a project palette (default: the project's) |
@@ -42,12 +42,14 @@ nothing when it has problems (each reported with its path, like `assets[3].size`
 | `variantOf`, `recolourOf` | all | a texture variant or a palette-swap recolour of another planned asset of the same kind |
 | `uses` | map | the assets it is built from |
 | `flat` | all | its colour in the flat templates: a palette entry name or `#rrggbb` |
+| `chars` | font | its characters (the characters themselves, or `"32-126"`, `"U+0041-U+005A"`) |
 
 What the manifest gives the tools:
 - `new <kind> <name>` with no size, palette or scheme takes them from the asset's entry (and an
   object's cell grid is the project's grid); the line records them, so replay never reads the
   manifest.
-- `consistency` compares an asset with the rest of its set and with its `height`; a set's check
+- `consistency` compares an asset with the rest of its set (like with like: ground tiles, figures,
+  icons) and with its `height`; plan icons as one set so they share a stroke weight and box fill; a set's check
   thresholds can be set in `project.json` `style.sets.<set>.checks`.
 - `review(set=…)` reviews a set's drawn assets, with a brief from the theme and descriptions.
 - `plan(templates=true)` draws `templates/mockup.png` (one game screen in flat colours, the
