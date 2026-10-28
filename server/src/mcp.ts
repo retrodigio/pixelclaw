@@ -393,7 +393,7 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
     title: 'Export through a profile',
     description: 'Write assets out through an export profile (plan §4.9): built-in png (loose PNGs), atlas (a page plus JSON records), tiled (.tsx wang sets per family, .tmx per map), ' +
       'godot (a TileSet with terrains per family), aseprite-json (Aseprite sheets), aseprite (.aseprite files), or the project\'s own (profiles/*.json: naming templates, numbered sets, density pages, role colours, CSV, snippets; docs/profiles.md). ' +
-      'Without assets, every asset; a map brings what it draws, an asset its texture variants and density copies. format=split|png instead writes one asset G8\'s way (one-cell pieces plus a stamp, or a PNG).',
+      'Without assets, every asset; a map brings what it draws, an asset its texture variants and density copies. format=split|png|strip|bmfont instead writes one asset on its own (one-cell pieces plus a stamp, a PNG, or a font as a glyph strip or BMFont).',
     inputSchema: z.object({
       profile: z.string().optional().describe('A profile name (see project) or a profile .json path (default png)'),
       assets: z.array(z.string()).optional().describe('The assets to export (default: all)'),

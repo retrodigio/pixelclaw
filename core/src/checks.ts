@@ -4,7 +4,8 @@
 // the art, so the server, the CLI and the watch view all get the same answers.
 
 import { opposite, sequences } from './anim.ts';
-import { TRANSPARENT, flatten, type Doc } from './doc.ts';
+import { TRANSPARENT, flatten, iconModeOf, type Doc } from './doc.ts';
+import { charText, glyphs } from './font.ts';
 import { rgbOf, type Palette } from './palette.ts';
 import type { Pt } from './raster.ts';
 import { hasRoles } from './themes.ts';
@@ -15,7 +16,7 @@ import { densityDiff, type ReducerOptions } from './density.ts';
 import { consistencyOf, isRecolour } from './consistency.ts';
 import { placements } from './map.ts';
 
-export const CHECK_IDS = ['palette', 'orphans', 'jaggies', 'banding', 'outline', 'seam', 'coverage', 'readability', 'revert', 'repetition', 'anim', 'views', 'fit', 'variant', 'footprint', 'draworder', 'density', 'consistency'] as const;
+export const CHECK_IDS = ['palette', 'orphans', 'jaggies', 'banding', 'outline', 'seam', 'coverage', 'readability', 'revert', 'repetition', 'anim', 'views', 'fit', 'variant', 'footprint', 'draworder', 'density', 'consistency', 'font'] as const;
 export type CheckId = (typeof CHECK_IDS)[number];
 
 export function isCheckId(s: string): s is CheckId {
@@ -123,18 +124,19 @@ const DEFAULTS: Record<CheckId, { all: Params } & Partial<Record<string, Params>
   // Stray pixels per 100 opaque pixels. Tiles are texture: a stray one ramp step from its
   // surroundings is allowed there.
   // An overlay is flecks and sparkles: its lone pixels are its art.
-  orphans: { all: { max: 1, texture: false }, tile: { max: 2, texture: true }, family: { max: 2, texture: true }, overlay: { off: true } },
-  jaggies: { all: { max: 0 }, tile: { max: 2 }, family: { max: 2 } },
+  orphans: { all: { max: 1, texture: false }, tile: { max: 2, texture: true }, family: { max: 2, texture: true }, overlay: { off: true }, font: { off: true } },
+  // A glyph sheet's single pixels and diagonals are its letters: it has the font check instead.
+  jaggies: { all: { max: 0 }, tile: { max: 2 }, family: { max: 2 }, font: { off: true } },
   // The pillow share: 1 when ramp steps follow the outline on every side alike.
-  banding: { all: { max: 0.5, minEdges: 8 } },
-  outline: { all: { min: 0.85 } },
+  banding: { all: { max: 0.5, minEdges: 8 }, font: { off: true } },
+  outline: { all: { min: 0.85 }, font: { off: true } },
   seam: { all: { max: 1 } },
   coverage: { all: { max: 0 } },
-  readability: { all: { min: 0.8, delta: 15, maxIou: 0.9, minSpread: 25 } },
+  readability: { all: { min: 0.8, delta: 15, maxIou: 0.9, minSpread: 25 }, font: { off: true } },
   revert: { all: { max: 0.15 } },
   // The most visible stripe when tiled: a band of rows or columns lighter or darker than the
   // rest, ΔL* times the square root of its width.
-  repetition: { all: { max: 3 }, map: { edgeRun: 4, motif: 10 } },
+  repetition: { all: { max: 3 }, map: { edgeRun: 4, motif: 10 }, font: { off: true } },
   // Frame diff share (changed pixels over the silhouette; the pilot's good pairs changed 16-19 %),
   // pivot drift and ground drift in pixels, silhouette area jumps, and the loop seam.
   anim: { all: { minDiff: 0.08, maxDiff: 0.35, maxPivot: 1, maxGround: 0, maxArea: 0.15 }, tile: { minDiff: 0.03 }, family: { minDiff: 0.01 }, overlay: { minDiff: 0, maxDiff: 1 } },
@@ -151,7 +153,11 @@ const DEFAULTS: Record<CheckId, { all: Params } & Partial<Record<string, Params>
   // copy is authored, so some difference is expected; the report says where).
   density: { all: { max: 0.25 } },
   // Outlier measures against the set (each measure's limit), and the drawn height against the manifest's.
-  consistency: { all: { max: 0, maxL: 18, maxOutline: 0.3, maxAngle: 90, maxCluster: 3, maxSteps: 1.5, heightTol: 2 }, family: { off: true }, overlay: { off: true } },
+  consistency: { all: { max: 0, maxL: 18, maxOutline: 0.3, maxAngle: 90, maxCluster: 3, maxSteps: 1.5, heightTol: 2 }, family: { off: true }, overlay: { off: true }, font: { off: true },
+    // Icons against the icon set: stroke weight (px), how much of the canvas the drawn box fills, and the optical centre's distance from the canvas centre (px).
+    icon: { maxStroke: 1, maxFill: 0.2, maxCentre: 1.5 } },
+  // Glyph sheets: problems with cap height, x-height, the baseline, advances and the line height (maxLine: the profile's limit, 0 none).
+  font: { all: { max: 0, maxLine: 0 } },
 };
 
 /** A check's thresholds for a document kind: defaults, then the style guide's. */
@@ -242,7 +248,9 @@ const isTile = (d: Doc): boolean => d.wrap || d.kind === 'family' || d.kind === 
 
 function checkPalette(img: Img, p: Params, ctx: CheckContext): CheckResult {
   const pal = img.doc.palette;
-  const roleArt = hasRoles(pal);
+  const mode = img.doc.kind === 'icon' ? iconModeOf(img.doc) : null;
+  const roleArt = hasRoles(pal) || mode === 'tone';
+  const pure = (hex: string) => rgbOf(hex).every((c) => c === 0 || c === 255);
   const allowed = ctx.style?.palettes?.length ? new Set(ctx.style.palettes.flatMap((x) => x.entries.map((e) => e.hex))) : null;
   const by = new Map<string, Pt[]>();
   const add = (label: string, i: number) => { if (!by.has(label)) by.set(label, []); by.get(label)!.push(ptOf(img, i)); };
@@ -253,16 +261,18 @@ function checkPalette(img: Img, p: Params, ctx: CheckContext): CheckResult {
     opaque++;
     const e = pal.entries[v];
     if (!e) add(`index ${v} is not a palette entry`, i);
-    else if (roleArt && !e.role) add(`${e.name} is a fixed colour in role art`, i);
+    else if (mode === 'channel' && (e.role || !pure(e.hex))) add(`${e.name} ${e.role ?? e.hex} is not a pure channel colour (channel icons use channels of 0 or 255)`, i);
+    else if (mode === 'full' && e.role) add(`${e.name} is a role in a full-colour icon (drawn as is)`, i);
+    else if (roleArt && mode !== 'channel' && mode !== 'full' && !e.role) add(`${e.name} is a fixed colour in ${mode === 'tone' ? 'a tone icon (recoloured through roles)' : 'role art'}`, i);
     else if (allowed && !e.role && !allowed.has(e.hex)) add(`${e.name} ${e.hex} is not in the style palettes`, i);
   }
   const groups = [...by].map(([label, pts]) => ({ label, pts }));
   const n = groups.reduce((s, g) => s + g.pts.length, 0);
   const max = Number(p.max);
-  const scope = roleArt ? 'role entries' : allowed ? `the style palettes (${ctx.style!.palettes!.map((x) => x.name).join(', ')})` : `palette '${pal.name}'`;
+  const scope = mode === 'channel' ? 'pure channel colours' : roleArt && mode !== 'full' ? 'role entries' : allowed ? `the style palettes (${ctx.style!.palettes!.map((x) => x.name).join(', ')})` : `palette '${pal.name}'`;
   return result('palette', {
     status: n <= max ? 'pass' : 'fail', score: n, shown: String(n), limit: `≤ ${max}`, groups,
-    detail: n === 0 ? `all ${opaque} px are ${roleArt ? 'role entries' : `in ${scope}`}` : `${n} px outside ${scope}: ${groups.map((g) => `${g.label} (${g.pts.length})`).join('; ')}`,
+    detail: n === 0 ? `all ${opaque} px are ${/^(role entries|pure channel colours)$/.test(scope) ? scope : `in ${scope}`}` : `${n} px outside ${scope}: ${groups.map((g) => `${g.label} (${g.pts.length})`).join('; ')}`,
   });
 }
 
@@ -1252,10 +1262,11 @@ function checkConsistency(img: Img, p: Params, ctx: CheckContext): CheckResult {
   const d = img.doc;
   if (d.family || d.overlay) return skip('consistency', 'judged on its maps');
   const peers = (ctx.peers ?? []).filter((x) => x.doc !== d && x.name !== d.name);
-  if (!peers.length && ctx.expect?.height === undefined) return skip('consistency', 'no set to compare with (plan it in the manifest)');
+  const icon = d.kind === 'icon' ? { maxStroke: Number(p.maxStroke), maxFill: Number(p.maxFill), maxCentre: Number(p.maxCentre) } : undefined;
+  if (!peers.length && ctx.expect?.height === undefined && !icon) return skip('consistency', 'no set to compare with (plan it in the manifest)');
   const r = consistencyOf(d, peers, {
     ink: ctx.style?.outline ?? ['ink', 'outline', 'black'], light: ctx.style?.light, height: ctx.expect?.height,
-    maxL: Number(p.maxL), maxOutline: Number(p.maxOutline), maxAngle: Number(p.maxAngle), maxCluster: Number(p.maxCluster), maxSteps: Number(p.maxSteps), heightTol: Number(p.heightTol),
+    maxL: Number(p.maxL), maxOutline: Number(p.maxOutline), maxAngle: Number(p.maxAngle), maxCluster: Number(p.maxCluster), maxSteps: Number(p.maxSteps), heightTol: Number(p.heightTol), ...(icon ? { icon } : {}),
   });
   const bad = r.parts.filter((x) => x.pass === false);
   const groups: FlagGroup[] = [];
@@ -1263,6 +1274,14 @@ function checkConsistency(img: Img, p: Params, ctx: CheckContext): CheckResult {
     const pts: Pt[] = [];
     for (let x = r.box.x; x < r.box.x + r.box.w; x++) pts.push([x, r.box.y], [x, r.box.y + r.box.h - 1]);
     groups.push({ label: 'the drawn shape\'s top and bottom rows (its height is off the plan)', pts });
+  }
+  const iconBad = bad.filter((x) => ['stroke weight', 'box fill', 'optical centre'].includes(x.name));
+  if (r.box && iconBad.length) {
+    const pts: Pt[] = [];
+    const b = r.box;
+    for (let x = b.x; x < b.x + b.w; x++) pts.push([x, b.y], [x, b.y + b.h - 1]);
+    for (let y = b.y; y < b.y + b.h; y++) pts.push([b.x, y], [b.x + b.w - 1, y]);
+    groups.push({ label: `the drawn box (${iconBad.map((x) => x.name).join(', ')} off the icon set)`, pts });
   }
   const max = Number(p.max);
   const with_ = r.peers.length ? `against ${r.peers.length} in its set (${r.peers.slice(0, 6).join(', ')}${r.peers.length > 6 ? ', …' : ''})` : 'against the plan';
@@ -1273,15 +1292,78 @@ function checkConsistency(img: Img, p: Params, ctx: CheckContext): CheckResult {
   });
 }
 
+/**
+ * A glyph sheet (plan §4.6): one cap height for the capitals, one x-height for the lowercase
+ * letters without ascenders, letters and digits without descenders standing on the baseline, no
+ * glyph drawn past its advance (or with no advance), and the line height: no shorter than the
+ * tallest glyph's rows and within the profile's limit (maxLine).
+ */
+function checkFont(img: Img, p: Params): CheckResult {
+  const d = img.doc;
+  if (!d.font) return skip('font', 'not a glyph sheet');
+  const f = d.font;
+  const gs = glyphs(d);
+  const groups: FlagGroup[] = [];
+  const problems: string[] = [];
+  const topRow = (g: (typeof gs)[number], row: number): Pt[] => {
+    const out: Pt[] = [];
+    for (let x = 0; x < d.cellW; x++) if (img.get(g.cell[0] + x, g.cell[1] + row) !== TRANSPARENT) out.push([g.cell[0] + x, g.cell[1] + row]);
+    return out;
+  };
+  const modeOfList = (xs: number[]) => {
+    const c = new Map<number, number>();
+    for (const x of xs) c.set(x, (c.get(x) ?? 0) + 1);
+    return [...c].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0]?.[0];
+  };
+  const height = (set: string, label: string) => {
+    const list = gs.filter((g) => g.box && set.includes(String.fromCodePoint(g.cp)));
+    if (list.length < 2) return null;
+    const hs = list.map((g) => f.baseline - g.box![1] + 1);
+    const want = modeOfList(hs)!;
+    const off = list.filter((_, i) => hs[i] !== want);
+    if (off.length) {
+      problems.push(`${label} ${want}: ${off.map((g) => `${charText(g.cp)} ${f.baseline - g.box![1] + 1}`).join(', ')}`);
+      groups.push({ label: `${label} is not ${want}`, pts: off.flatMap((g) => topRow(g, g.box![1])) });
+    }
+    return want;
+  };
+  const cap = height('ABCDEFGHIJKLMNOPRSTUVWXYZ', 'cap height');
+  const xh = height('acemnorsuvwxz', 'x-height');
+  // Standing on the baseline: everything but descenders (and the punctuation that floats).
+  const standing = gs.filter((g) => g.box && /^[A-PR-Za-fhik-ortuv-xz0-9]$/.test(String.fromCodePoint(g.cp)));
+  const offBase = standing.filter((g) => g.box![3] !== f.baseline);
+  if (offBase.length) {
+    problems.push(`off the baseline (row ${f.baseline}): ${offBase.map((g) => `${charText(g.cp)} ends on row ${g.box![3]}`).join(', ')}`);
+    groups.push({ label: `not standing on the baseline (row ${f.baseline})`, pts: offBase.flatMap((g) => topRow(g, g.box![3])) });
+  }
+  const clipped = gs.filter((g) => g.box && (g.advance === 0 || g.box[2] >= g.advance));
+  if (clipped.length) {
+    problems.push(`drawn past the advance: ${clipped.map((g) => `${charText(g.cp)} (advance ${g.advance}, ink to column ${g.box![2]})`).join(', ')}`);
+    groups.push({ label: 'drawn past its advance', pts: clipped.flatMap((g) => { const out: Pt[] = []; for (let y = 0; y < d.cellH; y++) for (let x = Math.max(g.advance, 0); x < d.cellW; x++) if (img.get(g.cell[0] + x, g.cell[1] + y) !== TRANSPARENT) out.push([g.cell[0] + x, g.cell[1] + y]); return out; }) });
+  }
+  const inked = gs.filter((g) => g.box);
+  const tall = inked.length ? Math.max(...inked.map((g) => g.box![3])) - Math.min(...inked.map((g) => g.box![1])) + 1 : 0;
+  if (tall && f.line < tall) problems.push(`the line height ${f.line} is less than the glyphs' ${tall} rows (lines would overlap)`);
+  const maxLine = Number(p.maxLine);
+  if (maxLine > 0 && f.line > maxLine) problems.push(`the line height ${f.line} is over the limit ${maxLine}`);
+  const n = problems.length;
+  const max = Number(p.max);
+  const empty = gs.length - inked.length;
+  return result('font', {
+    status: n <= max ? 'pass' : 'fail', score: n, shown: String(n), limit: `≤ ${max}`, groups,
+    detail: `${n ? problems.join('; ') : 'metrics agree'} (${inked.length} of ${gs.length} glyphs drawn${empty ? `, ${empty} empty` : ''}; cap height ${cap ?? '—'}, x-height ${xh ?? '—'}, baseline row ${f.baseline}, line ${f.line}${maxLine > 0 ? ` of at most ${maxLine}` : ''})`,
+  });
+}
+
 const RUNNERS: Record<CheckId, (img: Img, p: Params, ctx: CheckContext) => CheckResult> = {
   palette: checkPalette, orphans: checkOrphans, jaggies: checkJaggies, banding: checkBanding, outline: checkOutline,
   seam: checkSeam, coverage: checkCoverage, readability: checkReadability, revert: checkRevert, repetition: checkRepetition,
   anim: checkAnim, views: checkViews, fit: checkFit, variant: checkVariant, footprint: notMap('footprint'), draworder: notMap('draworder'), density: checkDensity,
-  consistency: checkConsistency,
+  consistency: checkConsistency, font: checkFont,
 };
 
 /** Checks of the whole document (every frame at once); the others read one frame's image. */
-const WHOLE = new Set<CheckId>(['consistency', 'coverage', 'anim', 'views', 'footprint', 'draworder']);
+const WHOLE = new Set<CheckId>(['font', 'consistency', 'coverage', 'anim', 'views', 'footprint', 'draworder']);
 
 /** The checks of a map document (plan §4.11), over the map composed from the assets it names. */
 /** A map's consistency: everything standing on it on one screen (§4.11): each object against the others. */

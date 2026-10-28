@@ -64,8 +64,9 @@ export const USAGE = `pixelclaw: a pixel art editor driven by commands
       Write assets through an export profile (default png): built-in png, atlas, tiled, godot,
       aseprite-json, aseprite, or the project's profiles/*.json (docs/profiles.md). Without assets,
       all; a map brings what it draws. Default folder: <project>/exports/<profile>/.
-  pixelclaw export <project> <asset> --format split|png [--out <dir>]
-      split: an oversized asset as one-cell pieces plus a stamp; png: a map at 1x or a first frame.
+  pixelclaw export <project> <asset> --format split|png|strip|bmfont [--out <dir>]
+      split: an oversized asset as one-cell pieces plus a stamp; png: a map at 1x or a first frame;
+      strip: a font as a glyph strip (red separator columns) plus its characters; bmfont: a font as .fnt + page.
   pixelclaw import <project> <file.png|file.aseprite|folder> [--profile <name>] [--as <name>] [--kind <kind>]
          [--palette <name> | --build] [--grid WxH [--cells]] [--by <author>] [--replace]
       A PNG or .aseprite file becomes a new asset quantised to a palette (--build: one made from

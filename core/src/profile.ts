@@ -11,7 +11,8 @@
 // importing gives the same indices. Everything here is pure: files are a map of paths to bytes.
 
 import { aseParts, readAseprite, ticksToMs, writeAseprite } from './aseprite.ts';
-import { TRANSPARENT, flatten, type Doc } from './doc.ts';
+import { TRANSPARENT, flatten, iconModeOf, type Doc } from './doc.ts';
+import { FontExportError, fontBmfont, fontStrip, STRIP_SEPARATOR } from './font.ts';
 import { cropRgba, decodePng, encodedColours, indicesToRgba, quantise } from './decode.ts';
 import { reduceIndices, remapByName, scaleIndices, type ReducerOptions } from './density.ts';
 import { layoutOf, schemeOf } from './family.ts';
@@ -58,15 +59,22 @@ export interface ProfileJson {
   records?: { format: 'csv' | 'json'; file?: string; columns?: string[]; header?: boolean };
   /** Loose and sheet image file names: {name} (loose) or {asset} (sheet). */
   image?: string;
+  /**
+   * Fonts (plan §4.6): written as a glyph strip (`strip`, the default: `{asset}.png` plus the
+   * characters in `{asset}.txt`), BMFont (`bmfont`: `{asset}.fnt` plus `{asset}_0.png`), both, or
+   * as an ordinary sheet item (`sheet`). `separator` is the strip's separator colour; `maxLine`
+   * the line-height limit (an export over it is noted, and the font check reads it).
+   */
+  fonts?: { format?: 'strip' | 'bmfont' | 'both' | 'sheet'; separator?: string; maxLine?: number };
   /** Animation snippets: one text file, a template per asset kind (or "default"). */
   snippets?: { file: string; header?: string; footer?: string; join?: string; templates: Record<string, string> };
 }
 
 export class ProfileError extends Error {}
 
-export const RECORD_COLUMNS = ['sprite', 'x', 'y', 'w', 'h', 'cropX', 'cropY', 'frameW', 'frameH', 'pivotX', 'pivotY', 'page', 'asset', 'frame', 'n', 'view', 'mirror', 'ticks', 'ms', 'd', 'cols', 'rows', 'anchorX', 'anchorY', 'flags', 'variant', 'kind'] as const;
+export const RECORD_COLUMNS = ['sprite', 'x', 'y', 'w', 'h', 'cropX', 'cropY', 'frameW', 'frameH', 'pivotX', 'pivotY', 'page', 'asset', 'frame', 'n', 'view', 'mirror', 'ticks', 'ms', 'd', 'cols', 'rows', 'anchorX', 'anchorY', 'flags', 'variant', 'kind', 'mode'] as const;
 export const DEFAULT_COLUMNS = ['sprite', 'x', 'y', 'w', 'h', 'cropX', 'cropY', 'frameW', 'frameH', 'pivotX', 'pivotY'];
-const SNIPPET_VARS = ['asset', 'name', 'kind', 'frames', 'names', 'first', 'ticks', 'ms', 'frameTicks', 'loop', 'tags', 'views', 'directions', 'mirror', 'w', 'h', 'cols', 'rows', 'anchorX', 'anchorY', 'pivotX', 'pivotY', 'variants', 'scheme'];
+const SNIPPET_VARS = ['asset', 'name', 'kind', 'mode', 'frames', 'names', 'first', 'ticks', 'ms', 'frameTicks', 'loop', 'tags', 'views', 'directions', 'mirror', 'w', 'h', 'cols', 'rows', 'anchorX', 'anchorY', 'pivotX', 'pivotY', 'variants', 'scheme'];
 const ITEM_VARS = ['asset', 'n', 'view', 'cx', 'cy', 'variant', 'sides', 'corners', 'name', 'd', 'page', 'stem'];
 
 /** Fill `{var}` placeholders; `{{` and `}}` are literal braces; any other `{` is literal. */
@@ -99,6 +107,11 @@ export function loadProfile(j: ProfileJson): ProfileJson {
     if (!Array.isArray(j.density.levels) || !j.density.levels.length || j.density.levels.some((d) => ![1, 2, 3, 4, 6, 8].includes(d))) throw new ProfileError(`${where}: density.levels lists sizes like 1, 2, 4`);
   }
   for (const c of j.records?.columns ?? []) if (!(RECORD_COLUMNS as readonly string[]).includes(c)) throw new ProfileError(`${where}: records.columns: '${c}' is not a column (${RECORD_COLUMNS.join(', ')})`);
+  if (j.fonts) {
+    if (j.fonts.format && !['strip', 'bmfont', 'both', 'sheet'].includes(j.fonts.format)) throw new ProfileError(`${where}: fonts.format is strip, bmfont, both or sheet`);
+    if (j.fonts.separator && !/^#[0-9a-fA-F]{6}$/.test(j.fonts.separator)) throw new ProfileError(`${where}: fonts.separator must be #rrggbb`);
+    if (j.fonts.maxLine !== undefined && (!Number.isInteger(j.fonts.maxLine) || j.fonts.maxLine < 1)) throw new ProfileError(`${where}: fonts.maxLine is a line height in pixels`);
+  }
   if (j.snippets) for (const t of Object.values(j.snippets.templates ?? {})) fillTemplate(t, Object.fromEntries(SNIPPET_VARS.map((v) => [v, ''])), SNIPPET_VARS);
   return j;
 }
@@ -174,6 +187,17 @@ function included(p: ProfileJson, d: Doc): boolean {
 }
 
 /** Every image an export writes (at 1x), named by the profile, in a fixed order. */
+const fontFormat = (p: ProfileJson) => p.fonts?.format ?? 'strip';
+
+/**
+ * The colours an asset is written in: role entries through the profile's encoding, except icons
+ * in full or channel mode, which are written exactly as drawn (plan §4.5).
+ */
+export function exportColours(d: Doc, roles?: ProfileJson['roles']): string[] {
+  if (d.kind === 'icon' && iconModeOf(d) !== 'tone') return d.palette.entries.map((e) => e.hex);
+  return encodedColours(d.palette, roles);
+}
+
 export function exportItems(p: ProfileJson, docs: Doc[]): Item[] {
   const byName = new Map(docs.map((d) => [d.name, d]));
   const asFrames = (p.variants ?? 'frames') === 'frames';
@@ -181,7 +205,7 @@ export function exportItems(p: ProfileJson, docs: Doc[]): Item[] {
   const groups: Doc[][] = [];
   const sorted = [...docs].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
   for (const d of sorted) {
-    if (!included(p, d) || d.map) continue;
+    if (!included(p, d) || d.map || (d.font && fontFormat(p) !== 'sheet')) continue;
     if (asFrames && d.variantOf && byName.has(d.variantOf) && included(p, byName.get(d.variantOf)!)) continue;
     groups.push([d, ...(asFrames ? sorted.filter((v) => v.variantOf === d.name && included(p, v) && v.width === d.width && v.height === d.height) : [])]);
   }
@@ -332,7 +356,7 @@ function recordValue(c: string, pl: Placed, page: string, d: number, ms: (t: num
     case 'cols': return fp?.cols ?? null; case 'rows': return fp?.rows ?? null;
     case 'anchorX': return fp ? fp.at[0] + fp.anchor[0] : null; case 'anchorY': return fp ? fp.at[1] + fp.anchor[1] : null;
     case 'flags': return fp ? fp.flags.join('/') : null;
-    case 'variant': return it.cell; case 'kind': return doc.kind;
+    case 'variant': return it.cell; case 'kind': return doc.kind; case 'mode': return doc.kind === 'icon' ? iconModeOf(doc) : '';
   }
   return null;
 }
@@ -381,7 +405,7 @@ export function exportProfile(prof: ProfileJson, docs: Doc[], o: ExportOptions =
   const coloursOf = (d: Doc) => {
     let c = colours.get(d);
     if (!c) {
-      c = encodedColours(d.palette, p.roles);
+      c = exportColours(d, p.roles);
       const seen = new Map<string, string>();
       d.palette.entries.forEach((e, i) => {
         const k = c![i]!.toLowerCase(), was = seen.get(k);
@@ -479,6 +503,26 @@ export function exportProfile(prof: ProfileJson, docs: Doc[], o: ExportOptions =
   } else if (p.layout === 'tiled') exportTiled(p, docs, items, put, png, ms, o.world, notes);
   else exportGodot(p, docs, items, put, png, rate, notes);
 
+  if (fontFormat(p) !== 'sheet') {
+    for (const d of docs.filter((x) => x.font && included(p, x))) {
+      try {
+        if (fontFormat(p) !== 'bmfont') {
+          const st = fontStrip(d, coloursOf(d), p.fonts?.separator ?? STRIP_SEPARATOR);
+          put(`${d.name}.png`, encodePng(st.img));
+          put(`${d.name}.txt`, st.chars + '\n');
+        }
+        if (fontFormat(p) !== 'strip') {
+          const bm = fontBmfont(d, coloursOf(d), `${d.name}_0.png`);
+          put(`${d.name}.fnt`, bm.fnt);
+          put(`${d.name}_0.png`, encodePng(bm.img));
+        }
+      } catch (e) {
+        if (e instanceof FontExportError) throw new ProfileError(e.message);
+        throw e;
+      }
+      if (p.fonts?.maxLine && d.font!.line > p.fonts.maxLine) notes.push(`${d.name}: the line height ${d.font!.line} is over the profile's limit ${p.fonts.maxLine}`);
+    }
+  }
   if (p.snippets) put(p.snippets.file, snippetText(p, docs, items, ms));
   for (const [k, n] of how) if (k !== 'authored') notes.push(`${n} images at a higher density were ${k} (no authored copy at that level)`);
   return { files, items, notes };
@@ -497,7 +541,7 @@ function snippetText(p: ProfileJson, docs: Doc[], items: Item[], ms: (t: number)
     const fp = footprintOf(doc);
     const ticks = list.map((i) => i.ticks);
     out.push(fillTemplate(t, {
-      asset: g, name: list[0]!.name, kind: doc.kind, frames: list.length, names: list.map((i) => `"${i.name}"`).join(', '), first: list[0]!.name,
+      asset: g, name: list[0]!.name, kind: doc.kind, mode: doc.kind === 'icon' ? iconModeOf(doc) : '', frames: list.length, names: list.map((i) => `"${i.name}"`).join(', '), first: list[0]!.name,
       ticks: ticks.join(', '), ms: ticks.map(ms).join(', '), frameTicks: ticks[0] ?? 10,
       loop: doc.tags[0]?.loop ?? 'cycle', tags: doc.tags.map((x) => x.name).join(', '), views: doc.views.map((v) => v.name).join(', '),
       directions: doc.views.length || 1, mirror: doc.views.filter((v) => v.mirror).map((v) => `${v.name}=${v.mirror}`).join(', '),
@@ -856,7 +900,7 @@ export function importProfile(prof: ProfileJson, files: Map<string, Uint8Array>,
       const doc = docs.find((d) => d.name === stem) ?? docs.find((d) => levelStem(p, d.densityOf?.of ?? '', d.densityOf?.d ?? 0) === stem);
       if (!doc) { notes.push(`${f}: no asset named '${stem}'`); continue; }
       const parts = aseParts(readAseprite(files.get(f)!));
-      const cols = encodedColours(doc.palette, p.roles);
+      const cols = exportColours(doc, p.roles);
       let inexact = 0;
       const frames = parts.ms.map((_, fr) => {
         const flat = new Uint16Array(parts.width * parts.height).fill(TRANSPARENT);
@@ -887,7 +931,7 @@ export function importProfile(prof: ProfileJson, files: Map<string, Uint8Array>,
     const d = im.d;
     let a = assets.get(target.name);
     if (!a) assets.set(target.name, (a = { frames: Array.from({ length: target.frameCount }, () => new Uint16Array(target.width * target.height).fill(TRANSPARENT)), inexact: 0, images: 0 }));
-    const q = quantise(im.img, it.doc.palette, encodedColours(it.doc.palette, p.roles));
+    const q = quantise(im.img, it.doc.palette, exportColours(it.doc, p.roles));
     a.inexact += q.inexact;
     a.images++;
     const px = target === it.doc ? q.px : remapByName(q.px, it.doc.palette, target.palette);

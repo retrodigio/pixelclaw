@@ -3,7 +3,8 @@
 // and written down. Normalising a normalised line gives the same line back.
 
 import { syncMirrors, viewOf } from './anim.ts';
-import { DOC_KINDS, TRANSPARENT, createDoc, ctxOf, type Doc, type DocKind, type FamilyState, type MapState, type OverlayState } from './doc.ts';
+import { DOC_KINDS, TRANSPARENT, createDoc, ctxOf, type Doc, type DocKind, type FamilyState, type FontState, type MapState, type OverlayState } from './doc.ts';
+import { charsText, parseChars } from './font.ts';
 import { defaultOverlay, familyLayout, familyCell, syncFamily } from './family.ts';
 import { defaultInset, loadScheme, schemeNamed, BUILTIN_SCHEMES, type Scheme, type SchemeJson } from './schemes.ts';
 import { drawColoured, drawPoints, mirrored, targetOf } from './draw.ts';
@@ -56,7 +57,7 @@ export function synthOpt(key: string, value: string, cmd: ParsedCommand): Extrac
 /** Defaults a project gives commands that leave an option out. */
 export interface StyleDefaults {
   /** `new <kind> <name>` with no size, palette or scheme: the manifest's entry for the name, else the style guide's for the kind. */
-  asset?(kind: string, name: string): { size?: [number, number]; palette?: string; scheme?: string; cell?: [number, number] } | undefined;
+  asset?(kind: string, name: string): { size?: [number, number]; palette?: string; scheme?: string; cell?: [number, number]; chars?: string } | undefined;
   /** `shade` with no light=: the style guide's light direction. */
   light?: string;
   /** `outline` with no c=: the style guide's outline colours (the first the palette has). */
@@ -66,7 +67,7 @@ export interface StyleDefaults {
 export type Op =
   | {
     k: 'new'; kind: DocKind; name: string; width: number; height: number; cellW: number; cellH: number; wrap: boolean; palette: Palette; bg: number;
-    family?: FamilyState; overlay?: OverlayState; map?: MapState;
+    family?: FamilyState; overlay?: OverlayState; map?: MapState; font?: FontState;
   }
   | { k: 'fork'; name: string }
   | { k: 'undo'; group: string }
@@ -258,7 +259,7 @@ const newCmd: CommandSpec = {
   summary: 'new <kind> <name> <W>x<H> [palette=<name>] [wrap=on|off] [cell=<W>x<H>] [bg=<colour>|none] [<< palette rows >>]   (new family <name> <T>x<T> scheme=<scheme> [map=<C>x<R>]: an autotile family of T px tiles; new map <name> <C>x<R> [tile=<T>]: a map of C x R cells of T px)',
   normalise(cmd, ctx) {
     if (ctx.doc) throw new DiagError(cmd.line, cmd.col, `new must be the first command of a tape (this document already exists)`);
-    const a = new Args(cmd, ['palette', 'wrap', 'cell', 'bg', 'scheme', 'def', 'map', 'tile']);
+    const a = new Args(cmd, ['palette', 'wrap', 'cell', 'bg', 'scheme', 'def', 'map', 'tile', 'chars', 'cols', 'baseline', 'line', 'spacing']);
     const kindTok = a.take('word', `a kind (${DOC_KINDS.join(', ')})`);
     if (!DOC_KINDS.includes(kindTok.v as DocKind)) throw new DiagError(kindTok.line, kindTok.col, `unknown kind '${kindTok.v}' (kinds: ${DOC_KINDS.join(', ')})`);
     const kind = kindTok.v as DocKind;
@@ -307,6 +308,9 @@ const newCmd: CommandSpec = {
     const mapOpt = a.opts.get('map');
     let family: FamilyState | undefined;
     let map: MapState | undefined;
+    let font: FontState | undefined;
+    const fontOpts = ['chars', 'cols', 'baseline', 'line', 'spacing'].flatMap((k) => (a.opts.get(k) ? [a.opts.get(k)!] : []));
+    if (kind !== 'font' && fontOpts.length) throw new DiagError(fontOpts[0]!.line, fontOpts[0]!.col, `${fontOpts[0]!.key}= is for new font`);
     let width = size.w, height = size.h, extra = '';
     const tileOpt = a.opts.get('tile');
     if (tileOpt && kind !== 'map') throw new DiagError(tileOpt.line, tileOpt.col, `tile= is for new map`);
@@ -359,13 +363,35 @@ const newCmd: CommandSpec = {
     } else {
       for (const o of [schemeOpt, mapOpt, a.opts.get('def')]) if (o) throw new DiagError(o.line, o.col, `${o.key}= is for new family`);
     }
+    if (kind === 'font') {
+      // The size is a glyph cell's; the canvas is the sheet of cells (plan §4.6).
+      const charsOpt = a.opts.get('chars') ?? (dflt?.chars ? { ...synthOpt('chars', dflt.chars, cmd), quoted: !/^[0-9U+,\-]+$/.test(dflt.chars) } : undefined);
+      const chars = charsOpt ? parseChars(charsOpt.value, charsOpt.quoted) : parseChars('32-126', false);
+      if (typeof chars === 'string') throw new DiagError(charsOpt!.line, charsOpt!.vcol, chars);
+      if (wrap) throw new DiagError(a.opts.get('wrap')!.line, a.opts.get('wrap')!.vcol, `a glyph sheet does not wrap`);
+      if (cellOpt && (cellW !== size.w || cellH !== size.h)) throw new DiagError(cellOpt.line, cellOpt.vcol, `a font's cells are its glyph size (${size.w}x${size.h})`);
+      const num = (k: string, lo: number, hi: number, dflt: number) => {
+        const o = a.opts.get(k);
+        if (!o) return dflt;
+        if (!/^\d+$/.test(o.value) || Number(o.value) < lo || Number(o.value) > hi) throw new DiagError(o.line, o.vcol, `${k}= must be ${lo}..${hi}`);
+        return Number(o.value);
+      };
+      const cols = num('cols', 1, 256, Math.min(16, chars.length));
+      const rows = Math.ceil(chars.length / cols);
+      if (size.w > 256 || size.h > 256) throw new DiagError(size.line, size.col, `a glyph cell is at most 256x256`);
+      if (cols * size.w > 4096 || rows * size.h > 4096) throw new DiagError(size.line, size.col, `${chars.length} glyphs in ${cols} columns make a ${cols * size.w}x${rows * size.h} sheet, over 4096`);
+      font = { chars, cols, baseline: num('baseline', 0, size.h - 1, size.h - 1), line: num('line', 1, 1024, size.h + 1), spacing: num('spacing', 0, 64, 1), advances: {} };
+      width = cols * size.w; height = rows * size.h; cellW = size.w; cellH = size.h;
+      extra = ` chars=${charsText(chars)} cols=${cols} baseline=${font.baseline} line=${font.line} spacing=${font.spacing}`;
+    }
     const head = map ? `new map ${nameTok.v} ${size.w}x${size.h}${extra} palette=${palette.name}`
+      : kind === 'font' ? `new font ${nameTok.v} ${size.w}x${size.h} palette=${palette.name} wrap=off cell=${cellW}x${cellH} bg=${bg.name}${extra}`
       : `new ${kind} ${nameTok.v} ${size.w}x${size.h}${extra} palette=${palette.name} wrap=${wrap ? 'on' : 'off'} cell=${cellW}x${cellH} bg=${bg.name}`;
     return {
       text: lang >= 2 ? `${head} <<\n${blockText(paletteRows(palette))}>>` : head,
       op: {
         k: 'new', kind, name: nameTok.v, width, height, cellW, cellH, wrap, palette, bg: bg.index,
-        ...(family ? { family } : {}), ...(map ? { map } : {}), ...(kind === 'overlay' ? { overlay: defaultOverlay() } : {}),
+        ...(family ? { family } : {}), ...(map ? { map } : {}), ...(font ? { font } : {}), ...(kind === 'overlay' ? { overlay: defaultOverlay() } : {}),
       },
     };
   },

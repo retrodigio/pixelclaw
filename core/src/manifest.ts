@@ -14,6 +14,7 @@
 //
 // Each stage needs the ones before it; a later `mark rejected` sends an approval back.
 
+import { parseChars } from './font.ts';
 import { DOC_KINDS, type DocKind, type Mark } from './doc.ts';
 
 export const MANIFEST_FORMAT = 'pixelclaw-manifest';
@@ -52,6 +53,8 @@ export interface ManifestAsset {
   uses?: string[];
   /** The flat colour templates draw it in (a palette entry name or #rrggbb). */
   flat?: string;
+  /** Fonts: the characters, as `new font … chars=` takes them ("32-126", "U+0041-U+005A", or the characters themselves). */
+  chars?: string;
 }
 
 export interface Manifest {
@@ -83,7 +86,7 @@ const SIZE_RE = /^(\d+)x(\d+)$/;
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 const ASSET_KEYS = new Set([
   'name', 'kind', 'size', 'set', 'description', 'palette', 'scheme', 'inside', 'outside', 'band', 'frames', 'ticks', 'views', 'mirror', 'cells',
-  'height', 'variantOf', 'recolourOf', 'uses', 'flat',
+  'height', 'variantOf', 'recolourOf', 'uses', 'flat', 'chars',
 ]);
 const TOP_KEYS = new Set(['format', 'version', 'theme', 'sets', 'export', 'assets']);
 
@@ -198,6 +201,10 @@ export function validateManifest(json: unknown, known: ManifestKnown = {}): { ma
       if (!Array.isArray(a.uses) || !a.uses.every((u) => typeof u === 'string')) err(at('uses'), 'a list of asset names');
       else for (const u of a.uses as string[]) if (!names.has(u)) err(at('uses'), `no asset '${u}' in the manifest`);
       if (kind !== 'map') err(at('uses'), 'uses is for maps');
+    }
+    if (a.chars !== undefined) {
+      if (kind !== 'font') err(at('chars'), 'chars is for fonts');
+      else if (typeof a.chars !== 'string' || typeof parseChars(a.chars, !/^[0-9U+,\-]+$/.test(a.chars)) === 'string') err(at('chars'), 'code points and ranges like "32-126", or the characters themselves');
     }
     if (typeof a.flat === 'string' && !HEX_RE.test(a.flat) && !NAME_RE.test(a.flat.toLowerCase())) err(at('flat'), 'a palette entry name or #rrggbb');
     if (typeof a.set === 'string' && sets && typeof sets === 'object' && !(a.set in (sets as object))) err(at('set'), `no set '${a.set}' in sets`);

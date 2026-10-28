@@ -14,3 +14,4 @@ import './cmd-family.ts';
 import './cmd-map.ts';
 import './cmd-io.ts';
 import './cmd-plan.ts';
+import './cmd-font.ts';

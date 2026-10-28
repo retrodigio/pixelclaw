@@ -10,8 +10,49 @@ import type { Geometry, SchemeJson } from './schemes.ts';
 /** The pixel value for "no colour". Palette entry i is stored as i. */
 export const TRANSPARENT = 0xffff;
 
-export type DocKind = 'tile' | 'sprite' | 'sheet' | 'icon' | 'family' | 'overlay' | 'object' | 'map';
-export const DOC_KINDS: readonly DocKind[] = ['tile', 'sprite', 'sheet', 'icon', 'family', 'overlay', 'object', 'map'];
+export type DocKind = 'tile' | 'sprite' | 'sheet' | 'icon' | 'family' | 'overlay' | 'object' | 'map' | 'font';
+export const DOC_KINDS: readonly DocKind[] = ['tile', 'sprite', 'sheet', 'icon', 'family', 'overlay', 'object', 'map', 'font'];
+
+/**
+ * How an icon is exported (plan §4.5): `tone` art is recoloured by the game (role entries, written
+ * through the profile's encoding), `full` art is drawn as is (often a white silhouette), `channel`
+ * art is pure-RGB channel masks (every colour's channels 0 or 255, written exactly).
+ */
+export type IconMode = 'tone' | 'full' | 'channel';
+export const ICON_MODES: readonly IconMode[] = ['tone', 'full', 'channel'];
+
+/**
+ * A glyph sheet (plan §4.6): a grid of cells, one per code point in `chars` order (row-major,
+ * `cols` cells a row), each glyph drawn from its cell's left edge. `baseline` is the cell row the
+ * glyphs stand on (the bottom row of a capital), `line` the line height in pixels, `spacing` the
+ * pixels added after each glyph's advance. A glyph's advance is its own (`advances`, by code
+ * point) or its ink width (the rightmost drawn column + 1); an empty glyph's is half the cell.
+ */
+export interface FontState {
+  chars: number[];
+  cols: number;
+  baseline: number;
+  line: number;
+  spacing: number;
+  advances: Record<number, number>;
+}
+
+/**
+ * An image under the art (plan §6): a content-addressed blob (blobs/<sha256>.png) of `iw` x `ih`
+ * pixels shown on a reference layer, stretched over the document rectangle x,y w x h. Never part
+ * of the art or an export; `snap` reads it into a draft layer. `layout` is the flat template the
+ * image was made from (a blob too), when there was one.
+ */
+export interface Underlay {
+  blob: string;
+  iw: number;
+  ih: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  layout: string | null;
+}
 
 /**
  * An asset's footprint on a map (plan §4.10): `cols` x `rows` grid cells of its art grid (the
@@ -113,6 +154,8 @@ export interface Layer {
   reference: boolean;
   /** A map's layer: what it holds (never changed in place, so copies may share it). */
   map?: MapLayerInfo;
+  /** A reference layer showing an image (never changed in place, so copies may share it). */
+  underlay?: Underlay;
 }
 
 /** A note pinned to a pixel (1x1) or a region, for whoever reads the tape next (plan §1.3). */
@@ -218,6 +261,19 @@ export interface Doc {
   map: MapState | null;
   /** Named points on the tape (plan §7.2 marks); `reviewed`, `approved` and `rejected` set the asset's status (plan §7.3). */
   marks: Mark[];
+  /** An icon's export mode (null: tone when the palette has roles, else full). */
+  iconMode: IconMode | null;
+  /** A glyph sheet's code points and metrics (kind font). */
+  font: FontState | null;
+}
+
+/** An icon's export mode, with the default filled in. */
+export function iconModeOf(d: Doc): IconMode {
+  return d.iconMode ?? (d.palette.entries.some((e) => e.role) ? 'tone' : 'full');
+}
+
+export function cloneFont(f: FontState): FontState {
+  return { ...f, chars: [...f.chars], advances: { ...f.advances } };
 }
 
 /** A mark: a name on the tape at a command, with what the art was then (its art hash). */
@@ -244,7 +300,7 @@ export function newLayer(name: string, o: Partial<Layer> = {}): Layer {
 
 export function createDoc(o: {
   kind: DocKind; name: string; width: number; height: number; cellW: number; cellH: number;
-  wrap: boolean; palette: Palette; bg: number; family?: FamilyState | null; overlay?: OverlayState | null; map?: MapState | null;
+  wrap: boolean; palette: Palette; bg: number; family?: FamilyState | null; overlay?: OverlayState | null; map?: MapState | null; font?: FontState | null;
 }): Doc {
   const pixels = new Uint16Array(o.width * o.height).fill(o.bg);
   // A family draws its textures on 'ground' and its band on 'band' (see family.ts).
@@ -259,6 +315,7 @@ export function createDoc(o: {
     ticks: [DEFAULT_TICKS], tags: [], views: [], pivot: null, ground: null,
     family: o.family ? cloneFamily(o.family) : null, overlay: o.overlay ? cloneOverlay(o.overlay) : null,
     footprint: null, variantOf: null, densityOf: null, map: o.map ? cloneMap(o.map) : null, marks: [],
+    iconMode: null, font: o.font ? cloneFont(o.font) : null,
   };
 }
 
@@ -309,7 +366,7 @@ export function cloneDoc(d: Doc): Doc {
     home: { ...d.home },
     family: d.family ? cloneFamily(d.family) : null, overlay: d.overlay ? cloneOverlay(d.overlay) : null,
     footprint: d.footprint ? cloneFootprint(d.footprint) : null, map: d.map ? cloneMap(d.map) : null,
-    notes: d.notes.map((n) => ({ ...n })), marks: d.marks.map((m) => ({ ...m })),
+    notes: d.notes.map((n) => ({ ...n })), marks: d.marks.map((m) => ({ ...m })), font: d.font ? cloneFont(d.font) : null,
     stamps: Object.fromEntries(Object.entries(d.stamps).map(([k, s]) => [k, { ...s, px: s.px.slice() }])),
     macros: Object.fromEntries(Object.entries(d.macros).map(([k, m]) => [k, { params: [...m.params], body: m.body }])),
   };
@@ -448,6 +505,11 @@ export function serializeDoc(d: Doc): Uint8Array {
     ...(d.densityOf ? { densityOf: [d.densityOf.of, d.densityOf.d] } : {}),
     ...(d.map ? { map: { tile: d.map.tile, entries: d.map.entries.map((e) => [e.name, e.variant, e.cols, e.rows, e.anchor]) } } : {}),
     ...(d.marks.length ? { marks: d.marks.map((m) => [m.name, m.seq, m.by, m.text, m.art]) } : {}),
+    ...(d.iconMode ? { iconMode: d.iconMode } : {}),
+    ...(d.font ? { font: [d.font.chars.join(','), d.font.cols, d.font.baseline, d.font.line, d.font.spacing, Object.keys(d.font.advances).map(Number).sort((a, b) => a - b).map((c) => [c, d.font!.advances[c]])] } : {}),
+    ...(d.layers.some((l) => l.underlay) ? {
+      underlays: d.layers.flatMap((l, i) => (l.underlay ? [[i, l.underlay.blob, l.underlay.iw, l.underlay.ih, l.underlay.x, l.underlay.y, l.underlay.w, l.underlay.h, l.underlay.layout]] : [])),
+    } : {}),
   });
   const head = utf8('PCLAWDOC 2\n' + header + '\n');
   const n = d.width * d.height;
@@ -488,6 +550,9 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
     densityOf?: [string, number];
     map?: { tile: number; entries: [string, string | null, number, number, [number, number]][] };
     marks?: [string, number, string, string, string][];
+    iconMode?: IconMode;
+    font?: [string, number, number, number, number, [number, number][]];
+    underlays?: [number, string, number, number, number, number, number, number, string | null][];
   };
   const h = JSON.parse(utf8Decode(bytes.subarray(magic.length, nl))) as Header;
   let o = nl + 1;
@@ -510,6 +575,8 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
   }
   const stamps: Record<string, Stamp> = {};
   for (const [s, w, sh] of h.stamps) stamps[s] = { w, h: sh, px: u16(w * sh) };
+  const layers: Layer[] = h.layers.map(([name, hidden, locked, reference, m]) => (m ? { name, hidden, locked, reference, map: mapLayerFromJson(m) } : { name, hidden, locked, reference }));
+  for (const [i, blob, iw, ih, x, y, w, uh, layout] of h.underlays ?? []) layers[i]!.underlay = { blob, iw, ih, x, y, w, h: uh, layout };
   return {
     kind: h.kind, name: h.name, width: h.width, height: h.height, cellW: h.cellW, cellH: h.cellH, wrap: h.wrap,
     palette: {
@@ -517,7 +584,7 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
       ramps: Object.fromEntries(h.palette.ramps),
     },
     paletteLocked: h.palette.locked,
-    layers: h.layers.map(([name, hidden, locked, reference, m]) => (m ? { name, hidden, locked, reference, map: mapLayerFromJson(m) } : { name, hidden, locked, reference })),
+    layers,
     frameCount: h.frameCount, cels, ctx, home: { layer: h.home[0], frame: h.home[1] },
     notes: h.notes.map(([id, x, y, w, nh, text]) => ({ id, x, y, w, h: nh, text })),
     stamps, macros: Object.fromEntries(h.macros.map(([m, params, body]) => [m, { params, body }])),
@@ -536,6 +603,11 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
     densityOf: h.densityOf ? { of: h.densityOf[0], d: h.densityOf[1] } : null,
     map: h.map ? { tile: h.map.tile, entries: h.map.entries.map(([name, variant, cols, rows, anchor]) => ({ name, variant, cols, rows, anchor })) } : null,
     marks: (h.marks ?? []).map(([name, seq, by, text, art]) => ({ name, seq, by, text, art })),
+    iconMode: h.iconMode ?? null,
+    font: h.font ? {
+      chars: h.font[0] ? h.font[0].split(',').map(Number) : [], cols: h.font[1], baseline: h.font[2], line: h.font[3], spacing: h.font[4],
+      advances: Object.fromEntries(h.font[5]),
+    } : null,
   };
 }
 
@@ -560,7 +632,7 @@ function mapLayerFromJson(a: string[]): MapLayerInfo {
  */
 export function serializeDocV1(d: Doc): Uint8Array | null {
   const authors = Object.keys(d.ctx);
-  if (hasAnim(d) || d.marks.length || d.family || d.overlay || d.footprint || d.variantOf || d.densityOf || d.map || d.paletteLocked || d.home.layer || d.home.frame || d.frameCount !== 1 || d.layers.length !== 1 || Object.keys(d.stamps).length || Object.keys(d.macros).length) return null;
+  if (hasAnim(d) || d.marks.length || d.iconMode || d.font || d.family || d.overlay || d.footprint || d.variantOf || d.densityOf || d.map || d.paletteLocked || d.home.layer || d.home.frame || d.frameCount !== 1 || d.layers.length !== 1 || Object.keys(d.stamps).length || Object.keys(d.macros).length) return null;
   const l = d.layers[0]!;
   if (l.hidden || l.locked || l.reference) return null;
   if (authors.length > 1 || authors.some((a) => d.ctx[a]!.mirror || d.ctx[a]!.brush || d.ctx[a]!.layer || d.ctx[a]!.frame)) return null;

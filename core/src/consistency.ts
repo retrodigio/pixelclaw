@@ -64,6 +64,47 @@ export interface Measures {
   material: string | null;
   /** Mean number of steps used per ramp the art uses. */
   steps: number | null;
+  /** Stroke weight: the median over drawn pixels of the shorter of the horizontal and vertical drawn runs through it (icons, plan §4.5). */
+  stroke: number | null;
+  /** The share of the canvas the drawn box covers. */
+  fill: number | null;
+  /** The drawn pixels' centre of mass, and its distance from the canvas centre in pixels. */
+  centre: { x: number; y: number; off: number } | null;
+}
+
+/** Stroke weight, box fill and optical centre of a frame's drawn pixels (the icon-set measures). */
+function iconMeasures(px: Uint16Array, W: number, H: number): Pick<Measures, 'stroke' | 'fill' | 'centre'> {
+  const runs: number[] = [];
+  let n = 0, sx = 0, sy = 0, x0 = W, y0 = H, x1 = -1, y1 = -1;
+  const h = new Int32Array(W * H), v = new Int32Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W;) {
+    if (px[y * W + x] === TRANSPARENT) { x++; continue; }
+    let e = x;
+    while (e < W && px[y * W + e] !== TRANSPARENT) e++;
+    for (let k = x; k < e; k++) h[y * W + k] = e - x;
+    x = e;
+  }
+  for (let x = 0; x < W; x++) for (let y = 0; y < H;) {
+    if (px[y * W + x] === TRANSPARENT) { y++; continue; }
+    let e = y;
+    while (e < H && px[e * W + x] !== TRANSPARENT) e++;
+    for (let k = y; k < e; k++) v[k * W + x] = e - y;
+    y = e;
+  }
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = y * W + x;
+    if (px[i] === TRANSPARENT) continue;
+    runs.push(Math.min(h[i]!, v[i]!));
+    n++; sx += x; sy += y;
+    x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+  }
+  if (!n) return { stroke: null, fill: null, centre: null };
+  const cx = sx / n, cy = sy / n;
+  return {
+    stroke: median(runs),
+    fill: ((x1 - x0 + 1) * (y1 - y0 + 1)) / (W * H),
+    centre: { x: cx, y: cy, off: Math.hypot(cx - (W - 1) / 2, cy - (H - 1) / 2) },
+  };
 }
 
 /** The measures of one document (its first frame of each view, merged). */
@@ -129,7 +170,7 @@ export function measure(d: Doc, ink: string[]): Measures {
       clusters++; clustered += size;
     }
   }
-  if (!n) return { box: null, lightness: null, outline: null, light: null, cluster: null, steps: null, material: null };
+  if (!n) return { box: null, lightness: null, outline: null, light: null, cluster: null, steps: null, material: null, stroke: null, fill: null, centre: null };
   const mag = Math.hypot(gx, gy);
   const strength = gw > 0 ? mag / gw : 0;
   const uses = [...rampUse.values()].map((s) => s.size);
@@ -144,6 +185,7 @@ export function measure(d: Doc, ink: string[]): Measures {
     cluster: clusters ? clustered / clusters / Math.sqrt(n / frames.length) : null,
     steps: uses.length ? uses.reduce((a, b) => a + b, 0) / uses.length : null,
     material,
+    ...iconMeasures(flatten(d, frames[0]!), W, H),
   };
 }
 
@@ -151,10 +193,10 @@ export const LIGHT_DIRS: Record<string, [number, number]> = {
   n: [0, -1], ne: [1, -1], e: [1, 0], se: [1, 1], s: [0, 1], sw: [-1, 1], w: [-1, 0], nw: [-1, -1],
 };
 
-const median = (xs: number[]): number => {
+function median(xs: number[]): number {
   const s = [...xs].sort((a, b) => a - b);
   return s.length % 2 ? s[(s.length - 1) / 2]! : (s[s.length / 2 - 1]! + s[s.length / 2]!) / 2;
-};
+}
 
 export interface ConsistencyOptions {
   /** Outline colours (style guide). */
@@ -170,6 +212,8 @@ export interface ConsistencyOptions {
   maxCluster: number;
   maxSteps: number;
   heightTol: number;
+  /** Icons (plan §4.5): stroke weight difference in px, box fill difference, the optical centre's distance from the canvas centre in px. */
+  icon?: { maxStroke: number; maxFill: number; maxCentre: number };
 }
 
 export interface ConsistencyPart {
@@ -220,6 +264,18 @@ export function consistencyOf(d: Doc, peers: { name: string; doc: Doc }[], o: Co
   vs('outline', 'outline share', (m) => m.outline, o.maxOutline, (x) => String(r2(x)));
   vs('cluster', 'cluster size', (m) => m.cluster, o.maxCluster, (x) => String(r2(x)), true);
   vs('steps', 'ramp steps', (m) => m.steps, o.maxSteps, (x) => String(r1(x)));
+  if (o.icon) {
+    // The icon set (plan §4.5): one stroke weight, boxes that fill the canvas alike, each icon optically centred.
+    vs('stroke', 'stroke weight', (m) => m.stroke, o.icon.maxStroke, (x) => String(r1(x)));
+    vs('fill', 'box fill', (m) => m.fill, o.icon.maxFill, (x) => String(r2(x)));
+    if (me.centre) {
+      const c = me.centre;
+      parts.push({
+        name: 'optical centre', value: r1(c.off), limit: `≤ ${o.icon.maxCentre} px from the canvas centre`, pass: c.off <= o.icon.maxCentre,
+        detail: `the drawn pixels' centre is at ${r1(c.x)},${r1(c.y)}, ${r1(c.off)} px from the canvas centre ${r1((d.width - 1) / 2)},${r1((d.height - 1) / 2)}`,
+      });
+    }
+  }
   // The light: against the style guide's direction, else the set's.
   const want = o.light && LIGHT_DIRS[o.light] ? LIGHT_DIRS[o.light]! : (() => {
     const ls = theirs.flatMap((t) => (t.m.light ? [t.m.light] : []));

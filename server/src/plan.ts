@@ -79,6 +79,7 @@ export function styleDefaults(p: Project, m: Manifest | null): StyleDefaults {
       const cell: [number, number] | undefined = kind === 'object' && size && size[0] % grid === 0 && size[1] % grid === 0 ? [grid, grid] : undefined;
       return {
         ...(size ? { size } : {}), ...(e?.palette ? { palette: e.palette } : {}), ...(e?.scheme && kind === 'family' ? { scheme: e.scheme } : {}), ...(cell ? { cell } : {}),
+        ...(e?.chars && kind === 'font' ? { chars: e.chars } : {}),
       };
     },
     ...(style.light ? { light: style.light } : {}),

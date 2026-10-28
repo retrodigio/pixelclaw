@@ -62,7 +62,7 @@ describe('normaliser', () => {
     expect(errs('frobnicate 1,1')[0]).toMatch(/^1:1 unknown command 'frobnicate'/);
     expect(errs('new tile a 8x8')).toEqual(['1:1 new must be the first command of a tape (this document already exists)']);
     expect(errs('px 1,1 c=ink', EMPTY)).toEqual([`1:1 there is no document yet: start with 'new'`]);
-    expect(errs('new blob a 8x8', EMPTY)).toEqual([`1:5 unknown kind 'blob' (kinds: tile, sprite, sheet, icon, family, overlay, object, map)`]);
+    expect(errs('new blob a 8x8', EMPTY)).toEqual([`1:5 unknown kind 'blob' (kinds: tile, sprite, sheet, icon, family, overlay, object, map, font)`]);
     expect(errs('new tile a 8x8 palette=nope', EMPTY)).toEqual([`1:24 unknown palette 'nope'`]);
     expect(errs('px @cell(1,0) 0,0 c=ink')).toEqual(['1:4 @cell(1,0) is outside the 1x1 cell grid']);
   });
