@@ -1,0 +1,21 @@
+# A test sprite for G5's checks: a glowcap mushroom with five deliberate defects, one per check.
+new sprite glowcap 24x24 palette=ruins-props
+# The cap, pillow shaded (defect: banding): a dark rim, a middle ring, a light middle, the same on every side.
+ellipse 3,4 18x11 c=soil0 fill
+ellipse 5,5 14x8 c=soil1 fill
+ellipse 7,6 10x5 c=soil2 fill
+# The stem, lit from the left.
+rect 9,15 6x6 c=stone4 fill
+line 9,15 9,20 c=stone5
+line 14,15 14,20 c=stone3
+line 9,14 14,14 c=soil0
+# Spots in a colour from outside the style guide (defect: palette).
+palette add glow hex=#ff4fd8
+px 9,7 10,7 14,9 15,9 c=glow
+# A crack drawn freehand, with doubled corners (defect: jaggies).
+stroke pencil c=stone2 pp=off 10,16 11,16 11,17 12,17 13,17 13,18 13,19
+# The outline, then its right side painted over (defect: outline).
+outline c=ink
+px 18,5 19,6 20,7 21,8 21,9 21,10 20,11 19,12 18,13 c=soil0
+# Three stray specks (defect: orphans).
+px 3,21 20,20 6,2 c=lichen

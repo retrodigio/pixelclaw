@@ -1,0 +1,22 @@
+# Fixing glowcap by the coordinates its checks gave.
+# orphans: the stray specks at 6,2 20,20 3,21 go.
+px 6,2 20,20 3,21 c=none
+# outline: the gaps on the cap's right side.
+px 18,5 19,6 20,7 21,8 21,9 21,10 20,11 19,12 18,13 c=ink
+# jaggies: the crack doubles a corner at 11,16 / 11,17; drop 11,16 so it steps diagonally.
+px 11,16 c=stone4
+# banding: the cap was shaded in rings, the same on every side. Flatten it to one tone (the
+# spots too), light it from the top left, then a broad highlight on the lit upper left and the
+# underside in shadow (the stray rim pixel at 16,5 back to the cap's tone).
+fill 9,8 c=soil1 mode=global
+fill 3,8 c=soil1 mode=global
+fill 9,7 c=soil1 mode=global
+shade light=nw ramp=soil edge=1
+ellipse 6,5 9x3 c=soil2 fill
+px 16,5 c=soil1
+line 7,13 16,13 c=soil0
+# The pass left one lit pixel alone on the underside (the summary said 1 stray; check said 8,14).
+px 8,14 c=soil0
+# palette: the spots at 9,7 10,7 14,9 15,9 were 'glow', from outside the style guide; they come
+# back in lichen.
+px 9,7 10,7 14,9 15,9 c=lichen

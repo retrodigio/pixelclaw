@@ -1,0 +1,42 @@
+{
+  "name": "glowcap",
+  "kind": "sprite",
+  "size": [
+    24,
+    24
+  ],
+  "cell": [
+    24,
+    24
+  ],
+  "wrap": false,
+  "palette": "ruins-props",
+  "layers": [
+    {
+      "name": "main",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    }
+  ],
+  "frames": 1,
+  "paletteLocked": false,
+  "stamps": [],
+  "macros": [],
+  "tags": [],
+  "views": [],
+  "links": [],
+  "notes": [],
+  "tape": {
+    "lang": 2,
+    "commands": 43,
+    "groups": 3
+  },
+  "state": {
+    "sha256": "12b1af0cc18c400923551c9e0e65839cb6e9596a935049fa40c4425115e64c11"
+  },
+  "checkpoints": {
+    "every": 200,
+    "files": []
+  }
+}

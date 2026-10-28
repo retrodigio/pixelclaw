@@ -1,0 +1,7 @@
+# The chest's strays, by the coordinates orphans gave: 7,4 17,4 6,14 17,14 6,18 17,18 6,19 6,20 16,20.
+# The straps' top pixels (7,4 and 17,4) were a lone mid grey: they carry the dark edge up instead.
+px 7,4 17,4 c=stone1
+# The rivets were single pixels: each is now a head across the whole strap.
+px 6,14 7,14 6,18 7,18 16,14 17,14 16,18 17,18 c=stone5
+# The straps' feet (6,20 and 16,20) carry the lit edge down to the base, so 6,19 has company.
+px 6,20 16,20 c=stone3

@@ -1,0 +1,11 @@
+# The second variant. repetition: row 17 was darker than the rest (ΔL* 3.3), from the dashes at
+# 11,17-12,17 and 17,17-18,17 and the marks at 20,17 23,17. The dash at 17,17 turns light.
+px 17,17 18,17 c=moss3
+# jaggies: a doubled corner in the dash at 19,15 19,16 20,16 (within the tile's allowance, but
+# cheap to fix): 19,16 goes, so the dash steps diagonally.
+px 19,16 c=moss2
+# The V tufts, made unalike (the one at the right edge keeps its root on the seam, so the seam
+# check stays low).
+px 16,2 15,5 c=moss2
+px 22,8 1,11 c=moss2
+px 6,20 5,23 c=moss2

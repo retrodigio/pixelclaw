@@ -7,7 +7,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  drawScaleOf, encodePng, groundOf, renderGame, renderScaled, renderTile3x3, setOf, type AssetDoc, type Doc,
+  drawScaleOf, encodePng, flatten, groundOf, renderGame, renderScaled, renderTile3x3, setOf, type AssetDoc, type Doc,
 } from '@pixelclaw/core';
 import { ProjectError } from './project.ts';
 import type { Writer } from './writer.ts';
@@ -25,7 +25,7 @@ You are reviewing pixel art for a game, with fresh eyes. Judge only what you see
 - \`assets/<name>.game.png\`: each asset at its real size (1x) and at the game's draw scale (${o.scale}x).
 - \`tiles/<name>.3x3.png\`: each tile repeated 3x3, at 1x and 4x, as it will cover the ground.
 - \`scenes/<name>.png\`: each sprite on its usual ground beside the rest of its set, at 1x and ${o.scale}x.
-- \`palette.md\`: the colours the art may use.${o.style ? '\n- `style.md`: the style guide.' : ''}
+- \`palette.md\`: the colours the art uses.${o.style ? '\n- `style.md`: the style guide.' : ''}
 
 Tiles:
 ${list(o.tiles)}
@@ -99,9 +99,14 @@ export function writeReview(w: Writer, o: { assets?: string[]; name?: string } =
     const set: Doc[] = setOf(a.name, a.doc, all, style).slice(0, 7).map((x) => x.doc);
     save(`scenes/${a.name}.png`, encodePng(renderGame([{ doc: a.doc }, ...set.map((d) => ({ doc: d }))], { ground: ground?.doc ?? null, scale })));
   }
+  // The colours the art uses (an entry no pixel uses would only mislead the reviewer).
   const pals = new Map<string, string>();
-  for (const a of chosen) for (const e of a.doc.palette.entries) pals.set(e.name, e.hex + (e.role ? ` (role: ${e.role})` : ''));
-  save('palette.md', `# Palette\n\n${[...pals].map(([n, h]) => `- ${n}: ${h}`).join('\n')}\n`);
+  for (const a of chosen) {
+    const used = new Set<number>();
+    for (let f = 0; f < a.doc.frameCount; f++) for (const v of flatten(a.doc, f)) used.add(v);
+    a.doc.palette.entries.forEach((e, i) => { if (used.has(i)) pals.set(e.name, e.hex + (e.role ? ` (role: ${e.role})` : '')); });
+  }
+  save('palette.md', `# Palette\n\nThe colours the art uses:\n\n${[...pals].map(([n, h]) => `- ${n}: ${h}`).join('\n')}\n`);
   const styleFile = join(w.project.dir, 'style.md');
   const styleText = existsSync(styleFile) ? readFileSync(styleFile, 'utf8') : null;
   if (styleText) save('style.md', styleText);

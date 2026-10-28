@@ -29,11 +29,11 @@
   "notes": [],
   "tape": {
     "lang": 2,
-    "commands": 30,
-    "groups": 1
+    "commands": 33,
+    "groups": 2
   },
   "state": {
-    "sha256": "fc040a9cfb0d6181793e591290569c091f14ce8bef3d5dbff6ae4b54366da52f"
+    "sha256": "04131bfc5bd24e86be10e8633abd78939879666e7987b2369dcbb76fe76c111a"
   },
   "checkpoints": {
     "every": 200,

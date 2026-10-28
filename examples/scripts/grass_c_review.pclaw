@@ -1,0 +1,11 @@
+# The blind reviewer's findings on the second variant, pinned where it pointed:
+note 14,23 "lone lichen pixel; the most visible repeating dot in the 3x3"
+note 5,18 "lone lichen pixel, same problem"
+note 13,8 4x1 "straight 4-px dark dash, the most regular mark in the tile; it gives away the repeat"
+# The dots soften to moss3; the dash breaks into two pixels and a step down.
+px 14,23 5,18 c=moss3
+px 15,8 16,8 c=moss2
+px 15,9 c=moss1
+note done n1
+note done n2
+note done n3

@@ -2,30 +2,29 @@
     012345678901234567890123
  0  bcccccbccccccccccccccccc
  1  dccccccccccccccccccccccd
- 2  ccccccccccccdcccdccccccc
+ 2  ccccccccccccdccccccccccc
  3  cccccccbbccccdcdccccdccc
  4  cccccbccdcccccdccccccdcc
- 5  cccccccccccccbbbcccccbcc
+ 5  cccccccccccccbbccccccbcc
  6  ccccccccccccccbccccccccc
  7  cdcccdcccccccccccccccccd
- 8  dcdcccddcccccbbbbcccccdc
- 9  bdccccbcccccccccccccbccd
+ 8  dcdcccddcccccbbccccccccc
+ 9  bdccccbccccccccbccccbccd
 10  dcccbccccccccdcccccccccc
-11  bbcccccbccccdccccccccccb
+11  bccccccbccccdccccccccccb
 12  cccdccccccccbcccccccccbc
 13  ccccdcccdccccccccccbcccc
 14  ccccbccdcdcccccccccdcccc
 15  cccccccccbccccccccbbdccc
-16  cccccccccccccccccccbbccc
-17  cccccccccccbbccccbbcbccb
-18  ccbbbeccccccccccbdbccccc
+16  ccccccccccccccccccccbccc
+17  cccccccccccbbccccddcbccb
+18  ccbbbdccccccccccbdbccccc
 19  ccccbccbcccbccccdcccccdd
-20  ccdcccdcccccccccbccccdcc
+20  ccdcccccccccccccbccccdcc
 21  cccdcdcbcccccdccccdccbcc
 22  ccccdccdccccdbcccccccccc
-23  bccbbbdbccccbceccccccccc
+23  bccbbcdbccccbcdccccccccc
 
-  b  moss1      #2c4729  55 px
-  c  moss2      #486a32  474 px
-  d  moss3      #6c8c3a  45 px
-  e  lichen     #a2ab52  2 px
+  b  moss1      #2c4729  48 px
+  c  moss2      #486a32  482 px
+  d  moss3      #6c8c3a  46 px

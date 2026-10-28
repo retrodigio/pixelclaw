@@ -1,0 +1,22 @@
+# A blind reviewer (a fresh agent given only the review bundle) found what the checks cannot.
+# Its findings, pinned where it pointed:
+note 10,16 5x5 "hooked dark-grey glyph on the stem reads as a letter or scratch; remove it"
+note 9,7 7x3 "the two lichen dashes pair up into a face; make the spots deliberate, of varied size"
+note 3,4 18x10 "the cap is dark and close in value to the grass, and nothing marks it as a glowcap"
+# The crack goes; the stem stays lit from the left.
+rect 10,16 4x4 c=stone4 fill
+# The cap in the props' wood ramp, lighter and warmer than the grass, tone for tone.
+fill 20,9 c=wood1 mode=global
+fill 4,8 c=wood2 mode=global
+fill 3,8 c=wood3 mode=global
+line 7,13 16,13 c=wood0
+line 8,14 15,14 c=wood0
+# Spots that glow, in brass: three sizes, none paired.
+px 9,7 10,7 c=wood3
+px 14,9 15,9 c=wood2
+px 12,7 13,7 12,8 13,8 c=brass2
+px 7,10 8,10 c=brass1
+px 17,8 17,9 c=brass1
+note done n1
+note done n2
+note done n3

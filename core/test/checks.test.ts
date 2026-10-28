@@ -86,6 +86,14 @@ describe('jaggies', () => {
     expect(r.groups[0]!.label).toBe('irregular step run');
   });
 
+  it('on a tile, the ground colour between marks is not a line', () => {
+    // A staircase with doubled corners inside a block of marks: in the ground colour it is just
+    // ground showing between marks; in a mark colour it is a jagged line.
+    const stairs = 'px 1,1 2,1 2,2 3,2 3,3 4,3';
+    expect(check(doc(`new tile t 12x12 bg=moss\nrect 0,0 6x6 c=leaf fill\n${stairs} c=moss`), 'jaggies').score).toBe(0);
+    expect(check(doc(`new tile t 12x12 bg=moss\nrect 0,0 6x6 c=leaf fill\n${stairs} c=rust`), 'jaggies').score).toBeGreaterThan(0);
+  });
+
   it('flags a spike and a notch on a silhouette', () => {
     const d = doc('new sprite s 12x12\nrect 2,2 8x8 c=moss fill\npx 5,1 c=moss\npx 9,6 c=none');
     const r = check(d, 'jaggies');
@@ -106,6 +114,17 @@ describe('banding', () => {
   it('a square lit from the top left is not', () => {
     const d = doc('new sprite s 16x16\nrect 2,2 12x12 c=moss fill\nrect 2,2 12x2 c=leaf fill\nrect 2,2 2x12 c=leaf fill');
     expect(check(d, 'banding')).toMatchObject({ status: 'pass', score: 0 });
+  });
+
+  it('is judged per material: a pillowed cap stays flagged beside a stem lit from one side', () => {
+    const d = doc([
+      'new sprite s 20x20', 'ramp stoneish = ink stone', // a second ramp for the stem
+      'rect 1,1 12x8 c=moss fill', 'rect 3,3 8x4 c=leaf fill', // pillowed: lighter inward on every side
+      'rect 14,1 5x16 c=ink fill', 'rect 14,1 2x16 c=stone fill', // lit from the left only
+    ].join('\n'));
+    const r = check(d, 'banding');
+    expect(r.status).toBe('fail');
+    expect(r.detail).toMatch(/^ramp green:/);
   });
 
   it('flat colour has nothing to band', () => {

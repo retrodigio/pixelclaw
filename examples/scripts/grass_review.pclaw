@@ -1,0 +1,7 @@
+# The blind reviewer's findings on the grass tile, pinned where it pointed:
+note 4,4 "single lichen pixel on moss2 is two ramp steps, a hot spot that repeats every 24 px"
+note 21,20 "the same lone lichen pixel"
+# Both dots soften to moss3, one step from the ground, as the style guide's texture rule allows.
+px 4,4 21,20 c=moss3
+note done n1
+note done n2

@@ -1,31 +1,34 @@
 {"pclaw":"tape","lang":2}
-{"seq":1,"by":"claude","at":"2026-10-28T05:04:00Z","group":"g1","cmd":"new sprite chest 24x24 palette=mossy-ruins wrap=off cell=24x24 bg=none <<\n  k ink #17181d\n  0 stone0 #272a30\n  1 stone1 #3b4044\n  2 stone2 #535a5b\n  3 stone3 #6c7570\n  4 stone4 #8b9489\n  5 stone5 #afb6a5\n  a moss0 #1c2e21\n  b moss1 #2c4729\n  c moss2 #486a32\n  d moss3 #6c8c3a\n  e lichen #a2ab52\n  f soil0 #2a211c\n  g soil1 #44352a\n  h soil2 #65503a\n  w pool #34566a\n  ramp stone stone0 stone1 stone2 stone3 stone4 stone5\n  ramp moss moss0 moss1 moss2 moss3 lichen\n  ramp soil soil0 soil1 soil2\n>>"}
-{"seq":2,"by":"claude","at":"2026-10-28T05:04:00Z","group":"g1","cmd":"palette add wood0 hex=#3a2418 key=W"}
-{"seq":3,"by":"claude","at":"2026-10-28T05:04:00Z","group":"g1","cmd":"palette add wood1 hex=#603c22 key=X"}
-{"seq":4,"by":"claude","at":"2026-10-28T05:04:00Z","group":"g1","cmd":"palette add wood2 hex=#8a5a30 key=Y"}
-{"seq":5,"by":"claude","at":"2026-10-28T05:04:00Z","group":"g1","cmd":"palette add wood3 hex=#b58044 key=Z"}
-{"seq":6,"by":"claude","at":"2026-10-28T05:04:00Z","group":"g1","cmd":"palette add brass0 hex=#6a4f1f key=B"}
-{"seq":7,"by":"claude","at":"2026-10-28T05:04:00Z","group":"g1","cmd":"palette add brass1 hex=#b08a35 key=C"}
-{"seq":8,"by":"claude","at":"2026-10-28T05:04:00Z","group":"g1","cmd":"palette add brass2 hex=#efd47c key=D"}
-{"seq":9,"by":"claude","at":"2026-10-28T05:04:00Z","group":"g1","cmd":"ramp wood = wood0 wood1 wood2 wood3"}
-{"seq":10,"by":"claude","at":"2026-10-28T05:04:00Z","group":"g1","cmd":"ramp brass = brass0 brass1 brass2"}
-{"seq":11,"by":"claude","at":"2026-10-28T05:04:00Z","group":"g1","cmd":"palette lock"}
-{"seq":12,"by":"claude","at":"2026-10-28T05:04:00Z","group":"g1","cmd":"palette save as=ruins-props"}
-{"seq":13,"by":"claude","at":"2026-10-28T05:04:00Z","group":"g1","cmd":"ellipse 3,3 18x8 c=wood2 fill"}
-{"seq":14,"by":"claude","at":"2026-10-28T05:04:00Z","group":"g1","cmd":"rect 3,7 18x5 c=wood2 fill"}
-{"seq":15,"by":"claude","at":"2026-10-28T05:04:00Z","group":"g1","cmd":"rect 3,12 18x9 c=wood1 fill"}
-{"seq":16,"by":"claude","at":"2026-10-28T05:04:00Z","group":"g1","cmd":"line 3,12 20,12 c=wood0 pp=on"}
-{"seq":17,"by":"claude","at":"2026-10-28T05:04:00Z","group":"g1","cmd":"line 4,16 19,16 c=wood0 pp=on"}
-{"seq":18,"by":"claude","at":"2026-10-28T05:04:00Z","group":"g1","cmd":"shade light=nw ramp=wood edge=1"}
-{"seq":19,"by":"claude","at":"2026-10-28T05:04:00Z","group":"g1","cmd":"line 4,11 19,11 c=wood3 pp=on"}
-{"seq":20,"by":"claude","at":"2026-10-28T05:04:00Z","group":"g1","cmd":"line 4,20 19,20 c=wood0 pp=on"}
-{"seq":21,"by":"claude","at":"2026-10-28T05:04:00Z","group":"g1","cmd":"layer add metal above=main"}
-{"seq":22,"by":"claude","at":"2026-10-28T05:04:00Z","group":"g1","cmd":"layer metal"}
-{"seq":23,"by":"claude","at":"2026-10-28T05:04:00Z","group":"g1","cmd":"mirror x=11.5 live"}
-{"seq":24,"by":"claude","at":"2026-10-28T05:04:00Z","group":"g1","cmd":"rect 6,4 2x17 c=stone2 fill"}
-{"seq":25,"by":"claude","at":"2026-10-28T05:04:00Z","group":"g1","cmd":"shade light=nw ramp=stone edge=1"}
-{"seq":26,"by":"claude","at":"2026-10-28T05:04:00Z","group":"g1","cmd":"px 6,14 6,18 c=stone5"}
-{"seq":27,"by":"claude","at":"2026-10-28T05:04:00Z","group":"g1","cmd":"mirror off"}
-{"seq":28,"by":"claude","at":"2026-10-28T05:04:00Z","group":"g1","cmd":"paint 10,10 <<\n  .CC.\n  CDDC\n  CkDC\n  CkCC\n  .BB.\n>>"}
-{"seq":29,"by":"claude","at":"2026-10-28T05:04:00Z","group":"g1","cmd":"layer merge metal"}
-{"seq":30,"by":"claude","at":"2026-10-28T05:04:00Z","group":"g1","cmd":"outline c=ink mode=outer corners=off"}
+{"seq":1,"by":"claude","at":"2026-10-28T05:52:11Z","group":"g1","cmd":"new sprite chest 24x24 palette=mossy-ruins wrap=off cell=24x24 bg=none <<\n  k ink #17181d\n  0 stone0 #272a30\n  1 stone1 #3b4044\n  2 stone2 #535a5b\n  3 stone3 #6c7570\n  4 stone4 #8b9489\n  5 stone5 #afb6a5\n  a moss0 #1c2e21\n  b moss1 #2c4729\n  c moss2 #486a32\n  d moss3 #6c8c3a\n  e lichen #a2ab52\n  f soil0 #2a211c\n  g soil1 #44352a\n  h soil2 #65503a\n  w pool #34566a\n  ramp stone stone0 stone1 stone2 stone3 stone4 stone5\n  ramp moss moss0 moss1 moss2 moss3 lichen\n  ramp soil soil0 soil1 soil2\n>>"}
+{"seq":2,"by":"claude","at":"2026-10-28T05:52:11Z","group":"g1","cmd":"palette add wood0 hex=#3a2418 key=W"}
+{"seq":3,"by":"claude","at":"2026-10-28T05:52:11Z","group":"g1","cmd":"palette add wood1 hex=#603c22 key=X"}
+{"seq":4,"by":"claude","at":"2026-10-28T05:52:11Z","group":"g1","cmd":"palette add wood2 hex=#8a5a30 key=Y"}
+{"seq":5,"by":"claude","at":"2026-10-28T05:52:11Z","group":"g1","cmd":"palette add wood3 hex=#b58044 key=Z"}
+{"seq":6,"by":"claude","at":"2026-10-28T05:52:11Z","group":"g1","cmd":"palette add brass0 hex=#6a4f1f key=B"}
+{"seq":7,"by":"claude","at":"2026-10-28T05:52:11Z","group":"g1","cmd":"palette add brass1 hex=#b08a35 key=C"}
+{"seq":8,"by":"claude","at":"2026-10-28T05:52:11Z","group":"g1","cmd":"palette add brass2 hex=#efd47c key=D"}
+{"seq":9,"by":"claude","at":"2026-10-28T05:52:11Z","group":"g1","cmd":"ramp wood = wood0 wood1 wood2 wood3"}
+{"seq":10,"by":"claude","at":"2026-10-28T05:52:11Z","group":"g1","cmd":"ramp brass = brass0 brass1 brass2"}
+{"seq":11,"by":"claude","at":"2026-10-28T05:52:11Z","group":"g1","cmd":"palette lock"}
+{"seq":12,"by":"claude","at":"2026-10-28T05:52:11Z","group":"g1","cmd":"palette save as=ruins-props"}
+{"seq":13,"by":"claude","at":"2026-10-28T05:52:11Z","group":"g1","cmd":"ellipse 3,3 18x8 c=wood2 fill"}
+{"seq":14,"by":"claude","at":"2026-10-28T05:52:11Z","group":"g1","cmd":"rect 3,7 18x5 c=wood2 fill"}
+{"seq":15,"by":"claude","at":"2026-10-28T05:52:11Z","group":"g1","cmd":"rect 3,12 18x9 c=wood1 fill"}
+{"seq":16,"by":"claude","at":"2026-10-28T05:52:11Z","group":"g1","cmd":"line 3,12 20,12 c=wood0 pp=on"}
+{"seq":17,"by":"claude","at":"2026-10-28T05:52:11Z","group":"g1","cmd":"line 4,16 19,16 c=wood0 pp=on"}
+{"seq":18,"by":"claude","at":"2026-10-28T05:52:11Z","group":"g1","cmd":"shade light=nw ramp=wood edge=1"}
+{"seq":19,"by":"claude","at":"2026-10-28T05:52:11Z","group":"g1","cmd":"line 4,11 19,11 c=wood3 pp=on"}
+{"seq":20,"by":"claude","at":"2026-10-28T05:52:11Z","group":"g1","cmd":"line 4,20 19,20 c=wood0 pp=on"}
+{"seq":21,"by":"claude","at":"2026-10-28T05:52:11Z","group":"g1","cmd":"layer add metal above=main"}
+{"seq":22,"by":"claude","at":"2026-10-28T05:52:11Z","group":"g1","cmd":"layer metal"}
+{"seq":23,"by":"claude","at":"2026-10-28T05:52:11Z","group":"g1","cmd":"mirror x=11.5 live"}
+{"seq":24,"by":"claude","at":"2026-10-28T05:52:11Z","group":"g1","cmd":"rect 6,4 2x17 c=stone2 fill"}
+{"seq":25,"by":"claude","at":"2026-10-28T05:52:11Z","group":"g1","cmd":"shade light=nw ramp=stone edge=1"}
+{"seq":26,"by":"claude","at":"2026-10-28T05:52:11Z","group":"g1","cmd":"px 6,14 6,18 c=stone5"}
+{"seq":27,"by":"claude","at":"2026-10-28T05:52:11Z","group":"g1","cmd":"mirror off"}
+{"seq":28,"by":"claude","at":"2026-10-28T05:52:11Z","group":"g1","cmd":"paint 10,10 <<\n  .CC.\n  CDDC\n  CkDC\n  CkCC\n  .BB.\n>>"}
+{"seq":29,"by":"claude","at":"2026-10-28T05:52:11Z","group":"g1","cmd":"layer merge metal"}
+{"seq":30,"by":"claude","at":"2026-10-28T05:52:11Z","group":"g1","cmd":"outline c=ink mode=outer corners=off"}
+{"seq":31,"by":"claude","at":"2026-10-28T05:52:12Z","group":"g2","cmd":"px 7,4 17,4 c=stone1"}
+{"seq":32,"by":"claude","at":"2026-10-28T05:52:12Z","group":"g2","cmd":"px 6,14 7,14 6,18 7,18 16,14 17,14 16,18 17,18 c=stone5"}
+{"seq":33,"by":"claude","at":"2026-10-28T05:52:12Z","group":"g2","cmd":"px 6,20 16,20 c=stone3"}

@@ -1,0 +1,9 @@
+# The blind reviewer's findings on the stone floor, pinned where it pointed:
+note 5,6 1x7 "vertical joints in near-black, darker than the 2-px mid-grey mortar between the courses: two materials"
+note 15,10 3x4 "the brightest moss patch repeats on an exact lattice with the other two"
+# The joints take the mortar's colour (stone0 is used only in them), and the patch's bright top
+# goes down a step.
+fill 5,6 c=stone1 mode=global
+px 15,10 16,10 17,10 c=moss2
+note done n1
+note done n2

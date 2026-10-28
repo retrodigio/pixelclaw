@@ -1,0 +1,7 @@
+# The blind reviewer's findings on the first variant, pinned where it pointed:
+note 14,8 "lone lichen pixel, two steps from moss2; repeats as a visible dot grid"
+note 6,18 "lone lichen pixel, same problem"
+# Both soften to moss3.
+px 14,8 6,18 c=moss3
+note done n1
+note done n2

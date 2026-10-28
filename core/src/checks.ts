@@ -162,7 +162,10 @@ const ptOf = (img: Img, i: number): Pt => [i % img.w, Math.floor(i / img.w)];
 const fmt = (n: number, d = 2): string => String(Number(n.toFixed(d)));
 
 function result(id: CheckId, o: Partial<CheckResult> & { status: CheckResult['status']; detail: string }): CheckResult {
-  const groups = o.groups ?? [];
+  const groups = (o.groups ?? []).map((g) => {
+    const once = new Set<number>();
+    return { label: g.label, pts: g.pts.filter((p) => { const k = p[1] * 65536 + p[0]; if (once.has(k)) return false; once.add(k); return true; }) };
+  });
   const seen = new Set<number>();
   const flagged: Pt[] = [];
   for (const g of groups) for (const p of g.pts) {
@@ -272,6 +275,13 @@ function checkOrphans(img: Img, p: Params): CheckResult {
 }
 
 // --- jaggies
+
+/** The commonest value (the lowest of equals). */
+function modeOf(px: Uint16Array): number {
+  const counts = new Map<number, number>();
+  for (const v of px) counts.set(v, (counts.get(v) ?? 0) + 1);
+  return [...counts].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]![0];
+}
 
 /** Same-colour 8-neighbours. */
 function sameN8(img: Img, x: number, y: number): Pt[] {
@@ -400,10 +410,12 @@ function checkJaggies(img: Img, p: Params): CheckResult {
   // vertical, with the corner between them empty, where the line zig-zags through it (it steps
   // the same way before and after, as a staircase does): a pixel-perfect line steps diagonally
   // there. A corner where the line turns and carries on (a box, a hook) is meant.
+  // On a tile the commonest colour is the ground the marks sit on, not a line.
+  const ground = isTile(img.doc) ? modeOf(img.px) : -1;
   const elbows: Pt[] = [];
   for (let i = 0; i < img.px.length; i++) {
     const c = img.px[i]!;
-    if (c === TRANSPARENT) continue;
+    if (c === TRANSPARENT || c === ground) continue;
     const [x, y] = ptOf(img, i);
     const n4 = N4.filter(([dx, dy]) => img.get(x + dx, y + dy) === c);
     if (n4.length !== 2) continue;
@@ -436,7 +448,7 @@ function checkJaggies(img: Img, p: Params): CheckResult {
   // silhouette) counts once.
   const runSets = new Map<string, Pt[]>();
   const addRuns = (runs: Pt[][]) => { for (const r of runs) runSets.set(r.map((q) => img.at(q[0], q[1])).sort((a, b) => a - b).join(','), r); };
-  for (const chain of thinChains(img, 6)) addRuns(irregularRuns(chain, img.w, img.h, img.wrap));
+  for (const chain of thinChains(img, 6)) if (img.get(chain[0]![0], chain[0]![1]) !== ground) addRuns(irregularRuns(chain, img.w, img.h, img.wrap));
   if (!isTile(img.doc)) for (const path of contours(img)) addRuns(irregularRuns(path, img.w, img.h, false));
   const irregular = [...runSets.values()].flat();
   const spikes: Pt[] = [];
@@ -509,6 +521,20 @@ function inkSet(img: Img, style?: CheckStyle): Set<number> {
   return new Set(best >= 0 ? [best] : []);
 }
 
+/** The first ramp two entries share (its index in the palette's ramps), or -1. */
+function sharedRamp(pal: Palette, a: number, b: number): number {
+  const names = Object.keys(pal.ramps);
+  const na = pal.entries[a]?.name;
+  const nb = pal.entries[b]?.name;
+  return names.findIndex((r) => pal.ramps[r]!.includes(na!) && pal.ramps[r]!.includes(nb!));
+}
+
+/**
+ * Pillow shading, per material: for the ramp steps that follow the outline (the inner pixel one
+ * step further from the edge), which way lightness goes inward on each side of the shape. Light
+ * from one side makes the lit side and the far side disagree; pillow shading goes the same way
+ * on all four sides. The score is the weakest side's agreement for the worst ramp (0 to 1).
+ */
 function checkBanding(img: Img, p: Params, ctx: CheckContext): CheckResult {
   if (isTile(img.doc)) return skip('banding', 'tiles have no silhouette to band along');
   const pal = img.doc.palette;
@@ -516,9 +542,9 @@ function checkBanding(img: Img, p: Params, ctx: CheckContext): CheckResult {
   const ink = inkSet(img, ctx.style);
   const L = pal.entries.map((e) => luma601(e.hex));
   const hasRamps = Object.keys(pal.ramps).length > 0;
-  // Inward directions: E (from the west side), S (from the top), W, N.
-  const count = N4.map(() => [0, 0]);
-  const edges: { p: Pt; dir: number; sign: number }[] = [];
+  const rampNames = Object.keys(pal.ramps);
+  // Per ramp: counts by inward direction (E from the west side, S from the top, W, N) and sign.
+  const by = new Map<number, { count: number[][]; edges: { p: Pt; sign: number }[] }>();
   for (let i = 0; i < img.px.length; i++) {
     const a = img.px[i]!;
     if (a === TRANSPARENT || ink.has(a)) continue;
@@ -528,29 +554,40 @@ function checkBanding(img: Img, p: Params, ctx: CheckContext): CheckResult {
       if (j < 0) return;
       const b = img.px[j]!;
       if (b === TRANSPARENT || b === a || ink.has(b) || d[j] !== d[i]! + 1) return;
-      if (hasRamps && rampSteps(pal, a, b) === Infinity) return;
+      const r = hasRamps ? sharedRamp(pal, a, b) : 0;
+      if (r < 0) return;
       const sign = Math.sign(L[b]! - L[a]!);
       if (!sign) return;
-      count[dir]![sign > 0 ? 0 : 1]!++;
-      edges.push({ p: [x, y], dir, sign });
+      if (!by.has(r)) by.set(r, { count: N4.map(() => [0, 0]), edges: [] });
+      const g = by.get(r)!;
+      g.count[dir]![sign > 0 ? 0 : 1]!++;
+      g.edges.push({ p: [x, y], sign });
     });
   }
-  const total = edges.length;
   const minEdges = Number(p.minEdges);
   const max = Number(p.max);
-  if (total < minEdges) {
+  const sides = ['west', 'top', 'east', 'bottom'];
+  let worst = { score: 0, ramp: -1, sign: 0, net: [0, 0, 0, 0], n: 0 };
+  let total = 0;
+  for (const [r, g] of by) {
+    total += g.edges.length;
+    if (g.edges.length < minEdges) continue;
+    const net = g.count.map(([pos, neg]) => (pos! + neg! >= 2 ? (pos! - neg!) / (pos! + neg!) : 0));
+    const sign = Math.sign(net[0]!);
+    const score = sign !== 0 && net.every((n) => Math.sign(n) === sign) ? Math.min(...net.map(Math.abs)) : 0;
+    if (score > worst.score || worst.ramp < 0) worst = { score, ramp: r, sign, net, n: g.edges.length };
+  }
+  const name = hasRamps && worst.ramp >= 0 ? `ramp ${rampNames[worst.ramp]}` : 'the colours';
+  if (worst.ramp < 0) {
     return result('banding', { status: 'pass', score: 0, shown: '0', limit: `≤ ${max}`, detail: `${total} ramp steps follow the outline; too few to band` });
   }
-  const net = count.map(([pos, neg]) => (pos! + neg! >= 2 ? (pos! - neg!) / (pos! + neg!) : 0));
-  const sign = Math.sign(net[0]!);
-  const pillow = sign !== 0 && net.every((n) => Math.sign(n) === sign) ? Math.min(...net.map(Math.abs)) : 0;
-  const fail = pillow > max;
-  const sides = ['west', 'top', 'east', 'bottom'];
+  const fail = worst.score > max;
+  const pts = fail ? by.get(worst.ramp)!.edges.filter((e) => e.sign === worst.sign).map((e) => e.p) : [];
   return result('banding', {
-    status: fail ? 'fail' : 'pass', score: pillow, shown: fmt(pillow), limit: `≤ ${max}`,
-    groups: fail ? [{ label: `pillow shading: ramp steps get ${sign > 0 ? 'lighter' : 'darker'} inward on every side`, pts: edges.filter((e) => e.sign === sign).map((e) => e.p) }] : [],
-    detail: `${total} ramp steps along the outline; inward ${net.map((n, k) => `${sides[k]} ${n > 0 ? '+' : ''}${fmt(n)}`).join(', ')}` +
-      (fail ? ` (the same on every side: pillow shading; light one side, shade the other)` : ''),
+    status: fail ? 'fail' : 'pass', score: worst.score, shown: fmt(worst.score), limit: `≤ ${max}`,
+    groups: fail ? [{ label: `pillow shading in ${name}: it gets ${worst.sign > 0 ? 'lighter' : 'darker'} inward on every side`, pts }] : [],
+    detail: `${name}: ${worst.n} ramp steps along the outline; inward ${worst.net.map((n, k) => `${sides[k]} ${n > 0 ? '+' : ''}${fmt(n)}`).join(', ')}` +
+      (fail ? ' (the same on every side: light one side and shade the other)' : ''),
   });
 }
 

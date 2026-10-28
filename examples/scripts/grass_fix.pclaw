@@ -1,0 +1,12 @@
+# The grass tile under G5's checks. repetition: row 20 was lighter than the rest (ΔL* 3.4), a
+# stripe across the floor when tiled, from its light marks at 1,20 2,20 11,20 19,20 21,20, while
+# rows 21-22 below were the darkest. One light mark goes, one turns dark, and a dark one in
+# row 22 turns light.
+px 1,20 c=moss2
+px 2,20 c=moss1
+px 14,22 c=moss3
+# Green, but the 3x3 still shows the three tufts as the same V repeating on a lattice. Each
+# loses a different blade tip and a pixel of its root, so no two are alike.
+px 19,5 18,8 c=moss2
+px 6,11 7,14 c=moss2
+px 0,15 23,18 c=moss2
