@@ -1,13 +1,15 @@
-// pixelclaw: new | run | view | check | review | verify. A thin layer over @pixelclaw/core and the project folder.
+// pixelclaw: new | run | view | check | review | verify | upgrade. A thin layer over @pixelclaw/core and the project folder.
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { CHECK_IDS, TapeCursor, checkSummary, isCheckId, serializeDoc, serializeDocV1, type AssetState, type CheckId, type Doc } from '@pixelclaw/core';
+import {
+  CHECK_IDS, LANG_VERSION, TapeCursor, Timeline, checkSummary, isCheckId, replay, serializeDoc, serializeDocV1, upgradeTape, type AssetState, type CheckId, type Doc,
+  type TapeEntry,
+} from '@pixelclaw/core';
 import {
   AssetExistsError, NoAssetError, ProjectError, VIEW_MODES, Writer, assetDir, checkpointNames, createProject, formatChecks, isViewMode, listAssets,
   loadProject, lockHolder, paletteSource, parseRegion, prefixHash, previewPng, readAssetJson, readCheckpoints, readPaletteFile,
-  readTape, sha256, writeReview, type Project, type ViewMode,
-  SUMMARY_BUDGET,
+  readTape, saveAsset, sha256, writeReview, SUMMARY_BUDGET, type Project, type ViewMode,
 } from '@pixelclaw/server';
 
 export interface Io {
@@ -45,6 +47,9 @@ export const USAGE = `pixelclaw: a pixel art editor driven by commands
       tiles) with the flagged pixels circled.
   pixelclaw review <project> [<asset>...] [--name <set>]
       Write a blind review bundle under <project>/reviews/<date>-<set>/ (rubric.md inside).
+  pixelclaw upgrade <project> [<asset>...]
+      Rewrite language 1 tapes (G1-G4) in the current language: the palette goes into the 'new'
+      line. Each is replayed before and after; it is written only if the pixels are the same.
   pixelclaw verify <project> [<asset>...]
       Replay every tape and compare with asset.json, preview.png and checkpoints.
   pixelclaw serve --project <project> [--port 7417] [--no-mcp]
@@ -231,6 +236,42 @@ function cmdView(io: Io, p: Parsed): number {
   return writeViews(io, proj, doc, modes, p);
 }
 
+function cmdUpgrade(io: Io, p: Parsed): number {
+  const [dir, ...names] = p.pos;
+  if (!dir) throw new UsageError('upgrade: give a project folder');
+  const proj = loadProject(dir);
+  assertNoServer(proj);
+  const src = paletteSource(proj);
+  let failed = 0;
+  const done: string[] = [];
+  for (const name of names.length ? names : listAssets(proj)) {
+    const entries = readTape(proj, name);
+    let up: TapeEntry[] | null;
+    try {
+      up = upgradeTape(entries, src);
+    } catch (e) {
+      io.out(`FAIL ${name}: ${(e as Error).message}\n`);
+      failed++;
+      continue;
+    }
+    if (!up) { io.out(`ok   ${name}: already language ${LANG_VERSION}\n`); continue; }
+    const before = replay(entries, src);
+    const after = replay(up, src);
+    const same = !before.problems.length && !after.problems.length && before.doc && after.doc && Buffer.compare(serializeDoc(before.doc), serializeDoc(after.doc)) === 0;
+    if (!same) {
+      io.out(`FAIL ${name}: the upgraded tape does not replay to the same document; left as it was\n`);
+      failed++;
+      continue;
+    }
+    const tl = new Timeline(src);
+    saveAsset(proj, { doc: after.doc, entries: up }, (n) => tl.docAt(up!, n).doc, true);
+    io.out(`ok   ${name}: language 1 → ${LANG_VERSION}, the same pixels (${up.length} commands)\n`);
+    done.push(name);
+  }
+  if (done.length) return Math.max(failed ? 1 : 0, cmdVerify(io, { ...p, pos: [dir, ...done] }));
+  return failed ? 1 : 0;
+}
+
 function cmdVerify(io: Io, p: Parsed): number {
   const [dir, ...names] = p.pos;
   if (!dir) throw new UsageError('verify: give a project folder');
@@ -318,6 +359,8 @@ export function main(argv: string[], io: Io = nodeIo): number {
         return cmdReview(io, parseArgs(rest, ['name'], []));
       case 'verify':
         return cmdVerify(io, parseArgs(rest, [], []));
+      case 'upgrade':
+        return cmdUpgrade(io, parseArgs(rest, [], []));
       case undefined: case 'help': case '-h': case '--help':
         io.out(USAGE);
         return cmd === undefined ? 1 : 0;

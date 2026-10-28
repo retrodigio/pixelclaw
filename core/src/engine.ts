@@ -468,3 +468,21 @@ export function parseTape(text: string): TapeEntry[] {
   }
   return entries;
 }
+
+/**
+ * A language 1 tape written in the current language (plan §14 `pixelclaw upgrade`): its `new` line
+ * takes the palette it read from the project, written into the line. Every other line, author,
+ * group and time is kept. Null when the tape is already current; an error when the `new` line no
+ * longer normalises (its palette is missing).
+ */
+export function upgradeTape(entries: TapeEntry[], palettes: PaletteSource): TapeEntry[] | null {
+  if (!entries.length || tapeLang(entries) === LANG_VERSION) return null;
+  const first = entries[0]!;
+  const { commands, errors } = parse(first.cmd);
+  if (errors.length || commands.length !== 1) throw new Error(`line 1 does not parse`);
+  const n = normaliseCommand(commands[0]!, {
+    lang: LANG_VERSION, doc: null, palette: (name) => palettes.get(name), defaultPalette: palettes.defaultName,
+    newSeed: () => 0, seq: first.seq, undoTarget: () => ({ error: 'no' }), redoTarget: () => ({ error: 'no' }), noteId: () => 'n1', by: first.by,
+  });
+  return [{ ...first, cmd: n.text }, ...entries.slice(1)];
+}

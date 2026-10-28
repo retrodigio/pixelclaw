@@ -70,4 +70,20 @@ describe('tape language', () => {
     expect(v.code).toBe(1);
     expect(v.out + v.err).toMatch(/header says language 2/);
   });
+
+  it('upgrade rewrites language 1 tapes with the same pixels, and they no longer read the palette file', () => {
+    const before = readFileSync(join(proj, 'assets', 'grass', 'asset.json'), 'utf8');
+    const r = cli(['upgrade', proj]);
+    expect(r.code).toBe(0);
+    expect(r.out).toMatch(/ok {3}grass: language 1 → 2, the same pixels/);
+    expect(r.out).toMatch(/ok {3}stone_floor\b/); // verified after writing
+    expect(header('grass')).toBe('{"pclaw":"tape","lang":2}');
+    const tape = readFileSync(join(proj, 'assets', 'grass', 'tape.jsonl'), 'utf8').split('\n');
+    expect(JSON.parse(tape[1]!).cmd).toMatch(/^new tile grass 24x24 palette=mossy-ruins wrap=on cell=24x24 bg=none <<\n {2}\S+ \w+ #[0-9a-f]{6}\n/);
+    // The state (and so its hash) is unchanged; a second run has nothing to do.
+    expect(JSON.parse(readFileSync(join(proj, 'assets', 'grass', 'asset.json'), 'utf8')).state).toEqual(JSON.parse(before).state);
+    expect(cli(['upgrade', proj, 'grass']).out).toMatch(/already language 2/);
+    editPalette();
+    expect(cli(['verify', proj]).code).toBe(0);
+  });
 });
