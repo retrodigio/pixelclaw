@@ -58,10 +58,10 @@ describe('pixelclaw CLI', () => {
     writeFileSync(script, '# border and a dot\nrect 0,0 8x8 c=ink\npx 3,3 c=leaf ; px 4,4 c=sky\n');
     const r = cli(['run', proj, script, '--asset', 'floor', '--by', 'human:test']);
     expect(r.code).toBe(0);
-    expect(r.out).toContain('floor: applied 3 commands as group g2; 30 px changed');
+    expect(r.out).toContain('floor: applied 3 commands as group h1; 30 px changed');
     const lines = read('assets', 'floor', 'tape.jsonl').trim().split('\n');
     expect(lines.length).toBe(5);
-    expect(JSON.parse(lines[2]!)).toEqual({ seq: 2, by: 'human:test', at: '2026-10-27T12:00:00Z', group: 'g2', cmd: 'rect 0,0 8x8 c=ink outline' });
+    expect(JSON.parse(lines[2]!)).toEqual({ seq: 2, by: 'human:test', at: '2026-10-27T12:00:00Z', group: 'h1', cmd: 'rect 0,0 8x8 c=ink outline' });
   });
 
   it('run with errors prints file:line:col and applies nothing', () => {
@@ -81,8 +81,8 @@ describe('pixelclaw CLI', () => {
 
   it('run -e and stdin work, and undo takes back a group', () => {
     expect(cli(['run', proj, '--asset', 'floor', '-e', 'fill 1,1 c=sky']).code).toBe(0);
-    expect(cli(['run', proj, '-', '--asset', 'floor'], 'undo\n').out).toContain('applied 1 command as group g4');
-    expect(read('assets', 'floor', 'tape.jsonl').trim().split('\n').at(-1)).toContain('"cmd":"undo group=g3"');
+    expect(cli(['run', proj, '-', '--asset', 'floor'], 'undo\n').out).toContain('applied 1 command as group g3');
+    expect(read('assets', 'floor', 'tape.jsonl').trim().split('\n').at(-1)).toContain('"cmd":"undo group=g2"');
   });
 
   it('run refuses to restart an existing asset without --replace', () => {

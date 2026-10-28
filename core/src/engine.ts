@@ -35,22 +35,26 @@ export type BatchResult =
 
 interface GroupInfo {
   id: string;
+  /** The author of the group's first command. */
+  by: string;
   undoTargets: string[];
+  /** Holds `new` or `fork`: the group that made this tape's document, which cannot be undone. */
   hasNew: boolean;
+  /** Every command is an undo or a redo. */
   onlyUndo: boolean;
 }
 
-const UNDO_RE = /^undo group=(\S+)$/;
+const UNDO_RE = /^(?:undo|redo) group=(\S+)$/;
 
 function groupsOf(entries: TapeEntry[]): GroupInfo[] {
   const map = new Map<string, GroupInfo>();
   for (const e of entries) {
     let g = map.get(e.group);
-    if (!g) map.set(e.group, (g = { id: e.group, undoTargets: [], hasNew: false, onlyUndo: true }));
+    if (!g) map.set(e.group, (g = { id: e.group, by: e.by, undoTargets: [], hasNew: false, onlyUndo: true }));
     const m = UNDO_RE.exec(e.cmd);
     if (m) g.undoTargets.push(m[1]!);
     else g.onlyUndo = false;
-    if (e.cmd.startsWith('new ')) g.hasNew = true;
+    if (e.cmd.startsWith('new ') || e.cmd.startsWith('fork ')) g.hasNew = true;
   }
   return [...map.values()];
 }
@@ -72,38 +76,95 @@ export function activeGroups(entries: TapeEntry[]): Set<string> {
   return active;
 }
 
-function nextGroupId(entries: TapeEntry[]): string {
+/** The group-id prefix for an author: `h` for people (`human:…`), `g` for agents and scripts. */
+export function groupPrefix(by: string): 'g' | 'h' {
+  return by === 'human' || by.startsWith('human:') ? 'h' : 'g';
+}
+
+/** The next group id with this prefix: each prefix counts on its own (g1, g2, … and h1, h2, …). */
+export function nextGroupId(entries: TapeEntry[], prefix = 'g'): string {
   let max = 0;
+  const re = new RegExp(`^${prefix}(\\d+)$`);
   for (const e of entries) {
-    const m = /^g(\d+)$/.exec(e.group);
+    const m = re.exec(e.group);
     if (m) max = Math.max(max, Number(m[1]));
   }
-  return `g${max + 1}`;
+  return `${prefix}${max + 1}`;
+}
+
+type Target = { group: string } | { error: string };
+
+/**
+ * The group a plain `undo` (or `undo by=<author>`) takes back: the latest group still in effect,
+ * by that author if given, that draws (is not itself an undo) and did not create the document.
+ */
+export function findUndo(entries: TapeEntry[], group: string | null, by: string | null = null, current?: string): Target {
+  const groups = groupsOf(entries).filter((g) => g.id !== current);
+  const active = activeGroups(entries);
+  if (group !== null) {
+    if (group === current) return { error: `a batch cannot undo its own group` };
+    const g = groups.find((x) => x.id === group);
+    if (!g) return { error: `no group '${group}' on this tape` };
+    if (!active.has(group)) return { error: `group '${group}' is already undone` };
+    if (g.hasNew) return { error: `group '${group}' created the document and cannot be undone` };
+    return { group };
+  }
+  for (let i = groups.length - 1; i >= 0; i--) {
+    const g = groups[i]!;
+    if (by !== null && g.by !== by) continue;
+    if (active.has(g.id) && !g.onlyUndo && !g.hasNew) return { group: g.id };
+  }
+  return { error: by !== null ? `nothing of ${by}'s to undo` : `nothing to undo` };
+}
+
+/**
+ * The undo group a `redo` takes back. With a group, it must be an undo still in effect. Otherwise
+ * the latest undo still in effect (by that author if given), as long as no drawing came after it:
+ * drawing something new ends the redo chain, as in any editor.
+ */
+export function findRedo(entries: TapeEntry[], group: string | null, by: string | null = null, current?: string): Target {
+  const groups = groupsOf(entries).filter((g) => g.id !== current);
+  const byId = new Map(groups.map((g) => [g.id, g]));
+  const active = activeGroups(entries);
+  /** An undo step: an undo group whose targets are drawing groups (not a redo). */
+  const isUndoStep = (g: GroupInfo) => g.onlyUndo && g.undoTargets.every((t) => !byId.get(t)?.onlyUndo);
+  if (group !== null) {
+    const g = byId.get(group);
+    if (!g) return { error: `no group '${group}' on this tape` };
+    if (!g.onlyUndo || !isUndoStep(g)) return { error: `group '${group}' is not an undo, so there is nothing to redo` };
+    if (!active.has(group)) return { error: `group '${group}' is already taken back` };
+    return { group };
+  }
+  for (let i = groups.length - 1; i >= 0; i--) {
+    const g = groups[i]!;
+    if (by !== null && g.by !== by) continue;
+    if (!g.onlyUndo) break;
+    if (isUndoStep(g) && active.has(g.id)) return { group: g.id };
+  }
+  return { error: by !== null ? `nothing of ${by}'s to redo` : `nothing to redo` };
+}
+
+const NOTE_LINE_RE = /^note .* id=n(\d+)$/;
+
+function nextNoteId(entries: TapeEntry[]): string {
+  let max = 0;
+  for (const e of entries) {
+    const m = NOTE_LINE_RE.exec(e.cmd);
+    if (m) max = Math.max(max, Number(m[1]));
+  }
+  return `n${max + 1}`;
 }
 
 function context(doc: Doc | null, entries: TapeEntry[], current: string, palettes: PaletteSource, seq: number): NormaliseContext {
   return {
     doc,
+    seq,
     palette: (n) => palettes.get(n),
     defaultPalette: palettes.defaultName,
     newSeed: () => seedFrom(new Pcg32(seq, hashString(doc?.name ?? 'doc'))),
-    undoTarget(group) {
-      const groups = groupsOf(entries).filter((g) => g.id !== current);
-      const active = activeGroups(entries);
-      if (group !== null) {
-        if (group === current) return { error: `a batch cannot undo its own group` };
-        const g = groups.find((x) => x.id === group);
-        if (!g) return { error: `no group '${group}' on this tape` };
-        if (!active.has(group)) return { error: `group '${group}' is already undone` };
-        if (g.hasNew) return { error: `group '${group}' created the document and cannot be undone` };
-        return { group };
-      }
-      for (let i = groups.length - 1; i >= 0; i--) {
-        const g = groups[i]!;
-        if (active.has(g.id) && !g.onlyUndo && !g.hasNew) return { group: g.id };
-      }
-      return { error: `nothing to undo` };
-    },
+    undoTarget: (group, by) => findUndo(entries, group, by ?? null, current),
+    redoTarget: (group, by) => findRedo(entries, group, by ?? null, current),
+    noteId: () => nextNoteId(entries),
   };
 }
 
@@ -139,7 +200,7 @@ export function runBatch(state: AssetState, text: string, opts: { by: string; at
   const { commands, errors } = parse(text);
   let doc = state.doc ? cloneDoc(state.doc) : null;
   const entries = [...state.entries];
-  const group = nextGroupId(state.entries);
+  const group = nextGroupId(state.entries, groupPrefix(opts.by));
   let seq = (state.entries[state.entries.length - 1]?.seq ?? 0) + 1;
   const added: TapeEntry[] = [];
   for (const cmd of commands) {
@@ -184,6 +245,14 @@ export class TapeCursor {
     this.palettes = palettes;
   }
 
+  /** A cursor that carries on from a known point: `doc` is the document after `done` (it is copied). */
+  static resume(palettes: PaletteSource, doc: Doc | null, done: TapeEntry[]): TapeCursor {
+    const c = new TapeCursor(palettes);
+    c.doc = doc ? cloneDoc(doc) : null;
+    c.done.push(...done);
+    return c;
+  }
+
   /** Apply one entry. On a problem the cursor is unchanged and the message is returned. */
   step(e: TapeEntry): string | null {
     const { commands, errors } = parse(e.cmd);
@@ -200,6 +269,58 @@ export class TapeCursor {
       if (!(err instanceof DiagError)) throw err;
       return err.message;
     }
+  }
+}
+
+interface Snapshot {
+  n: number;
+  last: TapeEntry;
+  doc: Doc | null;
+}
+
+/**
+ * The document at any point of a tape without replaying it from the start each time: a snapshot
+ * is kept every `every` commands as they are first passed, and a request replays from the nearest
+ * one before it. Snapshots are checked against the tape (the entry they end on), so a tape that
+ * grows keeps them and a tape that was started again drops them.
+ */
+export class Timeline {
+  private readonly palettes: PaletteSource;
+  private readonly every: number;
+  private snaps: Snapshot[] = [];
+
+  constructor(palettes: PaletteSource, every = 100) {
+    this.palettes = palettes;
+    this.every = every;
+  }
+
+  /** The document after the first n entries of the tape (a fresh copy the caller may keep). */
+  docAt(tape: TapeEntry[], n: number): { doc: Doc | null; problem: string | null } {
+    n = Math.max(0, Math.min(n, tape.length));
+    this.snaps = this.snaps.filter((s) => s.n <= tape.length && tape[s.n - 1] === s.last);
+    let base: Snapshot | undefined;
+    for (const s of this.snaps) if (s.n <= n && (!base || s.n > base.n)) base = s;
+    const cur = TapeCursor.resume(this.palettes, base?.doc ?? null, tape.slice(0, base?.n ?? 0));
+    for (let i = base?.n ?? 0; i < n; i++) {
+      const problem = cur.step(tape[i]!);
+      if (problem !== null) return { doc: cur.doc, problem: `#${tape[i]!.seq}: ${problem}` };
+      if ((i + 1) % this.every === 0 && !this.snaps.some((s) => s.n === i + 1)) {
+        this.snaps.push({ n: i + 1, last: tape[i]!, doc: cur.doc ? cloneDoc(cur.doc) : null });
+      }
+    }
+    return { doc: cur.doc, problem: null };
+  }
+
+  /** The document right after the entry with this seq (or before the tape starts, for 0). */
+  docAfter(tape: TapeEntry[], seq: number): { doc: Doc | null; problem: string | null } {
+    let n = 0;
+    while (n < tape.length && tape[n]!.seq <= seq) n++;
+    return this.docAt(tape, n);
+  }
+
+  /** How many snapshots are held (for tests). */
+  get size(): number {
+    return this.snaps.length;
   }
 }
 

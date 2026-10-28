@@ -228,3 +228,110 @@ export function renderGrid(doc: Doc, region?: Region): string {
   }
   return lines.join('\n') + '\n';
 }
+
+/** One pixel that differs between two documents (palette indices; TRANSPARENT for none). */
+export interface PixelChange {
+  x: number;
+  y: number;
+  from: number;
+  to: number;
+}
+
+/** The pixels of the flat image that differ. A missing or differently sized `before` counts as all changed. */
+export function diffPixels(before: Doc | null, after: Doc): PixelChange[] {
+  const a = flatten(after);
+  const same = before && before.width === after.width && before.height === after.height;
+  const b = same ? flatten(before) : null;
+  const out: PixelChange[] = [];
+  for (let i = 0; i < a.length; i++) {
+    const from = b ? b[i]! : TRANSPARENT;
+    if (b && from === a[i]) continue;
+    out.push({ x: i % after.width, y: Math.floor(i / after.width), from, to: a[i]! });
+  }
+  return out;
+}
+
+const MARK: RGB = [255, 0, 200];
+const NOTE: RGB = [255, 214, 10];
+
+/** The changes as text: one `x,y from→to` per pixel (by entry name), up to `limit` of them. */
+export function diffText(before: Doc | null, after: Doc, changes: PixelChange[], limit = 60): string {
+  const name = (d: Doc | null, v: number) => (v === TRANSPARENT ? 'none' : d?.palette.entries[v]?.name ?? `#${v}`);
+  if (changes.length === 0) return 'no pixels changed';
+  const head = `${changes.length} px changed`;
+  if (changes.length > limit) return `${head} (more than ${limit}: see the image)`;
+  return [head + ':', ...changes.map((c) => `  ${c.x},${c.y} ${name(before, c.from)}→${name(after, c.to)}`)].join('\n');
+}
+
+/**
+ * Before and after side by side at the render scale, each changed pixel outlined in magenta on
+ * both, and the after document's open notes outlined in yellow dashes. With more than `limit`
+ * changes a third panel shows them as a map: the after image dimmed, changed pixels solid magenta.
+ */
+export function renderDiff(before: Doc | null, after: Doc, o: { scale?: number; limit?: number } = {}): Rgba {
+  const changes = diffPixels(before, after);
+  const s = o.scale ?? Math.max(1, Math.min(16, Math.floor(160 / Math.max(after.width, after.height))));
+  const pad = 8;
+  const W = after.width * s;
+  const H = after.height * s;
+  const bw = before ? before.width * s : W;
+  const bh = before ? before.height * s : H;
+  const panels = changes.length > (o.limit ?? 60) ? 3 : 2;
+  const img = createRgba(pad + bw + pad + (W + pad) * (panels - 1), pad + Math.max(bh, H) + pad);
+  rect(img, 0, 0, img.width, img.height, RULER_BG);
+  const draw = (d: Doc, ox: number, dim: boolean): void => {
+    const px = flatten(d);
+    const pal = colourTable(d);
+    const chk = Math.max(2, s >> 1);
+    for (let y = 0; y < d.height; y++) for (let x = 0; x < d.width; x++) {
+      const v = px[y * d.width + x]!;
+      for (let j = 0; j < s; j++) for (let i = 0; i < s; i++) {
+        const c = v === TRANSPARENT ? (((x * s + i) / chk | 0) + ((y * s + j) / chk | 0)) % 2 ? CHECK_A : CHECK_B : pal[v]!;
+        put(img, ox + x * s + i, pad + y * s + j, c);
+        if (dim) tint(img, ox + x * s + i, pad + y * s + j, RULER_BG, 190);
+      }
+    }
+  };
+  const mark = (ox: number, w: number, h: number, solid: boolean): void => {
+    for (const c of changes) {
+      if (c.x >= w || c.y >= h) continue;
+      const x0 = ox + c.x * s;
+      const y0 = pad + c.y * s;
+      if (solid || s < 4) {
+        for (let j = 0; j < s; j++) for (let i = 0; i < s; i++) {
+          if (solid) put(img, x0 + i, y0 + j, MARK);
+          else tint(img, x0 + i, y0 + j, MARK, 150);
+        }
+        continue;
+      }
+      // An outline on the pixel's border, 1 px (2 px from 8x), so its colour stays visible.
+      const t = s >= 8 ? 2 : 1;
+      for (let k = 0; k < s; k++) for (let q = 0; q < t; q++) {
+        put(img, x0 + k, y0 + q, MARK); put(img, x0 + k, y0 + s - 1 - q, MARK);
+        put(img, x0 + q, y0 + k, MARK); put(img, x0 + s - 1 - q, y0 + k, MARK);
+      }
+    }
+  };
+  if (before) {
+    draw(before, pad, false);
+    mark(pad, before.width, before.height, false);
+  }
+  const ax = pad + bw + pad;
+  draw(after, ax, false);
+  mark(ax, after.width, after.height, false);
+  for (const n of after.notes) {
+    // A dashed box just outside the note's pixels (on the panel's border it sits inside).
+    const x0 = Math.max(ax, ax + n.x * s - 1);
+    const y0 = Math.max(pad, pad + n.y * s - 1);
+    const x1 = Math.min(ax + W - 1, ax + (n.x + n.w) * s);
+    const y1 = Math.min(pad + H - 1, pad + (n.y + n.h) * s);
+    for (let x = x0; x <= x1; x++) if (((x - x0) >> 1) % 2 === 0) { put(img, x, y0, NOTE); put(img, x, y1, NOTE); }
+    for (let y = y0; y <= y1; y++) if (((y - y0) >> 1) % 2 === 0) { put(img, x0, y, NOTE); put(img, x1, y, NOTE); }
+  }
+  if (panels === 3) {
+    const mx = ax + W + pad;
+    draw(after, mx, true);
+    mark(mx, after.width, after.height, true);
+  }
+  return img;
+}

@@ -1,5 +1,6 @@
 // Raster primitives on one cel. Integer maths only. On a wrap document coordinates past an edge
-// wrap around (the canvas is a torus, for seamless tiles); otherwise they are clipped.
+// wrap around (the canvas is a torus, for seamless tiles); otherwise they are clipped. A selection
+// mask, when there is one, clips every write.
 
 import { TRANSPARENT } from './doc.ts';
 
@@ -8,6 +9,8 @@ export interface Target {
   height: number;
   wrap: boolean;
   pixels: Uint16Array;
+  /** The selection (1 = writable), or null for the whole canvas. */
+  mask?: Uint8Array | null;
 }
 
 export type Pt = [number, number];
@@ -23,7 +26,7 @@ export function indexOf(t: Target, x: number, y: number): number {
 
 export function plot(t: Target, x: number, y: number, c: number): void {
   const i = indexOf(t, x, y);
-  if (i >= 0) t.pixels[i] = c;
+  if (i >= 0 && (!t.mask || t.mask[i])) t.pixels[i] = c;
 }
 
 /**
@@ -84,7 +87,29 @@ export function polyline(vertices: Pt[], pixelPerfect: boolean): Pt[] {
       if (axis1 && axis2) keep.add(path.length - 1);
     }
   }
-  if (!pixelPerfect || path.length < 3) return dedupe(path);
+  if (!pixelPerfect) return dedupe(path);
+  return dropLCorners(path, keep);
+}
+
+/**
+ * A freehand stroke through the sampled points (a pencil drag): consecutive points are joined by
+ * straight segments, and with pixelPerfect every doubled L-corner is dropped as it would be while
+ * drawing (Aseprite's pixel-perfect pencil). Unlike a polyline, no right angle is kept: a drag
+ * that steps one pixel right and then one down is a diagonal.
+ */
+export function freehand(points: Pt[], pixelPerfect: boolean): Pt[] {
+  const path: Pt[] = points.length ? [points[0]!] : [];
+  for (let v = 1; v < points.length; v++) {
+    const seg = segment(points[v - 1]!, points[v]!);
+    for (let k = 1; k < seg.length; k++) path.push(seg[k]!);
+  }
+  const d = dedupe(path);
+  return pixelPerfect ? dropLCorners(d, new Set()) : d;
+}
+
+/** Drop each pixel whose neighbours on the path touch diagonally (an L-corner), except at `keep`. */
+function dropLCorners(path: Pt[], keep: Set<number>): Pt[] {
+  if (path.length < 3) return dedupe(path);
   const out: Pt[] = [path[0]!];
   for (let i = 1; i < path.length - 1; i++) {
     const prev = out[out.length - 1]!;
@@ -161,14 +186,18 @@ function uniq(pts: Pt[]): Pt[] {
   return pts.filter(([x, y]) => (seen.has(`${x},${y}`) ? false : (seen.add(`${x},${y}`), true)));
 }
 
-/** Flood fill from x,y (4- or 8-connected; across edges on wrap targets), or a global colour swap. */
+/**
+ * Flood fill from x,y (4- or 8-connected; across edges on wrap targets), or a global colour swap.
+ * With a selection, the fill starts only inside it and never leaves it.
+ */
 export function fill(t: Target, x: number, y: number, c: number, global: boolean, conn: 4 | 8): void {
   const start = indexOf(t, x, y);
-  if (start < 0) return;
+  const m = t.mask;
+  if (start < 0 || (m && !m[start])) return;
   const from = t.pixels[start]!;
   if (from === c) return;
   if (global) {
-    for (let i = 0; i < t.pixels.length; i++) if (t.pixels[i] === from) t.pixels[i] = c;
+    for (let i = 0; i < t.pixels.length; i++) if (t.pixels[i] === from && (!m || m[i])) t.pixels[i] = c;
     return;
   }
   const steps: Pt[] = conn === 4 ? [[1, 0], [-1, 0], [0, 1], [0, -1]] : [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
@@ -180,12 +209,34 @@ export function fill(t: Target, x: number, y: number, c: number, global: boolean
     const py = (i - px) / t.width;
     for (const [sx, sy] of steps) {
       const j = indexOf(t, px + sx, py + sy);
-      if (j >= 0 && t.pixels[j] === from) {
+      if (j >= 0 && t.pixels[j] === from && (!m || m[j])) {
         t.pixels[j] = c;
         stack.push(j);
       }
     }
   }
+}
+
+/**
+ * Move the selected pixels (or, with no mask, the whole cel) by dx,dy. The pixels they leave
+ * become transparent; the destination wraps or clips like any write. Returns the moved mask.
+ */
+export function shiftPixels(t: Target, dx: number, dy: number): Uint8Array | null {
+  const moved: [number, number, number][] = [];
+  const m = t.mask;
+  for (let i = 0; i < t.pixels.length; i++) {
+    if (m && !m[i]) continue;
+    moved.push([i % t.width, Math.floor(i / t.width), t.pixels[i]!]);
+    t.pixels[i] = TRANSPARENT;
+  }
+  const out = m ? new Uint8Array(m.length) : null;
+  for (const [x, y, v] of moved) {
+    const j = indexOf(t, x + dx, y + dy);
+    if (j < 0) continue;
+    t.pixels[j] = v;
+    if (out) out[j] = 1;
+  }
+  return out;
 }
 
 export { TRANSPARENT };
