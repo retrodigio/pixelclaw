@@ -151,3 +151,93 @@ Points where the plan was unclear or silent. Each has the reading that was follo
     *Reading:* the `cli` package is named `pixelclaw` and is what `pnpm pack` ships (bundled, no
     runtime dependencies, third-party licences included), but it stays `"private": true`. The
     README gives the `npx pixelclaw` line for later and working lines for a clone or a tarball.
+
+## G3
+
+28. **Palette edits and replay.** G1 item 3 left it to G3: should palette edits change the project's
+    palette file, or be tape commands?
+    *Reading:* tape commands that edit the document's own copy of its palette (`palette set <entry>
+    hex=#…`, `palette add [<name>] hex=#… [key=…]`). Changing the project file would change how
+    every other tape replays. Entries are only changed or added, never removed or reordered, since
+    pixels store entry numbers. Saving a document's palette back to the project can come with
+    palette locking (G4). `#` starts a comment after a space, so colours are written `hex=#…`.
+
+29. **The `stroke` line.** §1.3 shows `stroke pencil c=ink 12,4 12,5 13,6`.
+    *Reading:* that order (options before the points, so the colour stays in view on long strokes),
+    with the default filled in: `stroke pencil c=ink pp=on 12,4 12,5 13,6`. The points are the
+    pixels the pointer passed over; core joins them and drops doubled L-corners (Aseprite's
+    pixel-perfect pencil; no right angle is kept, unlike `line`). The eraser is `stroke eraser
+    x,y …`.
+
+30. **What "rectangle select and move" logs.** A selection changes no pixels, and §3.2 says a
+    selection clips every drawing command until `deselect`.
+    *Reading:* in core, `select rect|all|none`, `deselect` and `shift dx,dy` exist, and the selection
+    clips drawing and fills. In the page the selection stays local until used: a move writes one
+    group `select rect …; shift dx,dy; deselect`, Delete writes `rect … c=none fill`, and drawing
+    inside a selection is wrapped in `select rect …` / `deselect`. Moved pixels leave transparent
+    pixels behind. The picker writes nothing either. "Every UI action replays" is tested for every
+    action that changes the document. Open point for G4: a selection the agent leaves active
+    clips people's strokes too (and a page's clipped batch ends with `deselect`); selections may
+    need to be per author.
+
+31. **`shift`.** §3.3 has `shift 0,-1` after a selection, `shift 5,0 wrap` and `shift sel 0,-1`.
+    *Reading:* G3 has `shift dx,dy`: the selection if there is one, else the whole canvas; past an
+    edge it wraps on `wrap=on` documents and clips otherwise. The `wrap` flag and `sel` word come
+    with G4's transforms.
+
+32. **Where notes live.** "Stored in the project, visible on the canvas and returned to the agent."
+    *Reading:* a note is a tape command (`note x,y [WxH] "text"`, as in §1.3), so it has an author,
+    a group and undo. The normal form adds an id (`id=n1`, never reused). Open notes are document
+    state: in the state hash, in `asset.json` (`notes`), on the canvas and in `changes`. The plan
+    has no way to close a note; `note done <id>` is added so the agent (or a person) can mark one
+    dealt with.
+
+33. **Where `changes` starts.** "Since Claude's last call", but there is no last call the first time,
+    and the agent's own commands are mixed in.
+    *Reading:* a read position per agent and asset, kept in `<project>/reads.json` (so a restart,
+    or a person editing with `--no-mcp`, loses nothing). With no position the agent has read
+    nothing, except that its own commands at the start count as read (it wrote them); on a branch
+    reading starts at the fork point. Each call lists only other authors' lines and moves the
+    position to the end. The diff runs from the position to now, so it includes any of the agent's
+    own commands in between; the result says how many. `since` overrides the position. Every MCP
+    call is the agent `claude` (G2 item 26).
+
+34. **Undo and redo per author.** §1.3 has only `undo group=…`; G3 asks for undo and redo per author
+    "and the agent's undo stays as it is".
+    *Reading:* `undo by=<author>` takes back that author's latest drawing group still in effect, and
+    a new `redo [group=|by=]` takes back an undo, latest first; both record the group they chose
+    (`undo group=h3`, `redo group=h7`). Drawing something new ends that author's redo chain, as in
+    any editor. The agent's plain `undo` still takes the latest group in effect, whoever wrote it.
+
+35. **The branching tape format.** §7.2: "`fork chest chest_b` copies an asset with its tape".
+    *Reading:* the branch's tape is self-contained: the source's entries up to the fork point copied
+    exactly (authors and groups kept), then `fork <from> <to> at=<n>` in the forking author's
+    group, then the branch's own commands. Replay rebuilds the source's state and the fork line
+    renames it; it checks the name and that `at` is the line before. Nothing is written on the
+    source's tape (it is not changed by being forked); `asset.json` links the branch to it. A fork
+    is the first command of a batch on the new asset (from MCP `run`, or "Branch here").
+
+36. **Who a person is.** §1.3 shows `human:chris`; there are no accounts.
+    *Reading:* the page asks for a name (header, `?name=`, remembered in the browser; default
+    `human:guest`). The server only checks the form `human:<name>`. Anyone with the token is
+    trusted, so one person could write as another; that is fine for a local tool.
+
+37. **How people's edits play.** G2 plays every batch command by command.
+    *Reading:* a person's batch shows at once on every page (it is one action, not a script to
+    watch). Follow (G2 item 24) turns off when you start editing, so the canvas does not switch to
+    whatever the agent draws next while you work.
+
+38. **The command line.** §8.3 has one at the bottom of the tape; it is not in G3's list.
+    *Reading:* added, since pages send commands anyway. It runs as the page's author.
+
+39. **The diff's "heat map".** §2 says more than about 60 changed pixels come back as a heat map
+    beside before and after.
+    *Reading:* with no notion of how much a pixel changed in an indexed image, the map is binary:
+    the after image dimmed with the changed pixels solid magenta, as a third panel. Before and
+    after always have the changed pixels outlined. The scale is the render view's.
+
+40. **Snapshot caching vs checkpoints.** §7.1's checkpoints are files every 200 commands; G2's notes
+    asked for snapshot caching for time travel.
+    *Reading:* an in-memory `Timeline` in core (a snapshot every 100 commands, checked against the
+    tape) serves time travel in the page and earlier states in the writer (`changes`, the diff,
+    forks). Checkpoint files stay a stub until load time needs them.

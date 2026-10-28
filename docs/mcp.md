@@ -1,8 +1,8 @@
 # The MCP server and the watch view
 
 `pixelclaw serve` owns one project folder. It is the project's single writer: every command, from
-the agent or (from G3) a browser, goes through one queue in the order it arrives, is saved to the
-tape, and is then streamed to every open page.
+the agent or from a person in a browser, goes through one queue in the order it arrives, is saved
+to the tape with its author, and is then streamed to every open page.
 
 ```
 pixelclaw serve --project <dir> [--port 7417] [--no-mcp]
@@ -44,7 +44,7 @@ link").
 
 ## Tools
 
-All four tools go through the writer's queue. Errors come back as tool errors (`isError`) with a
+All five tools go through the writer's queue. Errors come back as tool errors (`isError`) with a
 plain message.
 
 ### `project`
@@ -68,7 +68,7 @@ palette mossy-ruins (default): 16 colours
   ramps: stone [stone0 stone1 stone2 stone3 stone4 stone5]; moss [moss0 moss1 moss2 moss3 lichen]; …
 
 assets (1):
-  stone_floor: tile 24x24 wrap, palette mossy-ruins, 71 commands in 8 groups
+  stone_floor: tile 24x24 wrap, palette mossy-ruins, 75 commands in 12 groups; open notes: n1
 ```
 
 ### `run`
@@ -79,7 +79,7 @@ Apply command text (see [commands.md](commands.md)) to an asset as one undo grou
 |---|---|---|
 | `asset` | string | The asset to draw on. To create it, start the commands with `new <kind> <asset> <W>x<H> …`. |
 | `commands` | string | One or more lines of the command language. |
-| `view` | `render` \| `grid` \| `tile3x3`, optional | Also return this view of the result. |
+| `view` | `render` \| `grid` \| `tile3x3` \| `diff`, optional | Also return this view of the result. |
 | `replace` | boolean, optional | With a leading `new` for an asset that exists: start its tape again. |
 
 The result lists the commands as written to the tape (normal form, with their numbers), the
@@ -109,13 +109,14 @@ when the checks exist (G5).
 | Argument | Type | Does |
 |---|---|---|
 | `asset` | string | |
-| `mode` | `render` (default) \| `grid` \| `tile3x3` | See [commands.md, Views](commands.md#views). |
-| `scale` | 1..64, optional | `render` only. Default: about 192 px on the long side. |
+| `mode` | `render` (default) \| `grid` \| `tile3x3` \| `diff` | See [commands.md, Views](commands.md#views). |
+| `scale` | 1..64, optional | `render` and `diff`. Default: about 192 px on the long side. |
 | `region` | string, optional | `grid` only: `"x,y WxH"`, e.g. `"8,0 12x10"`. |
+| `since` | integer, optional | `diff` only: compare with the document after this command (default: before the latest group). |
 
 Images come back inline (`image/png`) with a line giving their size and the file they were saved
 to (`<project>/views/<asset>.<mode>.png`, overwritten each time). The grid comes back as text and
-is saved as `.txt`. Every image returned to the agent, from `view` or from `run`'s `view`, becomes
+is saved as `.txt`. The diff comes back as an image plus the list of changed pixels. Every image returned to the agent, from `view` or from `run`'s `view`, becomes
 "Claude's eye" in the watch view.
 
 ### `history`
@@ -136,25 +137,104 @@ stone_floor: 73 commands in 10 groups; undone: g9
 
 Undo is a command: `run` with `undo` or `undo group=g4`.
 
+### `changes`
+
+What people did in the watch view since the agent last called `changes` (plan §1.3, §8.2).
+
+| Argument | Type | Does |
+|---|---|---|
+| `asset` | string, optional | Only this asset (default: every asset). |
+| `since` | integer, optional | Read from after this command instead of the stored position. |
+
+For each asset with new lines by other authors, it returns:
+
+- the lines, each with its number, author and group (the agent's own lines are left out; how many
+  were in the same range is said, since the diff includes them);
+- the open notes, with the new ones marked;
+- the diff, as text (up to 60 pixels as `x,y from→to`) and as an image: before and after, changed
+  pixels outlined in magenta, notes in yellow. The image is saved as `views/<asset>.diff.png` and
+  becomes Claude's eye in the watch view.
+
+```
+Changes since you last looked: 1 asset (stone_floor).
+stone_floor: 4 commands (4 by human:chris) since #71; now at #75
+#72 human:chris h1  stroke pencil c=moss1 pp=on 12,8
+#73 human:chris h2  stroke pencil c=moss1 pp=on 13,8
+#74 human:chris h3  stroke pencil c=moss1 pp=on 14,8
+#75 human:chris h4  note 9,8 3x1 "carry the moss on along this joint, a shade darker (moss0)" id=n1
+open notes (1):
+  n1 at 9,8 3x1: "carry the moss on along this joint, a shade darker (moss0)"  (new)
+diff #71 → #75: 3 px changed:
+  12,8 stone1→moss1
+  13,8 stone1→moss1
+  14,8 stone1→moss1
+[image]
+diff image: 408x208 px, saved /…/views/stone_floor.diff.png
+```
+
+Then the read position moves to the end of every tape, so a second call says `No changes since
+you last looked.` The positions are kept per agent in `<project>/reads.json` (so a restarted
+server still knows them; leave it out of git if you like). On a tape the agent has never read,
+reading starts after the agent's own first commands (it wrote them), and on a branch it starts at
+the fork point. The agent's own commands straight after its position count as read too.
+
+The server's instructions ask the agent to call `changes` at the start of each turn while someone
+is watching, to carry on from what they did, and to close notes it has dealt with (`note done n1`).
+
 ## The watch view
 
 Open the link (with its token). The page shows:
 
-- **Assets** (left), with a dot on assets that have commands still to play, and the palette of the
-  asset on show. With **follow** on (the default), the view moves to whichever asset the agent is
-  drawing on once the current one has caught up.
+- **Assets** (left), with a dot on assets that have commands still to play (branches show `⑂`
+  and their source). With **follow** on (the default), the view moves to whichever asset the
+  agent is drawing on once the current one has caught up. Follow turns off when you start editing,
+  so the canvas never switches away under you.
+- **Tools** and the **palette** (left), for editing; see below.
 - **The canvas**: zoom 1–64x (−/+, Fit, or Ctrl/⌘ + wheel), a pixel grid from 4x (stronger every
   8 px) and the cell grid (magenta) on sheets. Transparent pixels show as a grey checkerboard.
 - **The tape** (right): every command, grouped by undo group and coloured by author (the agent in
-  orange, people in blue from G3). Each batch plays command by command at the chosen speed
+  orange, people in blue). The list is virtualised, so a tape of 10,000 lines scrolls freely. Each batch plays command by command at the chosen speed
   (1–60 commands a second, or instant); the line being drawn is highlighted and lines still to play
   are dimmed. **Pause** holds playback (new commands keep arriving); **Jump to live** shows
   everything at once and resumes.
 - **Time travel**: click any tape line to see the document right after it, read-only. **Back to
-  live** returns.
-- **Claude's eye**: the last image the agent was shown. Click it to enlarge.
+  live** returns. **Branch here** makes a new asset from that point (a `fork`) and opens it.
+  Earlier states come from snapshots kept every 100 commands, so travelling is quick on long tapes.
+- **The command line** under the tape runs any commands on the shown asset, as you.
+- **Notes**: the open notes, with who wrote them; ✓ closes one.
+- **Claude's eye**: the last image the agent was shown (a view, or the diff `changes` returned).
+  Click it to enlarge.
 
-Several browsers can watch at once; they all receive the same stream.
+Several browsers can watch, and edit, at once; they all receive the same stream.
+
+### Editing
+
+Your edits are written as `human:<name>`: click **you:** in the header to set the name (it is
+remembered in the browser; `?name=chris` in the link sets it too). Every action becomes the same
+command text the agent would write (see [commands.md](commands.md)), sent to the single writer as
+one batch, one undo group (`h1`, `h2`, …). While you drag, the canvas shows the batch applied by
+core to a copy, so what you see is exactly what will be logged. Editing is off while time
+travelling.
+
+| Tool | Key | Writes |
+|---|---|---|
+| Pencil | B | `stroke pencil c=… pp=on x,y …` (one drag; pixel-perfect can be turned off) |
+| Eraser | E | `stroke eraser x,y …` |
+| Line | L | `line a b c=…` |
+| Rectangle | U | `rect x,y WxH c=… outline` (F toggles `fill`) |
+| Ellipse | Shift+U | `ellipse x,y WxH c=… outline` (F toggles `fill`) |
+| Fill | G | `fill x,y c=…` |
+| Colour picker | I, or Alt+click | nothing: it picks the colour you draw with |
+| Rectangle select | M | nothing until used: drag inside it to move (`select rect …; shift dx,dy; deselect`), Delete clears it (`rect … c=none fill`), Esc lets go; drawing inside it is clipped to it |
+| Move | V | `shift dx,dy` (the selection, or everything); arrow keys nudge by 1 |
+| Note | N | click a pixel or drag a region, write, **Pin note**: `note x,y [WxH] "text"` |
+
+- **Palette**: click a swatch to draw with it (`none` draws transparent). Double-click a swatch to
+  change its colour (`palette set`), or **+** to add one (`palette add`). These edit the shown
+  asset's palette, on its tape.
+- **Undo / Redo** (buttons, Ctrl/⌘+Z, Ctrl/⌘+Shift+Z or Ctrl+Y) take back only your own groups:
+  they write `undo by=human:<you>` and `redo by=human:<you>`, which the tape records as
+  `undo group=h3` and `redo group=h7`.
 
 ### Security
 
@@ -178,6 +258,15 @@ The page and the server talk JSON over the WebSocket (types in
 | `batch` | After each applied batch: the asset, author, group, the new tape entries (or the whole tape after a `new`, with `reset`), and the pixels changed. |
 | `eye` | When an image view is returned to the agent: the PNG (base64), its size and path. |
 | `palettes` | When palettes are added. |
+| `result` | To one page only: the answer to its `run` (ok with the group, or the errors). |
+
+A page sends:
+
+| Message | Does |
+|---|---|
+| `{"type":"run","id":7,"asset":"slab","commands":"…","by":"human:chris"}` | Apply the commands as one batch. `by` must be `human:<name>` (letters, digits, `.`, `_`, `-`). A page cannot start an existing asset's tape again. The batch goes to every page like any other; the `result` with the same `id` goes back to the sender. |
+| `{"type":"ping"}` | Answered with `pong`. |
 
 The page replays tape lines itself with the core library, so what it draws is what the core
-computes; the server sends commands, not pixels.
+computes; the server sends commands, not pixels. A person's batch is shown at once rather than
+played command by command.

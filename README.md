@@ -1,18 +1,21 @@
 # PixelClaw
 
 A pixel art editor built for an AI agent to drive by command. The agent draws with exact
-commands, sees exact feedback, and checks its own work. People can watch, and later edit, in a
-live browser view. All art is indexed colour.
+commands, sees exact feedback, and checks its own work. People watch and edit in a live browser
+view, and every human edit is written down as a command, so the agent reads what changed and
+carries on from there. All art is indexed colour.
 
 Every edit is a line of a small command language. A document *is* its tape of commands replayed,
 and replay is deterministic (integer maths, seeded randomness), so the same tape always gives the
 same pixels.
 
-**Status: step G2.** The core library and CLI (G1), plus the MCP server and the live watch view:
-an agent draws through MCP while people watch the canvas fill in and the commands scroll past.
-Editing in the browser comes in G3. See [PROGRESS.md](PROGRESS.md).
+**Status: step G3.** The core library and CLI (G1); the MCP server and the live watch view (G2);
+and editing (G3): people draw in the browser with pencil, eraser, line, rectangle, ellipse, fill,
+picker, select and move, edit the palette, pin notes, undo and redo their own edits, and branch
+from any point in history. Each action is a command on the tape with its author, and the agent's
+`changes` tool returns exactly what people did, with a diff image. See [PROGRESS.md](PROGRESS.md).
 
-![The watch view: the canvas, the tape with the line being drawn, and Claude's eye](docs/screenshots/g2-live.png)
+![The watch view after the agent read a person's changes: their lines on the tape in blue, their note on the canvas, and the diff the agent saw as Claude's eye](docs/screenshots/g3-changes.png)
 
 ## Use it from Claude Code
 
@@ -35,9 +38,12 @@ Once the package is published to npm, the same thing is
 made with `cd cli && pnpm pack`).
 
 Start `claude` and ask for the watch link: the `project` tool returns
-`http://127.0.0.1:7417/?token=…`. Open it, then ask Claude to draw. The tools are `project`, `run`,
-`view` and `history`; see [docs/mcp.md](docs/mcp.md). [examples/demo-g2.md](examples/demo-g2.md)
-walks through a session, and has a script that stands in for the agent.
+`http://127.0.0.1:7417/?token=…`. Open it, then ask Claude to draw. Draw in the page too, or pin a
+note on a pixel, and tell Claude: its `changes` tool returns your lines, your notes and a diff
+image. The tools are `project`, `run`, `view`, `history` and `changes`; see
+[docs/mcp.md](docs/mcp.md). [examples/demo-g2.md](examples/demo-g2.md) and
+[examples/demo-g3.md](examples/demo-g3.md) walk through sessions, with scripts that stand in for
+the agent.
 
 ## Quick start (CLI)
 
@@ -70,7 +76,7 @@ node cli/bin/pixelclaw.js verify my-art.pclaw
 | `pixelclaw new <project> [--palette <file>]...` | Create a project folder. Palettes can be `.json`, Lospec `.json`, `.hex` or `.gpl`. |
 | `pixelclaw new <project> <kind> <name> <W>x<H> [opts]` | Create an asset (a `new` command). |
 | `pixelclaw run <project> <script.pclaw>\|-\|-e "..." [--asset <name>] [--replace] [--by <who>] [--view <mode>]` | Apply commands as one undo group. Any error applies nothing. |
-| `pixelclaw view <project> <asset> [render\|grid\|tile3x3\|all] [--scale N] [--region x,y,WxH]` | Write views and print the text grid. |
+| `pixelclaw view <project> <asset> [render\|grid\|tile3x3\|diff\|all] [--scale N] [--region x,y,WxH]` | Write views and print the text grid (or the diff's list of changes). |
 | `pixelclaw verify <project> [<asset>...]` | Replay every tape and compare it with the saved state and preview. |
 | `pixelclaw serve --project <project> [--port 7417] [--no-mcp]` | Own the project: MCP on stdin/stdout and the live watch view on localhost (the link, with its token, is printed to stderr). See [docs/mcp.md](docs/mcp.md). |
 
@@ -83,11 +89,12 @@ my-art.pclaw/
   project.json              name, tick rate, default palette
   palettes/<name>.json      entries (key, name, hex) and ramps
   assets/<name>/
-    asset.json              kind, size, cell grid, wrap, palette, state hash
-    tape.jsonl              the history: one command per line
+    asset.json              kind, size, cell grid, wrap, palette, open notes, fork link, state hash
+    tape.jsonl              the history: one command per line, with its author
     preview.png             the current image at 1x
     checkpoints/            fast-load snapshots (written from a later step)
-  views/                    renders written by 'pixelclaw view' and the MCP 'view' tool
+  views/                    renders written by 'pixelclaw view' and the MCP 'view' and 'changes' tools
+  reads.json                how far each agent has read each tape (for 'changes')
   .pixelclaw.lock           present while a server owns the project (not for git)
 ```
 
@@ -103,7 +110,8 @@ checked in:
 - [the 3x3 preview](examples/mossy-ruins.pclaw/views/stone_floor.tile3x3.png)
 
 The G2 demo ([examples/demo-g2.md](examples/demo-g2.md)) draws the same tile through MCP while you
-watch.
+watch. In the G3 demo ([examples/demo-g3.md](examples/demo-g3.md)) you fix three pixels and leave a
+note, and the agent reads them with `changes` and carries on.
 
 ## Packages
 
@@ -112,7 +120,8 @@ watch.
   runs anywhere.
 - `server`: the project folder, the single writer (one queue for every command), views, the MCP
   server (stdio) and the HTTP + WebSocket server for the watch view.
-- `ui`: the watch view (Vite + React + canvas 2D). It replays the tape with `core` itself.
+- `ui`: the watch view and editor (Vite + React + canvas 2D). It replays the tape with `core`
+  itself, and its tools write commands that `core` previews before they are sent.
 - `cli`: the `pixelclaw` command. `pnpm build` bundles it with `core`, `server` and the built UI
   into `cli/dist` (no runtime dependencies), which is what `pnpm pack` ships.
 

@@ -37,13 +37,13 @@ Status of plan features touched so far. Steps refer to the build plan (§10).
 | MCP over stdio (official TS SDK v2), server instructions | §8.2 | done | `mcp.test.ts` | Serves both protocol eras (2025 `initialize` checked by hand). Instructions carry a command cheat sheet and ask the agent to share the watch link. |
 | MCP `project` | §8.2 | partial | `mcp.test.ts` | Palettes, assets, watch link; open/create another folder; add palette files. Profiles come with G9. |
 | MCP `run` | §8.2 | partial | `mcp.test.ts` | One undo group; applied lines, pixels changed, warnings, optional view; errors with line:col apply nothing. The check summary joins in G5. |
-| MCP `view` | §8.2, §2 | partial | `mcp.test.ts` | `render`, `grid` (with region), `tile3x3`; image inline plus saved path, text for the grid. Other modes come with their steps (`diff` G3, `game`/`recolour` G5, `anim` G6, `map` G7, `density` G9). |
+| MCP `view` | §8.2, §2 | partial | `mcp.test.ts`, `edits.test.ts` | `render`, `grid` (with region), `tile3x3`, `diff` (G3, with `since`); image inline plus saved path, text for the grid and the diff's list. Other modes come with their steps (`game`/`recolour` G5, `anim` G6, `map` G7, `density` G9). |
 | MCP `history` | §8.2 | done | `mcp.test.ts` | Range by number or last N; undone groups marked. |
 | HTTP + WebSocket on localhost, token | §1.2, §8.1 | done | `mcp.test.ts`, `watch.spec.ts` | 127.0.0.1 only, host-name check, random token for the page, `/api/state` and `/ws`. Port 7417 or the next free one. Small RFC 6455 server side, no dependency. |
 | UI shell: canvas, zoom 1–64x, pixel and cell grids | §8.3, G2 | done | `watch.spec.ts` (canvas equals the core render at two zooms, with and without the grid) | Draws core's `renderFlat`; checkerboard under transparent pixels. Wrap ghosts and onion skin come later. |
 | Tape panel streaming live with author colouring | §8.3, G2 | done | `watch.spec.ts` | Grouped by undo group; undone groups struck through. |
 | Live playback, speed, pause, jump to live | §8.3, G2 | done | `watch.spec.ts` (every command shown in turn; pause holds; jump shows all) | Pages replay lines with core's new `TapeCursor`. Follows the asset being drawn. |
-| Time travel (read-only) | §8.3, G2 | done | `watch.spec.ts` | Click a line to see the document after it. "Branch here" (fork) is G3. |
+| Time travel (read-only) | §8.3, G2 | done | `watch.spec.ts` | Click a line to see the document after it. "Branch here" is G3 (below). |
 | Claude's eye | §8.3, G2 | done | `watch.spec.ts` | The last image returned to the agent (`view`, or `run` with a view). |
 | Asset list (and palette swatches) | §8.3 | done | `watch.spec.ts` | Busy dot on assets with commands to play. |
 | Two browsers receive the same stream | §1.2, G2 | done | `mcp.test.ts` (two sockets), `watch.spec.ts` (two browsers) | |
@@ -51,4 +51,19 @@ Status of plan features touched so far. Steps refer to the build plan (§10).
 | Playwright | G2 | done | `e2e/watch.spec.ts` (6 tests) | `pnpm test` builds, then runs vitest and Playwright. Needs `npx playwright install chromium` once. |
 | Demo: the agent draws a tile through MCP while a person watches | G2 | done | `examples/demo-g2.md`, `examples/demo-g2-agent.ts` (run by hand; its tape verifies, same state hash as the G1 tile) | Screenshots in `docs/screenshots/`. |
 | Docs: "Use it from Claude Code", docs/mcp.md | G2 | done | — | |
-| Editing in the UI, notes, `changes`, fork | §1.3, G3 | deferred | — | The writer already takes an author per batch; pages only receive in G2. |
+| Edits from pages: WebSocket `run` as `human:<name>`, through the single writer | §1.2, §1.3, G3 | done | `edits.test.ts`, `edit.spec.ts` | The sender gets a `result`; every page gets the batch. Pages can't restart an asset; names must be `human:<name>`. |
+| Human groups `h<N>` with their own counter | §1.3, G3 | done | `authors.test.ts`, `edits.test.ts`, `edit.spec.ts` | Per tape, like `g<N>`. |
+| UI tools: pencil (pixel-perfect), eraser, line, rect, ellipse, fill, picker, rectangle select and move | §8.3, G3 | done | `edit.spec.ts` (each tool driven with the mouse; the logged lines checked; core's replay of the server's tape equals the canvas after every action) | New commands `stroke pencil\|eraser`, `select rect\|all\|none`, `deselect`, `shift`. A stroke is one line, one group. Previews are the batch applied by core. Picker and an unused selection log nothing (they don't change the document). |
+| Keyboard shortcuts in tooltips | §8.3, G3 | done | `edit.spec.ts` (B, E, L, U, Shift+U, F, G, I, Alt+click, M, V, arrows, Delete, Esc, N, Ctrl+Z, Ctrl+Shift+Z) | Aseprite-style. `[ ]` frames come with G6. |
+| Selections clip drawing | §3.2 | partial | `edit.test.ts`, `edit.spec.ts` | Rectangle (and all/none) only; ellipse, lasso, wand and by-colour selections are G4. |
+| Palette editing as tape commands | §3.1, G1 q3, G3 | done | `edit.test.ts`, `edit.spec.ts` | `palette set <entry> hex=`, `palette add [<name>] hex= [key=]` edit the document's own copy; the project palette file is untouched. |
+| Notes pinned to pixels or regions | §1.3, §8.3, G3 | done | `edit.test.ts`, `edits.test.ts`, `edit.spec.ts` | `note x,y [WxH] "text" id=nK`, `note done nK`. In the state, `asset.json`, on the canvas (labels and outlines), in a Notes panel and in `changes`. |
+| Undo and redo per author from the UI | §1.3, G3 | done | `authors.test.ts`, `edits.test.ts`, `edit.spec.ts` (two people) | `undo by=<author>`, new `redo [group=\|by=]`. The agent's plain `undo` is unchanged. |
+| "Branch here" (`fork`) and the branching tape format | §7.2, §8.3, G3 | done | `authors.test.ts`, `edits.test.ts` (verify), `edit.spec.ts` | `fork <from> <to> at=<n>` after a copied prefix; documented in docs/commands.md. Also from MCP `run`. |
+| MCP `changes` | §8.2, G3 | done | `edits.test.ts`, `edit.spec.ts` (exactly the person's lines and note, then nothing new) | Per-agent read position in `reads.json`. Other authors' lines per asset, open notes, a diff text and image (saved path; becomes Claude's eye). |
+| Diff view (before/after, changed pixels marked) | §2 (3) | done | `diff.test.ts` (golden), `edits.test.ts` | Up to 60 changes as text; above that a third panel maps them. Notes outlined in yellow. |
+| Time travel snapshot cache | G2 notes, G3 | done | `authors.test.ts` (Timeline equals replay), `edit.spec.ts` (10,000 lines) | `Timeline` in core: a snapshot every 100 commands, in the page and the writer. On-disk checkpoints are still a stub. |
+| Virtualised tape list | G2 notes, G3 | done | `edit.spec.ts` (10,000 lines: load ~0.4 s, travel ~0.1 s, a stroke ~0.25 s; under 150 rows in the page) | Fixed row heights; long lines are cut with an ellipsis (the tooltip has the whole line). |
+| Two browsers editing at once | §1.2, G3 | done | `edit.spec.ts` (overlapping drags; both canvases equal core's replay; both tapes equal the server's) | |
+| Command line under the tape | §8.3 | done | `edit.spec.ts` | Runs commands as the page's author. |
+| Demo: the person fixes three pixels and leaves a note; `changes` returns them; the agent carries on | G3 | done | `edit.spec.ts` (same scenario), `examples/demo-g3-agent.ts --simulate` (run by hand) | `examples/demo-g3.md`; screenshots in `docs/screenshots/g3-*.png`. |
