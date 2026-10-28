@@ -21,3 +21,5 @@ export * from './anim.ts';
 export * from './gif.ts';
 export * from './schemes.ts';
 export * from './family.ts';
+export * from './map.ts';
+export { genLayout, routeCells, smoothCells } from './cmd-map.ts';

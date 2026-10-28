@@ -9,9 +9,10 @@ import { rgbOf, type Palette } from './palette.ts';
 import type { Pt } from './raster.ts';
 import { hasRoles } from './themes.ts';
 import { DEFAULT_MAP, composeMap, islandTerrain, layoutOf, mapSeam, schemeOf } from './family.ts';
+import { artGrid, cellFlag, composeMapDoc, inFootprint, mapChecks, variantMatch, type MapWorld } from './map.ts';
 import { rampsOf } from './values.ts';
 
-export const CHECK_IDS = ['palette', 'orphans', 'jaggies', 'banding', 'outline', 'seam', 'coverage', 'readability', 'revert', 'repetition', 'anim', 'views'] as const;
+export const CHECK_IDS = ['palette', 'orphans', 'jaggies', 'banding', 'outline', 'seam', 'coverage', 'readability', 'revert', 'repetition', 'anim', 'views', 'fit', 'variant', 'footprint', 'draworder'] as const;
 export type CheckId = (typeof CHECK_IDS)[number];
 
 export function isCheckId(s: string): s is CheckId {
@@ -99,6 +100,8 @@ export interface CheckContext {
   set?: { name: string; doc: Doc }[];
   /** revert: the reference asset the art must not simply copy. */
   ref?: Doc | null;
+  /** Maps and variants: the project's other assets, as a map reads them. */
+  world?: MapWorld;
 }
 
 type Params = Record<string, number | boolean>;
@@ -120,12 +123,19 @@ const DEFAULTS: Record<CheckId, { all: Params } & Partial<Record<string, Params>
   revert: { all: { max: 0.15 } },
   // The most visible stripe when tiled: a band of rows or columns lighter or darker than the
   // rest, ΔL* times the square root of its width.
-  repetition: { all: { max: 3 } },
+  repetition: { all: { max: 3 }, map: { edgeRun: 4, motif: 10 } },
   // Frame diff share (changed pixels over the silhouette; the pilot's good pairs changed 16-19 %),
   // pivot drift and ground drift in pixels, silhouette area jumps, and the loop seam.
   anim: { all: { minDiff: 0.08, maxDiff: 0.35, maxPivot: 1, maxGround: 0, maxArea: 0.15 }, tile: { minDiff: 0.03 }, family: { minDiff: 0.01 }, overlay: { minDiff: 0, maxDiff: 1 } },
   // Views must differ from each other (by colour, over both silhouettes) by at least this share.
   views: { all: { min: 0.2 } },
+  // Oversized assets: footprint cells drawn, overhangs marked as roofs.
+  fit: { all: { max: 0 } },
+  // A texture variant's colour mix against its base (the pilot's rule: L1 < 0.3, ΔL* < 2).
+  variant: { all: { maxL1: 0.3, maxDl: 2 } },
+  // Maps: footprints and draw order without problems.
+  footprint: { all: { max: 0 } },
+  draworder: { all: { max: 0 } },
 };
 
 /** A check's thresholds for a document kind: defaults, then the style guide's. */
@@ -1106,14 +1116,81 @@ function checkViews(img: Img, p: Params): CheckResult {
   });
 }
 
+// --- fit and variant (plan §4.10, §4.1)
+
+/** An oversized asset's fit: every footprint cell drawn, and art outside the footprint marked as a roof. */
+function checkFit(img: Img, p: Params): CheckResult {
+  const d = img.doc;
+  const [ac, ar] = artGrid(d);
+  if (d.family || d.overlay || d.kind === 'sheet') return skip('fit', `a ${d.kind} is not placed as one piece`);
+  if (!d.footprint && ac * ar === 1) return skip('fit', 'one cell, no footprint');
+  if (d.width % d.cellW || d.height % d.cellH) return skip('fit', `the canvas is not whole ${d.cellW}x${d.cellH} cells`);
+  const fp = d.footprint ?? { cols: ac, rows: ar, at: [0, 0] as [number, number], anchor: [0, ar - 1] as [number, number], flags: [] };
+  const groups: FlagGroup[] = [];
+  const ring = (cx: number, cy: number): Pt[] => {
+    const pts: Pt[] = [];
+    for (let i = 0; i < d.cellW; i++) pts.push([cx * d.cellW + i, cy * d.cellH], [cx * d.cellW + i, cy * d.cellH + d.cellH - 1]);
+    for (let j = 1; j < d.cellH - 1; j++) pts.push([cx * d.cellW, cy * d.cellH + j], [cx * d.cellW + d.cellW - 1, cy * d.cellH + j]);
+    return pts;
+  };
+  for (let cy = 0; cy < ar; cy++) for (let cx = 0; cx < ac; cx++) {
+    const pts: Pt[] = [];
+    for (let y = 0; y < d.cellH; y++) for (let x = 0; x < d.cellW; x++) if (img.px[(cy * d.cellH + y) * d.width + cx * d.cellW + x] !== TRANSPARENT) pts.push([cx * d.cellW + x, cy * d.cellH + y]);
+    if (inFootprint(fp, cx, cy) && !pts.length) groups.push({ label: `footprint cell ${cx},${cy} is empty`, pts: ring(cx, cy) });
+    if (!inFootprint(fp, cx, cy) && pts.length && !cellFlag(fp, cx, cy).roof) groups.push({ label: `cell ${cx},${cy} overhangs the footprint but is not a roof (r): actors behind would be drawn over it`, pts });
+  }
+  const n = groups.length, max = Number(p.max);
+  return result('fit', {
+    status: n <= max ? 'pass' : 'fail', score: n, shown: String(n), limit: `≤ ${max}`, groups,
+    detail: n ? groups.map((g) => g.label).join('; ') : `${ac}x${ar} cells, footprint ${fp.cols}x${fp.rows} at ${fp.at.join(',')} drawn${ac * ar > fp.cols * fp.rows ? ', overhangs are roofs' : ''}`,
+  });
+}
+
+/** A texture variant against its base: the colour mix (L1 of the colour shares, mean ΔL*), and how much of its border differs. */
+function checkVariant(img: Img, p: Params, ctx: CheckContext): CheckResult {
+  const d = img.doc;
+  if (!d.variantOf) return skip('variant', 'not a variant (variant of=<asset>)');
+  const base = ctx.world?.get(d.variantOf);
+  if (!base) return result('variant', { status: 'fail', score: null, shown: '?', limit: '', detail: `no asset '${d.variantOf}' to be a variant of` });
+  const m = variantMatch(base, d, ctx.frame ?? 0);
+  const ok = m.l1 < Number(p.maxL1) && m.dl < Number(p.maxDl);
+  return result('variant', {
+    status: ok ? 'pass' : 'fail', score: m.l1, shown: `${fmt(m.l1)} · ΔL* ${fmt(m.dl, 1)}`, limit: `< ${p.maxL1} · < ${p.maxDl}`,
+    groups: m.border.length ? [{ label: `border pixels unlike ${d.variantOf}'s (a seam where they meet, unless the textures blend)`, pts: m.border }] : [],
+    detail: `colour mix against ${d.variantOf}: L1 ${fmt(m.l1)}, ΔL* ${fmt(m.dl, 1)}${ok ? '' : ' (too different: on a map it reads as a patch)'}; ${m.border.length ? `${m.border.length} border pixels differ` : 'same border'}`,
+  });
+}
+
+const notMap = (id: CheckId) => (): CheckResult => skip(id, 'a map check (on map documents)');
+
 const RUNNERS: Record<CheckId, (img: Img, p: Params, ctx: CheckContext) => CheckResult> = {
   palette: checkPalette, orphans: checkOrphans, jaggies: checkJaggies, banding: checkBanding, outline: checkOutline,
   seam: checkSeam, coverage: checkCoverage, readability: checkReadability, revert: checkRevert, repetition: checkRepetition,
-  anim: checkAnim, views: checkViews,
+  anim: checkAnim, views: checkViews, fit: checkFit, variant: checkVariant, footprint: notMap('footprint'), draworder: notMap('draworder'),
 };
 
 /** Checks of the whole document (every frame at once); the others read one frame's image. */
-const WHOLE = new Set<CheckId>(['coverage', 'anim', 'views']);
+const WHOLE = new Set<CheckId>(['coverage', 'anim', 'views', 'footprint', 'draworder']);
+
+/** The checks of a map document (plan §4.11), over the map composed from the assets it names. */
+function runMapChecks(doc: Doc, ids: readonly CheckId[], ctx: CheckContext): CheckResult[] {
+  if (!ctx.world) return ids.map((id) => skip(id, 'a map is checked with the project\'s assets'));
+  const rep = checkParams('repetition', 'map', ctx.style, doc.name);
+  const seamP = checkParams('seam', 'map', ctx.style, doc.name);
+  const composed = composeMapDoc(doc, ctx.world);
+  const ms = mapChecks(doc, ctx.world, { edgeRun: Number(rep.edgeRun), motif: Number(rep.motif), seam: Number(seamP.max) }, composed);
+  return ids.map((id) => {
+    const p = checkParams(id, 'map', ctx.style, doc.name);
+    if (p.off === true) return skip(id, 'turned off in the style guide');
+    const m = ms.find((x) => x.id === id);
+    if (!m) return skip(id, 'checked on the assets the map names, not on the map');
+    return result(id, {
+      status: m.pass ? 'pass' : 'fail', score: m.score, shown: m.shown, limit: m.limitText, detail: m.detail,
+      groups: m.groups.map((g) => ({ label: g.label, pts: g.cells })),
+      ...(m.parts ? { parts: m.parts.map((x) => ({ name: x.name, value: x.value, limit: x.limit, pass: x.pass, detail: x.detail })) } : {}),
+    });
+  });
+}
 
 /** One check's results on several frames as one: the worst frame's score, every frame's pixels. */
 function mergeFrames(id: CheckId, rs: { f: number; r: CheckResult }[], note: string): CheckResult {
@@ -1135,6 +1212,7 @@ function mergeFrames(id: CheckId, rs: { f: number; r: CheckResult }[], note: str
  * off (`"off": true`) comes back as `skip`.
  */
 export function runChecks(doc: Doc, ids: readonly CheckId[] = CHECK_IDS, ctx: CheckContext = {}): CheckResult[] {
+  if (doc.map) return runMapChecks(doc, ids, ctx);
   let frames = ctx.frame !== undefined ? [ctx.frame] : Array.from({ length: doc.frameCount }, (_, f) => f);
   let note = '';
   if (frames.length > 1 && ctx.budget !== undefined && doc.width * doc.height * doc.frameCount > ctx.budget) {

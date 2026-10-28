@@ -5,7 +5,7 @@
 
 import { insertFrames, moveFrame, moveMap, removeFrame, viewOf } from './anim.ts';
 import { Args, fn, needDoc, registerCommand, type CommandSpec } from './commands.ts';
-import { TRANSPARENT, ctxOf, newLayer, remapCtx, setCtx, type Doc } from './doc.ts';
+import { TRANSPARENT, ctxOf, newLayer, remapCtx, setCtx, type Doc, type MapLayerInfo } from './doc.ts';
 import { DiagError, type ParsedCommand, type Token } from './parser.ts';
 
 const LAYER_RE = /^[A-Za-z][A-Za-z0-9_-]*$/;
@@ -53,10 +53,12 @@ function flagOpts(a: Args): { hidden?: boolean; locked?: boolean; reference?: bo
 
 const layerCmd: CommandSpec = {
   name: 'layer',
-  summary: 'layer <name> | layer add <name> [above=|below=<layer>] [reference] | layer set <name> [hidden=] [locked=] [reference=] | layer rename <name> <new> | layer move <name> above=|below=<layer> | layer merge <name> | layer remove <name>',
+  summary: 'layer <name> | layer add <name> [above=|below=<layer>] [reference] | (maps) layer add <name> terrain=<family> [outside=on|off] | tiles | objects | overlay=<overlay> on=<layer>|<layer>:out|all | layer set <name> [hidden=] [locked=] [reference=] | layer rename <name> <new> | layer move <name> above=|below=<layer> | layer merge <name> | layer remove <name>',
   normalise(cmd, ctx) {
     const doc = needDoc(cmd, ctx);
-    const a = new Args(cmd, ['above', 'below', 'hidden', 'locked', 'reference'], ['reference']);
+    const first = cmd.args[0];
+    const mapAdd = !!doc.map && first?.t === 'word' && first.v === 'add';
+    const a = new Args(cmd, ['above', 'below', 'hidden', 'locked', 'reference', 'terrain', 'outside', 'overlay', 'on'], mapAdd ? ['reference', 'tiles', 'objects'] : ['reference']);
     const how = a.take('word', 'a layer name, or add, set, rename, move, merge or remove');
     const noOpts = (except: string[] = []) => {
       for (const o of a.opts.values()) if (!except.includes(o.key)) throw new DiagError(o.line, o.col, `layer ${how.v} takes no ${o.key}=`);
@@ -72,16 +74,24 @@ const layerCmd: CommandSpec = {
     if (how.v === 'add') {
       const name = a.take('word', 'a name for the new layer');
       a.done();
-      noOpts(['above', 'below', 'flag']);
       checkNewName(doc, name);
+      let info: MapLayerInfo | undefined;
+      let what = '';
+      if (doc.map) {
+        info = mapLayerInfo(a, doc);
+        what = mapLayerText(info);
+        noOpts(['above', 'below', 'flag', 'terrain', 'outside', 'overlay', 'on']);
+      } else {
+        noOpts(['above', 'below', 'flag']);
+      }
       const where = placement(a, doc, doc.layers[ctxOf(doc, ctx.by).layer]!.name);
-      const ref = a.flags.length > 0;
+      const ref = !doc.map && a.flags.length > 0;
       return {
-        text: `layer add ${name.v} ${where.text}${ref ? ' reference' : ''}`,
+        text: `layer add ${name.v}${what} ${where.text}${ref ? ' reference' : ''}`,
         op: fn((d) => {
           const n = d.width * d.height;
           const order = d.layers.map((_, i) => i);
-          d.layers.push(newLayer(name.v, { reference: ref }));
+          d.layers.push(newLayer(name.v, { reference: ref, ...(info ? { map: info } : {}) }));
           d.cels.push(Array.from({ length: d.frameCount }, () => new Uint16Array(n).fill(TRANSPARENT)));
           order.splice(where.at, 0, d.layers.length - 1);
           reorder(d, order);
@@ -128,6 +138,7 @@ const layerCmd: CommandSpec = {
     if (how.v === 'merge') {
       a.done();
       noOpts();
+      if (doc.map) throw new DiagError(how.line, how.col, `layer merge: a map's layers hold different things; move or remove them instead`);
       if (i === 0) throw new DiagError(target.line, target.col, `layer merge: '${target.v}' is the bottom layer; there is nothing below to merge into`);
       const below = doc.layers[i - 1]!;
       if (below.locked) throw new DiagError(target.line, target.col, `layer merge: '${below.name}' below is locked`);
@@ -152,6 +163,40 @@ const layerCmd: CommandSpec = {
     return { text: `layer remove ${target.v}`, op: fn((d) => removeLayer(d, i)) };
   },
 };
+
+/** What a new map layer holds: terrain=<family> [outside=on|off], tiles, objects, or overlay=<overlay> on=<where>. */
+function mapLayerInfo(a: Args, doc: Doc): MapLayerInfo {
+  const ter = a.opts.get('terrain'), ov = a.opts.get('overlay');
+  const kinds = [ter ? 'terrain' : '', ov ? 'overlay' : '', ...a.flags.filter((f) => f.v === 'tiles' || f.v === 'objects').map((f) => f.v)].filter(Boolean);
+  if (kinds.length !== 1) throw new DiagError(a.cmd.line, a.cmd.col, `layer add: a map layer holds one thing: terrain=<family>, tiles, objects or overlay=<overlay> on=<where>`);
+  const ref = a.flags.find((f) => f.v === 'reference');
+  if (ref) throw new DiagError(ref.line, ref.col, `layer add: a map has no reference layers`);
+  const name = (v: string, o: { line: number; vcol: number }) => {
+    if (!/^[a-z][a-z0-9_-]*$/.test(v)) throw new DiagError(o.line, o.vcol, `'${v}' is not an asset name`);
+    return v;
+  };
+  for (const k of ['outside', 'on']) {
+    const o = a.opts.get(k);
+    if (o && !((k === 'outside' && ter) || (k === 'on' && ov))) throw new DiagError(o.line, o.col, `${k}= goes with ${k === 'outside' ? 'terrain=' : 'overlay='}`);
+  }
+  if (ter) return { kind: 'terrain', family: name(ter.value, ter), outside: a.choice('outside', ['on', 'off'], 'off') === 'on' };
+  if (ov) {
+    const on = a.opts.get('on');
+    const where = on?.value ?? 'all';
+    const [l, out] = where.split(':');
+    if (where !== 'all' && (!doc.layers.some((x) => x.name === l && x.map?.kind === 'terrain') || (out !== undefined && out !== 'out'))) {
+      throw new DiagError(on!.line, on!.vcol, `on= must be all, a terrain layer, or a terrain layer:out (terrain layers: ${doc.layers.filter((x) => x.map?.kind === 'terrain').map((x) => x.name).join(', ') || 'none'})`);
+    }
+    return { kind: 'overlay', overlay: name(ov.value, ov), on: where };
+  }
+  return { kind: kinds[0] as 'tiles' | 'objects' };
+}
+
+function mapLayerText(m: MapLayerInfo): string {
+  if (m.kind === 'terrain') return ` terrain=${m.family} outside=${m.outside ? 'on' : 'off'}`;
+  if (m.kind === 'overlay') return ` overlay=${m.overlay} on=${m.on}`;
+  return ` ${m.kind}`;
+}
 
 /** Drop a layer; authors on it move to the layer below (or the new bottom one). */
 function removeLayer(d: Doc, i: number): void {

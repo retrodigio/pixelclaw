@@ -3,7 +3,7 @@
 // and written down. Normalising a normalised line gives the same line back.
 
 import { syncMirrors, viewOf } from './anim.ts';
-import { DOC_KINDS, TRANSPARENT, createDoc, ctxOf, type Doc, type DocKind, type FamilyState, type OverlayState } from './doc.ts';
+import { DOC_KINDS, TRANSPARENT, createDoc, ctxOf, type Doc, type DocKind, type FamilyState, type MapState, type OverlayState } from './doc.ts';
 import { defaultOverlay, familyLayout, familyCell, syncFamily } from './family.ts';
 import { defaultInset, schemeNamed, BUILTIN_SCHEMES } from './schemes.ts';
 import { drawColoured, drawPoints, mirrored, targetOf } from './draw.ts';
@@ -47,7 +47,7 @@ export interface NormaliseContext {
 export type Op =
   | {
     k: 'new'; kind: DocKind; name: string; width: number; height: number; cellW: number; cellH: number; wrap: boolean; palette: Palette; bg: number;
-    family?: FamilyState; overlay?: OverlayState;
+    family?: FamilyState; overlay?: OverlayState; map?: MapState;
   }
   | { k: 'fork'; name: string }
   | { k: 'undo'; group: string }
@@ -178,6 +178,7 @@ export function needDoc(cmd: ParsedCommand, ctx: NormaliseContext): Doc {
 /** The document, for a command that draws on the author's layer: refused while that layer is locked. */
 export function drawable(cmd: ParsedCommand, ctx: NormaliseContext): Doc {
   const doc = needDoc(cmd, ctx);
+  if (doc.map) throw new DiagError(cmd.line, cmd.col, `${cmd.name}: a map holds tiles and objects by name, not pixels (terrain, place, move, road, scatter, map gen)`);
   const l = doc.layers[ctxOf(doc, ctx.by).layer]!;
   if (l.locked) throw new DiagError(cmd.line, cmd.col, `layer '${l.name}' is locked (layer set ${l.name} locked=off to draw on it)`);
   const f = ctxOf(doc, ctx.by).frame;
@@ -224,10 +225,10 @@ export const shiftPts = (pts: Pt[], dx: number, dy: number): Pt[] => (dx || dy ?
 
 const newCmd: CommandSpec = {
   name: 'new',
-  summary: 'new <kind> <name> <W>x<H> [palette=<name>] [wrap=on|off] [cell=<W>x<H>] [bg=<colour>|none] [<< palette rows >>]   (new family <name> <T>x<T> scheme=<scheme> [map=<C>x<R>]: an autotile family of T px tiles)',
+  summary: 'new <kind> <name> <W>x<H> [palette=<name>] [wrap=on|off] [cell=<W>x<H>] [bg=<colour>|none] [<< palette rows >>]   (new family <name> <T>x<T> scheme=<scheme> [map=<C>x<R>]: an autotile family of T px tiles; new map <name> <C>x<R> [tile=<T>]: a map of C x R cells of T px)',
   normalise(cmd, ctx) {
     if (ctx.doc) throw new DiagError(cmd.line, cmd.col, `new must be the first command of a tape (this document already exists)`);
-    const a = new Args(cmd, ['palette', 'wrap', 'cell', 'bg', 'scheme', 'map']);
+    const a = new Args(cmd, ['palette', 'wrap', 'cell', 'bg', 'scheme', 'map', 'tile']);
     const kindTok = a.take('word', `a kind (${DOC_KINDS.join(', ')})`);
     if (!DOC_KINDS.includes(kindTok.v as DocKind)) throw new DiagError(kindTok.line, kindTok.col, `unknown kind '${kindTok.v}' (kinds: ${DOC_KINDS.join(', ')})`);
     const kind = kindTok.v as DocKind;
@@ -272,7 +273,10 @@ const newCmd: CommandSpec = {
     const schemeOpt = a.opts.get('scheme');
     const mapOpt = a.opts.get('map');
     let family: FamilyState | undefined;
+    let map: MapState | undefined;
     let width = size.w, height = size.h, extra = '';
+    const tileOpt = a.opts.get('tile');
+    if (tileOpt && kind !== 'map') throw new DiagError(tileOpt.line, tileOpt.col, `tile= is for new map`);
     if (kind === 'family') {
       // The size is the tile's; the canvas is the sheet (plan §4.2).
       if (size.w !== size.h || size.w % 2 || size.w < 4 || size.w > 256) throw new DiagError(size.line, size.col, `a family's tiles are square, even and 4..256 px (${size.w}x${size.h})`);
@@ -294,15 +298,28 @@ const newCmd: CommandSpec = {
         mapCols: mc, mapRows: mr, terrain: new Uint8Array(),
       };
       extra = ` scheme=${scheme.name}${mc ? ` map=${mc}x${mr}` : ''}`;
+    } else if (kind === 'map') {
+      // The size is in cells; the canvas is the grid of cells (plan §4.11).
+      if (size.w > 512 || size.h > 512) throw new DiagError(size.line, size.col, `a map is at most 512x512 cells`);
+      for (const o of [schemeOpt, mapOpt, cellOpt, a.opts.get('wrap'), bgOpt]) if (o) throw new DiagError(o.line, o.col, `new map takes no ${o.key}= (its cells are tile= px)`);
+      let tile = 24;
+      if (tileOpt) {
+        if (!/^\d+$/.test(tileOpt.value) || Number(tileOpt.value) < 4 || Number(tileOpt.value) > 256) throw new DiagError(tileOpt.line, tileOpt.vcol, `tile= must be the cell size in pixels, 4..256`);
+        tile = Number(tileOpt.value);
+      }
+      cellW = 1; cellH = 1;
+      map = { tile, entries: [] };
+      extra = ` tile=${tile}`;
     } else {
       for (const o of [schemeOpt, mapOpt]) if (o) throw new DiagError(o.line, o.col, `${o.key}= is for new family`);
     }
-    const head = `new ${kind} ${nameTok.v} ${size.w}x${size.h}${extra} palette=${palette.name} wrap=${wrap ? 'on' : 'off'} cell=${cellW}x${cellH} bg=${bg.name}`;
+    const head = map ? `new map ${nameTok.v} ${size.w}x${size.h}${extra} palette=${palette.name}`
+      : `new ${kind} ${nameTok.v} ${size.w}x${size.h}${extra} palette=${palette.name} wrap=${wrap ? 'on' : 'off'} cell=${cellW}x${cellH} bg=${bg.name}`;
     return {
       text: lang >= 2 ? `${head} <<\n${blockText(paletteRows(palette))}>>` : head,
       op: {
         k: 'new', kind, name: nameTok.v, width, height, cellW, cellH, wrap, palette, bg: bg.index,
-        ...(family ? { family } : {}), ...(kind === 'overlay' ? { overlay: defaultOverlay() } : {}),
+        ...(family ? { family } : {}), ...(map ? { map } : {}), ...(kind === 'overlay' ? { overlay: defaultOverlay() } : {}),
       },
     };
   },

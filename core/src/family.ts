@@ -479,9 +479,10 @@ export function overlayPeriod(o: Doc): number {
   return st.mode === 'sparkle' ? loop + st.rest : loop;
 }
 
-/** Which frame of an overlay a tile shows at a tick (null: none at this moment). */
-function overlayFrame(o: Doc, tx: number, ty: number, tick: number): number | null {
+/** Which frame of an overlay a tile shows at a tick (null: none at this moment, or no instance on this tile). */
+export function overlayFrameAt(o: Doc, tx: number, ty: number, tick: number): number | null {
   const st = o.overlay!;
+  if (hash32(st.seed, tx, ty) % st.every !== 0) return null;
   const q = overlaySeq(o);
   const loop = Math.max(1, loopTicks(o, q));
   if (st.mode === 'cycle' || st.mode === 'pingpong') return frameAtTick(o, q, tick);
@@ -489,6 +490,19 @@ function overlayFrame(o: Doc, tx: number, ty: number, tick: number): number | nu
   const period = loop + st.rest;
   const local = (tick + (hash32(st.seed, tx, ty, 7) % period)) % period;
   return local < loop ? frameAtTick(o, q, local) : null;
+}
+
+/** Draw one instance of an overlay's frame on the tile tx,ty of a map of t px tiles: put(x, y, colour) per pixel. */
+export function drawOverlayAt(o: Doc, f: number, tx: number, ty: number, t: number, put: (x: number, y: number, c: number) => void, flat?: Uint16Array): void {
+  const st = o.overlay!;
+  const px = flat ?? flatten(o, f);
+  const r = hash32(st.seed, tx, ty, 1);
+  const ox = (st.anchor ? st.anchor[0] : Math.floor((t - o.width) / 2)) + (st.spread[0] ? (r % (2 * st.spread[0] + 1)) - st.spread[0] : 0);
+  const oy = (st.anchor ? st.anchor[1] : Math.floor((t - o.height) / 2)) + (st.spread[1] ? ((r >>> 8) % (2 * st.spread[1] + 1)) - st.spread[1] : 0);
+  for (let y = 0; y < o.height; y++) for (let x = 0; x < o.width; x++) {
+    const c = px[y * o.width + x]!;
+    if (c !== TRANSPARENT) put(tx * t + ox + x, ty * t + oy + y, c);
+  }
 }
 
 /** Draw overlays onto a map image at a tick (in place). */
@@ -503,19 +517,10 @@ export function drawOverlays(img: MapImage, items: Doc[], tick: number, fam: Doc
       const tx = i % cols, ty = Math.floor(i / cols);
       const inside = v !== null && s?.variants[v]!.on !== 'face';
       if ((st.on === 'outside' && inside) || (st.on === 'inside' && !inside)) return;
-      if (hash32(st.seed, tx, ty) % st.every !== 0) return;
-      const f = overlayFrame(o, tx, ty, tick);
+      const f = overlayFrameAt(o, tx, ty, tick);
       if (f === null) return;
-      const px = flats.get(f) ?? flats.set(f, flatten(o, f)).get(f)!;
-      const r = hash32(st.seed, tx, ty, 1);
-      const ox = (st.anchor ? st.anchor[0] : Math.floor((img.t - o.width) / 2)) + (st.spread[0] ? (r % (2 * st.spread[0] + 1)) - st.spread[0] : 0);
-      const oy = (st.anchor ? st.anchor[1] : Math.floor((img.t - o.height) / 2)) + (st.spread[1] ? ((r >>> 8) % (2 * st.spread[1] + 1)) - st.spread[1] : 0);
-      for (let y = 0; y < o.height; y++) for (let x = 0; x < o.width; x++) {
-        const c = px[y * o.width + x]!;
-        if (c === TRANSPARENT) continue;
-        const X = tx * img.t + ox + x, Y = ty * img.t + oy + y;
-        if (X >= 0 && Y >= 0 && X < img.w && Y < img.h) img.px[Y * img.w + X] = c;
-      }
+      const flat = flats.get(f) ?? flats.set(f, flatten(o, f)).get(f)!;
+      drawOverlayAt(o, f, tx, ty, img.t, (X, Y, c) => { if (X >= 0 && Y >= 0 && X < img.w && Y < img.h) img.px[Y * img.w + X] = c; }, flat);
     });
   }
 }

@@ -11,3 +11,4 @@ import './cmd-stamps.ts';
 import './cmd-macros.ts';
 import './cmd-anim.ts';
 import './cmd-family.ts';
+import './cmd-map.ts';

@@ -14,6 +14,7 @@
 
 import type { CheckContext, CheckStyle } from './checks.ts';
 import type { Doc } from './doc.ts';
+import { mapWorld } from './map.ts';
 import type { Palette } from './palette.ts';
 import { BUILTIN_THEMES, themeFromJson, type Theme } from './themes.ts';
 
@@ -109,6 +110,7 @@ export function checkContextFor(
     ctx: {
       frame: o.frame, style, ground: ground?.doc ?? null, ref: ref?.doc ?? null,
       set: setOf(name, doc, assets, json, o.set).map((a) => ({ name: a.name, doc: a.doc })),
+      ...(doc.map || doc.variantOf ? { world: mapWorld(assets) } : {}),
     },
     problems,
   };

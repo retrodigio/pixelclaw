@@ -10,8 +10,52 @@ import type { Geometry } from './schemes.ts';
 /** The pixel value for "no colour". Palette entry i is stored as i. */
 export const TRANSPARENT = 0xffff;
 
-export type DocKind = 'tile' | 'sprite' | 'sheet' | 'icon' | 'family' | 'overlay';
-export const DOC_KINDS: readonly DocKind[] = ['tile', 'sprite', 'sheet', 'icon', 'family', 'overlay'];
+export type DocKind = 'tile' | 'sprite' | 'sheet' | 'icon' | 'family' | 'overlay' | 'object' | 'map';
+export const DOC_KINDS: readonly DocKind[] = ['tile', 'sprite', 'sheet', 'icon', 'family', 'overlay', 'object', 'map'];
+
+/**
+ * An asset's footprint on a map (plan §4.10): `cols` x `rows` grid cells of its art grid (the
+ * canvas in cells), starting at art cell `at` (default: the bottom-left of the art), placed by
+ * its `anchor` cell (within the footprint). `flags` has a row per art cell row, a character per
+ * art cell: `.` nothing, `b` blocks movement, `r` roof or canopy (drawn above actors), `x` both.
+ * Footprint cells that do not block are walkable.
+ */
+export interface Footprint {
+  cols: number;
+  rows: number;
+  at: [number, number];
+  anchor: [number, number];
+  flags: string[];
+}
+
+/** What a map layer holds (plan §4.11). Terrain layers hold 1 where their family's terrain is. */
+export type MapLayerInfo =
+  | { kind: 'terrain'; family: string; outside: boolean }
+  | { kind: 'tiles' }
+  | { kind: 'objects' }
+  | { kind: 'overlay'; overlay: string; on: string };
+
+/** A thing a map places by name: a tile, a family's variant, an object; with the footprint it was placed with. */
+export interface MapEntry {
+  name: string;
+  /** A family's variant placed by name (shore.ns), else null. */
+  variant: string | null;
+  cols: number;
+  rows: number;
+  anchor: [number, number];
+}
+
+/**
+ * A map document (plan §4.11): its canvas is the grid of cells (one 'pixel' per cell), each
+ * layer's cels hold what is in each cell (terrain: 1; tiles and objects: an entry index at the
+ * anchor cell). The art is read from the assets it names when it is drawn, so a map redraws
+ * itself when a tile changes, and its tape never reads another asset.
+ */
+export interface MapState {
+  /** Pixels per cell. */
+  tile: number;
+  entries: MapEntry[];
+}
 
 /**
  * An autotile family (plan §4.2): a sheet of the scheme's variants, with the two textures the
@@ -65,6 +109,8 @@ export interface Layer {
   hidden: boolean;
   locked: boolean;
   reference: boolean;
+  /** A map's layer: what it holds (never changed in place, so copies may share it). */
+  map?: MapLayerInfo;
 }
 
 /** A note pinned to a pixel (1x1) or a region, for whoever reads the tape next (plan §1.3). */
@@ -161,6 +207,19 @@ export interface Doc {
   ground: number | null;
   family: FamilyState | null;
   overlay: OverlayState | null;
+  /** Where the asset stands on a map (null: its whole art grid, placed by the bottom-left cell). */
+  footprint: Footprint | null;
+  /** The asset this one is a texture variant of (plan §4.1): maps pick among an asset and its variants per cell. */
+  variantOf: string | null;
+  map: MapState | null;
+}
+
+export function cloneFootprint(f: Footprint): Footprint {
+  return { ...f, at: [f.at[0], f.at[1]], anchor: [f.anchor[0], f.anchor[1]], flags: [...f.flags] };
+}
+
+export function cloneMap(m: MapState): MapState {
+  return { tile: m.tile, entries: m.entries.map((e) => ({ ...e, anchor: [e.anchor[0], e.anchor[1]] })) };
 }
 
 export function newLayer(name: string, o: Partial<Layer> = {}): Layer {
@@ -169,11 +228,12 @@ export function newLayer(name: string, o: Partial<Layer> = {}): Layer {
 
 export function createDoc(o: {
   kind: DocKind; name: string; width: number; height: number; cellW: number; cellH: number;
-  wrap: boolean; palette: Palette; bg: number; family?: FamilyState | null; overlay?: OverlayState | null;
+  wrap: boolean; palette: Palette; bg: number; family?: FamilyState | null; overlay?: OverlayState | null; map?: MapState | null;
 }): Doc {
   const pixels = new Uint16Array(o.width * o.height).fill(o.bg);
   // A family draws its textures on 'ground' and its band on 'band' (see family.ts).
-  const layers = o.family ? [newLayer('ground'), newLayer('band')] : [newLayer('main')];
+  // A map starts with one layer of tiles placed by name.
+  const layers = o.family ? [newLayer('ground'), newLayer('band')] : o.map ? [newLayer('floor', { map: { kind: 'tiles' } })] : [newLayer('main')];
   const cels = o.family ? [[pixels], [new Uint16Array(o.width * o.height).fill(TRANSPARENT)]] : [[pixels]];
   return {
     kind: o.kind, name: o.name, width: o.width, height: o.height, cellW: o.cellW, cellH: o.cellH,
@@ -182,6 +242,7 @@ export function createDoc(o: {
     ctx: {}, home: { layer: o.family ? 1 : 0, frame: 0 }, notes: [], stamps: {}, macros: {},
     ticks: [DEFAULT_TICKS], tags: [], views: [], pivot: null, ground: null,
     family: o.family ? cloneFamily(o.family) : null, overlay: o.overlay ? cloneOverlay(o.overlay) : null,
+    footprint: null, variantOf: null, map: o.map ? cloneMap(o.map) : null,
   };
 }
 
@@ -231,6 +292,7 @@ export function cloneDoc(d: Doc): Doc {
     ctx: Object.fromEntries(Object.entries(d.ctx).map(([k, v]) => [k, cloneCtx(v)])),
     home: { ...d.home },
     family: d.family ? cloneFamily(d.family) : null, overlay: d.overlay ? cloneOverlay(d.overlay) : null,
+    footprint: d.footprint ? cloneFootprint(d.footprint) : null, map: d.map ? cloneMap(d.map) : null,
     notes: d.notes.map((n) => ({ ...n })),
     stamps: Object.fromEntries(Object.entries(d.stamps).map(([k, s]) => [k, { ...s, px: s.px.slice() }])),
     macros: Object.fromEntries(Object.entries(d.macros).map(([k, m]) => [k, { params: [...m.params], body: m.body }])),
@@ -336,7 +398,7 @@ export function serializeDoc(d: Doc): Uint8Array {
       name: d.palette.name, entries: d.palette.entries.map((e) => (e.role ? [e.key, e.name, e.hex, e.role] : [e.key, e.name, e.hex])),
       ramps: sortedKeys(d.palette.ramps).map((k) => [k, d.palette.ramps[k]]), locked: d.paletteLocked,
     },
-    layers: d.layers.map((l) => [l.name, l.hidden, l.locked, l.reference]), frameCount: d.frameCount,
+    layers: d.layers.map((l) => (l.map ? [l.name, l.hidden, l.locked, l.reference, mapLayerJson(l.map)] : [l.name, l.hidden, l.locked, l.reference])), frameCount: d.frameCount,
     home: [d.home.layer, d.home.frame],
     notes: d.notes.map((m) => [m.id, m.x, m.y, m.w, m.h, m.text]),
     ctx: authors.map((a) => {
@@ -363,6 +425,9 @@ export function serializeDoc(d: Doc): Uint8Array {
     ...(d.overlay ? {
       overlay: { mode: d.overlay.mode, on: d.overlay.on, anchor: d.overlay.anchor, spread: d.overlay.spread, every: d.overlay.every, rest: d.overlay.rest, seed: d.overlay.seed },
     } : {}),
+    ...(d.footprint ? { footprint: [d.footprint.cols, d.footprint.rows, d.footprint.at, d.footprint.anchor, d.footprint.flags] } : {}),
+    ...(d.variantOf ? { variantOf: d.variantOf } : {}),
+    ...(d.map ? { map: { tile: d.map.tile, entries: d.map.entries.map((e) => [e.name, e.variant, e.cols, e.rows, e.anchor]) } } : {}),
   });
   const head = utf8('PCLAWDOC 2\n' + header + '\n');
   const n = d.width * d.height;
@@ -389,7 +454,7 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
   type Header = {
     kind: DocKind; name: string; width: number; height: number; cellW: number; cellH: number; wrap: boolean;
     palette: { name: string; entries: ([string, string, string] | [string, string, string, Role])[]; ramps: [string, string[]][]; locked: boolean };
-    layers: [string, boolean, boolean, boolean][]; frameCount: number; home: [number, number]; notes: [string, number, number, number, number, string][];
+    layers: ([string, boolean, boolean, boolean] | [string, boolean, boolean, boolean, string[]])[]; frameCount: number; home: [number, number]; notes: [string, number, number, number, number, string][];
     ctx: [string, number, number, boolean, [number | null, number | null] | null, [string, string | number] | null][];
     stamps: [string, number, number][]; macros: [string, string[], string][];
     anim?: {
@@ -398,6 +463,9 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
     };
     family?: { scheme: string; tile: number; inset: number; radius: number; bands: [number, number | 'outside' | 'inside'][]; detached: string[]; map: [number, number]; terrain: string };
     overlay?: OverlayState;
+    footprint?: [number, number, [number, number], [number, number], string[]];
+    variantOf?: string;
+    map?: { tile: number; entries: [string, string | null, number, number, [number, number]][] };
   };
   const h = JSON.parse(utf8Decode(bytes.subarray(magic.length, nl))) as Header;
   let o = nl + 1;
@@ -427,7 +495,7 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
       ramps: Object.fromEntries(h.palette.ramps),
     },
     paletteLocked: h.palette.locked,
-    layers: h.layers.map(([name, hidden, locked, reference]) => ({ name, hidden, locked, reference })),
+    layers: h.layers.map(([name, hidden, locked, reference, m]) => (m ? { name, hidden, locked, reference, map: mapLayerFromJson(m) } : { name, hidden, locked, reference })),
     frameCount: h.frameCount, cels, ctx, home: { layer: h.home[0], frame: h.home[1] },
     notes: h.notes.map(([id, x, y, w, nh, text]) => ({ id, x, y, w, h: nh, text })),
     stamps, macros: Object.fromEntries(h.macros.map(([m, params, body]) => [m, { params, body }])),
@@ -440,7 +508,24 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
       detached: h.family.detached, mapCols: h.family.map[0], mapRows: h.family.map[1], terrain: Uint8Array.from([...h.family.terrain].map(Number)),
     } : null,
     overlay: h.overlay ?? null,
+    footprint: h.footprint ? { cols: h.footprint[0], rows: h.footprint[1], at: h.footprint[2], anchor: h.footprint[3], flags: h.footprint[4] } : null,
+    variantOf: h.variantOf ?? null,
+    map: h.map ? { tile: h.map.tile, entries: h.map.entries.map(([name, variant, cols, rows, anchor]) => ({ name, variant, cols, rows, anchor })) } : null,
   };
+}
+
+function mapLayerJson(m: MapLayerInfo): string[] {
+  switch (m.kind) {
+    case 'terrain': return ['terrain', m.family, m.outside ? 'outside' : ''];
+    case 'overlay': return ['overlay', m.overlay, m.on];
+    default: return [m.kind];
+  }
+}
+
+function mapLayerFromJson(a: string[]): MapLayerInfo {
+  if (a[0] === 'terrain') return { kind: 'terrain', family: a[1]!, outside: a[2] === 'outside' };
+  if (a[0] === 'overlay') return { kind: 'overlay', overlay: a[1]!, on: a[2]! };
+  return { kind: a[0] as 'tiles' | 'objects' };
 }
 
 /**
@@ -450,7 +535,7 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
  */
 export function serializeDocV1(d: Doc): Uint8Array | null {
   const authors = Object.keys(d.ctx);
-  if (hasAnim(d) || d.family || d.overlay || d.paletteLocked || d.home.layer || d.home.frame || d.frameCount !== 1 || d.layers.length !== 1 || Object.keys(d.stamps).length || Object.keys(d.macros).length) return null;
+  if (hasAnim(d) || d.family || d.overlay || d.footprint || d.variantOf || d.map || d.paletteLocked || d.home.layer || d.home.frame || d.frameCount !== 1 || d.layers.length !== 1 || Object.keys(d.stamps).length || Object.keys(d.macros).length) return null;
   const l = d.layers[0]!;
   if (l.hidden || l.locked || l.reference) return null;
   if (authors.length > 1 || authors.some((a) => d.ctx[a]!.mirror || d.ctx[a]!.brush || d.ctx[a]!.layer || d.ctx[a]!.frame)) return null;
