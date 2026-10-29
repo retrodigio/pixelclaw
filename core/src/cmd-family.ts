@@ -198,7 +198,8 @@ function bandCmd(a: Args, doc: Doc, f: FamilyState, ctx: NormaliseContext): { te
       const t = fam.tile;
       const L = layoutOf(fam);
       const maps = bandMaps(s, t, geometry);
-      const pieces = s.pieces.map((p) => s.byName.get(p)!);
+      // Face pieces are the face's own art, drawn by hand outside the terrain: the band leaves them (G13).
+      const pieces = s.pieces.map((p) => s.byName.get(p)!).filter((v) => s.variants[v]!.on !== 'face');
       const seen = new Set<Uint16Array>();
       for (const cel of d.cels[bl]!) {
         if (seen.has(cel)) continue;

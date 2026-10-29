@@ -24,6 +24,14 @@ rect @cell(face_o) 0,0 ${T}x5 c=rust fill
 rect @cell(face_ew) 0,0 ${T}x5 c=rust fill`).doc!;
   const grass = run(EMPTY, `new tile grass ${T}x${T}\nrect 0,0 ${T}x${T} c=stone fill`).doc!;
 
+  it('a later family band keeps the face pieces\' art', () => {
+    const again = run({ doc: cliff, entries: [] } as AssetState, 'family band 2:outside 1:ink 1:moss').doc!;
+    const [cx, cy] = layoutOf(again.family!).cells[BUILTIN_SCHEMES.get('face')!.byName.get('face_o')!]!;
+    const bl = again.layers.findIndex((l) => l.name === 'band');
+    const rust = again.palette.entries.findIndex((e) => e.name === 'rust');
+    expect(again.cels[bl]![0]![(cy * T + 2) * again.width + cx * T + 3]).toBe(rust);
+  });
+
   for (const outside of ['on', 'off']) {
     it(`a face below the terrain is drawn with outside=${outside}`, () => {
       const docs = { cliff, grass };
