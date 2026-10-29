@@ -50,20 +50,37 @@ function modeColour(d: Doc, frame: number, cx: number, cy: number, t: number): n
 /**
  * `family band from=<family>`: the band of another family of the same scheme and tile (its
  * geometry, detached variants and band layer), copied into the line so replay never reads it.
- * The line as written: `family band from=<f> <bands> radius= inset= [fillet=] [jitter= seed=]
- * detached=<a,b|none> frames=<n> << the band layer's sheet rows, frame after frame >>`.
+ * Only the cells the family does not assemble are recorded (G14): its pieces, its detached
+ * variants and any other cell with band art; the variants built from the pieces' quadrants are
+ * built again after the line, so they come out as the source's. The line as written:
+ * `family band from=<f> <bands> radius= inset= [fillet=] [jitter= seed=] detached=<a,b|none>
+ * frames=<n> cells=<names|none> << each recorded cell's rows side by side, frame after frame >>`
+ * (a cell is named by its variant, `inside`, `outside`, or `<cx>:<cy>` for a spare cell). The
+ * older form without cells= (the whole band layer's sheet rows) still replays.
  */
 function bandFrom(a: Args, doc: Doc, f: FamilyState, ctx: NormaliseContext): { text: string; run: (d: Doc) => void } {
   const from = a.opts.get('from')!;
   const L = layoutOf(f);
+  const s = schemeOf(f);
   const t = f.tile;
   const sheetH = L.mapRow * t;
   const W = doc.width;
   const keyOf = new Map(doc.palette.entries.map((e, i) => [i, e.key]));
-  let geometryText: string, detached: string[], frames: number, rows: string[];
   const items = a.rest();
   const blk = items.at(-1)?.t === 'block' ? items.pop() as Extract<typeof items[number], { t: 'block' }> : null;
-  if (!blk) {
+  /** The sheet's cells by name, and the name of each. */
+  const cellName = (cx: number, cy: number): string => {
+    if (cx === L.inside[0] && cy === L.inside[1]) return 'inside';
+    if (cx === L.outside[0] && cy === L.outside[1]) return 'outside';
+    const v = L.cells.findIndex(([x, y]) => x === cx && y === cy);
+    return v >= 0 ? s.variants[v]!.name : `${cx}:${cy}`;
+  };
+  const cellAt = (name: string): [number, number] | null => {
+    const m = /^(\d+):(\d+)$/.exec(name);
+    if (m) return Number(m[1]) < W / t && Number(m[2]) < L.mapRow ? [Number(m[1]), Number(m[2])] : null;
+    return familyCell(f, name);
+  };
+  if (!blk && !a.opts.get('cells')) {
     if (items.length) throw new DiagError(items[0]!.line, items[0]!.col, `family band from=: the band comes from '${from.value}' (give nothing else)`);
     onlyOpts(a, 'family band from=', ['from']);
     const src = ctx.asset?.(from.value);
@@ -73,15 +90,27 @@ function bandFrom(a: Args, doc: Doc, f: FamilyState, ctx: NormaliseContext): { t
     const g = sf.geometry;
     const name = (fill: BandFill) => (fill === 'outside' || fill === 'inside' ? fill : src.palette.entries[fill]!.name);
     for (const b of g.bands) if (typeof b.fill === 'number' && !doc.palette.entries.some((e) => e.name === name(b.fill))) throw new DiagError(from.line, from.vcol, `family band: '${from.value}' uses ${name(b.fill)}, which palette '${doc.palette.name}' does not have`);
-    geometryText = `${g.bands.map((b) => `${b.w}:${name(b.fill)}`).join(' ')} radius=${g.radius} inset=${g.inset}${g.fillet !== undefined ? ` fillet=${g.fillet}` : ''}${g.jitter ? ` jitter=${g.jitter.px} seed=${g.jitter.seed}` : ''}`;
-    detached = sf.detached;
-    frames = Math.min(src.frameCount, doc.frameCount);
+    const geometryText = `${g.bands.map((b) => `${b.w}:${name(b.fill)}`).join(' ')} radius=${g.radius} inset=${g.inset}${g.fillet !== undefined ? ` fillet=${g.fillet}` : ''}${g.jitter ? ` jitter=${g.jitter.px} seed=${g.jitter.seed}` : ''}`;
+    const detached = sf.detached;
+    const frames = Math.min(src.frameCount, doc.frameCount);
     const sbl = layerIndex(src, BAND_LAYER);
-    rows = [];
-    for (let fr = 0; fr < frames; fr++) for (let y = 0; y < sheetH; y++) {
+    // The cells to record: every cell of the sheet the family does not assemble, with band art on some frame.
+    const det = new Set(detached);
+    const SL = layoutOf(sf);
+    const assembled = new Set(s.variants.map((v, i) => (s.sources[i] && !det.has(v.name) ? `${SL.cells[i]![0]},${SL.cells[i]![1]}` : '')).filter(Boolean));
+    const at = (fr: number, x: number, y: number) => (sbl >= 0 ? src.cels[sbl]![fr]![y * src.width + x]! : TRANSPARENT);
+    const cells: [number, number][] = [];
+    for (let cy = 0; cy < L.mapRow; cy++) for (let cx = 0; cx < W / t; cx++) {
+      if (assembled.has(`${cx},${cy}`)) continue;
+      let any = false;
+      for (let fr = 0; fr < frames && !any; fr++) for (let y = 0; y < t && !any; y++) for (let x = 0; x < t; x++) if (at(fr, cx * t + x, cy * t + y) !== TRANSPARENT) { any = true; break; }
+      if (any) cells.push([cx, cy]);
+    }
+    const rows: string[] = [];
+    for (let fr = 0; fr < frames; fr++) for (let y = 0; y < t; y++) {
       let row = '';
-      for (let x = 0; x < W; x++) {
-        const v = sbl >= 0 ? src.cels[sbl]![fr]![y * src.width + x]! : TRANSPARENT;
+      for (const [cx, cy] of cells) for (let x = 0; x < t; x++) {
+        const v = at(fr, cx * t + x, cy * t + y);
         if (v === TRANSPARENT) { row += '.'; continue; }
         const k = doc.palette.entries.findIndex((e) => e.name === src.palette.entries[v]!.name);
         if (k < 0) throw new DiagError(from.line, from.vcol, `family band: '${from.value}' uses ${src.palette.entries[v]!.name}, which palette '${doc.palette.name}' does not have`);
@@ -90,15 +119,15 @@ function bandFrom(a: Args, doc: Doc, f: FamilyState, ctx: NormaliseContext): { t
       rows.push(row);
     }
     // Replay reads the line, so it goes through the parser as written.
-    const text = `band from=${from.value} ${geometryText} detached=${detached.length ? detached.join(',') : 'none'} frames=${frames} <<\n${blockText(rows)}>>`;
+    const text = `band from=${from.value} ${geometryText} detached=${detached.length ? detached.join(',') : 'none'} frames=${frames} cells=${cells.length ? cells.map(([x, y]) => cellName(x, y)).join(',') : 'none'}${cells.length ? ` <<\n${blockText(rows)}>>` : ''}`;
     const re = parse(`family ${text}`);
     if (re.errors.length || re.commands.length !== 1) throw new DiagError(from.line, from.vcol, `family band from=: ${re.errors[0]?.message ?? 'could not record the band'}`);
-    const a2 = new Args(re.commands[0]!, ['radius', 'inset', 'fillet', 'jitter', 'draw', 'from', 'frame', 'seed', 'copies', 'fill', 'textures', 'detached', 'frames']);
+    const a2 = new Args(re.commands[0]!, ['radius', 'inset', 'fillet', 'jitter', 'draw', 'from', 'frame', 'seed', 'copies', 'fill', 'textures', 'detached', 'frames', 'cells']);
     a2.take('word', 'band');
     return bandFrom(a2, doc, f, ctx);
   }
   // The recorded line: geometry from the band items, the layer from the rows.
-  onlyOpts(a, 'family band from=', ['from', 'radius', 'inset', 'fillet', 'jitter', 'seed', 'detached', 'frames']);
+  onlyOpts(a, 'family band from=', ['from', 'radius', 'inset', 'fillet', 'jitter', 'seed', 'detached', 'frames', 'cells']);
   const bands: Band[] = [];
   const parts: string[] = [];
   for (const it of items) {
@@ -116,12 +145,24 @@ function bandFrom(a: Args, doc: Doc, f: FamilyState, ctx: NormaliseContext): { t
   const seed = jit ? intOpt(a, 'seed', 1, 0x7fffffff, 1) : 0;
   const det = a.opts.get('detached')?.value ?? 'none';
   const detachedList = det === 'none' ? [] : det.split(',');
-  const s = schemeOf(f);
   for (const n of detachedList) if (!s.byName.has(n)) throw new DiagError(a.opts.get('detached')!.line, a.opts.get('detached')!.vcol, `${s.name} has no variant '${n}'`);
   const nf = intOpt(a, 'frames', 1, doc.frameCount, 1);
-  if (blk.rows.length !== nf * sheetH || blk.rows.some((r) => r.text.length !== W)) throw new DiagError(blk.line, blk.col, `family band from=: the rows must be ${nf} frame${nf === 1 ? '' : 's'} of ${W}x${sheetH}`);
+  const co = a.opts.get('cells');
+  // cells=: only those cells' rows, side by side; without it, the whole sheet (the G13 form).
+  const cells: [number, number][] = [];
+  if (co && co.value !== 'none') for (const n of co.value.split(',')) {
+    const c = cellAt(n);
+    if (!c) throw new DiagError(co.line, co.vcol, `family band from=: '${n}' is not a cell of the sheet (a variant, inside, outside or <cx>:<cy>)`);
+    cells.push(c);
+  }
+  const rowW = co ? cells.length * t : W, nRows = co ? (cells.length ? nf * t : 0) : nf * sheetH;
+  const rowsIn = blk?.rows ?? [];
+  if (rowsIn.length !== nRows || rowsIn.some((r) => r.text.length !== rowW)) {
+    const at = blk ?? co!;
+    throw new DiagError(at.line, at.col, `family band from=: the rows must be ${nf} frame${nf === 1 ? '' : 's'} of ${rowW}x${co ? t : sheetH}${co ? ` (the ${cells.length} cells side by side)` : ''}`);
+  }
   const keyIndex = new Map(doc.palette.entries.map((e, i) => [e.key, i]));
-  const px = blk.rows.map((r) => [...r.text].map((ch, k) => {
+  const px = rowsIn.map((r) => [...r.text].map((ch, k) => {
     if (ch === '.') return TRANSPARENT;
     const v = keyIndex.get(ch);
     if (v === undefined) throw new DiagError(r.line, r.col + k, `'${ch}' is not a key in palette '${doc.palette.name}'`);
@@ -129,7 +170,7 @@ function bandFrom(a: Args, doc: Doc, f: FamilyState, ctx: NormaliseContext): { t
   }));
   const geometry = { inset, radius, bands, ...(fillet !== undefined ? { fillet } : {}), ...(jit ? { jitter: { px: jit, seed } } : {}) };
   return {
-    text: `band from=${from.value} ${parts.join(' ')} radius=${radius} inset=${inset}${fillet !== undefined ? ` fillet=${fillet}` : ''}${jit ? ` jitter=${jit} seed=${seed}` : ''} detached=${det} frames=${nf} <<\n${blockText(blk.rows.map((r) => r.text))}>>`,
+    text: `band from=${from.value} ${parts.join(' ')} radius=${radius} inset=${inset}${fillet !== undefined ? ` fillet=${fillet}` : ''}${jit ? ` jitter=${jit} seed=${seed}` : ''} detached=${det} frames=${nf}${co ? ` cells=${co.value}` : ''}${rowsIn.length ? ` <<\n${blockText(rowsIn.map((r) => r.text))}>>` : ''}`,
     run: (d) => {
       const fam = d.family!;
       fam.geometry = geometry;
@@ -142,7 +183,12 @@ function bandFrom(a: Args, doc: Doc, f: FamilyState, ctx: NormaliseContext): { t
         const cel = d.cels[bl]![fr]!;
         if (seen.has(cel)) continue;
         seen.add(cel);
-        for (let y = 0; y < sheetH; y++) for (let x = 0; x < W; x++) cel[y * W + x] = px[fr * sheetH + y]![x]!;
+        if (!co) { for (let y = 0; y < sheetH; y++) for (let x = 0; x < W; x++) cel[y * W + x] = px[fr * sheetH + y]![x]!; continue; }
+        // The recorded cells; every other cell is cleared, and the family builds its variants again after the line.
+        cel.fill(TRANSPARENT, 0, sheetH * W);
+        cells.forEach(([cx, cy], k) => {
+          for (let y = 0; y < t; y++) for (let x = 0; x < t; x++) cel[(cy * t + y) * W + cx * t + x] = px[fr * t + y]![k * t + x]!;
+        });
       }
     },
   };
@@ -281,7 +327,7 @@ const familyCmd: CommandSpec = {
     'family detach|attach <variant>|all | family coverage [seed=<n>] [copies=<n>] [fill=on|off] | family cut [textures=on|off]',
   normalise(cmd, ctx) {
     const { doc, f } = familyOf(cmd, ctx);
-    const a = new Args(cmd, ['radius', 'inset', 'fillet', 'jitter', 'draw', 'from', 'frame', 'seed', 'copies', 'fill', 'textures', 'detached', 'frames']);
+    const a = new Args(cmd, ['radius', 'inset', 'fillet', 'jitter', 'draw', 'from', 'frame', 'seed', 'copies', 'fill', 'textures', 'detached', 'frames', 'cells']);
     noFlags(a);
     const how = a.take('word', 'band, texture, detach, attach, coverage or cut');
     const s = schemeOf(f);

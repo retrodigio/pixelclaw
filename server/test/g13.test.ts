@@ -173,7 +173,7 @@ family band 1:outside 1:stone5 1:soil1`, by: 'claude' }));
     expect(ground('shore_b')).toEqual(before);
     expect(ground('shore_b')).not.toEqual(ground('shore'));
     const last = w.history({ asset: 'shore_b', last: 1 }).entries[0]!;
-    expect(last.cmd).toMatch(/^family band from=shore 1:outside 1:ink 2:soil1 radius=1 inset=0 detached=none frames=1 <<\n/);
+    expect(last.cmd).toMatch(/^family band from=shore 1:outside 1:ink 2:soil1 radius=1 inset=0 detached=none frames=1 cells=\S+ <<\n/);
     // The variant's tape replays alone (the band is in the line).
     const r = replay(w.state('shore_b').entries, _ps(p));
     expect(r.problems).toEqual([]);
