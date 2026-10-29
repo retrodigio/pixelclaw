@@ -47,7 +47,7 @@ function modeColour(d: Doc, frame: number, cx: number, cy: number, t: number): n
   return best;
 }
 
-function bandCmd(a: Args, doc: Doc, f: FamilyState): { text: string; run: (d: Doc) => void } {
+function bandCmd(a: Args, doc: Doc, f: FamilyState, ctx: NormaliseContext): { text: string; run: (d: Doc) => void } {
   const items = a.rest();
   if (!items.length) throw new DiagError(a.cmd.line, a.cmd.col, `family band: give the band from the edge in, as <width>:<colour|outside|inside> (e.g. 3:outside 1:foam 2:sand1)`);
   const bands: Band[] = [];
@@ -69,7 +69,7 @@ function bandCmd(a: Args, doc: Doc, f: FamilyState): { text: string; run: (d: Do
     parts.push(`${w}:${name}`);
   }
   const fillets = !!schemeOf(f).fillets;
-  onlyOpts(a, 'family band', fillets ? ['radius', 'inset', 'draw', 'fillet'] : ['radius', 'inset', 'draw']);
+  onlyOpts(a, 'family band', fillets ? ['radius', 'inset', 'draw', 'fillet', 'jitter', 'seed'] : ['radius', 'inset', 'draw', 'jitter', 'seed']);
   const h = f.tile / 2;
   const radius = intOpt(a, 'radius', 0, h, 0);
   const inset = intOpt(a, 'inset', 0, h - 1, f.geometry.inset);
@@ -80,9 +80,13 @@ function bandCmd(a: Args, doc: Doc, f: FamilyState): { text: string; run: (d: Do
   }
   // A fillet scheme rounds inner corners: by what the family had, else the band's width, unless told.
   const fillet = fillets ? intOpt(a, 'fillet', 1, h, f.geometry.fillet ?? Math.min(h, total || 1)) : undefined;
-  const geometry = { inset, radius, bands, ...(fillet !== undefined ? { fillet } : {}) };
+  // Jitter: band edges move in and out by up to n px (a seeded field that repeats every tile).
+  const jitter = intOpt(a, 'jitter', 0, Math.max(0, h - inset - total - radius), 0);
+  if (!jitter && a.opts.get('seed')) throw new DiagError(a.opts.get('seed')!.line, a.opts.get('seed')!.col, `family band: seed= goes with jitter=`);
+  const seed = jitter ? (a.opts.get('seed') ? intOpt(a, 'seed', 1, 0x7fffffff, 1) : ctx.newSeed()) : 0;
+  const geometry = { inset, radius, bands, ...(fillet !== undefined ? { fillet } : {}), ...(jitter ? { jitter: { px: jitter, seed } } : {}) };
   return {
-    text: `band ${parts.join(' ')} radius=${radius} inset=${inset}${fillet !== undefined ? ` fillet=${fillet}` : ''} draw=${draw ? 'on' : 'off'}`,
+    text: `band ${parts.join(' ')} radius=${radius} inset=${inset}${fillet !== undefined ? ` fillet=${fillet}` : ''}${jitter ? ` jitter=${jitter} seed=${seed}` : ''} draw=${draw ? 'on' : 'off'}`,
     run: (d) => {
       const fam = d.family!;
       fam.geometry = geometry;
@@ -175,12 +179,12 @@ const familyCmd: CommandSpec = {
     'family detach|attach <variant>|all | family coverage [seed=<n>] [copies=<n>] [fill=on|off] | family cut [textures=on|off]',
   normalise(cmd, ctx) {
     const { doc, f } = familyOf(cmd, ctx);
-    const a = new Args(cmd, ['radius', 'inset', 'fillet', 'draw', 'from', 'frame', 'seed', 'copies', 'fill', 'textures']);
+    const a = new Args(cmd, ['radius', 'inset', 'fillet', 'jitter', 'draw', 'from', 'frame', 'seed', 'copies', 'fill', 'textures']);
     noFlags(a);
     const how = a.take('word', 'band, texture, detach, attach, coverage or cut');
     const s = schemeOf(f);
     if (how.v === 'band') {
-      const r = bandCmd(a, doc, f);
+      const r = bandCmd(a, doc, f, ctx);
       return { text: `family ${r.text}`, op: fn((d) => r.run(d)) };
     }
     if (how.v === 'texture') {

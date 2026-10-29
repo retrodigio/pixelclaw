@@ -10,6 +10,7 @@ import face from '../schemes/face.json' with { type: 'json' };
 import path from '../schemes/path.json' with { type: 'json' };
 import single from '../schemes/single.json' with { type: 'json' };
 import wang16 from '../schemes/wang16-corner.json' with { type: 'json' };
+import { Pcg32 } from './pcg.ts';
 
 /** Neighbourhood bits. Corner schemes use the diagonal bits for a tile's own corners. */
 export const NB = { N: 1, NE: 2, E: 4, SE: 8, S: 16, SW: 32, W: 64, NW: 128 } as const;
@@ -228,6 +229,11 @@ export interface Geometry {
    * cell, in pixels; every contour round an inner corner is then an arc this much wider (unset: 0).
    */
   fillet?: number;
+  /**
+   * Edges that are not ruler-straight (G13): every band edge moves in or out by up to `jitter`
+   * pixels, by a smooth field that repeats every tile (so the tiles still join), from `seed`.
+   */
+  jitter?: { px: number; seed: number };
   bands: Band[];
 }
 
@@ -296,8 +302,10 @@ function belowRound(base: BaseKind, U: number, V: number, K: number, F: number):
  * Which band a pixel of a quadrant lies in: -1 outside the terrain, 0..n-1 a band, n inside past
  * the band (n = the number of bands).
  */
-export function bandAt(spec: QuadSpec, t: number, q: Quad, x: number, y: number, g: Geometry): number {
-  const [U, V] = uv(t, q, spec.face, x, y, g.inset);
+export function bandAt(spec: QuadSpec, t: number, q: Quad, x: number, y: number, g: Geometry, Ju = 0, Jv = 0): number {
+  const [U0, V0] = uv(t, q, spec.face, x, y, g.inset);
+  // The jitter moves the pixel deeper or shallower: every band edge moves with it, in order.
+  const U = U0 - Ju, V = V0 - Jv;
   const F = 2 * (g.fillet ?? 0);
   if (F > 0 || spec.base === 'vround' || spec.base === 'hround' || spec.base === 'fillet') {
     if (spec.base !== 'outer' && spec.base !== 'in' && spec.base !== 'out' && spec.base !== 'vert' && spec.base !== 'horiz') {
@@ -328,11 +336,37 @@ export const quadOf = (t: number, x: number, y: number): Quad => (((y >= t / 2 ?
  */
 export function bandMap(s: Scheme, v: number, t: number, g: Geometry): Int8Array {
   const out = new Int8Array(t * t);
+  const J = g.jitter && g.jitter.px > 0 ? jitterField(t, g.jitter.px, g.jitter.seed) : null;
   for (let y = 0; y < t; y++) for (let x = 0; x < t; x++) {
     const q = quadOf(t, x, y);
-    out[y * t + x] = bandAt(s.quadSpecs[v]![q]!, t, q, x, y, g);
+    out[y * t + x] = bandAt(s.quadSpecs[v]![q]!, t, q, x, y, g, J ? J.u[y]! : 0, J ? J.v[x]! : 0);
   }
   return out;
+}
+
+/**
+ * The band's jitter over one tile, in doubled pixels (-2px..2px): along x for horizontal edges
+ * (`v`, by column) and along y for vertical ones (`u`, by row), so each column (row) still crosses
+ * every band once. Value noise on a lattice about five pixels apart that wraps at the tile's
+ * edges, interpolated in integers: the same in every tile and continuous across tile edges, so
+ * neighbouring tiles' bands still meet.
+ */
+export function jitterField(t: number, px: number, seed: number): { u: Int32Array; v: Int32Array } {
+  const L = Math.max(2, Math.floor(t / 5));
+  const g = new Pcg32(seed, 11);
+  const line = () => {
+    const lat = Array.from({ length: L }, () => g.nextInt(4 * px + 1) - 2 * px);
+    const out = new Int32Array(t);
+    for (let x = 0; x < t; x++) {
+      // The pixel's centre at (x + 1/2) L / t lattice cells, in units of 1 / 2t.
+      const ux = (2 * x + 1) * L, s = 2 * t;
+      const i = Math.floor(ux / s), f = ux - i * s;
+      out[x] = Math.round((lat[i % L]! * (s - f) + lat[(i + 1) % L]! * f) / s);
+    }
+    return out;
+  };
+  const v = line();
+  return { u: line(), v };
 }
 
 /** A scheme's default inset for a tile size. */

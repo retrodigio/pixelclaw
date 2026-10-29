@@ -492,6 +492,7 @@ export function serializeDoc(d: Doc): Uint8Array {
       family: {
         scheme: d.family.scheme, tile: d.family.tile, inset: d.family.geometry.inset, radius: d.family.geometry.radius,
         ...(d.family.geometry.fillet !== undefined ? { fillet: d.family.geometry.fillet } : {}),
+        ...(d.family.geometry.jitter ? { jitter: [d.family.geometry.jitter.px, d.family.geometry.jitter.seed] } : {}),
         bands: d.family.geometry.bands.map((b) => [b.w, b.fill]), detached: d.family.detached, map: [d.family.mapCols, d.family.mapRows],
         terrain: Array.from(d.family.terrain).join(''),
         ...(d.family.def ? { def: d.family.def } : {}),
@@ -543,7 +544,7 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
       ticks: number[]; tags: [string, number, number, Loop][]; views: [string, number, number, string | null][];
       pivot: [number, number] | null; ground: number | null; links: [number, number, number][];
     };
-    family?: { scheme: string; tile: number; inset: number; radius: number; fillet?: number; bands: [number, number | 'outside' | 'inside'][]; detached: string[]; map: [number, number]; terrain: string; def?: SchemeJson };
+    family?: { scheme: string; tile: number; inset: number; radius: number; fillet?: number; jitter?: [number, number]; bands: [number, number | 'outside' | 'inside'][]; detached: string[]; map: [number, number]; terrain: string; def?: SchemeJson };
     overlay?: OverlayState;
     footprint?: [number, number, [number, number], [number, number], string[]];
     variantOf?: string;
@@ -593,7 +594,7 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
     views: (h.anim?.views ?? []).map(([name, from, to, mirror]) => ({ name, from, to, mirror })),
     pivot: h.anim?.pivot ?? null, ground: h.anim?.ground ?? null,
     family: h.family ? {
-      scheme: h.family.scheme, tile: h.family.tile, geometry: { inset: h.family.inset, radius: h.family.radius, bands: h.family.bands.map(([w, fill]) => ({ w, fill })), ...(h.family.fillet !== undefined ? { fillet: h.family.fillet } : {}) },
+      scheme: h.family.scheme, tile: h.family.tile, geometry: { inset: h.family.inset, radius: h.family.radius, bands: h.family.bands.map(([w, fill]) => ({ w, fill })), ...(h.family.fillet !== undefined ? { fillet: h.family.fillet } : {}), ...(h.family.jitter ? { jitter: { px: h.family.jitter[0], seed: h.family.jitter[1] } } : {}) },
       detached: h.family.detached, mapCols: h.family.map[0], mapRows: h.family.map[1], terrain: Uint8Array.from([...h.family.terrain].map(Number)),
       ...(h.family.def ? { def: h.family.def } : {}),
     } : null,

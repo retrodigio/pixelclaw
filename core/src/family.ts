@@ -84,7 +84,7 @@ const masks = new Map<string, Int8Array[]>();
 
 /** Every variant's band map (cached: they depend only on the scheme, the tile size and the geometry). */
 export function bandMaps(s: Scheme, t: number, g: Geometry): Int8Array[] {
-  const key = `${s.name}|${t}|${g.inset}|${g.radius}|${g.fillet ?? ''}|${g.bands.map((b) => `${b.w}:${b.fill}`).join(',')}`;
+  const key = `${s.name}|${t}|${g.inset}|${g.radius}|${g.fillet ?? ''}|${g.jitter ? `${g.jitter.px}:${g.jitter.seed}` : ''}|${g.bands.map((b) => `${b.w}:${b.fill}`).join(',')}`;
   let m = masks.get(key);
   if (!m) {
     m = s.variants.map((_, v) => bandMap(s, v, t, g));
