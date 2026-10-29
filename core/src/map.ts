@@ -9,7 +9,7 @@
 
 import { frameAtTick, loopTicks, playOrder, sequences } from './anim.ts';
 import { TRANSPARENT, flatten, type Doc, type Footprint, type MapEntry, type MapLayerInfo } from './doc.ts';
-import { bandMaps, drawOverlayAt, hash32, layoutOf, mapSeam, overlayFrameAt, schemeOf, showsOutside, type MapImage } from './family.ts';
+import { GROUND_LAYER, bandMaps, drawOverlayAt, hash32, layoutOf, mapSeam, overlayFrameAt, schemeOf, showsOutside, type MapImage } from './family.ts';
 import { luma601, lstar } from './checks.ts';
 import type { Rgba } from './png.ts';
 import type { Pt } from './raster.ts';
@@ -240,6 +240,25 @@ export function composeMapDoc(d: Doc, world: MapWorld, o: ComposeOptions = {}): 
       }
     }
   };
+  /** A family's art without its ground layer (the textures): what a face piece draws. */
+  const faces = new Map<Doc, Map<number, Uint16Array>>();
+  const faceArt = (x: Doc) => {
+    const f = frameOf(x, tick);
+    let byF = faces.get(x);
+    if (!byF) faces.set(x, (byF = new Map()));
+    let a = byF.get(f);
+    if (!a) {
+      const map = pal.of(x);
+      a = new Uint16Array(x.width * x.height).fill(TRANSPARENT);
+      x.layers.forEach((l, li) => {
+        if (l.hidden || l.reference || l.underlay || l.name === GROUND_LAYER) return;
+        const cel = x.cels[li]![f]!;
+        for (let i = 0; i < cel.length; i++) if (cel[i] !== TRANSPARENT) a![i] = map[cel[i]!]!;
+      });
+      byF.set(f, a);
+    }
+    return a;
+  };
   const missing = new Set<string>();
   const need = (name: string): Doc[] => {
     const fam = world.family(name);
@@ -281,7 +300,11 @@ export function composeMapDoc(d: Doc, world: MapWorld, o: ComposeOptions = {}): 
         const f = pick(fam, x, y, li);
         const L = layoutOf(f.family!);
         const [cx, cy] = v === null ? L.outside : L.cells[v]!;
-        if (v !== null && s.variants[v]!.on && !info.outside) {
+        if (v !== null && s.variants[v]!.on === 'face' && !info.outside) {
+          // A face is art in a cell outside the terrain: all of it is drawn, whatever the layer's
+          // fill (G13); only the outside texture laid under it is left to the layers below.
+          blit(faceArt(f), f.width, cx * t, cy * t, t, t, x * t, y * t);
+        } else if (v !== null && s.variants[v]!.on && !info.outside) {
           // A fillet or a face in a cell outside the terrain, on a layer that leaves the outside
           // to the layers below: only its terrain pixels.
           const m = bandMaps(s, t, f.family!.geometry)[v]!;
