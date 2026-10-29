@@ -2,14 +2,14 @@
 // nothing; `seeds` tries a generator line with several seeds and ranks them by the checks.
 
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { BAND_LAYER, GROUND_LAYER, layoutOf, createRgba, encodePng, replay, serializeDoc } from '@pixelclaw/core';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { serve, type Served } from '../src/serve.ts';
-import { Writer, createProject, loadProject, paletteSource as _ps, readCostLog } from '../src/index.ts';
+import { ProjectError, Writer, createProject, loadProject, paletteSource as _ps, readCostLog, scrub, type FetchLike } from '../src/index.ts';
 import { BIN, PALETTE, type Content } from './spawn.ts';
 
 const texts = (c: Content) => c.filter((x) => x.type === 'text').map((x) => x.text).join('\n');
@@ -187,5 +187,52 @@ family band 1:outside 1:stone5 1:soil1`, by: 'claude' }));
     expect(w.run({ asset: 'shore_b', commands: 'layer band\npx @cell(o) 1,1 c=ink', by: 'claude' }).ok).toBe(false);
     ok(w.run({ asset: 'shore_b', commands: 'variant of=shore band=own\nfamily band 1:outside 1:ink', by: 'claude' }));
     expect(ok(w.run({ asset: 'shore', commands: 'family band 1:outside 1:stone5 1:soil1', by: 'claude' })).followed).toBeUndefined();
+  });
+});
+
+describe('item 9: no part of the key is written; input image tokens are priced', () => {
+  const KEY = 'sk-proj-PLANTEDfake0123456789abcdefWXYZ';
+  /** Every window of 4 characters of the key's start or end, and its middle runs of 6. */
+  const parts = [...Array.from({ length: KEY.length - 3 }, (_, i) => KEY.slice(i, i + 6)).filter((x) => x.length === 6), KEY.slice(-4), KEY.slice(0, 8)];
+  const files = (dir: string): string[] => readdirSync(dir).flatMap((f) => { const q = join(dir, f); return statSync(q).isDirectory() ? files(q) : [q]; });
+  const leaks = (dir: string, texts: string[]) => [
+    ...files(dir).flatMap((f) => { const b = readFileSync(f, 'latin1'); return parts.filter((x) => b.includes(x)).map((x) => `${f}: ${x}`); }),
+    ...texts.flatMap((t) => parts.filter((x) => t.includes(x)).map((x) => `message: ${x}`)),
+  ];
+  const answer = (status: number, body: string): FetchLike => async () => ({ ok: false, status, json: async () => JSON.parse(body), text: async () => body });
+
+  it('a 401 that echoes the key masked (first and last characters) leaves nothing of it', async () => {
+    const p = createProject(join(root, 'k9.pclaw'), { palettes: [JSON.parse(readFileSync(PALETTE, 'utf8'))] });
+    const w = new Writer(p, { now: () => '2026-10-29T09:00:00Z' });
+    expect(w.run({ commands: 'new sheet yard 24x16', by: 'claude' }).ok).toBe(true);
+    const masked = `${KEY.slice(0, 8)}${'*'.repeat(24)}${KEY.slice(-4)}`;
+    const bodies = [
+      JSON.stringify({ error: { message: `Incorrect API key provided: ${masked}. You can find your API key at https://platform.openai.com/account/api-keys.`, type: 'invalid_request_error', code: 'invalid_api_key' } }),
+      JSON.stringify({ error: { message: `The key ending in ${KEY.slice(-6)} was revoked` } }),
+      `<html>401 for key ${KEY.slice(0, 12)}…</html>`,
+    ];
+    const messages: string[] = [];
+    for (const b of bodies) {
+      const err = await w.runAsync({ asset: 'yard', commands: 'underlay generate "a yard"', by: 'claude' }, { env: { OPENAI_API_KEY: KEY }, fetch: answer(401, b) }).catch((e: Error) => e);
+      expect(err).toBeInstanceOf(ProjectError);
+      messages.push((err as Error).message);
+    }
+    expect(messages[0]).toContain('OpenAI answered 401: Incorrect API key provided: [key]');
+    expect(leaks(p.dir, messages)).toEqual([]);
+    expect(readCostLog(p).map((l) => l.ok)).toEqual([false, false, false]);
+    expect(scrub(`x ${KEY.slice(-5)} y`, KEY)).toBe('x [key] y');
+  });
+
+  it('an edit\'s estimate includes the layout image\'s input tokens, and the cap holds them', async () => {
+    const p = createProject(join(root, 'c9.pclaw'), { palettes: [JSON.parse(readFileSync(PALETTE, 'utf8'))] });
+    const w = new Writer(p, { now: () => '2026-10-29T09:00:00Z' });
+    expect(w.run({ commands: 'new sheet yard 24x16\nlayer add plan\nrect 0,0 12x16 c=moss2 fill', by: 'claude' }).ok).toBe(true);
+    let sent = 0;
+    const f: FetchLike = async () => { sent++; return { ok: false, status: 500, json: async () => ({}), text: async () => '' }; };
+    // 0.05 for the image alone would pass a 0.055 cap; with the layout's 1105 input tokens at $8 a million it does not.
+    await expect(w.runAsync({ asset: 'yard', commands: 'underlay generate "a yard" layout=plan cap=0.055', by: 'claude' }, { env: { OPENAI_API_KEY: KEY }, fetch: f })).rejects.toThrow(/about \$0\.059, over the cap of \$0\.06|about \$0\.059, over the cap/);
+    expect(sent).toBe(0);
+    const log = readCostLog(p);
+    expect(log[0]!.estimate).toBeCloseTo(0.05 + (1105 * 8 + 2 * 5) / 1e6, 9);
   });
 });

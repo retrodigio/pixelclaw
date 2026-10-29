@@ -90,7 +90,7 @@ describe('underlay generate through the OpenAI provider (a fake client)', () => 
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     const line = r.added[0]!.cmd;
-    expect(line).toMatch(/^underlay mockup blob=[0-9a-f]{64} image=1536x1024 at=0,0 size=24x16 layout=[0-9a-f]{64} prompt="mossy ruins around a pool, a pixel art draft" provider=openai model=gpt-image-1\.5 quality=medium cost=0\.05$/);
+    expect(line).toMatch(/^underlay mockup blob=[0-9a-f]{64} image=1536x1024 at=0,0 size=24x16 layout=[0-9a-f]{64} prompt="mossy ruins around a pool, a pixel art draft" provider=openai model=gpt-image-1\.5 quality=medium cost=0\.0369$/);
     // An edit of the layout, sent to the edits endpoint with the key in the header only.
     expect(sent).toHaveLength(1);
     expect(sent[0]!.url).toBe('https://api.openai.com/v1/images/edits');
@@ -99,7 +99,10 @@ describe('underlay generate through the OpenAI provider (a fake client)', () => 
     expect(sent[0]!.body).toMatch(/model=gpt-image-1\.5\nprompt=mossy ruins/);
     const log = readCostLog(p);
     expect(log).toHaveLength(1);
-    expect(log[0]).toMatchObject({ ok: true, provider: 'openai', model: 'gpt-image-1.5', quality: 'medium', size: '1536x1024', estimate: 0.05, cap: 0.25 });
+    // G13: the estimate adds the layout's input image tokens (1105 at $8 a million) and the prompt's;
+    // the line's cost is the usage as billed (40 text, 360 image in, 1056 out at $5, $8, $32).
+    expect(log[0]).toMatchObject({ ok: true, provider: 'openai', model: 'gpt-image-1.5', quality: 'medium', size: '1536x1024', cap: 0.25, actual: (40 * 5 + 360 * 8 + 1056 * 32) / 1e6 });
+    expect(log[0]!.estimate).toBeCloseTo(0.05 + (1105 * 8 + 11 * 5) / 1e6, 9);
     expect(log[0]!.usage).toBeTruthy();
     expect(leaks(p.dir, [JSON.stringify(r), line])).toEqual([]);
     // Usage priced by tokens when the table has token prices (gpt-image-1: $5 text, $10 image in, $40 out per million).

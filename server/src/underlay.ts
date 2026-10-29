@@ -76,10 +76,32 @@ export interface Provider {
   generate(req: ImageRequest, e: ProviderEnv): Promise<ImageResult>;
 }
 
-/** Replace every occurrence of a secret in a message (errors from a provider may echo a request). */
+/**
+ * Take every part of a secret out of a message (errors from a provider may echo a request, or the
+ * key masked with its first and last characters showing, as OpenAI's 401 does): the key, anything
+ * shaped like an API key (sk-…, masked or not), and any run of four or more of the key's own
+ * first or last characters. Nothing of the key is ever written anywhere (G13).
+ */
 export function scrub(msg: string, secret: string | undefined): string {
-  if (!secret || secret.length < 4) return msg;
-  return msg.split(secret).join('[key]');
+  let out = msg.replace(/\b(sk|rk|pk)-[A-Za-z0-9_*\-.]{2,}/g, '[key]').replace(/\*{4,}[A-Za-z0-9_-]*/g, '[key]');
+  if (!secret) return out;
+  out = out.split(secret).join('[key]');
+  for (let n = secret.length - 1; n >= 4; n--) {
+    for (const part of [secret.slice(0, n), secret.slice(-n)]) if (out.includes(part)) out = out.split(part).join('[key]');
+  }
+  return out;
+}
+
+/**
+ * Input image tokens for an image (as OpenAI counts them for vision input): scaled to fit 2048,
+ * the short side to 768, then 170 tokens per 512 px tile plus 85.
+ */
+export function imageInputTokens(w: number, h: number): number {
+  let s = Math.min(1, 2048 / Math.max(w, h));
+  let W = w * s, H = h * s;
+  s = Math.min(1, 768 / Math.min(W, H));
+  W *= s; H *= s;
+  return 85 + 170 * Math.ceil(W / 512) * Math.ceil(H / 512);
 }
 
 export const OPENAI_URL = 'https://api.openai.com/v1';
@@ -225,7 +247,8 @@ export interface PriceEntry {
 /**
  * Estimates for OpenAI's image models (US dollars per image; check https://openai.com/api/pricing/
  * and override in project.json `underlay.prices`). An edit also pays for the layout image's input
- * tokens, which the usage-based cost (when the answer reports usage) includes.
+ * tokens: the estimate adds them (imageIn per million tokens), and the usage-based cost (when the
+ * answer reports usage) has them as billed.
  */
 export const DEFAULT_PRICES: Record<string, PriceEntry> = {
   'gpt-image-1.5': {
@@ -234,6 +257,7 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
       medium: { '1024x1024': 0.034, '1536x1024': 0.05, '1024x1536': 0.05 },
       high: { '1024x1024': 0.133, '1536x1024': 0.2, '1024x1536': 0.2 },
     },
+    tokens: { textIn: 5, imageIn: 8, imageOut: 32 },
   },
   'gpt-image-1': {
     image: {
@@ -249,6 +273,7 @@ export const DEFAULT_PRICES: Record<string, PriceEntry> = {
       medium: { '1024x1024': 0.011, '1536x1024': 0.015, '1024x1536': 0.015 },
       high: { '1024x1024': 0.036, '1536x1024': 0.052, '1024x1536': 0.052 },
     },
+    tokens: { textIn: 2, imageIn: 2.5, imageOut: 8 },
   },
   draft: { image: { low: {}, medium: {}, high: {} } },
 };
@@ -265,11 +290,20 @@ export interface UnderlayConfig {
   prices?: Record<string, PriceEntry>;
 }
 
-/** The estimated cost of one image (null when the price table has no entry for it). */
-export function estimateCost(provider: string, model: string, quality: string, size: string, prices: Record<string, PriceEntry>): number | null {
+/**
+ * The estimated cost of one image (null when the price table has no entry for it): the image,
+ * plus for an edit the input tokens of the image sent (and the prompt's, about 4 characters a
+ * token) at the model's token prices.
+ */
+export function estimateCost(provider: string, model: string, quality: string, size: string, prices: Record<string, PriceEntry>, input?: { image?: [number, number] | null; prompt?: string }): number | null {
   if (provider === 'fake') return 0;
   const q = prices[model]?.image?.[quality];
-  return q?.[size] ?? null;
+  const out = q?.[size];
+  if (out === undefined) return null;
+  const t = prices[model]?.tokens;
+  const imageIn = input?.image ? imageInputTokens(input.image[0], input.image[1]) * (t?.imageIn ?? 0) : 0;
+  const textIn = input?.prompt ? Math.ceil(input.prompt.length / 4) * (t?.textIn ?? 0) : 0;
+  return out + (imageIn + textIn) / 1e6;
 }
 
 /** The cost from reported usage, when the price table has token prices for the model. */
@@ -439,7 +473,7 @@ export async function resolveUnderlays(p: Project, text: string, o: ResolveOptio
     const cap = capRaw !== undefined ? Number(capRaw) : DEFAULT_CAP;
     if (!Number.isFinite(cap) || cap < 0) throw new ProjectError(`${where}: cap= is US dollars, like 0.25`);
     const sizeKey = `${size[0]}x${size[1]}`;
-    const estimate = estimateCost(providerName, model, quality, sizeKey, prices);
+    const estimate = estimateCost(providerName, model, quality, sizeKey, prices, { image: layoutImg ? size : null, prompt });
     const base = { at: o.now, provider: providerName, model, quality, size: sizeKey, layout: layoutBlob, prompt, estimate, cap };
     if (estimate === null) {
       logCost(p, { ...base, ok: false, error: 'no price for this model, quality and size' });
