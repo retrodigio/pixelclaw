@@ -5,9 +5,34 @@
 
 import {
   BUILTIN_THEMES, CHECK_IDS, TapeCursor, Timeline, activeGroups, checkContextFor, runChecks, type AssetDoc, type CheckId, type CheckResult, type Diag,
-  type Doc, type Palette, type PaletteSource, type StyleJson, type TapeEntry, type Theme,
+  type Doc, type Palette, type PaletteSource, type StyleJson, type TapeEntry, type Theme, type WorkRequest,
 } from '@pixelclaw/core';
-import { HUMAN_RE, type Eye, type ServerMessage, type Snapshot } from '@pixelclaw/server/protocol';
+import { HUMAN_RE, type Eye, type PersonRequest, type ServerMessage, type Snapshot, type WorkerStatus } from '@pixelclaw/server/protocol';
+
+export type Tab = 'editor' | 'dashboard' | 'gallery';
+const TABS: Tab[] = ['editor', 'dashboard', 'gallery'];
+
+export type Answer = { ok: boolean; error?: string; request?: WorkRequest };
+
+/** What an import from the dashboard sends with its files (the server's ImportOptions). */
+export interface ImportChoice {
+  kind?: string;
+  slice?: { cell: [number, number]; offset?: [number, number]; gap?: [number, number] };
+  pattern?: string;
+  names?: string[];
+  set?: string;
+  palette?: string;
+  build?: boolean;
+  wrap?: boolean;
+}
+
+export interface ImportAnswer {
+  created?: { name: string; kind: string; size: string; inexact: number; failing: string[]; checks: number; planned: boolean }[];
+  added?: string[];
+  notes?: string[];
+  text?: string;
+  error?: string;
+}
 
 export interface AssetModel {
   name: string;
@@ -73,7 +98,12 @@ export class Store {
   /** The check whose details are open under the toolbar. */
   openCheck: CheckId | null = null;
   /** The tab shown: the editor, or the dashboard (the plan, plan §7.3). Only for looking. */
-  tab: 'editor' | 'dashboard' = new URLSearchParams(location.search).get('tab') === 'dashboard' ? 'dashboard' : 'editor';
+  tab: Tab = (TABS as string[]).includes(new URLSearchParams(location.search).get('tab') ?? '') ? (new URLSearchParams(location.search).get('tab') as Tab) : 'editor';
+  /** Every request (plan §21) as it stands: from the plan report, then as the server sends them. */
+  requests: WorkRequest[] = [];
+  /** The headless worker, and its log as far as this page has seen it. */
+  worker: WorkerStatus | null = null;
+  workerLog: string[] = [];
   /** Bumped when the plan may have changed (a batch, an export, a new manifest): the dashboard reloads it. */
   planVersion = 0;
   /** The token the page was opened with (the dashboard's requests carry it). */
@@ -85,6 +115,7 @@ export class Store {
   private travelCache: { key: string; doc: Doc | null } | null = null;
   private nextId = 0;
   private waiting = new Map<number, (r: RunResult) => void>();
+  private answers = new Map<number, (r: Answer) => void>();
   private listeners = new Set<() => void>();
   private version = 0;
   private ws: WebSocket | null = null;
@@ -146,12 +177,64 @@ export class Store {
     }));
   }
 
+  /** A request, a reply or a cancel, written as this person (plan §21). */
+  request(body: PersonRequest): Promise<Answer> {
+    return this.ask({ type: 'request', body });
+  }
+
+  /** Start or stop the headless worker. */
+  workerAction(action: 'start' | 'stop'): Promise<Answer> {
+    return this.ask({ type: 'worker', action });
+  }
+
+  private ask(m: { type: 'request'; body: PersonRequest } | { type: 'worker'; action: 'start' | 'stop' }): Promise<Answer> {
+    const ws = this.ws;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return Promise.resolve({ ok: false, error: 'not connected' });
+    const id = ++this.nextId;
+    ws.send(JSON.stringify({ ...m, id, by: this.me }));
+    return new Promise((resolve) => this.answers.set(id, resolve));
+  }
+
+  /** Import files into the gallery (plan §21): new assets, manifest entries, checks. */
+  async importFiles(files: File[], choice: ImportChoice): Promise<ImportAnswer> {
+    const enc = await Promise.all(files.map(async (f) => {
+      const b = new Uint8Array(await f.arrayBuffer());
+      let bin = '';
+      for (let i = 0; i < b.length; i += 0x8000) bin += String.fromCharCode(...b.subarray(i, i + 0x8000));
+      return { name: f.name, data: btoa(bin) };
+    }));
+    try {
+      const r = await fetch(`/api/import?token=${encodeURIComponent(this.token)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ files: enc, options: choice, by: this.me }) });
+      return (await r.json()) as ImportAnswer;
+    } catch (e) {
+      return { error: String(e) };
+    }
+  }
+
+  /** The worker's log so far (on opening the panel). */
+  async loadWorker(): Promise<void> {
+    try {
+      const r = (await (await fetch(`/api/worker?token=${encodeURIComponent(this.token)}`)).json()) as { status: WorkerStatus; log: string[] };
+      this.worker = r.status;
+      this.workerLog = r.log;
+      this.changed();
+    } catch {
+      // shown when the next line arrives
+    }
+  }
+
+  /** Who wrote the asset's last command, and when (for "Claude is working on this"). */
+  lastWrite(name: string): { by: string; at: string } | null {
+    const e = this.assets.get(name)?.tape.at(-1);
+    return e ? { by: e.by, at: e.at ?? "" } : null;
+  }
+
   // --- connection
 
-  setTab(t: 'editor' | 'dashboard'): void {
+  setTab(t: Tab): void {
     this.tab = t;
     const u = new URL(location.href);
-    if (t === 'dashboard') u.searchParams.set('tab', 'dashboard'); else u.searchParams.delete('tab');
+    if (t !== 'editor') u.searchParams.set('tab', t); else u.searchParams.delete('tab');
     history.replaceState(null, '', u);
     this.changed();
   }
@@ -193,6 +276,13 @@ export class Store {
       this.waiting.delete(m.id);
       done?.(m.ok ? { ok: true, asset: m.asset, group: m.group, seq: m.seq } : { ok: false, errors: m.errors });
     } else if (m.type === 'plan') this.planVersion++;
+    else if (m.type === 'answer') {
+      const done = this.answers.get(m.id);
+      this.answers.delete(m.id);
+      done?.({ ok: m.ok, ...(m.error ? { error: m.error } : {}), ...(m.request ? { request: m.request } : {}) });
+    } else if (m.type === 'requests') this.requests = m.requests;
+    else if (m.type === 'worker') this.worker = m.status;
+    else if (m.type === 'workerLog') this.workerLog = [...this.workerLog, ...m.lines].slice(-500);
     else if (m.type === 'batch') {
       this.planVersion++;
       let a = this.assets.get(m.asset);
@@ -221,6 +311,7 @@ export class Store {
     this.themes = s.themes ?? BUILTIN_THEMES;
     this.styleVersion++;
     this.eye = s.eye;
+    this.worker = s.worker ?? null;
     this.queue = [];
     this.travel = null;
     this.assets = new Map();

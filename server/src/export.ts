@@ -15,7 +15,7 @@ export const EXPORT_FORMATS = ['split', 'png', 'strip', 'bmfont'] as const;
 export type ExportFormat = (typeof EXPORT_FORMATS)[number];
 
 /** Palette indices as RGBA (transparent stays transparent). */
-function rgbaOf(px: Uint16Array, w: number, h: number, palette: { hex: string }[]): Rgba {
+export function rgbaOf(px: Uint16Array, w: number, h: number, palette: { hex: string }[]): Rgba {
   const data = new Uint8Array(w * h * 4);
   const rgb = palette.map((e) => [parseInt(e.hex.slice(1, 3), 16), parseInt(e.hex.slice(3, 5), 16), parseInt(e.hex.slice(5, 7), 16)]);
   for (let i = 0; i < px.length; i++) {

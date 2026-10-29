@@ -169,7 +169,8 @@ export function planReport(w: Writer, o: { set?: string } = {}): PlanReport {
   for (const sc of scenes) for (const n of sc.needs) out.find((y) => y.name === n)?.scenes.push(sc.name);
   const requests = [...readRequests(p).values()];
   const counts = Object.fromEntries(STATUSES.map((s) => [s, out.filter((x) => x.planned && x.status === s).length])) as Record<Status, number>;
-  const setNames = [...new Set(out.map((x) => x.set))];
+  // Every set the assets are in, then the manifest's sets with nothing in them yet (an import can fill one).
+  const setNames = [...new Set([...out.map((x) => x.set), ...(o.set ? [] : Object.keys(m?.sets ?? {}))])];
   return {
     project: p.json.name, theme: m?.theme ?? null, manifest: { exists: mr.exists, errors: mr.errors },
     sets: setNames.map((s) => ({ name: s, description: m?.sets?.[s]?.description ?? '', assets: out.filter((x) => x.set === s).map((x) => x.name) })),

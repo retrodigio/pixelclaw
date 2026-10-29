@@ -12,6 +12,7 @@ import { TimelinePanel } from './Timeline.tsx';
 import { FamilyMap, FamilyVariants, type FamilyMode } from './Family.tsx';
 import { MapEditor } from './MapEditor.tsx';
 import { Dashboard } from './Dashboard.tsx';
+import { Gallery } from './Gallery.tsx';
 import { SPEEDS, type Store } from './store.ts';
 import { TapePanel, authorClass, time } from './TapePanel.tsx';
 
@@ -147,11 +148,12 @@ export function App({ store }: { store: Store }) {
   };
 
   const draft = ed.noteDraft;
-  const dash = store.tab === 'dashboard';
+  const dash = store.tab !== 'editor';
   const tabs = (
     <span className="seg tabs" data-testid="tabs">
       <button className={dash ? '' : 'on'} onClick={() => store.setTab('editor')} data-tab="editor">Editor</button>
-      <button className={dash ? 'on' : ''} onClick={() => store.setTab('dashboard')} data-tab="dashboard" title="The plan: every planned asset by set, with its status">Dashboard</button>
+      <button className={store.tab === 'dashboard' ? 'on' : ''} onClick={() => store.setTab('dashboard')} data-tab="dashboard" title="The plan: every planned asset by set, with its status; ask Claude for work">Dashboard</button>
+      <button className={store.tab === 'gallery' ? 'on' : ''} onClick={() => store.setTab('gallery')} data-tab="gallery" title="Every asset at game scale: filter, sort, compare">Gallery</button>
     </span>
   );
 
@@ -166,7 +168,7 @@ export function App({ store }: { store: Store }) {
           <span className="chip me" title="The name your approvals are written with on the tape">you: <b>{store.me}</b></span>
           <span className={`chip conn-${store.status}`} data-testid="status">{store.status === 'open' ? '● connected' : store.status === 'connecting' ? 'connecting…' : 'reconnecting…'}</span>
         </header>
-        <Dashboard store={store} />
+        {store.tab === 'gallery' ? <Gallery store={store} /> : <Dashboard store={store} />}
       </div>
     );
   }

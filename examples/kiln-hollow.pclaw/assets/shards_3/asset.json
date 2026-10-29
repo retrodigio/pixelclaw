@@ -1,0 +1,42 @@
+{
+  "name": "shards_3",
+  "kind": "sprite",
+  "size": [
+    24,
+    24
+  ],
+  "cell": [
+    24,
+    24
+  ],
+  "wrap": false,
+  "palette": "kiln-hollow",
+  "layers": [
+    {
+      "name": "main",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    }
+  ],
+  "frames": 1,
+  "paletteLocked": false,
+  "stamps": [],
+  "macros": [],
+  "tags": [],
+  "views": [],
+  "links": [],
+  "notes": [],
+  "tape": {
+    "lang": 2,
+    "commands": 4,
+    "groups": 1
+  },
+  "state": {
+    "sha256": "fc46ac0658ab8ca1d09da1b74669299dd7fbd3e83ea47904791e774c14385bcd"
+  },
+  "checkpoints": {
+    "every": 200,
+    "files": []
+  }
+}

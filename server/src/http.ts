@@ -9,7 +9,8 @@ import type { AddressInfo } from 'node:net';
 import { extname, join, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createMcpHandler, type McpServerFactory } from '@modelcontextprotocol/server';
-import { createRgba, encodePng, renderFlat } from '@pixelclaw/core';
+import { composeMapDoc, createRgba, encodePng, mapWorld, renderFlat } from '@pixelclaw/core';
+import { rgbaOf } from './export.ts';
 import { HUMAN_RE, type ClientMessage, type PersonRequest, type ServerMessage } from './protocol.ts';
 import { ProjectError } from './project.ts';
 import type { Writer } from './writer.ts';
@@ -98,7 +99,11 @@ export async function requestFromPage(w: Writer, m: Extract<ClientMessage, { typ
 /** Every frame of an asset side by side at 1x (the gallery plays them by their ticks). */
 export function framesStrip(w: Writer, name: string): Uint8Array {
   const d = w.doc(name);
-  if (d.frameCount <= 1 || d.map || d.family) return encodePng(renderFlat(d));
+  if (d.map) {
+    const c = composeMapDoc(d, mapWorld(w.assetDocs()));
+    return encodePng(rgbaOf(c.px, c.w, c.h, c.palette));
+  }
+  if (d.frameCount <= 1 || d.family) return encodePng(renderFlat(d));
   const img = createRgba(d.width * d.frameCount, d.height);
   for (let f = 0; f < d.frameCount; f++) {
     const fr = renderFlat(d, f);

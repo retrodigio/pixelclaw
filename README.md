@@ -97,9 +97,10 @@ node cli/bin/pixelclaw.js verify my-art.pclaw
 | `pixelclaw check <project> [<asset>...] [--checks a,b] [--marks]` | Run the quality checks against the style guide; exits 1 if any fails. See [docs/checks.md](docs/checks.md). |
 | `pixelclaw export <project> [<asset>...] [--profile <name>] [--out <dir>]` | Write assets through an export profile (built-in `png`, `atlas`, `tiled`, `godot`, `aseprite-json`, `aseprite`, or the project's own). See [docs/profiles.md](docs/profiles.md). |
 | `pixelclaw export <project> <asset> --format split\|png\|strip\|bmfont [--out <dir>]` | One asset on its own: one-cell pieces, a PNG, or a font as a glyph strip or BMFont. |
-| `pixelclaw import <project> <file.png\|file.aseprite\|folder> [--profile <name>] [--as <name>] [--grid WxH] [--palette <p>\|--build]` | Make a new asset from an image (quantised, sliced by a grid) or an `.aseprite` file, or read a profile's export back and compare. |
+| `pixelclaw import <project> <file.png\|file.aseprite\|folder> [--profile <name>] [--as <name>] [--grid WxH] [--slice WxH] [--set s] [--palette <p>\|--build]` | Make new assets from an image (quantised; a grid of frames, or `--slice` into one asset per cell, with manifest entries and checks), a folder of images or an `.aseprite` file, or read a profile's export back and compare. |
 | `pixelclaw review <project> [<asset>...] [--set s] [--name n]` | Write a blind review bundle (images, palette, style guide, brief, rubric). |
-| `pixelclaw plan <project> [--set s] [--json] [--manifest <file>] [--templates]` | The asset plan and each asset's status; write a manifest (checked first); draw the flat templates. See [docs/pipeline.md](docs/pipeline.md). |
+| `pixelclaw plan <project> [--set s] [--order set\|scene] [--json] [--manifest <file>] [--templates]` | Requests from the dashboard first, then the asset plan and each asset's status, by set or scene by scene; write a manifest (checked first); draw the flat templates. See [docs/pipeline.md](docs/pipeline.md). |
+| `pixelclaw work <project> [--port N]` | Work the dashboard's request queue with a headless Claude Code session, up to a budget cap; only when the project enables it. See [docs/worker.md](docs/worker.md). |
 | `pixelclaw skill install [--dest <dir> \| --project <dir>]` | Install the Claude Code skill (default `~/.claude/skills/pixelclaw`). |
 | `pixelclaw verify <project> [<asset>...]` | Replay every tape and compare it with the saved state, the preview, the checkpoints and the state cache. |
 | `pixelclaw upgrade <project> [<asset>...]` | Rewrite tapes from tape language 1 (G1-G4) in language 2 (the palette in the `new` line); written only if the replay gives the same pixels, then verified. |
@@ -199,6 +200,13 @@ four HUD **icons** held to each other by the icon-set check. It also says how to
 underlay with your own OpenAI key ([how](examples/demo-g11.md#a-live-underlay-with-your-own-key)).
 Screenshots: [the underlay](docs/screenshots/g11-yard-underlay.png), [the snapped draft](docs/screenshots/g11-yard-draft.png),
 [the font](docs/screenshots/g11-font-editor.png), [its strip](docs/screenshots/g11-font-strip.png).
+The G12 demo ([examples/demo-g12.md](examples/demo-g12.md)) is the work queue: a person imports
+a sheet of pot shards into the **gallery** through the slice dialog, asks Claude for two planned
+assets and a change from the **dashboard**, and the agent takes them with `plan` and `work`:
+one done, one blocked on a question, one in progress. Scenes show what each place still needs.
+To let Claude work the queue headless (it spends money), see [docs/worker.md](docs/worker.md).
+Screenshots: [the request states](docs/screenshots/g12-states.png), [the gallery](docs/screenshots/g12-gallery.png),
+[the slice dialog](docs/screenshots/g12-import-dialog.png), [scenes](docs/screenshots/g12-scenes.png).
 
 ## Packages
 

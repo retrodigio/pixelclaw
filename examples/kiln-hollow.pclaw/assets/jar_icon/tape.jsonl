@@ -4,3 +4,5 @@
 {"seq":3,"by":"claude","at":"2026-10-28T11:42:05Z","group":"g1","cmd":"paint 0,0 <<\n  ................\n  ................\n  .....000000.....\n  ....0oooonn0....\n  .....0mmmm0.....\n  ....0nnnmmm0....\n  ...0onnnmmml0...\n  ..0onnnmmmmll0..\n  ..0nnnmmmmmll0..\n  ..0nnmmmmmmll0..\n  ..0nmmmmmmlll0..\n  ...0mmmmmmll0...\n  ...0mmmmmlll0...\n  ....0llllll0....\n  .....000000.....\n  ................\n>>"}
 {"seq":4,"by":"claude","at":"2026-10-28T11:42:05Z","group":"g2","cmd":"px 4,4 11,4 c=ink"}
 {"seq":5,"by":"claude","at":"2026-10-28T11:42:05Z","group":"g2","cmd":"px 4,7 c=glaze3"}
+{"seq":6,"by":"human:chris","at":"2026-10-29T15:12:02Z","group":"h1","cmd":"mark rejected \"a wider mouth, so it reads as a jar at 1x\""}
+{"seq":7,"by":"claude","at":"2026-10-29T15:12:02Z","group":"g3","cmd":"note 3,2 10x3 \"widening the rim here: out by a pixel each side, the ink corners kept square\" id=n1"}

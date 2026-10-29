@@ -1,0 +1,11 @@
+# urn_blue (G12): the urn glazed blue, a palette swap the consistency check recognises as a recolour.
+# The urn's pixels, then each clay entry swapped for its glaze step (clay4, the highlight, for smoke).
+new sprite urn_blue
+import 0,0 asset=urn region=0,0,24x24
+fill 8,12 c=glaze0 mode=global
+fill 14,13 c=glaze1 mode=global
+fill 10,13 c=glaze2 mode=global
+fill 14,11 c=glaze3 mode=global
+fill 8,11 c=smoke mode=global
+# The smoke highlight sits on the glaze as clay4 sat on the clay: one ramp, so its steps read as shading.
+ramp glazed = glaze0 glaze1 glaze2 glaze3 smoke

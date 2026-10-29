@@ -148,14 +148,104 @@ manifest alone (no art needed), into `<project>/templates/`:
 ## The dashboard
 
 The watch view's second tab (`…/?token=…&tab=dashboard`): the theme, a bar of the planned assets
-by status, filters by status and set (only for looking), and a card per asset by set: its preview
-(click to open it in the editor), status, kind and size, description, failing checks, what it
-needs next and any flags. A person approves a `reviewed` asset (**✓ Approve**: `mark approved` on
-its tape, by them) or asks for changes on a reviewed, approved or exported one (**Ask for
-changes…**: `mark rejected "<reason>"`). The agent reads both with `changes`. The dashboard reloads
-the plan after every batch and when the agent writes a manifest or exports.
+by status, filters by status and set (only for looking), the **scenes** with what each still
+needs, and a card per asset by set: its preview (click to open it in the editor), status, kind and
+size, description, failing checks, what it needs next and any flags. A person approves a
+`reviewed` asset (**✓ Approve**: `mark approved` on its tape, by them). The dashboard reloads the
+plan after every batch and when the agent writes a manifest, exports or imports.
 
 ![Asking for changes](screenshots/g10-dashboard-actions.png)
+
+## Requests from the dashboard
+
+People ask Claude for work without a chat (plan §21):
+
+- **Draw this…** on a planned card (an optional note): a `draw` request.
+- **Ask for changes…** on any drawn card (what should change): a `change` request, and the same
+  `mark rejected "<reason>"` on the asset's tape, by the person, as before.
+- **+ Add an asset** (name, kind, size, set, height, what it is, a note): a new manifest entry,
+  validated with the whole manifest first (nothing is written if it would have problems), and a
+  `new` request to draw it.
+
+Requests are records in `<project>/requests.jsonl`, one JSON object a line, only ever appended:
+
+```json
+{"type":"request","id":"r1","asset":"urn_blue","kind":"draw","note":"the deep blue glaze; keep the rim dark","by":"human:chris","at":"…"}
+{"type":"claim","id":"r1","by":"claude","at":"…"}
+{"type":"progress","id":"r1","by":"claude","at":"…","text":"swapping the clay ramp for the glaze ramp"}
+{"type":"done","id":"r1","by":"claude","at":"…","text":"urn_blue drawn: …"}
+{"type":"request","id":"r3","asset":"jar_icon","kind":"change","note":"a wider mouth","by":"human:chris","at":"…","mark":9}
+```
+
+A request's state is worked out from its records (core's `foldRequests`), and a record that does
+not fit is refused before it is written:
+
+| state | from | by |
+|---|---|---|
+| open | `request`, or `reply` to a blocked one | a person |
+| claimed | `claim` (open only; the claimer may claim again); `progress` posts a note | the agent |
+| done | `done` with what changed (claimed, by the claimer) | the agent |
+| blocked | `blocked` with a question (claimed, by the claimer) | the agent |
+| cancelled | `cancel` (open, claimed or blocked) | a person |
+
+The cards show each request live: who asked and what; **Claude is working on this** (with its
+latest progress note) while the claimer's batches arrive on the asset; Claude's question with an
+answer box when blocked; ✓ done with what changed. The agent hears through `plan` (requests
+first) and takes them with the MCP `work` tool; the skill's routine takes requests before
+planned work and calls `plan` after each finished asset.
+
+![Each state: urn_blue done, the goat blocked on a question, Claude working on the jar](screenshots/g12-states.png)
+
+### Claude without a session: the worker
+
+MCP cannot wake a Claude session, so `pixelclaw work <project>` (or **▶ Start Claude** on the
+dashboard) starts one: Claude Code headless (`claude -p`) with the PixelClaw MCP server and the
+skill, working the queue until it is empty or the budget cap is reached. Off by default (it
+spends money); see [worker.md](worker.md) for how to turn it on, the command line, the cap and the
+log.
+
+## Scenes
+
+`scenes` in the manifest (optional): the places the game shows, the assets each needs, and the
+map document that builds it, if any (its own `uses` count too):
+
+```json
+"scenes": [
+  { "name": "kiln_yard", "description": "the yard below the kilns", "uses": ["clay", "kiln", "rack", "urn", "cistern", "potter"], "map": "hollow" }
+]
+```
+
+The dashboard lists each scene's missing assets (dashed: not drawn) and unfinished ones (red:
+drawn, checks failing); `plan(order="scene")` (CLI `pixelclaw plan --order scene`) lists the
+work scene by scene. `map gen` on a planned map stands the drawn objects its `uses` lists on the
+ground it lays ([commands.md](commands.md)).
+
+![Scenes on the dashboard](screenshots/g12-scenes.png)
+
+## The gallery
+
+The third tab (`&tab=gallery`): every asset at game scale (the style guide's `drawScale`),
+animated ones playing at the game's tick rate, maps composed from what they use, planned ones as
+dashed boxes. Filters by set, kind, status and failing check; a sort (by set, name, kind, status,
+recently changed, size); tick the box on several and **Compare** shows them side by side at the
+same scale (×2, ×4 to look closer). A map lists the assets it uses, and an asset the maps that
+use it; click one to show just those. Click an asset to open it in the editor. Nothing here writes.
+
+![The gallery, sorted by recent change](screenshots/g12-gallery.png)
+
+## Importing into the gallery
+
+Drop a PNG sheet, a folder of PNGs or an `.aseprite` file on the dashboard or the gallery (or
+**Import…**). A sheet gets the slice dialog: the cell size, the offset to the first cell and the
+gap between cells, drawn over the image; names from a pattern (`{name}_{n}`, `{name}_{col}_{row}`)
+or from the plan's undrawn entries of the chosen set, in reading order; the kind and set; quantise
+to a project palette or adopt the image's. Empty cells are skipped. Each new asset's tape starts
+with `import` (the file kept under `blobs/`), the manifest gets an entry for each it does not plan
+yet, and every check is run; the result says what each found (an imported asset is `drafted`
+until its checks pass, like any other). MCP `import(slice=…, set=…)` and `pixelclaw import
+--slice 24x24 --set …` reach the same import.
+
+![The slice dialog](screenshots/g12-import-dialog.png)
 
 ## The review hand-off
 

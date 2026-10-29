@@ -26,14 +26,23 @@
   "tags": [],
   "views": [],
   "links": [],
-  "notes": [],
+  "notes": [
+    {
+      "id": "n1",
+      "x": 3,
+      "y": 2,
+      "w": 10,
+      "h": 3,
+      "text": "widening the rim here: out by a pixel each side, the ink corners kept square"
+    }
+  ],
   "tape": {
     "lang": 2,
-    "commands": 5,
-    "groups": 2
+    "commands": 7,
+    "groups": 4
   },
   "state": {
-    "sha256": "6c5d1789c390993e35d8fdc42104e6a67e43bb1fcd6828bb537a49a7e44f0baa"
+    "sha256": "1251898938db6d2efb41a83f496b4f54815e3620de9ca40d68fa76590f9260ec"
   },
   "checkpoints": {
     "every": 200,

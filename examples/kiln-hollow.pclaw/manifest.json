@@ -20,6 +20,9 @@
     },
     "hud": {
       "description": "icons and type on the screen"
+    },
+    "clutter": {
+      "description": "small things scattered on the ground"
     }
   },
   "export": {
@@ -296,6 +299,66 @@
       "set": "ground",
       "description": "still silty water at the yard's edge, from the yard mockup",
       "flat": "stream1"
+    },
+    {
+      "name": "shards_1",
+      "kind": "sprite",
+      "size": "24x24",
+      "set": "clutter",
+      "description": "imported from shards.png cell 0,0"
+    },
+    {
+      "name": "shards_2",
+      "kind": "sprite",
+      "size": "24x24",
+      "set": "clutter",
+      "description": "imported from shards.png cell 1,0"
+    },
+    {
+      "name": "shards_3",
+      "kind": "sprite",
+      "size": "24x24",
+      "set": "clutter",
+      "description": "imported from shards.png cell 0,1"
+    }
+  ],
+  "scenes": [
+    {
+      "name": "kiln_yard",
+      "description": "the yard below the kilns",
+      "uses": [
+        "clay",
+        "yard_clay",
+        "kiln",
+        "rack",
+        "urn",
+        "urn_blue",
+        "cistern",
+        "potter"
+      ],
+      "map": "hollow"
+    },
+    {
+      "name": "stream_bank",
+      "description": "where the goat grazes by the water",
+      "uses": [
+        "sage",
+        "shallows",
+        "stream",
+        "reeds",
+        "goat"
+      ]
+    },
+    {
+      "name": "trade_menu",
+      "description": "the glaze-seller's screen",
+      "uses": [
+        "jar_icon",
+        "hearth_icon",
+        "drop_icon",
+        "bowl_icon",
+        "hollow_type"
+      ]
     }
   ]
 }

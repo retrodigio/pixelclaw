@@ -1,0 +1,10 @@
+{"type":"request","id":"r1","asset":"urn_blue","kind":"draw","note":"the deep blue glaze; keep the rim dark","by":"human:chris","at":"2026-10-29T15:12:01Z"}
+{"type":"request","id":"r2","asset":"goat","kind":"draw","note":"she grazes by the stream","by":"human:chris","at":"2026-10-29T15:12:01Z"}
+{"type":"request","id":"r3","asset":"jar_icon","kind":"change","note":"a wider mouth, so it reads as a jar at 1x","by":"human:chris","at":"2026-10-29T15:12:02Z","mark":6}
+{"type":"claim","id":"r1","by":"claude","at":"2026-10-29T15:12:02Z"}
+{"type":"progress","id":"r1","by":"claude","at":"2026-10-29T15:12:02Z","text":"swapping the clay ramp for the glaze ramp"}
+{"type":"done","id":"r1","by":"claude","at":"2026-10-29T15:12:02Z","text":"urn_blue drawn: the urn with clay0-3 as glaze0-3 and its highlight as smoke; rim and ink unchanged; every check passes"}
+{"type":"claim","id":"r2","by":"claude","at":"2026-10-29T15:12:02Z"}
+{"type":"blocked","id":"r2","by":"claude","at":"2026-10-29T15:12:02Z","text":"Horns or none? A nanny with short horns reads best at 24 px; a billy needs a beard too. And white, or the pale stone grey of the plan?"}
+{"type":"claim","id":"r3","by":"claude","at":"2026-10-29T15:12:02Z"}
+{"type":"progress","id":"r3","by":"claude","at":"2026-10-29T15:12:02Z","text":"widening the rim by a pixel each side"}

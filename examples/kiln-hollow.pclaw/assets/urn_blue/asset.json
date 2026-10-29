@@ -1,0 +1,42 @@
+{
+  "name": "urn_blue",
+  "kind": "sprite",
+  "size": [
+    24,
+    24
+  ],
+  "cell": [
+    24,
+    24
+  ],
+  "wrap": false,
+  "palette": "kiln-hollow",
+  "layers": [
+    {
+      "name": "main",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    }
+  ],
+  "frames": 1,
+  "paletteLocked": false,
+  "stamps": [],
+  "macros": [],
+  "tags": [],
+  "views": [],
+  "links": [],
+  "notes": [],
+  "tape": {
+    "lang": 2,
+    "commands": 8,
+    "groups": 1
+  },
+  "state": {
+    "sha256": "3f8fe5f456a99d55832f5b3cfa6cbade6f4da6010f2f500c7f1ebbde9a1af91a"
+  },
+  "checkpoints": {
+    "every": 200,
+    "files": []
+  }
+}

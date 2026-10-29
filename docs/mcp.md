@@ -204,7 +204,31 @@ checked, reviewed, approved, exported, with what it needs next and why it is not
 `manifest` writes a manifest, checked against its schema first (nothing is written when it has
 problems, each listed with its path). `templates: true` draws the flat templates (the mockup
 screen, returned inline, and a coverage map per family) into `templates/`. The result ends with
-the dashboard's link. See [pipeline.md](pipeline.md).
+the dashboard's link. Requests people made in the dashboard come **first** (open, claimed or
+blocked, with their notes and questions); `order: "scene"` lists the work scene by scene, each
+scene with what it still needs (missing, or drawn with failing checks), then what no scene needs.
+Check results are kept in `.cache/checks/` by the state hashes of everything they read, so a
+fresh process (a CLI call, a new server) does not run every check on every asset again. See
+[pipeline.md](pipeline.md).
+
+### `work`
+
+The request queue (plan §21; [pipeline.md](pipeline.md#requests-from-the-dashboard)). With no
+`action` (or `"next"`): claim the next open request (or the one named by `id`) and say what is
+asked, with the asset's plan entry and status and any answer the person gave. One at a time: while
+you hold a claimed request, `work` says to finish it first. `action: "progress"` with `text`
+posts a note the person sees on the card; `"done"` with `text` (what changed) finishes it;
+`"blocked"` with `text` (one clear question) stops it until the person answers in the dashboard,
+which opens it again. `"list"` shows every request still open, claimed or blocked.
+
+```
+claimed r1
+r1 draw urn_blue: "the deep blue glaze; keep the rim dark" (from human:chris at 2026-10-29T15:08:50Z; claimed by claude)
+plan: urn_blue is a sprite 24x24 in set props: the urn glazed blue (drawn height 14 px)
+status: planned → draw it
+Draw it: run with `new sprite urn_blue` (the manifest fills in its size and palette), look, check, fix; then work(action="done", text=<what you drew>).
+If you cannot go on without the person, work(action="blocked", text=<one clear question>).
+```
 
 ### `export`
 
@@ -225,7 +249,16 @@ and `bmfont`, a font as a glyph strip (plus its characters) or as BMFont
 
 ### `import`
 
-Bring art in (see [profiles.md](profiles.md#import)). `path` is a PNG (a new asset quantised to
+Bring art in (see [profiles.md](profiles.md#import)). For a set of art (plan §21): `slice:
+"24x24"` (with `offset: "x,y"` and `gap: "x,y"`) cuts a sheet into **separate assets**, one per
+non-empty cell in reading order, named by `pattern` (`{name}_{n}`, `{name}_{col}_{row}`), a
+`names` list, or `namesFrom: "manifest"` (the planned, undrawn entries of `set`, in order); a
+folder imports every `.png` and `.aseprite` in it. New assets the manifest does not plan get
+entries (in `set`, `description: "imported from …"`; `manifest: false` leaves it alone; the
+whole manifest is validated first and nothing is made if it would have problems), every check is
+run on each, and the result lists what each found. `wrap: true` makes tiles seamless canvases.
+The dashboard's import dialog and `pixelclaw import --slice … --set …` reach the same import.
+ `path` is a PNG (a new asset quantised to
 `palette`, default the project's; `build: true` makes a palette from the image; `grid: "24x24"`
 slices a sheet into frames, `cells: true` keeps it one image with that cell grid), an `.aseprite`
 file (layers, frames, durations, tags, views), or with `profile` a folder an export wrote: each
@@ -233,7 +266,7 @@ image read back by name into the asset it came from, and the result says which a
 exactly and which differ; images no asset exports become new assets. `as` names a new asset
 (default the file's name), `kind` sets its kind (default `sprite`), `replace` starts an existing
 asset's tape again. A new asset's tape starts with `import` commands; the file is kept under
-`blobs/`. CLI: `pixelclaw import <project> <path> [--profile] [--as] [--kind] [--palette|--build] [--grid WxH [--cells]] [--replace]`.
+`blobs/`. CLI: `pixelclaw import <project> <path> [--profile] [--as] [--kind] [--palette|--build] [--grid WxH [--cells]] [--slice WxH [--offset x,y] [--gap x,y]] [--pattern … | --names a,b | --names-from manifest] [--set] [--wrap] [--no-manifest] [--replace]`.
 
 ### `history`
 
@@ -297,12 +330,23 @@ the fork point. The agent's own commands straight after its position count as re
 The server's instructions ask the agent to call `changes` at the start of each turn while someone
 is watching, to carry on from what they did, and to close notes it has dealt with (`note done n1`).
 
+## MCP over HTTP
+
+The server also speaks MCP at `http://127.0.0.1:<port>/mcp` (streamable HTTP, both protocol
+eras), with the watch token as a bearer (`Authorization: Bearer <token>`). This is how the
+headless worker connects to a running server (one writer for the project, whoever drives it):
+```json
+{ "mcpServers": { "pixelclaw": { "type": "http", "url": "http://127.0.0.1:7417/mcp", "headers": { "Authorization": "Bearer <token>" } } } }
+```
+
 ## The watch view
 
-Open the link (with its token). Two tabs in the header: **Editor** (below) and **Dashboard**, the
-plan by set with each asset's status, where a person approves work or asks for changes (both are
-`mark` commands on the asset's tape with their name; see [pipeline.md](pipeline.md#the-dashboard)).
-`&tab=dashboard` in the link opens it. The editor shows:
+Open the link (with its token). Three tabs in the header: **Editor** (below), **Dashboard**, the
+plan by set with each asset's status, where a person approves work, asks Claude for work (Draw
+this, Ask for changes, Add an asset), answers its questions, imports art and (when the project
+allows it) starts Claude headless; and **Gallery**, every asset at game scale with filters, a
+sort and a side-by-side compare (see [pipeline.md](pipeline.md#the-dashboard)). `&tab=dashboard`
+or `&tab=gallery` in the link opens one. The editor shows:
 
 - **Assets** (left), with a dot on assets that have commands still to play (branches show `⑂`
   and their source). With **follow** on (the default), the view moves to whichever asset the
