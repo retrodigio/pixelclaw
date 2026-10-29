@@ -53,12 +53,15 @@ describe('map documents (§4.11)', () => {
     for (let round = 0; round < 6; round++) {
       const W = 12, H = 9;
       const rows = Array.from({ length: H }, () => Array.from({ length: W }, () => (rnd() ? '#' : '-')).join(''));
-      const st = runMap(EMPTY, `new map m ${W}x${H} tile=${T}\nlayer add ground terrain=land outside=on\nterrain ground paint 0,0 <<\n${rows.map((r) => `  ${r}\n`).join('')}>>`, { land });
+      // Past the map's edge a cell counts as its own (G15), or as terrain or not when the layer says so.
+      const border = (['same', 'not', 'terrain'] as const)[round % 3]!;
+      const st = runMap(EMPTY, `new map m ${W}x${H} tile=${T}\nlayer add ground terrain=land outside=on border=${border}\nterrain ground paint 0,0 <<\n${rows.map((r) => `  ${r}\n`).join('')}>>`, { land });
       const c = composeMapDoc(st.doc!, world({ land }));
       const L = layoutOf(land.family!);
       const flat = flatten(land, 0);
       for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-        const at = (i: number, j: number) => i >= 0 && j >= 0 && i < W && j < H && rows[j]![i] === '#';
+        const at = (i: number, j: number) => (i >= 0 && j >= 0 && i < W && j < H ? rows[j]![i] === '#'
+          : border === 'same' ? rows[Math.min(H - 1, Math.max(0, j))]![Math.min(W - 1, Math.max(0, i))] === '#' : border === 'terrain');
         const dirs: [number, number, number][] = [[1, 0, -1], [2, 1, -1], [4, 1, 0], [8, 1, 1], [16, 0, 1], [32, -1, 1], [64, -1, 0], [128, -1, -1]];
         let bits = 0;
         for (const [b, dx, dy] of dirs) if (at(x + dx, y + dy)) bits |= b;
@@ -126,7 +129,8 @@ describe('map documents (§4.11)', () => {
     const st = runMap(EMPTY, `new map m 14x8 tile=${T}\nlayer add ground terrain=land outside=on\nterrain ground rect 0,3 14x5`, docs);
     let rep = mapChecks(st.doc!, world(docs)).find((x) => x.id === 'repetition')!;
     expect(rep.pass).toBe(false);
-    expect(rep.groups[0]!.label).toMatch(/^12 land\.\w+ in a row at 1,3 12x1$/);
+    // The edge runs the whole width: past the map's edge the terrain goes on (G15), so no corner at either end.
+    expect(rep.groups[0]!.label).toMatch(/^14 land\.\w+ in a row at 0,3 14x1$/);
     // Variants with different band detail on the straight edge: the map picks among them cell by cell.
     const b = run(EMPTY, `${FAMILY.replace('land', 'land_b')}\nvariant of=land\npx @cell(ew) 2,0 2,7 c=stone`).doc!;
     const c2 = run(EMPTY, `${FAMILY.replace('land', 'land_c')}\nvariant of=land\npx @cell(ew) 5,0 5,7 c=stone`).doc!;

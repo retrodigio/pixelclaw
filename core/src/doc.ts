@@ -69,9 +69,13 @@ export interface Footprint {
   flags: string[];
 }
 
-/** What a map layer holds (plan §4.11). Terrain layers hold 1 where their family's terrain is. */
+/**
+ * What a map layer holds (plan §4.11). Terrain layers hold 1 where their family's terrain is; past
+ * the map's edge a cell counts as its own (G15; `border` terrain or not says otherwise), and `mix`
+ * draws the terrain's inside cells as a weighted scatter of one-cell tiles (from `seed`).
+ */
 export type MapLayerInfo =
-  | { kind: 'terrain'; family: string; outside: boolean; walkable?: boolean }
+  | { kind: 'terrain'; family: string; outside: boolean; walkable?: boolean; border?: 'terrain' | 'not'; mix?: { name: string; weight: number }[]; seed?: number }
   | { kind: 'tiles' }
   | { kind: 'objects' }
   | { kind: 'overlay'; overlay: string; on: string };
@@ -620,14 +624,24 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
 
 function mapLayerJson(m: MapLayerInfo): string[] {
   switch (m.kind) {
-    case 'terrain': return ['terrain', m.family, m.outside ? 'outside' : '', ...(m.walkable ? ['walkable'] : [])];
+    case 'terrain': return ['terrain', m.family, m.outside ? 'outside' : '', ...(m.walkable ? ['walkable'] : []), ...(m.border ? [`border=${m.border}`] : []),
+      ...(m.mix ? [`mix=${m.mix.map((x) => `${x.name}:${x.weight}`).join(',')}`, `seed=${m.seed ?? 1}`] : [])];
     case 'overlay': return ['overlay', m.overlay, m.on];
     default: return [m.kind];
   }
 }
 
 function mapLayerFromJson(a: string[]): MapLayerInfo {
-  if (a[0] === 'terrain') return { kind: 'terrain', family: a[1]!, outside: a[2] === 'outside', ...(a[3] === 'walkable' ? { walkable: true } : {}) };
+  if (a[0] === 'terrain') {
+    const rest = a.slice(3);
+    const val = (k: string) => rest.find((x) => x.startsWith(`${k}=`))?.slice(k.length + 1);
+    const border = val('border'), mix = val('mix');
+    return {
+      kind: 'terrain', family: a[1]!, outside: a[2] === 'outside', ...(rest.includes('walkable') ? { walkable: true } : {}),
+      ...(border === 'terrain' || border === 'not' ? { border } : {}),
+      ...(mix ? { mix: mix.split(',').map((x) => { const [name, w] = x.split(':'); return { name: name!, weight: Number(w) }; }), seed: Number(val('seed') ?? 1) } : {}),
+    };
+  }
   if (a[0] === 'overlay') return { kind: 'overlay', overlay: a[1]!, on: a[2]! };
   return { kind: a[0] as 'tiles' | 'objects' };
 }

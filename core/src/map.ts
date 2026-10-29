@@ -121,12 +121,47 @@ export function layerTerrain(d: Doc, layer: number, s: Scheme): Terrain {
   const W = d.width, H = d.height;
   const on = (x: number, y: number) => (cel[Math.min(y, H - 1) * W + Math.min(x, W - 1)] === 1 ? 1 : 0);
   if (s.neighbours !== 'corners') return { cols: W, rows: H, cells: Uint8Array.from(cel, (v) => (v === 1 ? 1 : 0)) };
+  // Corner schemes: the corners on the map's edge take the edge cell's value, unless the layer's
+  // border says terrain or not.
+  const border = d.layers[layer]!.map?.kind === 'terrain' ? (d.layers[layer]!.map as { border?: 'terrain' | 'not' }).border : undefined;
   const cells = new Uint8Array((W + 1) * (H + 1));
-  for (let y = 0; y <= H; y++) for (let x = 0; x <= W; x++) cells[y * (W + 1) + x] = on(x, y);
+  for (let y = 0; y <= H; y++) for (let x = 0; x <= W; x++) {
+    const edge = x === 0 || y === 0 || x === W || y === H;
+    cells[y * (W + 1) + x] = edge && border ? (border === 'terrain' ? 1 : 0) : on(x, y);
+  }
   return { cols: W, rows: H, cells };
 }
 
 // --- Composing
+
+/**
+ * A terrain layer's inside mix (G15): each inside cell takes a tile by weight from a hash of its
+ * place and the seed, drawn again (once) when it would equal both the cell to its left and the one
+ * above, so one look seldom clumps and two tiles do not fall into a checkerboard. The choice is the
+ * cell's own: painting terrain elsewhere does not move it. `outside(k)` says a neighbour is not a
+ * mix cell (off the map, or not inside).
+ */
+export function mixPicker(items: { name: string; weight: number }[], seed: number, cols: number, rows: number): (x: number, y: number, outside: (k: number) => boolean) => string {
+  const memo = new Map<number, string>();
+  const byWeight = (h: number, from: { name: string; weight: number }[]): string => {
+    const total = from.reduce((s, o) => s + o.weight, 0);
+    let r = h % total;
+    for (const o of from) { if (r < o.weight) return o.name; r -= o.weight; }
+    return from[0]!.name;
+  };
+  const at = (x: number, y: number, outside: (k: number) => boolean): string | null => {
+    if (x < 0 || y < 0 || x >= cols || y >= rows || outside(y * cols + x)) return null;
+    const k = y * cols + x;
+    const hit = memo.get(k);
+    if (hit !== undefined) return hit;
+    let name = byWeight(hash32(x, y, seed, 0x6d6978), items);
+    const left = at(x - 1, y, outside), up = at(x, y - 1, outside);
+    if (name === left && name === up && items.length > 1) name = byWeight(hash32(x, y, seed, 0x6d6979), items.filter((o) => o.name !== name));
+    memo.set(k, name);
+    return name;
+  };
+  return (x, y, outside) => at(x, y, outside)!;
+}
 
 /** The palette a composed map is drawn in: the map's own entries, then every asset's, merged by name and colour. */
 export class MapPalette {
@@ -295,10 +330,22 @@ export function composeMapDoc(d: Doc, world: MapWorld, o: ComposeOptions = {}): 
       const fam = need(info.family).filter((x) => x.family);
       if (!fam.length) { if (world.get(info.family)) problems.push(`layer ${l.name}: '${info.family}' is not a family`); return; }
       const s = schemeOf(fam[0]!.family!);
-      const vs = resolveMap(s, layerTerrain(d, li, s));
+      const vs = resolveMap(s, layerTerrain(d, li, s), info.border ?? 'same');
+      const mix = info.mix ? mixPicker(info.mix, info.seed ?? 1, cols, rows) : null;
       vs.forEach((v, i) => {
         const x = i % cols, y = Math.floor(i / cols);
         if (v === null && !info.outside) return;
+        if (mix && v !== null && fullInside(s, v)) {
+          // The terrain's inside drawn as its mix of one-cell tiles (G15).
+          const name = mix(x, y, (k) => k < 0 || vs[k] === null || !fullInside(s, vs[k]!));
+          const tile = world.get(name);
+          if (!tile) { problems.push(`layer ${l.name}: mix= names '${name}', which is not drawn`); return; }
+          if (tile.width !== t || tile.height !== t) { problems.push(`layer ${l.name}: mix= tile '${name}' is ${tile.width}x${tile.height}, not ${t}x${t}`); return; }
+          blit(flat(tile), tile.width, 0, 0, t, t, x * t, y * t);
+          top[i] = { asset: name, variant: s.variants[v]!.name, edge: false, ...(info.outside ? { base: true } : {}), ...(info.walkable ? { walkable: true } : {}) };
+          variants[i] = v;
+          return;
+        }
         const f = pick(fam, x, y, li);
         const L = layoutOf(f.family!);
         const [cx, cy] = v === null ? L.outside : L.cells[v]!;
@@ -550,7 +597,8 @@ export function mapDocText(d: Doc, world: MapWorld, c: ComposedMap = composeMapD
     if (info.kind === 'terrain') {
       const n = cel.reduce((a, v) => a + (v === 1 ? 1 : 0), 0);
       const fam = world.family(info.family);
-      lines.push(`layer ${l.name}: terrain of ${info.family}${fam.length > 1 ? ` (+ variants ${fam.slice(1).map((x) => x.name).join(', ')})` : ''}, ${n} cells${info.outside ? '; its outside ground fills the rest' : ''}${info.walkable ? ' (walkable: objects may stand on it)' : ''}${hid}`);
+      lines.push(`layer ${l.name}: terrain of ${info.family}${fam.length > 1 ? ` (+ variants ${fam.slice(1).map((x) => x.name).join(', ')})` : ''}, ${n} cells${info.outside ? '; its outside ground fills the rest' : ''}${info.walkable ? ' (walkable: objects may stand on it)' : ''}` +
+        `${info.border ? `; past the map's edge: ${info.border === 'terrain' ? 'terrain' : 'not terrain'}` : ''}${info.mix ? `; inside: mix=${info.mix.map((x) => `${x.name}:${x.weight}`).join(',')} seed=${info.seed}` : ''}${hid}`);
     } else if (info.kind === 'overlay') {
       lines.push(`layer ${l.name}: overlay ${info.overlay} on ${info.on}${hid}`);
     } else {

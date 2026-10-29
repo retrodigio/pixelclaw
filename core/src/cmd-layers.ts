@@ -4,7 +4,8 @@
 // tags and views (cmd-anim.ts) follow frames as they are added, removed and moved.
 
 import { insertFrames, moveFrame, moveMap, removeFrame, viewOf } from './anim.ts';
-import { Args, fn, needDoc, registerCommand, type CommandSpec } from './commands.ts';
+import { Args, fn, needDoc, registerCommand, type CommandSpec, type NormaliseContext } from './commands.ts';
+import { mixSeed, parseMix, spreadMix } from './mix.ts';
 import { TRANSPARENT, ctxOf, newLayer, remapCtx, setCtx, type Doc, type MapLayerInfo } from './doc.ts';
 import { DiagError, type ParsedCommand, type Token } from './parser.ts';
 
@@ -53,12 +54,12 @@ function flagOpts(a: Args): { hidden?: boolean; locked?: boolean; reference?: bo
 
 const layerCmd: CommandSpec = {
   name: 'layer',
-  summary: 'layer <name> | layer add <name> [above=|below=<layer>] [reference] | (maps) layer add <name> terrain=<family> [outside=on|off] [walkable=on|off] | tiles | objects | overlay=<overlay> on=<layer>|<layer>:out|all | layer set <name> [hidden=] [locked=] [reference=] [walkable=] | layer rename <name> <new> | layer move <name> above=|below=<layer> | layer merge <name> | layer remove <name>',
+  summary: 'layer <name> | layer add <name> [above=|below=<layer>] [reference] | (maps) layer add <name> terrain=<family> [outside=on|off] [walkable=on|off] [border=same|terrain|not] [mix=<tile>:<weight>,... [variants=spread|named] [seed=]] | tiles | objects | overlay=<overlay> on=<layer>|<layer>:out|all | layer set <name> [hidden=] [locked=] [reference=] [walkable=] [border=] [mix=…|none] | layer rename <name> <new> | layer move <name> above=|below=<layer> | layer merge <name> | layer remove <name>   (border: past the map\'s edge a cell counts as its own (same, the default), as terrain, or not; mix: the terrain\'s inside cells drawn as a seeded scatter of one-cell tiles by weight)',
   normalise(cmd, ctx) {
     const doc = needDoc(cmd, ctx);
     const first = cmd.args[0];
     const mapAdd = !!doc.map && first?.t === 'word' && first.v === 'add';
-    const a = new Args(cmd, ['above', 'below', 'hidden', 'locked', 'reference', 'terrain', 'outside', 'walkable', 'overlay', 'on'], mapAdd ? ['reference', 'tiles', 'objects'] : ['reference']);
+    const a = new Args(cmd, ['above', 'below', 'hidden', 'locked', 'reference', 'terrain', 'outside', 'walkable', 'overlay', 'on', 'border', 'mix', 'seed', 'variants'], mapAdd ? ['reference', 'tiles', 'objects'] : ['reference']);
     const how = a.take('word', 'a layer name, or add, set, rename, move, merge or remove');
     const noOpts = (except: string[] = []) => {
       for (const o of a.opts.values()) if (!except.includes(o.key)) throw new DiagError(o.line, o.col, `layer ${how.v} takes no ${o.key}=`);
@@ -79,9 +80,9 @@ const layerCmd: CommandSpec = {
       let info: MapLayerInfo | undefined;
       let what = '';
       if (doc.map) {
-        info = mapLayerInfo(a, doc);
+        info = mapLayerInfo(a, doc, ctx);
         what = mapLayerText(info);
-        noOpts(['above', 'below', 'flag', 'terrain', 'outside', 'walkable', 'overlay', 'on']);
+        noOpts(['above', 'below', 'flag', 'terrain', 'outside', 'walkable', 'overlay', 'on', 'border', 'mix', 'seed', 'variants']);
       } else {
         noOpts(['above', 'below', 'flag']);
       }
@@ -103,16 +104,30 @@ const layerCmd: CommandSpec = {
     const i = layerIndex(doc, target);
     if (how.v === 'set') {
       a.done();
-      const wk = a.opts.get('walkable');
-      if (wk) {
-        // A terrain layer's filled ground (its outside and edges) is walkable: footprints may stand on it.
+      const wk = a.opts.get('walkable'), bo = a.opts.get('border'), mo = a.opts.get('mix');
+      if (wk || bo || mo) {
+        // Terrain settings: walkable ground (footprints may stand on its outside and edges), the
+        // border rule, the inside's mix.
         const info = doc.layers[i]!.map;
-        if (info?.kind !== 'terrain') throw new DiagError(wk.line, wk.col, `walkable= goes with a terrain layer`);
-        noOpts(['walkable']);
-        const on = a.choice('walkable', ['on', 'off'], 'off') === 'on';
-        return { text: `layer set ${target.v} walkable=${on ? 'on' : 'off'}`, op: fn((d) => {
-          const m = d.layers[i]!.map as Extract<MapLayerInfo, { kind: 'terrain' }>;
-          d.layers[i]!.map = on ? { ...m, walkable: true } : { kind: 'terrain', family: m.family, outside: m.outside };
+        const first = (wk ?? bo ?? mo)!;
+        if (info?.kind !== 'terrain') throw new DiagError(first.line, first.col, `${first.key}= goes with a terrain layer`);
+        noOpts(['walkable', 'border', 'mix', 'seed', 'variants']);
+        const set: Partial<Extract<MapLayerInfo, { kind: 'terrain' }>> & { walkable?: boolean } = {};
+        const parts: string[] = [];
+        if (wk) { const on = a.choice('walkable', ['on', 'off'], 'off') === 'on'; set.walkable = on; parts.push(`walkable=${on ? 'on' : 'off'}`); }
+        if (bo) { const b = borderOpt(a); set.border = b; parts.push(`border=${b ?? 'same'}`); }
+        let clearMix = false;
+        if (mo) {
+          if (mo.value === 'none') { clearMix = true; parts.push('mix=none'); for (const k of ['seed', 'variants']) if (a.opts.get(k)) throw new DiagError(a.opts.get(k)!.line, a.opts.get(k)!.col, `${k}= goes with a mix`); }
+          else { const m = mixOpt(a, ctx)!; set.mix = m.mix; set.seed = m.seed; parts.push(m.text); }
+        } else for (const k of ['seed', 'variants']) if (a.opts.get(k)) throw new DiagError(a.opts.get(k)!.line, a.opts.get(k)!.col, `${k}= goes with mix=`);
+        return { text: `layer set ${target.v} ${parts.join(' ')}`, op: fn((d) => {
+          const m = { ...(d.layers[i]!.map as Extract<MapLayerInfo, { kind: 'terrain' }>), ...set };
+          // Unset fields are left out, so a layer back at its defaults is stored as it always was.
+          if (!m.walkable) delete m.walkable;
+          if (!m.border) delete m.border;
+          if (clearMix) { delete m.mix; delete m.seed; }
+          d.layers[i]!.map = m;
         }) };
       }
       noOpts(['hidden', 'locked', 'reference']);
@@ -177,8 +192,30 @@ const layerCmd: CommandSpec = {
   },
 };
 
-/** What a new map layer holds: terrain=<family> [outside=on|off], tiles, objects, or overlay=<overlay> on=<where>. */
-function mapLayerInfo(a: Args, doc: Doc): MapLayerInfo {
+/** border=same|terrain|not (same: undefined, the default). */
+function borderOpt(a: Args): 'terrain' | 'not' | undefined {
+  const b = a.choice('border', ['same', 'terrain', 'not'], 'same');
+  return b === 'same' ? undefined : b as 'terrain' | 'not';
+}
+
+/** mix=<tile>:<weight>,... [variants=spread|named] [seed=]: the weights shared out over texture variants (as tiles fill mix= does), and the seed. */
+function mixOpt(a: Args, ctx: NormaliseContext): { mix: { name: string; weight: number }[]; seed: number; text: string } | null {
+  const o = a.opts.get('mix');
+  if (!o) return null;
+  const vo = a.opts.get('variants');
+  if (vo && vo.value !== 'spread' && vo.value !== 'named') throw new DiagError(vo.line, vo.vcol, `variants= is spread (a tile's weight shared with its texture variants) or named (only the tiles the mix names)`);
+  const items = parseMix(o);
+  const mix = vo?.value === 'named' ? items : spreadMix(items, ctx);
+  for (const m of mix) {
+    const src = ctx.asset?.(m.name);
+    if (src && src.kind !== 'tile') throw new DiagError(o.line, o.vcol, `mix= takes one-cell tiles; '${m.name}' is a ${src.kind}`);
+  }
+  const seed = mixSeed(a, ctx);
+  return { mix, seed, text: `mix=${mix.map((m) => `${m.name}:${m.weight}`).join(',')} variants=named seed=${seed}` };
+}
+
+/** What a new map layer holds: terrain=<family> [outside=on|off] [walkable=] [border=] [mix=], tiles, objects, or overlay=<overlay> on=<where>. */
+function mapLayerInfo(a: Args, doc: Doc, ctx: NormaliseContext): MapLayerInfo {
   const ter = a.opts.get('terrain'), ov = a.opts.get('overlay');
   const kinds = [ter ? 'terrain' : '', ov ? 'overlay' : '', ...a.flags.filter((f) => f.v === 'tiles' || f.v === 'objects').map((f) => f.v)].filter(Boolean);
   if (kinds.length !== 1) throw new DiagError(a.cmd.line, a.cmd.col, `layer add: a map layer holds one thing: terrain=<family>, tiles, objects or overlay=<overlay> on=<where>`);
@@ -188,13 +225,19 @@ function mapLayerInfo(a: Args, doc: Doc): MapLayerInfo {
     if (!/^[a-z][a-z0-9_-]*$/.test(v)) throw new DiagError(o.line, o.vcol, `'${v}' is not an asset name`);
     return v;
   };
-  for (const k of ['outside', 'walkable', 'on']) {
+  for (const k of ['outside', 'walkable', 'on', 'border', 'mix']) {
     const o = a.opts.get(k);
     if (o && !((k !== 'on' && ter) || (k === 'on' && ov))) throw new DiagError(o.line, o.col, `${k}= goes with ${k !== 'on' ? 'terrain=' : 'overlay='}`);
   }
+  for (const k of ['seed', 'variants']) if (a.opts.get(k) && !a.opts.get('mix')) throw new DiagError(a.opts.get(k)!.line, a.opts.get(k)!.col, `${k}= goes with mix=`);
   if (ter) {
     const walkable = a.choice('walkable', ['on', 'off'], 'off') === 'on';
-    return { kind: 'terrain', family: name(ter.value, ter), outside: a.choice('outside', ['on', 'off'], 'off') === 'on', ...(walkable ? { walkable } : {}) };
+    const border = borderOpt(a);
+    const m = mixOpt(a, ctx);
+    return {
+      kind: 'terrain', family: name(ter.value, ter), outside: a.choice('outside', ['on', 'off'], 'off') === 'on', ...(walkable ? { walkable } : {}),
+      ...(border ? { border } : {}), ...(m ? { mix: m.mix, seed: m.seed } : {}),
+    };
   }
   if (ov) {
     const on = a.opts.get('on');
@@ -209,7 +252,10 @@ function mapLayerInfo(a: Args, doc: Doc): MapLayerInfo {
 }
 
 function mapLayerText(m: MapLayerInfo): string {
-  if (m.kind === 'terrain') return ` terrain=${m.family} outside=${m.outside ? 'on' : 'off'}${m.walkable ? ' walkable=on' : ''}`;
+  if (m.kind === 'terrain') {
+    return ` terrain=${m.family} outside=${m.outside ? 'on' : 'off'}${m.walkable ? ' walkable=on' : ''}${m.border ? ` border=${m.border}` : ''}` +
+      (m.mix ? ` mix=${m.mix.map((x) => `${x.name}:${x.weight}`).join(',')} variants=named seed=${m.seed}` : '');
+  }
   if (m.kind === 'overlay') return ` overlay=${m.overlay} on=${m.on}`;
   return ` ${m.kind}`;
 }

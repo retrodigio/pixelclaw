@@ -6,7 +6,7 @@
 import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  CHECK_IDS, SNAP_MIN_MATERIAL, SNAP_MIN_R2, ReplayCache, composeUnderlay, TapeCursor, Timeline, serializeDoc, tapeLang, tapeToJsonl, activeGroups, checkContextFor, drawScaleOf, groundOf, paletteToJson, parse, projectThemes, replay, runBatch,
+  CHECK_IDS, SNAP_MIN_MATERIAL, SNAP_MIN_R2, ReplayCache, composeUnderlay, TapeCursor, Timeline, serializeDoc, tapeLang, tapeToJsonl, activeGroups, checkContextFor, ctxOf, drawScaleOf, groundOf, paletteToJson, parse, projectThemes, replay, runBatch,
   VIEW_NAMES, cameraOf, flaggedOn, footprintOf, mapWorld, runChecks, setOf, type AssetDoc, type AssetState, type CheckId, type CheckResult, type Diag, type Doc, type Note, type Palette, type Pt,
   type TapeEntry, type Theme, type Token,
 } from '@pixelclaw/core';
@@ -477,6 +477,12 @@ export class Writer {
    * change to it: each gets `family band from=<base>` (the band copied into its own tape) when
    * its band differs, as one undo group by the same author. With `self`, the asset itself is
    * brought up to its base too (it has just been made to inherit).
+   *
+   * Families follow the tiles their textures came from (G15, plan §26 item 4): for each of a
+   * family's frames, the latest `family texture inside|outside` line drawn on it decides; when it
+   * copied from=<tile> and that tile has changed, the family gets the same line again (on that
+   * frame, the author's frame put back after), as one undo group. A texture drawn from rows (no
+   * from=) is the family's own and is left alone.
    */
   private following = false;
   private follow(base: string, by: string, self: boolean): string[] {
@@ -486,16 +492,16 @@ export class Writer {
     try {
       const queue = [base];
       const seen = new Set<string>();
-      const sync = (v: string, from: string) => {
+      const sync = (v: string, commands: string) => {
         const cur = this.doc(v);
-        const d = this.dry({ asset: v, commands: `family band from=${from}`, by });
+        const d = this.dry({ asset: v, commands, by });
         if (!d.ok || !d.doc || Buffer.compare(Buffer.from(serializeDoc(d.doc)), Buffer.from(serializeDoc(cur))) === 0) return;
-        const r = this.run({ asset: v, commands: `family band from=${from}`, by });
-        if (r.ok) { out.push(v); queue.push(v); }
+        const r = this.run({ asset: v, commands, by });
+        if (r.ok) { if (!out.includes(v)) out.push(v); queue.push(v); }
       };
       if (self) {
         const f = this.doc(base).family;
-        if (f?.bandOf && this.assets().includes(f.bandOf)) sync(base, f.bandOf);
+        if (f?.bandOf && this.assets().includes(f.bandOf)) sync(base, `family band from=${f.bandOf}`);
       }
       while (queue.length) {
         const b = queue.shift()!;
@@ -505,13 +511,51 @@ export class Writer {
           if (v === b || seen.has(v)) continue;
           let f;
           try { f = this.doc(v).family; } catch { continue; }
-          if (f?.bandOf === b) sync(v, b);
+          if (!f) continue;
+          if (f.bandOf === b) sync(v, `family band from=${b}`);
+          const lines = this.textureFollow(v, b, by);
+          if (lines) sync(v, lines);
         }
       }
     } finally {
       this.following = false;
     }
     return out;
+  }
+
+  /** The lines that copy `source` into family `name`'s textures again, where they came from it (null: none do). */
+  private textureFollow(name: string, source: string, by: string): string | null {
+    const { entries } = this.state(name);
+    // Most batches touch no texture source: look for one before working out frames.
+    if (!entries.some((e) => e.cmd.startsWith('family texture ') && e.cmd.split('\n')[0]!.includes(` from=${source} `))) return null;
+    const doc = this.doc(name);
+    const active = activeGroups(entries);
+    // Each texture line in effect, and the family frame it drew on (its author's frame then).
+    const latest = new Map<string, { from: string | null; frame: number; on: number }>();
+    for (const e of entries) {
+      if (!active.has(e.group)) continue;
+      const m = /^family texture (inside|outside)\b([^\n]*)/.exec(e.cmd);
+      if (!m) continue;
+      const from = / from=(\S+)/.exec(m[2]!)?.[1] ?? null;
+      const frame = Number(/ frame=(\d+)/.exec(m[2]!)?.[1] ?? 1);
+      let on = 0;
+      if (doc.frameCount > 1) {
+        const after = this.docAt(name, e.seq);
+        on = after ? ctxOf(after, e.by).frame : 0;
+      }
+      latest.set(`${m[1]}@${on}`, { from, frame, on });
+    }
+    const todo = [...latest].filter(([, x]) => x.from === source);
+    if (!todo.length) return null;
+    const lines: string[] = [];
+    const mine = ctxOf(doc, by).frame;
+    let at = mine;
+    for (const [k, x] of todo.sort((p, q) => p[1].on - q[1].on || p[0].localeCompare(q[0]))) {
+      if (doc.frameCount > 1 && at !== x.on) { lines.push(`frame ${x.on + 1}`); at = x.on; }
+      lines.push(`family texture ${k.split('@')[0]} from=${source} frame=${x.frame}`);
+    }
+    if (at !== mine) lines.push(`frame ${mine + 1}`);
+    return lines.join('\n');
   }
 
   /** Parse and apply a batch to the asset's state (or a new one), without saving anything. */

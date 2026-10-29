@@ -219,7 +219,10 @@ describe('project schemes and fillets (plan §17)', () => {
     expect(again.problems).toEqual([]);
     expect(Buffer.compare(serializeDoc(again.doc!), serializeDoc(r.state.doc!))).toBe(0);
     expect(schemeOf(deserializeDoc(serializeDoc(r.state.doc!)).family!).variants.length).toBe(176);
-    expect(runBatch(EMPTY, fam, { by: 't', palettes }).ok).toBe(false);
+    // Without a project copy, blob47-round is built in (G15): the line names it, no def= needed.
+    const built = runBatch(EMPTY, fam, { by: 't', palettes });
+    expect(built.ok && built.state.entries[0]!.cmd).toMatch(/^new family coast 8x8 scheme=blob47-round palette=test wrap=off/);
+    expect(built.ok && built.state.entries[0]!.cmd).not.toContain('def=');
   });
   it('fillets: an outside cell gets one in each inner corner of the terrain around it', () => {
     const s = loadScheme(ROUND);

@@ -101,12 +101,13 @@ describe('schemes (§4.2)', () => {
   });
 
   it('every built-in scheme loads, and its pieces supply every quadrant of the other variants', () => {
-    expect([...BUILTIN_SCHEMES.keys()]).toEqual(['blob47', 'wang16-corner', 'path', 'bridge8', 'single', 'face']);
+    expect([...BUILTIN_SCHEMES.keys()]).toEqual(['blob47', 'blob47-round', 'wang16-corner', 'path', 'bridge8', 'single', 'face']);
     for (const s of BUILTIN_SCHEMES.values()) {
       s.variants.forEach((v, i) => {
         const src = s.sources[i];
         if (s.pieces.includes(v.name)) { expect(src).toBeNull(); return; }
         src!.forEach(([p, q], k) => {
+          if (p < 0) return; // a fillet's plain outside quadrant: the outside texture, no piece
           expect(s.pieces).toContain(s.variants[p]!.name);
           expect(s.quadSpecs[p]![q]!.kind).toBe(s.quadSpecs[i]![k]!.kind);
           expect(s.quadSpecs[p]![q]!.face).toBe(s.quadSpecs[i]![k]!.face);

@@ -218,9 +218,10 @@ pixel apart. A space has a zero box and its advance.
 
 A project's own autotile schemes live in `<project>/schemes/*.json` (the format of
 `core/schemes/*.json`). `new family <name> <T>x<T> scheme=<name>` copies a project scheme into the
-line (`def="…"`, its JSON), like the palette, so the tape replays without the file.
+line (`def="…"`, its JSON), like the palette, so the tape replays without the file. A project
+scheme with a built-in's name wins over the built-in.
 
-`blob47-round` (in the example project) is blob47 with rounder inner corners: a diagonal counts
+`blob47-round` (built in since G15; the example project keeps its own copy, so its lines still carry `def=`) is blob47 with rounder inner corners: a diagonal counts
 when either side next to it is the terrain, so an edge knows the terrain turns an inner corner at
 its end and bends into it, the inner corner's arcs widen, and the cell outside the corner gets the
 rounding's tip (15 fillet variants drawn in outside cells). `family band … fillet=<px>` says how

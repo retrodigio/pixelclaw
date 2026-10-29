@@ -60,6 +60,8 @@ export function MapEditor({ doc, store, ed, editable }: { doc: Doc; store: Store
   const chosen = asset && placeable.some((a) => a.name === asset) ? asset : placeable.find((a) => a.doc.kind === 'object')?.name ?? placeable[0]?.name ?? null;
   const terrainInfo = doc.layers.find((l) => l.name === terrainLayer)?.map;
   const walkable = terrainInfo?.kind === 'terrain' && !!terrainInfo.walkable;
+  const border = terrainInfo?.kind === 'terrain' ? terrainInfo.border ?? 'same' : 'same';
+  const insideMix = terrainInfo?.kind === 'terrain' && terrainInfo.mix ? terrainInfo.mix.map((x) => `${x.name}:${x.weight}`).join(',') : '';
   const screen = cameraOf(store.style, store.project?.grid);
   const cam = camera && showCam ? cameraRegion(composed, camera[0], camera[1], screen[0], screen[1]) : null;
   const region = cam ? { x: cam.x, y: cam.y, w: cam.w, h: cam.h } : { x: 0, y: 0, w: doc.width, h: doc.height };
@@ -184,6 +186,19 @@ export function MapEditor({ doc, store, ed, editable }: { doc: Doc; store: Store
         {(tool === 'brush' || tool === 'rect' || tool === 'erase') && terrainLayer && (
           <label className="chk" title="Objects may stand on this terrain layer's filled ground and edges (layer set <layer> walkable=on|off): ground, not sea">
             <input type="checkbox" checked={walkable} disabled={!editable} data-testid="map-walkable" onChange={(e) => send(`layer set ${terrainLayer} walkable=${e.target.checked ? 'on' : 'off'}`)} /> walkable
+          </label>
+        )}
+        {(tool === 'brush' || tool === 'rect' || tool === 'erase') && terrainLayer && (
+          <label className="chk" title="Past the map's edge: the edge cell's own terrain (same: no band along the border), terrain, or not terrain (layer set <layer> border=same|terrain|not)">
+            border <select value={border} disabled={!editable} data-testid="map-border" onChange={(e) => send(`layer set ${terrainLayer} border=${e.target.value}`)}>
+              <option value="same">same</option><option value="terrain">terrain</option><option value="not">not</option>
+            </select>
+          </label>
+        )}
+        {(tool === 'brush' || tool === 'rect' || tool === 'erase') && terrainLayer && (
+          <label className="chk" title="The terrain's inside cells as a seeded scatter of one-cell tiles by weight, e.g. meadow:2,clover:1 (each tile's weight shared with its texture variants); empty: the family's own inside (layer set <layer> mix=…|none). Enter to apply">
+            inside <input key={`${terrainLayer}:${insideMix}`} defaultValue={insideMix} placeholder="family's own" disabled={!editable} data-testid="map-inside-mix" size={18}
+              onKeyDown={(e) => { if (e.key === 'Enter') { const v = e.currentTarget.value.trim(); send(`layer set ${terrainLayer} mix=${v || 'none'}`); } }} />
           </label>
         )}
         {tool === 'fill' && (

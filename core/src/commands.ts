@@ -327,10 +327,12 @@ const newCmd: CommandSpec = {
       // The size is the tile's; the canvas is the sheet (plan §4.2).
       if (size.w !== size.h || size.w % 2 || size.w < 4 || size.w > 256) throw new DiagError(size.line, size.col, `a family's tiles are square, even and 4..256 px (${size.w}x${size.h})`);
       if (!schemeOpt) throw new DiagError(cmd.line, cmd.col, `new family: missing scheme=<scheme> (${[...BUILTIN_SCHEMES.keys()].join(', ')})`);
-      // A built-in scheme by name; a project's own scheme is copied into the line (def=), like the palette.
+      // A built-in scheme by name; a project's own scheme is copied into the line (def=), like the
+      // palette. A project scheme of a built-in's name wins (a project that kept its own copy of
+      // blob47-round, built in since G15, writes its lines as before).
       const defOpt = a.opts.get('def');
       let def: SchemeJson | null = null;
-      let scheme: Scheme | undefined = defOpt ? undefined : schemeNamed(schemeOpt.value);
+      let scheme: Scheme | undefined = defOpt || ctx.scheme?.(schemeOpt.value) ? undefined : schemeNamed(schemeOpt.value);
       if (!scheme) {
         try {
           const raw = defOpt ? (JSON.parse(defOpt.value) as SchemeJson) : ctx.scheme?.(schemeOpt.value) ?? null;

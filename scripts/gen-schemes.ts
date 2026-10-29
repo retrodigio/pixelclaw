@@ -183,7 +183,9 @@ const write = (dir: string, s: Scheme) => {
 mkdirSync(OUT, { recursive: true });
 const EXAMPLE = join(import.meta.dirname, '..', 'examples', 'mossy-ruins.pclaw', 'schemes');
 mkdirSync(EXAMPLE, { recursive: true });
+// blob47-round is built in since G15 (plan §26 item 4); the example project keeps its own copy (its
+// tapes name it with def=, as a project scheme).
 write(EXAMPLE, blob47Round());
-for (const s of [blob47(), wang16(), path(), bridge8(), single(), face()]) {
+for (const s of [blob47(), blob47Round(), wang16(), path(), bridge8(), single(), face()]) {
   write(OUT, s);
 }

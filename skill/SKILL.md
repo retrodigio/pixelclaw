@@ -157,7 +157,8 @@ frames=…`, `view W mirror=E`, `view anim`; the anim check (8-35 % change per f
 from=<tile>`, `family band 3:outside 1:foam 2:sand1 radius=3 jitter=2` (jitter: edges that are not
 ruler-straight; pick its seed with `seeds`), then hand-detail the pieces on the band layer (`paint
 @cell(o) …`); every variant follows. Judge on `view map` (seam ≤ 1, ideally ≤ 0.5) and `view
-family`. Rounder corners: a scheme with fillets (`blob47-round`). Cliffs: `scheme=face`, paint
+family`. The family follows the tiles its textures came `from=`: fix the tile, and the family is
+copied again. Rounder corners: `scheme=blob47-round` (built in; fillets). Cliffs: `scheme=face`, paint
 `@cell(face_o)` and `@cell(face_ew)`. A texture variant that should follow later band fixes:
 `fork <f> <f>_b`, `variant of=<f> band=inherit`, then change only its textures. After a `family
 cut`, heed the seam warning.
@@ -166,7 +167,10 @@ cut`, heed the seam warning.
 
 `new map <name> 40x30 tile=24`, `tiles floor fill <ground tile>` (the floor in one line; `tiles floor fill mix=bed:2,bed_b:1,bed_c:1`
 scatters several looks by weight, the cure for a failing `lattice`), terrain
-layers per family (`walkable=on` when a layer's filled ground is ground objects stand on, not sea),
+layers per family (`walkable=on` when a layer's filled ground is ground objects stand on, not sea;
+terrain that runs off the map has no band along the border unless `border=not`; `mix=meadow:2,clover:1`
+draws the terrain's inside as a scatter of tiles that match its inside texture, a clean border and a
+varied inside),
 `terrain … rect|ellipse|brush`, `place`, `road`, `scatter`; look at it with `view map camera=x,y` (a player's screen); fix
 repetition hot spots with texture variants, and a failing `lattice` (one mark at the same spot of
 most cells, a grid of dots at map scale) with variants that move or leave out the mark; consistency on a map compares the objects standing on

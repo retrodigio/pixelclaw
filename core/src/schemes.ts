@@ -5,6 +5,7 @@
 // textures with. Everything is integer maths.
 
 import blob47 from '../schemes/blob47.json' with { type: 'json' };
+import blob47Round from '../schemes/blob47-round.json' with { type: 'json' };
 import bridge8 from '../schemes/bridge8.json' with { type: 'json' };
 import face from '../schemes/face.json' with { type: 'json' };
 import path from '../schemes/path.json' with { type: 'json' };
@@ -123,7 +124,7 @@ export function loadScheme(s: SchemeJson): Scheme {
 }
 
 export const BUILTIN_SCHEMES: ReadonlyMap<string, Scheme> = new Map(
-  ([blob47, wang16, path, bridge8, single, face] as SchemeJson[]).map((s) => [s.name, loadScheme(s)]),
+  ([blob47, blob47Round, wang16, path, bridge8, single, face] as SchemeJson[]).map((s) => [s.name, loadScheme(s)]),
 );
 
 export function schemeNamed(name: string): Scheme | undefined {
@@ -192,10 +193,20 @@ export interface Terrain {
 
 export const terrainWidth = (s: SchemeJson, t: Terrain): number => (s.neighbours === 'corners' ? t.cols + 1 : t.cols);
 
-/** Every tile of a map: its variant (index) or null for plain outside. Outside the map is outside. */
-export function resolveMap(s: Scheme, t: Terrain): (number | null)[] {
+/**
+ * Every tile of a map: its variant (index) or null for plain outside. Past the map's edge a cell is
+ * outside (`border` not, the default here: a family's sample island), terrain (`terrain`), or the
+ * edge cell's own value (`same`: maps since G15, so terrain running off the map has no edge band
+ * along the border). Corner schemes read the terrain's own corner grid (`layerTerrain`).
+ */
+export function resolveMap(s: Scheme, t: Terrain, border: 'same' | 'terrain' | 'not' = 'not'): (number | null)[] {
   const tw = terrainWidth(s, t);
-  const at = (x: number, y: number): boolean => x >= 0 && y >= 0 && x < tw && y < t.cells.length / tw && t.cells[y * tw + x] === 1;
+  const th = t.cells.length / tw;
+  const at = (x: number, y: number): boolean => {
+    if (x >= 0 && y >= 0 && x < tw && y < th) return t.cells[y * tw + x] === 1;
+    if (border !== 'same') return border === 'terrain';
+    return t.cells[Math.min(th - 1, Math.max(0, y)) * tw + Math.min(tw - 1, Math.max(0, x))] === 1;
+  };
   const out: (number | null)[] = [];
   for (let y = 0; y < t.rows; y++) for (let x = 0; x < t.cols; x++) {
     if (s.neighbours === 'corners') {
