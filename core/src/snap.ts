@@ -113,8 +113,30 @@ export function fitAxis(img: Rgba, axis: 'x' | 'y', hint?: number): AxisFit {
   return { pitch: fine.p, offset: fine.o, score: fine.m };
 }
 
-/** Fit the grid on both axes (hints: the expected pitch on each). */
-export function fitGrid(img: Rgba, hint?: { x?: number; y?: number }): GridFit {
+/** One axis at a known pitch: only the offset (where the grid lines fall) is fitted. */
+export function fitAxisAt(img: Rgba, axis: 'x' | 'y', pitch: number): AxisFit {
+  const prof = profile(img, axis);
+  const total = prof.reduce((s, v) => s + v, 0);
+  const mean = total / Math.max(1, prof.length);
+  for (let k = 0; k < prof.length; k++) prof[k]! -= mean;
+  const c = component(prof, pitch, total);
+  return { pitch, offset: c.o, score: c.m };
+}
+
+/**
+ * Fit the grid on both axes (hints: the expected pitch on each). With `cells` (the placement's
+ * size in document pixels, G13) the grid is the placement's: the pitch is the image's size over
+ * the cells, exactly that many blocks, and only the offset is fitted (by less than half a block),
+ * so the draft lands on the placement pixel for pixel.
+ */
+export function fitGrid(img: Rgba, hint?: { x?: number; y?: number }, cells?: { cols: number; rows: number }): GridFit {
+  if (cells) {
+    const x = fitAxisAt(img, 'x', img.width / cells.cols);
+    const y = fitAxisAt(img, 'y', img.height / cells.rows);
+    // A grid line past the middle of the first block belongs to the block before it.
+    const k0 = (f: AxisFit) => (f.offset > f.pitch / 2 ? -1 : 0);
+    return { x, y, cols: cells.cols, rows: cells.rows, i0: k0(x), j0: k0(y) };
+  }
   const x = fitAxis(img, 'x', hint?.x);
   const y = fitAxis(img, 'y', hint?.y);
   const span = (f: AxisFit, len: number) => {
@@ -229,8 +251,8 @@ export interface SnapResult {
 }
 
 /** Snap an image to the palette (see the top of this file). */
-export function snapImage(img: Rgba, palette: Palette, o: { hint?: { x?: number; y?: number }; layout?: Rgba | null } = {}): SnapResult {
-  const fit = fitGrid(img, o.hint);
+export function snapImage(img: Rgba, palette: Palette, o: { hint?: { x?: number; y?: number }; cells?: { cols: number; rows: number }; layout?: Rgba | null } = {}): SnapResult {
+  const fit = fitGrid(img, o.hint, o.cells);
   const { img: blocks, r2 } = blockColours(img, fit);
   const q = quantise(blocks, palette);
   const material = o.layout ? materialMatch(blocks, o.layout) : null;

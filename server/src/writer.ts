@@ -394,6 +394,7 @@ export class Writer {
     this.live = name;
     this.freshStyle();
     const warnings = batchWarnings(r.added, r.changed);
+    if (r.state.doc.family && r.added.some((e) => /^family cut\b/.test(e.cmd))) warnings.push(...this.cutWarnings(name));
     this.emit({
       type: 'batch', asset: name, by: req.by, group: r.group!, entries: creates ? r.state.entries : r.added,
       changed: r.changed, reset: creates,
@@ -411,6 +412,7 @@ export class Writer {
     const { name, r } = b;
     const doc = r.added.length ? r.state.doc : null;
     const warnings = doc ? batchWarnings(r.added, r.changed) : ['no commands'];
+    if (doc?.family && r.added.some((e) => /^family cut\b/.test(e.cmd))) warnings.push(...this.cutWarnings(name, doc));
     const results = doc ? this.checks(name, o, doc).results : [];
     return { ok: true, asset: name, doc, added: r.added, changed: r.changed, warnings, results };
   }
@@ -448,6 +450,16 @@ export class Writer {
     }
     trials.sort((a, b) => a.failing.length - b.failing.length || a.excess - b.excess || a.margin - b.margin || a.seed - b.seed);
     return { ok: true, trials };
+  }
+
+  /**
+   * After a `family cut`: the cut family's seam over a sample island. Cut tiles come from a painted
+   * (often snapped) map, so their borders need not join; a high seam is worth knowing at once.
+   */
+  private cutWarnings(name: string, dry?: Doc): string[] {
+    const seam = this.checks(name, { checks: ['seam'] }, dry).results[0];
+    if (!seam || seam.status !== 'fail') return [];
+    return [`family cut: the cut family's seam is ${seam.shown} (limit ${seam.limit}) on a sample island: its tiles do not join; look at view map, fix the band or the textures by coordinates (check seam), or cut again from a cleaner map`];
   }
 
   /** Parse and apply a batch to the asset's state (or a new one), without saving anything. */

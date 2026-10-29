@@ -91,11 +91,11 @@ const underlayCmd: CommandSpec = {
 
 const snapCmd: CommandSpec = {
   name: 'snap',
-  summary: 'snap [from=<underlay layer>] [into=<new layer>]   (fits the underlay\'s pixel grid, quantises each block to the palette into a new draft layer, and reports block R² and, with the layout it was made from, the material match; below 0.8 or 0.85 it suggests a reroll)',
+  summary: 'snap [from=<underlay layer>] [into=<new layer>] [fit=placement|free]   (fits the underlay\'s pixel grid, quantises each block to the palette into a new draft layer, and reports block R² and, with the layout it was made from, the material match; below 0.8 or 0.85 it suggests a reroll)',
   normalise(cmd, ctx) {
     const doc = needDoc(cmd, ctx);
     if (doc.map) throw new DiagError(cmd.line, cmd.col, `snap: a map holds cells by name`);
-    const a = new Args(cmd, ['from', 'into', 'at', 'grid', 'pitch', 'offset', 'r2', 'material']);
+    const a = new Args(cmd, ['from', 'into', 'fit', 'at', 'grid', 'pitch', 'offset', 'r2', 'material']);
     const block = a.peek()?.t === 'block' ? a.take('block', 'rows') : null;
     a.done();
     const fromOpt = a.opts.get('from');
@@ -104,6 +104,9 @@ const snapCmd: CommandSpec = {
     if (!src?.underlay) {
       throw new DiagError(fromOpt?.line ?? cmd.line, fromOpt?.vcol ?? cmd.col, fromOpt ? `snap: layer '${fromOpt.value}' has no underlay` : unders.length ? `snap: give from=<layer> (underlays: ${unders.map((l) => l.name).join(', ')})` : `snap: there is no underlay (underlay generate / import first)`);
     }
+    const fitOpt = a.opts.get('fit');
+    if (fitOpt && fitOpt.value !== 'placement' && fitOpt.value !== 'free') throw new DiagError(fitOpt.line, fitOpt.vcol, `snap: fit= is placement (the placement's grid, the default) or free`);
+    const free = fitOpt?.value === 'free';
     const intoOpt = a.opts.get('into');
     const into = intoOpt?.value ?? 'draft';
     if (!LAYER_RE.test(into)) throw new DiagError(intoOpt!.line, intoOpt!.vcol, `'${into}' is not a usable layer name`);
@@ -124,7 +127,9 @@ const snapCmd: CommandSpec = {
       if (!img) throw new DiagError(cmd.line, cmd.col, `snap: the underlay image (blobs/${u.blob}.png) is not readable here; run snap through the server`);
       if (img.width !== u.iw || img.height !== u.ih) throw new DiagError(cmd.line, cmd.col, `snap: the blob is ${img.width}x${img.height}, the underlay says ${u.iw}x${u.ih}`);
       const layout = u.layout ? ctx.image?.(u.layout) ?? null : null;
-      const r = snapImage(img, doc.palette, { hint: { x: u.iw / u.w, y: u.ih / u.h }, layout });
+      // fit=placement (the default): the placement's grid, one block per document pixel it covers;
+      // fit=free: the strongest grid near the placement's pitch (the G11 rule).
+      const r = snapImage(img, doc.palette, { hint: { x: u.iw / u.w, y: u.ih / u.h }, ...(free ? {} : { cells: { cols: u.w, rows: u.h } }), layout });
       const keys = doc.palette.entries.map((e) => e.key);
       rows = Array.from({ length: r.fit.rows }, (_, j) => Array.from({ length: r.fit.cols }, (_, i) => {
         const v = r.px[j * r.fit.cols + i]!;
@@ -140,7 +145,7 @@ const snapCmd: CommandSpec = {
     }
     const px = rows.map((row) => [...row].map((ch) => (ch === '.' ? TRANSPARENT : keyIndex.get(ch)!)));
     return {
-      text: `snap from=${src.name} into=${into} at=${at[0]},${at[1]}${stats} <<\n${blockText(rows)}>>`,
+      text: `snap from=${src.name} into=${into}${free ? ' fit=free' : ''} at=${at[0]},${at[1]}${stats} <<\n${blockText(rows)}>>`,
       op: fn((d) => {
         insertLayer(d, d.layers.length, into, {});
         const fr = d.cels[d.layers.length - 1]!;
