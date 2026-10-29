@@ -1,6 +1,7 @@
 // Check results as text, for the MCP `check` tool and `pixelclaw check`.
 
 import type { CheckResult, Pt } from '@pixelclaw/core';
+import type { SeedTrial } from './writer.ts';
 
 const COORDS_SHOWN = 40;
 
@@ -25,3 +26,25 @@ export function formatChecks(asset: string, results: CheckResult[], problems: st
   return out.join('\n');
 }
 
+/** The ranked seeds as a table: seed, failing checks, and each check's score. */
+export function formatSeeds(asset: string, trials: SeedTrial[]): string {
+  if (!trials.length) return `${asset}: no seeds tried`;
+  // The checks worth a column: any that fails somewhere, then the rest that have a score.
+  const ids = [...new Set(trials.flatMap((t) => t.results.filter((r) => r.status !== 'skip' && r.score !== null).map((r) => r.id)))];
+  const failingSomewhere = ids.filter((id) => trials.some((t) => t.failing.includes(id)));
+  const cols = [...failingSomewhere, ...ids.filter((id) => !failingSomewhere.includes(id))].slice(0, 8);
+  const limits = cols.map((id) => trials[0]!.results.find((r) => r.id === id)?.limit ?? '');
+  const head = `${asset}: ${trials.length} seed${trials.length === 1 ? '' : 's'} ranked by the checks (fewest failing, then least over, then most room)`;
+  const row = (cells: string[]) => cells.map((c, i) => c.padEnd(i === 0 ? 6 : Math.max(13, c.length + 2))).join('').trimEnd();
+  const lines = [head, `limits: ${cols.map((id, i) => `${id} ${limits[i]}`).join(', ')} (a limit in brackets: that seed's own, e.g. repetition's raised by its spread)`];
+  lines.push(row(['seed', ...cols, 'failing']));
+  for (const t of trials) {
+    lines.push(row([String(t.seed), ...cols.map((id, i) => {
+      const r = t.results.find((x) => x.id === id);
+      if (!r || r.status === 'skip') return '–';
+      return `${r.shown}${r.limit !== limits[i] ? ` (${r.limit})` : ''} ${r.status === 'pass' ? '✓' : '✗'}`;
+    }), t.failing.length ? t.failing.join(',') : 'none']));
+  }
+  lines.push(`best: ${trials[0]!.line}`);
+  return lines.join('\n');
+}

@@ -43,8 +43,9 @@ describe('pixelclaw check', () => {
     expect(ok.code).toBe(0);
     expect(ok.out).toContain('chest: all 2 checks pass');
     const m = cli(['check', proj, 'grass_b', '--marks']);
-    expect(m.out).toMatch(/✗ {2}repetition +4\.1 +≤ 3 +most visible stripe: row 1, darker by ΔL\* 4\.1/);
-    expect(m.out).toContain('row 1: darker than the rest (ΔL* 4.1), a stripe when tiled: 0,1 3,1 12,1 13,1 19,1 22,1 23,1');
+    // The faint rows still fail (G13's contrast-scaled limit reports the band nearest to failing).
+    expect(m.out).toMatch(/✗ {2}repetition +3\.7 +≤ 3 +most visible stripe: rows 1-2, darker by ΔL\* 2\.6/);
+    expect(m.out).toContain('rows 1-2: darker than the rest (ΔL* 2.6), a stripe when tiled: 0,1 3,1 12,1 13,1 19,1 22,1 23,1 9,2 10,2');
     expect(existsSync(join(proj, 'views', 'grass_b.tile3x3.png'))).toBe(true);
     expect(cli(['check', proj, '--checks', 'shiny']).code).toBe(2);
   });

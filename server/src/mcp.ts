@@ -5,7 +5,7 @@ import { McpServer, type CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import { BUILTIN_SCHEMES, CHECK_IDS, checkSummary, ctxOf, diffPixels, diffText, type CheckResult, type Note, type TapeEntry } from '@pixelclaw/core';
 import { ProjectError, listAssets, readPaletteFile } from './project.ts';
-import { formatChecks } from './report.ts';
+import { formatChecks, formatSeeds } from './report.ts';
 import { writeReview } from './review.ts';
 import { EXPORT_FORMATS, exportAsset } from './export.ts';
 import { exportWithProfile, importIntoProject, importSummary, planImport, projectProfiles, projectSchemes } from './io.ts';
@@ -14,7 +14,8 @@ import { openRequests, type WorkRequest } from '@pixelclaw/core';
 import { manifestEntry, planReport, planText, readManifest, writeManifest, writeTemplates } from './plan.ts';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { VIEW_MODES, parseRegion, type View, type ViewMode } from './views.ts';
+import { VIEW_MODES, makeView, parseRegion, type View, type ViewMode } from './views.ts';
+import { needsUnderlay } from './underlay.ts';
 import { SUMMARY_BUDGET, type AssetChanges, type Writer } from './writer.ts';
 
 /** The author name every MCP batch is written with, and whose read position `changes` keeps. */
@@ -26,7 +27,7 @@ export const INSTRUCTIONS = `PixelClaw is a pixel art editor you drive with a sm
 
 Start with the \`project\` tool: it lists palettes and assets, and gives a watch link (http://127.0.0.1:…/?token=…). Give the person that link so they can watch you draw live, and edit too.
 
-Draw with \`run\` (one batch = one undo group; any error applies nothing); every result ends with a one-line check summary. Look with \`view\` (render: scaled PNG with grid and rulers; tile3x3: seams and repetition; grid: exact palette keys per pixel; diff: what the last group changed; game: a sprite on its ground at 1x and the draw scale beside its set; recolour: role art under preview themes; map: a family on a random island with the seam score; family: every variant among its neighbours; marks: "failing" circles flagged pixels in magenta). \`check\` gives the full table: each check's score against the style guide's threshold and the exact pixels it flags; fix them by coordinates. Read the tape with \`history\`. \`review\` writes a blind review bundle: hand its folder to a fresh agent with no context, and bring its findings back as notes on the pixels.
+Draw with \`run\` (one batch = one undo group; any error applies nothing); every result ends with a one-line check summary. \`run\` with dry=true applies to a copy, checks it and keeps nothing. \`seeds\` tries a generator line (noise, scatter, voronoi, bricks, map gen, family coverage) with N seeds and ranks them by the checks (apply=true runs the best): use it instead of guessing seeds by hand. Look with \`view\` (render: scaled PNG with grid and rulers; tile3x3: seams and repetition; grid: exact palette keys per pixel; diff: what the last group changed; game: a sprite on its ground at 1x and the draw scale beside its set; recolour: role art under preview themes; map: a family on a random island with the seam score; family: every variant among its neighbours; marks: "failing" circles flagged pixels in magenta). \`check\` gives the full table: each check's score against the style guide's threshold and the exact pixels it flags; fix them by coordinates. Read the tape with \`history\`. \`review\` writes a blind review bundle: hand its folder to a fresh agent with no context, and bring its findings back as notes on the pixels.
 
 People edit in the watch view too. Their edits are commands on the same tape, written by human:<name>. Call \`changes\` at the start of each turn while someone is watching, and whenever they say they changed something: it returns their commands and notes since you last looked, with a before/after diff image. Carry on from what they did; never silently redo their pixels. Close a note you have dealt with: note done <id>.
 
@@ -224,9 +225,25 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
       commands: z.string().describe('One or more lines of the command language'),
       view: z.enum(VIEW_MODES).optional().describe('Also return this view of the result'),
       replace: z.boolean().optional().describe('With a leading `new` for an existing asset: start its tape again'),
+      dry: z.boolean().optional().describe('Apply to a copy, check it and report, then discard: nothing is written to the tape (try a change before keeping it)'),
     }),
   }, (a) => w.enqueue(async () => {
     try {
+      if (a.dry) {
+        if (needsUnderlay(a.commands)) return fail('error: a dry run cannot call the image provider (underlay generate/import); run it for real');
+        const d = w.dry({ asset: a.asset, commands: a.commands, by: AGENT, replace: a.replace });
+        if (!d.ok) {
+          return fail(d.errors.map((e) => `${e.line}:${e.col}: error: ${e.message}`).join('\n') + `\n${d.errors.length} error${d.errors.length === 1 ? '' : 's'}; nothing was applied.`);
+        }
+        const out = [`${d.asset}: dry run of ${d.added.length} command${d.added.length === 1 ? '' : 's'}; ${d.changed} px would change; nothing was kept`];
+        out.push(...d.added.map((e) => `  ${e.cmd.split('\n')[0]}`));
+        out.push(d.warnings.length ? `warnings: ${d.warnings.join('; ')}` : 'warnings: none');
+        if (d.doc) out.push(checkSummary(d.results));
+        const content: CallToolResult['content'] = [text(out.join('\n'))];
+        if (a.view && d.doc && !['render', 'grid', 'tile3x3'].includes(a.view)) return fail(`error: a dry run shows render, grid or tile3x3 (not ${a.view})`);
+        if (a.view && d.doc) content.push(...viewContent(makeView(d.doc, a.view, { frame: ctxOf(d.doc, AGENT).frame, tickRate: w.project.json.tickRate ?? 60 }, join(w.project.dir, 'views', 'dry'))));
+        return { content };
+      }
       const r = await w.runAsync({ asset: a.asset, commands: a.commands, by: AGENT, replace: a.replace });
       if (!r.ok) {
         return fail(r.errors.map((e) => `${e.line}:${e.col}: error: ${e.message}`).join('\n') +
@@ -298,6 +315,48 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
       const v = w.view(a.asset, a.mode as ViewMode, { scale: a.scale, region, since: a.since, frame, marks, theme: a.theme, themes: a.themes, ground: a.ground, with: a.with, size, seed: a.seed, camera });
       w.showEye(a.asset, v);
       return { content: viewContent(v) };
+    } catch (e) {
+      return errorResult(e);
+    }
+  }));
+
+  server.registerTool('seeds', {
+    title: 'Try seeds',
+    description: 'Try a generator line (noise, scatter, voronoi, bricks, map gen, family coverage, …) with several seeds, each as a dry run on the asset, and rank them by the checks: ' +
+      'fewest failing first, then the least over their limits, then the most room on the rest. Nothing is kept unless apply is true (then the best seed is run as one undo group).',
+    inputSchema: z.object({
+      asset: z.string(),
+      line: z.string().describe('One generator command; any seed= in it is replaced'),
+      before: z.string().optional().describe('Commands run first in the same batch (a selection, a clear)'),
+      count: z.number().int().min(1).max(64).optional().describe('How many seeds (default 8)'),
+      from: z.number().int().min(1).optional().describe('The first seed (default 1); seeds from..from+count-1'),
+      seeds: z.array(z.number().int().min(1)).max(64).optional().describe('These seeds instead'),
+      checks: z.array(z.enum(CHECK_IDS)).optional().describe('Rank by these checks only (default all)'),
+      apply: z.boolean().optional().describe('Run the best seed for real'),
+      view: z.enum(VIEW_MODES).optional().describe('With apply: also return this view of the result'),
+    }),
+  }, (a) => w.enqueue(() => {
+    try {
+      const r = w.seeds({ asset: a.asset, line: a.line, before: a.before, by: AGENT, count: a.count, from: a.from, seeds: a.seeds, checks: a.checks });
+      if (!r.ok) return fail(r.errors.map((e) => `${e.line}:${e.col}: error: ${e.message}`).join('\n'));
+      const out = [formatSeeds(a.asset, r.trials)];
+      const content: CallToolResult['content'] = [];
+      if (a.apply && r.trials[0]) {
+        const best = r.trials[0];
+        const run = w.run({ asset: a.asset, commands: a.before ? `${a.before}\n${best.line}` : best.line, by: AGENT });
+        if (!run.ok) return fail(run.errors.map((e) => `${e.line}:${e.col}: error: ${e.message}`).join('\n'));
+        out.push('', `applied seed ${best.seed} as group ${run.group}; ${run.changed} px changed`);
+        if (run.doc) out.push(checkSummary(w.checks(a.asset, { budget: SUMMARY_BUDGET }).results));
+        content.push(text(out.join('\n')));
+        if (a.view && run.doc) {
+          const v = w.view(a.asset, a.view, { frame: ctxOf(run.doc, AGENT).frame });
+          w.showEye(a.asset, v);
+          content.push(...viewContent(v));
+        }
+        return { content };
+      }
+      out.push('', r.trials[0] ? `nothing was kept; run the best: ${r.trials[0].line} (or seeds apply=true)` : 'no seeds tried');
+      return { content: [text(out.join('\n'))] };
     } catch (e) {
       return errorResult(e);
     }

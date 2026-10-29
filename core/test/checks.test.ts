@@ -278,6 +278,28 @@ describe('repetition', () => {
       expect(check(loud, 'repetition').status).toBe('fail');
     }
   });
+
+  it('G13: one mark on a calm tile is not a stripe; the limit scales with the band\'s spread', () => {
+    // A 3x3 ink pebble on calm noise: its rows are 1/8 ink, so they are darker on average
+    // (score above 3), but the difference is all in three pixels of each row.
+    for (const seed of [1, 2, 3]) {
+      const calm = doc(`new tile t 24x24 bg=moss\npalette add moss2 hex=#476f3f\nnoise ramp=moss,moss2 weights=3,1 cluster=1..2 density=0.15 seed=${seed}\nrect 10,10 3x3 c=ink fill`);
+      expect(check(calm, 'repetition', { style: { checks: { repetition: { contrast: 0 } } } }).status).toBe('fail');
+      const r = check(calm, 'repetition');
+      expect(r.status).toBe('pass');
+    }
+    // A line of ink across a third of the tile is a dashed stripe when tiled: it still fails.
+    const dash = doc('new tile t 24x24 bg=moss\nrect 6,10 12x1 c=ink fill');
+    expect(check(dash, 'repetition').status).toBe('fail');
+    // contrast=0 is the old rule.
+    const pebble = doc('new tile t 24x24 bg=moss\nrect 10,10 3x3 c=ink fill');
+    const r = check(pebble, 'repetition');
+    expect(r).toMatchObject({ status: 'pass' });
+    expect(r.detail).toMatch(/(row|rows) 1[0-2](-1[0-2])?, darker .*limit raised from 3/);
+    expect(check(pebble, 'repetition', { style: { checks: { repetition: { contrast: 0 } } } }).status).toBe('fail');
+    const s = repetitionScore(pebble, 0, 3, 3);
+    expect(s.limit).toBeCloseTo(3 * s.spread * Math.sqrt(s.width / 24), 9);
+  });
 });
 
 describe('style and context', () => {

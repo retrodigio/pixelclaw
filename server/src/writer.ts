@@ -95,6 +95,47 @@ export type RunOutcome =
   }
   | { ok: false; errors: Diag[] };
 
+/** `run dry=true`: a batch applied to a copy and checked; nothing is kept. */
+export type DryOutcome =
+  | { ok: true; asset: string; doc: Doc | null; added: TapeEntry[]; changed: number; warnings: string[]; results: CheckResult[] }
+  | { ok: false; errors: Diag[] };
+
+export interface SeedsRequest {
+  asset: string;
+  /** One generator command (noise, scatter, voronoi, bricks, map gen, family coverage, …); its seed= is replaced. */
+  line: string;
+  /** Commands run first in the same batch (a selection, a clear). */
+  before?: string;
+  by: string;
+  /** Seeds from..from+count-1 (default 1 and 8), or these seeds. */
+  count?: number;
+  from?: number;
+  seeds?: number[];
+  /** Rank by these checks (default all). */
+  checks?: CheckId[];
+}
+
+/** One seed's dry run: the line as written, what fails, and how far over its limits. */
+export interface SeedTrial {
+  seed: number;
+  line: string;
+  results: CheckResult[];
+  failing: CheckId[];
+  /** Failing checks' scores over their limits, summed (0 when every check passes). */
+  excess: number;
+  /** The closest any passing check comes to its limit (score over limit; lower is safer). */
+  margin: number;
+}
+
+/** A check's score against its limit as a ratio: above 1 fails (≥ limits are inverted). */
+export function overLimit(r: CheckResult): number | null {
+  const m = /^([≤≥<>]) ?(-?[\d.]+)/.exec(r.limit);
+  if (!m || r.score === null || !Number.isFinite(r.score)) return null;
+  const lim = Number(m[2]);
+  if (m[1] === '≤' || m[1] === '<') return lim > 0 ? r.score / lim : r.score > 0 ? 1 + r.score : 0;
+  return r.score > 0 ? lim / r.score : lim > 0 ? 2 : 0;
+}
+
 export interface HistoryRequest {
   asset: string;
   from?: number;
@@ -133,6 +174,20 @@ export type Listener = (m: ServerMessage) => void;
 /** Commands that write pixels: a batch of these that changes nothing gets a warning. */
 const DRAWING_RE = /^(px|line|rect|ellipse|fill|paint|stroke|shift|flip|rotate|clear|curve|polygon|dither|gradient|outline|shade|clean|noise|scatter|voronoi|bricks|stamp (?!save |remove )|call)\b/;
 const words = (args: Token[]): string[] => args.flatMap((t) => (t.t === 'word' ? [t.v] : []));
+
+/** A batch's warnings: drawing that changed nothing, an unreliable snap. */
+function batchWarnings(added: TapeEntry[], changed: number): string[] {
+  const warnings: string[] = [];
+  const drew = added.some((e) => DRAWING_RE.test(e.cmd));
+  if (drew && changed === 0) warnings.push('the batch changed no pixels');
+  for (const e of added) {
+    const m = /^snap .* r2=([\d.]+) material=([\d.]+|none)/.exec(e.cmd);
+    if (!m) continue;
+    const low = [Number(m[1]) < SNAP_MIN_R2 ? `block R² ${m[1]} < ${SNAP_MIN_R2}` : '', m[2] !== 'none' && Number(m[2]) < SNAP_MIN_MATERIAL ? `material match ${m[2]} < ${SNAP_MIN_MATERIAL}` : ''].filter(Boolean);
+    if (low.length) warnings.push(`snap: ${low.join(', ')}; the draft is unreliable: reroll the underlay (a new prompt or seed) or trace over it instead`);
+  }
+  return warnings;
+}
 
 export interface WriterOptions {
   /** The clock for tape `at` stamps (UTC, whole seconds). */
@@ -314,6 +369,89 @@ export class Writer {
    * <to> from a copy of <from>'s tape up to the fork point.
    */
   run(req: RunRequest): RunOutcome {
+    const b = this.batch(req);
+    if (!b.ok) return b;
+    const { name, creates, r } = b;
+    const base = { asset: name, doc: r.state.doc, group: r.group, added: r.added, changed: r.changed, created: creates };
+    const totals = (s: AssetState) => ({ commands: s.entries.length, groups: new Set(s.entries.map((e) => e.group)).size });
+    if (!r.state.doc || r.added.length === 0) {
+      return { ok: true, ...base, warnings: ['no commands'], ...totals(r.state), dir: null };
+    }
+    const saved = this.checkSaves(r.saves);
+    if (creates) this.timelines.delete(name);
+    const tl = this.timeline(name);
+    const dir = saveAsset(this.project, r.state, (n) => {
+      const at = tl.docAt(r.state.entries, n);
+      if (at.problem) throw new ProjectError(`asset '${name}': ${at.problem}`);
+      return at.doc;
+    }, creates);
+    this.writePalettes(saved);
+    const key = stateKey(this.project, Buffer.from(tapeToJsonl(r.state.entries), 'utf8'), tapeLang(r.state.entries));
+    this.keys.set(name, key);
+    writeStateCache(this.project, name, key, serializeDoc(r.state.doc));
+    this.states.set(name, r.state);
+    this.versions.set(name, ++this.clock);
+    this.live = name;
+    this.freshStyle();
+    const warnings = batchWarnings(r.added, r.changed);
+    this.emit({
+      type: 'batch', asset: name, by: req.by, group: r.group!, entries: creates ? r.state.entries : r.added,
+      changed: r.changed, reset: creates,
+    });
+    return { ok: true, ...base, warnings, ...totals(r.state), dir };
+  }
+
+  /**
+   * `run dry=true`: apply a batch to a copy of the asset, check the result as if it were saved,
+   * and keep nothing (no tape line, no file, nothing sent to the watchers).
+   */
+  dry(req: RunRequest, o: CheckRequest = {}): DryOutcome {
+    const b = this.batch(req, true);
+    if (!b.ok) return b;
+    const { name, r } = b;
+    const doc = r.added.length ? r.state.doc : null;
+    const warnings = doc ? batchWarnings(r.added, r.changed) : ['no commands'];
+    const results = doc ? this.checks(name, o, doc).results : [];
+    return { ok: true, asset: name, doc, added: r.added, changed: r.changed, warnings, results };
+  }
+
+  /**
+   * Try one generator line with several seeds, each as a dry run, and rank them by the checks:
+   * fewest failing first, then the least over their limits, then the most room on the rest.
+   */
+  seeds(req: SeedsRequest): { ok: true; trials: SeedTrial[] } | { ok: false; errors: Diag[] } {
+    const parsed = parse(req.line);
+    if (parsed.errors.length) return { ok: false, errors: parsed.errors };
+    if (parsed.commands.length !== 1) throw new ProjectError(`seeds: give one generator command (got ${parsed.commands.length})`);
+    const seeds = req.seeds?.length ? [...new Set(req.seeds)] : Array.from({ length: req.count ?? 8 }, (_, i) => (req.from ?? 1) + i);
+    if (seeds.some((x) => !Number.isInteger(x) || x < 1)) throw new ProjectError('seeds: seeds are whole numbers from 1');
+    if (seeds.length > 64) throw new ProjectError('seeds: at most 64 seeds at once');
+    const line = req.line.trim().replace(/\s+seed=\S+/, '');
+    const trials: SeedTrial[] = [];
+    for (const seed of seeds) {
+      const text = `${line} seed=${seed}`;
+      const d = this.dry({ asset: req.asset, commands: req.before ? `${req.before}\n${text}` : text, by: req.by }, { checks: req.checks });
+      if (!d.ok) {
+        if (d.errors.some((e) => /no option 'seed'/.test(e.message))) throw new ProjectError(`seeds: '${parsed.commands[0]!.name}' takes no seed (only generators do: noise, scatter, voronoi, bricks, map gen, family coverage, …)`);
+        return d;
+      }
+      const written = d.added.at(-1)?.cmd ?? '';
+      if (!new RegExp(`\\bseed=${seed}\\b`).test(written)) throw new ProjectError(`seeds: '${parsed.commands[0]!.name}' takes no seed (only generators do: noise, scatter, voronoi, bricks, map gen, family coverage, …)`);
+      const live = d.results.filter((x) => x.status !== 'skip');
+      const failing = live.filter((x) => x.status === 'fail');
+      const ratio = (x: CheckResult) => overLimit(x) ?? (x.status === 'fail' ? 2 : 0);
+      trials.push({
+        seed, line: written, results: d.results, failing: failing.map((x) => x.id),
+        excess: failing.reduce((a, x) => a + Math.max(0, ratio(x) - 1), 0),
+        margin: live.filter((x) => x.status === 'pass').reduce((a, x) => Math.max(a, ratio(x)), 0),
+      });
+    }
+    trials.sort((a, b) => a.failing.length - b.failing.length || a.excess - b.excess || a.margin - b.margin || a.seed - b.seed);
+    return { ok: true, trials };
+  }
+
+  /** Parse and apply a batch to the asset's state (or a new one), without saving anything. */
+  private batch(req: RunRequest, dry = false): { ok: true; name: string; creates: boolean; r: Extract<ReturnType<typeof runBatch>, { ok: true }> } | { ok: false; errors: Diag[] } {
     const parsed = parse(req.commands);
     const first = parsed.commands[0];
     const startsNew = first?.name === 'new';
@@ -332,7 +470,8 @@ export class Writer {
     const creates = startsNew || startsFork;
     if (exists) {
       if (creates && !req.replace) throw new AssetExistsError(name);
-      if (!creates) state = this.state(name);
+      // A dry run keeps its own replay cache: its lines must not stand in for the tape's snapshots.
+      if (!creates) state = dry ? { ...this.state(name), cache: new ReplayCache() } : this.state(name);
     } else if (!creates && !parsed.errors.length) {
       throw new ProjectError(`no asset '${name}' in ${this.project.dir}; start the commands with 'new <kind> ${name} <W>x<H>'`);
     }
@@ -344,42 +483,8 @@ export class Writer {
     const defaults = styleDefaults(this.project, readManifest(this.project).manifest);
     const r = runBatch(state, req.commands, { by: req.by, at: this.now(), palettes: paletteSource(this.project), assets, defaults, images: (b) => blobImage(this.project, b) });
     if (!r.ok) return { ok: false, errors: r.errors };
-    const base = { asset: name, doc: r.state.doc, group: r.group, added: r.added, changed: r.changed, created: creates };
-    const totals = (s: AssetState) => ({ commands: s.entries.length, groups: new Set(s.entries.map((e) => e.group)).size });
-    if (!r.state.doc || r.added.length === 0) {
-      return { ok: true, ...base, warnings: ['no commands'], ...totals(r.state), dir: null };
-    }
-    if (r.state.doc.name !== name) throw new ProjectError(`the commands create '${r.state.doc.name}' but the asset is '${name}'`);
-    const saved = this.checkSaves(r.saves);
-    if (creates) this.timelines.delete(name);
-    const tl = this.timeline(name);
-    const dir = saveAsset(this.project, r.state, (n) => {
-      const at = tl.docAt(r.state.entries, n);
-      if (at.problem) throw new ProjectError(`asset '${name}': ${at.problem}`);
-      return at.doc;
-    }, creates);
-    this.writePalettes(saved);
-    const key = stateKey(this.project, Buffer.from(tapeToJsonl(r.state.entries), 'utf8'), tapeLang(r.state.entries));
-    this.keys.set(name, key);
-    writeStateCache(this.project, name, key, serializeDoc(r.state.doc));
-    this.states.set(name, r.state);
-    this.versions.set(name, ++this.clock);
-    this.live = name;
-    this.freshStyle();
-    const warnings: string[] = [];
-    const drew = r.added.some((e) => DRAWING_RE.test(e.cmd));
-    if (drew && r.changed === 0) warnings.push('the batch changed no pixels');
-    for (const e of r.added) {
-      const m = /^snap .* r2=([\d.]+) material=([\d.]+|none)/.exec(e.cmd);
-      if (!m) continue;
-      const low = [Number(m[1]) < SNAP_MIN_R2 ? `block R² ${m[1]} < ${SNAP_MIN_R2}` : '', m[2] !== 'none' && Number(m[2]) < SNAP_MIN_MATERIAL ? `material match ${m[2]} < ${SNAP_MIN_MATERIAL}` : ''].filter(Boolean);
-      if (low.length) warnings.push(`snap: ${low.join(', ')}; the draft is unreliable: reroll the underlay (a new prompt or seed) or trace over it instead`);
-    }
-    this.emit({
-      type: 'batch', asset: name, by: req.by, group: r.group!, entries: creates ? r.state.entries : r.added,
-      changed: r.changed, reset: creates,
-    });
-    return { ok: true, ...base, warnings, ...totals(r.state), dir };
+    if (r.state.doc && r.added.length && r.state.doc.name !== name) throw new ProjectError(`the commands create '${r.state.doc.name}' but the asset is '${name}'`);
+    return { ok: true, name, creates, r };
   }
 
   /**
@@ -511,9 +616,9 @@ export class Writer {
    * run (every check, every frame) is kept until the asset, its ground, its set, the style guide
    * or the manifest changes.
    */
-  checks(asset: string, o: CheckRequest = {}): { results: CheckResult[]; problems: string[] } {
+  checks(asset: string, o: CheckRequest = {}, dry?: Doc): { results: CheckResult[]; problems: string[] } {
     this.freshStyle();
-    const doc = this.doc(asset);
+    const doc = dry ?? this.doc(asset);
     if (o.frame !== undefined && (o.frame < 0 || o.frame >= doc.frameCount)) throw new ProjectError(`frame ${o.frame + 1} does not exist (frames 1..${doc.frameCount})`);
     const m = readManifest(this.project).manifest;
     const entry = manifestEntry(m, asset);
@@ -523,9 +628,11 @@ export class Writer {
       ...(entry.height !== undefined ? { expect: { height: entry.height } } : {}),
       ...(set && this.project.json.style?.sets?.[set]?.checks ? { setChecks: this.project.json.style.sets[set]!.checks } : {}),
     } : {};
-    const all = this.assetDocs();
+    // A dry run's document stands in for the asset, as the project's other assets see it too.
+    const saved = this.assetDocs();
+    const all = dry ? [...saved.filter((a) => a.name !== asset), { name: asset, doc: dry, forkOf: saved.find((a) => a.name === asset)?.forkOf ?? null }] : saved;
     const { ctx, problems } = checkContextFor(asset, doc, all, this.project.json.style, (n) => this.project.palettes.get(n), { ...o, ...plan });
-    const plain = !o.checks && o.frame === undefined && o.budget === undefined && o.ground === undefined && o.ref === undefined && o.set === undefined;
+    const plain = !dry && !o.checks && o.frame === undefined && o.budget === undefined && o.ground === undefined && o.ref === undefined && o.set === undefined;
     const v = (n: string) => `${n}:${this.versions.get(n) ?? 0}`;
     const deps = ctx.world ? all.map((a) => a.name) : [asset, ...(ctx.ground ? [ctx.ground.name] : []), ...(ctx.set ?? []).map((x) => x.name), ...(ctx.peers ?? []).map((x) => x.name)];
     const key = plain ? JSON.stringify([this.project.json.style, m, deps.map(v), all.length, [...this.project.palettes.keys()]]) : '';

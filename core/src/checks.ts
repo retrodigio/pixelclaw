@@ -137,7 +137,8 @@ const DEFAULTS: Record<CheckId, { all: Params } & Partial<Record<string, Params>
   revert: { all: { max: 0.15 } },
   // The most visible stripe when tiled: a band of rows or columns lighter or darker than the
   // rest, ΔL* times the square root of its width.
-  repetition: { all: { max: 3 }, map: { edgeRun: 4, motif: 10 }, font: { off: true } },
+  // The limit rises with the band's own spread along its length (contrast: standard errors; 0 turns it off).
+  repetition: { all: { max: 3, contrast: 3 }, map: { edgeRun: 4, motif: 10 }, font: { off: true } },
   // Frame diff share (changed pixels over the silhouette; the pilot's good pairs changed 16-19 %),
   // pivot drift and ground drift in pixels, silhouette area jumps, and the loop seam.
   anim: { all: { minDiff: 0.08, maxDiff: 0.35, maxPivot: 1, maxGround: 0, maxArea: 0.15 }, tile: { minDiff: 0.03 }, family: { minDiff: 0.01 }, overlay: { minDiff: 0, maxDiff: 1 } },
@@ -999,29 +1000,46 @@ function checkRevert(img: Img, p: Params, ctx: CheckContext): CheckResult {
  * most from the tile's shows. The score is that difference in L* times the square root of the
  * band's width (wider bands show at lower contrast). Random noise on a calm ramp scores about 2;
  * marks that line up in rows score more.
+ *
+ * The limit scales with the band's own contrast along its length (G13): a band that differs
+ * because of one mark (a pebble, a crack on a calm tile) varies a lot along its length, and
+ * tiled it reads as a dotted row of that mark, not a stripe. The limit is the larger of `max`
+ * and `contrast` times the band's lightness spread (the standard deviation of its cross-section
+ * means) times √(width / length): a band fails only when its difference stands out from its own
+ * spread by `contrast` standard errors. A band even along its length (a stripe) keeps `max`.
+ * The band reported is the one nearest to failing (score over limit).
  */
-export function repetitionScore(doc: Doc, frame = 0): { score: number; axis: 'rows' | 'columns'; from: number; width: number; delta: number } {
+export function repetitionScore(doc: Doc, frame = 0, contrast = DEFAULTS.repetition.all.contrast as number, max = DEFAULTS.repetition.all.max as number): {
+  score: number; axis: 'rows' | 'columns'; from: number; width: number; delta: number; spread: number; limit: number;
+} {
   const px = flatten(doc, frame);
   const { width: w, height: h } = doc;
   const L = doc.palette.entries.map((e) => lstar(e.hex));
   const v = Float64Array.from(px, (c) => (c === TRANSPARENT ? 0 : L[c]!));
   const mu = v.reduce((s, x) => s + x, 0) / v.length;
-  let best = { score: 0, axis: 'rows' as 'rows' | 'columns', from: 0, width: 1, delta: 0 };
+  let best = { score: 0, axis: 'rows' as 'rows' | 'columns', from: 0, width: 1, delta: 0, spread: 0, limit: max };
+  let bestRatio = -1;
   for (const axis of ['rows', 'columns'] as const) {
     const n = axis === 'rows' ? h : w;
     const len = axis === 'rows' ? w : h;
-    const lines = Array.from({ length: n }, (_, k) => {
-      let s = 0;
-      for (let i = 0; i < len; i++) s += axis === 'rows' ? v[k * w + i]! : v[i * w + k]!;
-      return s / len;
-    });
+    const at = (k: number, i: number) => (axis === 'rows' ? v[k * w + i]! : v[i * w + k]!);
     for (let width = 1; width <= Math.min(6, Math.floor(n / 4)) || width === 1; width++) {
+      const cross = new Float64Array(len);
       for (let k = 0; k < n; k++) {
-        let s = 0;
-        for (let i = 0; i < width; i++) s += lines[(k + i) % n]!;
-        const delta = s / width - mu;
+        // The band's cross-section: the mean of its `width` lines at each position along it.
+        cross.fill(0);
+        for (let i = 0; i < width; i++) { const r = (k + i) % n; for (let j = 0; j < len; j++) cross[j] += at(r, j); }
+        let m = 0;
+        for (let j = 0; j < len; j++) m += (cross[j] /= width);
+        m /= len;
+        let ss = 0;
+        for (let j = 0; j < len; j++) ss += (cross[j]! - m) ** 2;
+        const spread = Math.sqrt(ss / len);
+        const delta = m - mu;
         const score = Math.abs(delta) * Math.sqrt(width);
-        if (score > best.score + 1e-9) best = { score, axis, from: k, width, delta };
+        const limit = Math.max(max, contrast * spread * Math.sqrt(width / len));
+        const ratio = score / limit;
+        if (ratio > bestRatio + 1e-9) { bestRatio = ratio; best = { score, axis, from: k, width, delta, spread, limit }; }
       }
       if (n < 4) break;
     }
@@ -1031,9 +1049,9 @@ export function repetitionScore(doc: Doc, frame = 0): { score: number; axis: 'ro
 
 function checkRepetition(img: Img, p: Params, ctx: CheckContext): CheckResult {
   if (!img.wrap) return skip('repetition', 'not a wrap (tile) document');
-  const r = repetitionScore(img.doc, ctx.frame ?? 0);
   const max = Number(p.max);
-  const fail = r.score > max;
+  const r = repetitionScore(img.doc, ctx.frame ?? 0, Number(p.contrast ?? 0), max);
+  const fail = r.score > r.limit;
   const n = r.axis === 'rows' ? img.h : img.w;
   const len = r.axis === 'rows' ? img.w : img.h;
   const band: Pt[] = [];
@@ -1051,10 +1069,14 @@ function checkRepetition(img: Img, p: Params, ctx: CheckContext): CheckResult {
   const last = (r.from + r.width - 1) % n;
   const where = r.width === 1 ? `${r.axis === 'rows' ? 'row' : 'column'} ${r.from}` : `${r.axis} ${r.from}-${last}`;
   const tone = r.delta < 0 ? 'darker' : 'lighter';
+  // A limit raised above `max` says why: the band's difference is uneven along it (a mark, not a stripe).
+  const raised = r.limit > max + 1e-9;
+  const limit = raised ? `≤ ${fmt(r.limit, 1)}` : `≤ ${max}`;
+  const why = raised ? `; limit raised from ${max} by its spread along the band (σ ${fmt(r.spread, 1)}): an uneven band is a mark, not a stripe` : '';
   return result('repetition', {
-    status: fail ? 'fail' : 'pass', score: r.score, shown: fmt(r.score, 1), limit: `≤ ${max}`,
+    status: fail ? 'fail' : 'pass', score: r.score, shown: fmt(r.score, 1), limit,
     groups: fail ? [{ label: `${where}: ${tone} than the rest (ΔL* ${fmt(Math.abs(r.delta), 1)}), a stripe when tiled`, pts }] : [],
-    detail: `most visible stripe: ${where}, ${tone} by ΔL* ${fmt(Math.abs(r.delta), 1)} (score ΔL*·√width ${fmt(r.score, 1)})`,
+    detail: `most visible stripe: ${where}, ${tone} by ΔL* ${fmt(Math.abs(r.delta), 1)} (score ΔL*·√width ${fmt(r.score, 1)}${why})`,
   });
 }
 

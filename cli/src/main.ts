@@ -11,7 +11,7 @@ import {
 import {
   AssetExistsError, NoAssetError, ProjectError, VIEW_MODES, Writer, assetDir, checkpointNames, createProject, formatChecks, isViewMode, listAssets,
   loadProject, lockHolder, paletteSource, parseRegion, prefixHash, previewPng, readAssetJson, readCheckpoints, readPaletteFile,
-  needsUnderlay, resolveUnderlays, readTape, readTapeFile, readStateCacheRaw, stateKey, saveAsset, sha256, writeReview, planReport, planText, writeManifest, writeTemplates, SUMMARY_BUDGET, EXPORT_FORMATS, exportAsset, exportWithProfile, importIntoProject, importSummary, planImport, type ExportFormat, type Project, type ViewMode,
+  needsUnderlay, resolveUnderlays, formatSeeds, readTape, readTapeFile, readStateCacheRaw, stateKey, saveAsset, sha256, writeReview, planReport, planText, writeManifest, writeTemplates, SUMMARY_BUDGET, EXPORT_FORMATS, exportAsset, exportWithProfile, importIntoProject, importSummary, planImport, type ExportFormat, type Project, type ViewMode,
 } from '@pixelclaw/server';
 
 export interface Io {
@@ -35,10 +35,14 @@ export const USAGE = `pixelclaw: a pixel art editor driven by commands
   pixelclaw new <project> <kind> <name> <W>x<H> [palette=..] [wrap=on|off] [cell=WxH] [bg=..] [--replace]
       Create an asset (kinds: tile, sprite, sheet, icon, object, map, …). Same as running a 'new' command.
   pixelclaw run <project> (<script.pclaw> | - | -e "<commands>") [--asset <name>] [--replace] [--by <author>] [--view <mode>]
-      Apply commands as one undo group. Any error applies nothing.
+      Apply commands as one undo group. Any error applies nothing. --dry applies them to a copy,
+      prints the checks and keeps nothing.
       A script that starts with 'new' creates the asset (--replace starts its tape again).
       underlay generate|import lines are resolved first (an image provider, the key from
       OPENAI_API_KEY, a cost cap per call, logs/underlay-costs.jsonl; or a PNG file).
+  pixelclaw seeds <project> <asset> <generator line> [--count 8] [--from 1 | --seeds 3,7,9] [--checks a,b] [--before "<commands>"] [--apply]
+      Try the line (noise, scatter, voronoi, bricks, map gen, family coverage, …) with each seed as a
+      dry run and rank the seeds by the checks; --apply runs the best one.
   pixelclaw view <project> <asset> [render|grid|tile3x3|diff|game|recolour|anim|map|family|density|all]... [--scale N] [--region x,y,WxH] [--frame N] [--out <dir>]
          [--marks failing|<check>,...] [--theme <name>] [--themes a,b,c] [--ground <tile>] [--with <asset>]... [--size CxR] [--seed N] [--camera x,y]
       Write views (default: <project>/views/<asset>.<mode>.png|txt). The grid is also printed.
@@ -148,9 +152,10 @@ function assertNoServer(proj: Project): void {
   if (held) throw new ProjectError(`a pixelclaw server (pid ${held.pid}) owns ${proj.dir}; send commands through it (MCP), or stop it first`);
 }
 
-function apply(io: Io, proj: Project, text: string, source: string, o: { asset?: string; replace: boolean; by: string }): { code: number; doc?: Doc } {
-  assertNoServer(proj);
+function apply(io: Io, proj: Project, text: string, source: string, o: { asset?: string; replace: boolean; by: string; dry?: boolean }): { code: number; doc?: Doc } {
   const w = new Writer(proj, { now: io.now });
+  if (o.dry) return applyDry(io, w, text, source, o);
+  assertNoServer(proj);
   let r;
   try {
     r = w.run({ asset: o.asset, commands: text, by: o.by, replace: o.replace });
@@ -167,6 +172,43 @@ function apply(io: Io, proj: Project, text: string, source: string, o: { asset?:
   for (const wn of r.warnings) io.out(`  warning: ${wn}\n`);
   io.out(`  ${checkSummary(w.checks(r.asset, { budget: SUMMARY_BUDGET }).results)}\n`);
   return { code: 0, doc: r.doc };
+}
+
+/** `run --dry`: apply to a copy, check it, keep nothing (safe while a server owns the project). */
+function applyDry(io: Io, w: Writer, text: string, source: string, o: { asset?: string; replace: boolean; by: string }): { code: number; doc?: Doc } {
+  if (needsUnderlay(text)) throw new UsageError('run --dry: a dry run cannot call the image provider (underlay generate/import)');
+  let r;
+  try {
+    r = w.dry({ asset: o.asset, commands: text, by: o.by, replace: o.replace });
+  } catch (e) {
+    if (e instanceof NoAssetError) { io.err(`error: say which asset with --asset <name> (or start the script with 'new')\n`); return { code: 1 }; }
+    if (e instanceof AssetExistsError) { io.err(`error: asset '${e.asset}' already exists; use --replace to try starting its tape again\n`); return { code: 1 }; }
+    throw e;
+  }
+  if (!r.ok) { printErrors(io, source, r.errors); return { code: 1 }; }
+  io.out(`${r.asset}: dry run of ${r.added.length} command${r.added.length === 1 ? '' : 's'}; ${r.changed} px would change; nothing was kept\n`);
+  for (const wn of r.warnings) io.out(`  warning: ${wn}\n`);
+  if (r.doc) io.out(`  ${checkSummary(r.results)}\n`);
+  return { code: 0, doc: r.doc ?? undefined };
+}
+
+function cmdSeeds(io: Io, p: Parsed): number {
+  const [dir, asset, ...line] = p.pos;
+  if (!dir || !asset || !line.length) throw new UsageError('seeds: give a project, an asset and a generator line');
+  const proj = loadProject(dir);
+  const num = (k: string) => { const v = one(p, k); if (v === undefined) return undefined; const n = Number(v); if (!Number.isInteger(n) || n < 1) throw new UsageError(`--${k} must be a whole number from 1`); return n; };
+  const checks = one(p, 'checks')?.split(',');
+  for (const c of checks ?? []) if (!isCheckId(c)) throw new UsageError(`unknown check '${c}' (checks: ${CHECK_IDS.join(', ')})`);
+  const seeds = one(p, 'seeds')?.split(',').map(Number);
+  const w = new Writer(proj, { now: io.now });
+  const by = one(p, 'by') ?? 'claude';
+  const before = one(p, 'before');
+  const r = w.seeds({ asset, line: line.join(' '), before, by, count: num('count'), from: num('from'), seeds, checks: checks as CheckId[] | undefined });
+  if (!r.ok) { printErrors(io, '<line>', r.errors); return 1; }
+  io.out(formatSeeds(asset, r.trials) + '\n');
+  if (!p.flags.has('apply') || !r.trials[0]) return 0;
+  const best = r.trials[0];
+  return apply(io, proj, before ? `${before}\n${best.line}` : best.line, '<seeds>', { asset, replace: false, by }).code;
 }
 
 function cmdNewAsset(io: Io, dir: string, p: Parsed): number {
@@ -194,7 +236,7 @@ function cmdRun(io: Io, p: Parsed): number {
     text = readFileSync(script, 'utf8');
     source = script;
   } else throw new UsageError('run: give a script file, - for stdin, or -e "<commands>"');
-  const r = apply(io, proj, text, source, { asset: one(p, 'asset'), replace: p.flags.has('replace'), by: one(p, 'by') ?? 'claude' });
+  const r = apply(io, proj, text, source, { asset: one(p, 'asset'), replace: p.flags.has('replace'), by: one(p, 'by') ?? 'claude', dry: p.flags.has('dry') });
   if (r.code === 0 && r.doc && p.flags.has('view')) return writeViews(io, proj, r.doc, p.flags.get('view')!, p);
   return r.code;
 }
@@ -209,9 +251,9 @@ const RUN_OPTS = ['asset', 'by', 'e', 'view', 'scale', 'region', 'out', 'frame',
 export async function resolveRunArgv(argv: string[], io: Io = nodeIo): Promise<string[]> {
   if (argv[0] !== 'run') return argv;
   let p: Parsed;
-  try { p = parseArgs(argv.slice(1), RUN_OPTS, ['replace']); } catch { return argv; }
+  try { p = parseArgs(argv.slice(1), RUN_OPTS, ['replace', 'dry']); } catch { return argv; }
   const [dir, script] = p.pos;
-  if (!dir) return argv;
+  if (!dir || p.flags.has('dry')) return argv;
   const inline = p.flags.get('e');
   const text = inline ? inline.join('\n') : script === '-' ? io.stdin() : script && existsSync(script) ? readFileSync(script, 'utf8') : null;
   if (text === null || (!needsUnderlay(text) && script !== '-')) return argv;
@@ -562,7 +604,9 @@ export function main(argv: string[], io: Io = nodeIo): number {
         return p.pos.length === 1 ? cmdNewProject(io, p.pos[0], p) : cmdNewAsset(io, p.pos[0], p);
       }
       case 'run':
-        return cmdRun(io, parseArgs(rest, RUN_OPTS, ['replace']));
+        return cmdRun(io, parseArgs(rest, RUN_OPTS, ['replace', 'dry']));
+      case 'seeds':
+        return cmdSeeds(io, parseArgs(rest, ['count', 'from', 'seeds', 'checks', 'before', 'by'], ['apply']));
       case 'view':
         return cmdView(io, parseArgs(rest, ['scale', 'region', 'out', 'frame', 'marks', 'theme', 'themes', 'ground', 'with', 'size', 'seed', 'camera'], []));
       case 'export': {
