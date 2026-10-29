@@ -153,7 +153,7 @@ const DEFAULTS: Record<CheckId, { all: Params } & Partial<Record<string, Params>
   draworder: { all: { max: 0 } },
   // Maps: the share of one ground's cells that show a mark at the same spot of the cell (a mark:
   // pixels at least `contrast` ΔL* off their cell's median).
-  lattice: { all: { max: 0.3, contrast: 18 } },
+  lattice: { all: { max: 0.3, contrast: 18 } }, // contrast: ΔE (CIE76) from the cell's median colour (G15; ΔL* in G14)
   // A higher-density copy reduced to its base: the share of the base's pixels that differ (a lower
   // copy is authored, so some difference is expected; the report says where).
   density: { all: { max: 0.25 } },
@@ -198,6 +198,20 @@ export function lstar(hex: string): number {
   const [r, g, b] = rgbOf(hex);
   const y = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
   return y > 216 / 24389 ? 116 * Math.cbrt(y) - 16 : (24389 / 27) * y;
+}
+
+/** CIE L*a*b* (D65) of an sRGB colour. */
+export function lab(hex: string): [number, number, number] {
+  const lin = (c: number) => {
+    const v = c / 255;
+    return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  };
+  const [r, g, b] = rgbOf(hex).map(lin) as [number, number, number];
+  const f = (t: number) => (t > 216 / 24389 ? Math.cbrt(t) : ((24389 / 27) * t + 16) / 116);
+  const x = f((0.4124564 * r + 0.3575761 * g + 0.1804375 * b) / 0.95047);
+  const y = f(0.2126729 * r + 0.7151522 * g + 0.072175 * b);
+  const z = f((0.0193339 * r + 0.119192 * g + 0.9503041 * b) / 1.08883);
+  return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
 }
 
 // --- the image every check reads
