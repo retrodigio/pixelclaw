@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { serve, type Served } from '../src/serve.ts';
-import { Writer, loadProject } from '../src/index.ts';
+import { Writer, createProject, loadProject, readCostLog } from '../src/index.ts';
 import { BIN, PALETTE, type Content } from './spawn.ts';
 
 const texts = (c: Content) => c.filter((x) => x.type === 'text').map((x) => x.text).join('\n');
@@ -84,5 +84,20 @@ describe('seeds', () => {
     const ap = await call('seeds', { asset: 'turf', line, count: 6, apply: true });
     expect(texts(ap.content)).toContain(`applied seed ${best.seed} as group`);
     expect(texts((await call('history', { asset: 'turf', last: 1 })).content)).toContain(`seed=${best.seed}`);
+  });
+});
+
+describe('item 3: underlays sized from the placed area', () => {
+  it('a portrait area of a landscape sheet asks for a portrait image', async () => {
+    const p = createProject(join(root, 'u.pclaw'), { palettes: [JSON.parse(readFileSync(PALETTE, 'utf8'))] });
+    const w = new Writer(p, { now: () => '2026-10-29T09:00:00Z' });
+    expect(w.run({ commands: 'new sheet yard 96x48 cell=24x24', by: 'claude' }).ok).toBe(true);
+    const r = await w.runAsync({ asset: 'yard', commands: 'underlay generate "a well" provider=fake at=24,0 size=24x48', by: 'claude' });
+    expect(r.ok && r.added[0]!.cmd).toMatch(/image=1024x1536 at=24,0 size=24x48 /);
+    const whole = await w.runAsync({ asset: 'yard', commands: 'underlay generate "the yard" provider=fake layer=all', by: 'claude' });
+    expect(whole.ok && whole.added[0]!.cmd).toMatch(/image=1536x1024 /);
+    const sq = await w.runAsync({ asset: 'yard', commands: 'underlay generate "a tile" provider=fake size=48x48 layer=sq', by: 'claude' });
+    expect(sq.ok && sq.added[0]!.cmd).toMatch(/image=1024x1024 /);
+    expect(readCostLog(p).map((l) => l.size)).toEqual(['1024x1536', '1536x1024', '1024x1024']);
   });
 });

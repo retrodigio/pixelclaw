@@ -308,10 +308,10 @@ export interface ResolveOptions extends ProviderEnv {
 
 const SIZES: [number, number][] = [[1024, 1024], [1536, 1024], [1024, 1536]];
 
-/** The supported size closest to the document's shape. */
-function sizeFor(doc: Doc | null): [number, number] {
-  if (!doc) return [1536, 1024];
-  const r = doc.width / doc.height;
+/** The supported size closest to the shape of the area the underlay is placed on (its orientation and aspect). */
+export function sizeFor(area: [number, number] | null): [number, number] {
+  if (!area) return [1536, 1024];
+  const r = area[0] / area[1];
   return SIZES.reduce((best, s) => (Math.abs(Math.log(s[0] / s[1] / r)) < Math.abs(Math.log(best[0] / best[1] / r)) ? s : best));
 }
 
@@ -326,17 +326,33 @@ function stretch(img: Rgba, w: number, h: number): Rgba {
 }
 
 /** One layer of a document in its palette's colours (a layout drawn on a layer). */
-function layerImage(doc: Doc, name: string): Rgba | null {
+function layerImage(doc: Doc, name: string, box?: { x: number; y: number; w: number; h: number }): Rgba | null {
   const i = doc.layers.findIndex((l) => l.name === name);
   if (i < 0) return null;
   const cel = doc.cels[i]![0]!;
-  const out = createRgba(doc.width, doc.height);
-  for (let k = 0; k < cel.length; k++) {
-    if (cel[k] === TRANSPARENT) continue;
-    const c = rgbOf(doc.palette.entries[cel[k]!]!.hex);
-    out.data.set([c[0], c[1], c[2], 255], k * 4);
+  // Only the placed area: the layout the image must follow is what lies under the underlay.
+  const b = box ?? { x: 0, y: 0, w: doc.width, h: doc.height };
+  const out = createRgba(b.w, b.h);
+  for (let y = 0; y < b.h; y++) for (let x = 0; x < b.w; x++) {
+    const X = b.x + x, Y = b.y + y;
+    if (X < 0 || Y < 0 || X >= doc.width || Y >= doc.height) continue;
+    const v = cel[Y * doc.width + X]!;
+    if (v === TRANSPARENT) continue;
+    const c = rgbOf(doc.palette.entries[v]!.hex);
+    out.data.set([c[0], c[1], c[2], 255], (y * b.w + x) * 4);
   }
   return out;
+}
+
+/** Where an underlay goes on the document: at= and size= (default the whole canvas), in document pixels. */
+function placedArea(opts: Map<string, string>, doc: Doc | null, where: string): { x: number; y: number; w: number; h: number } | null {
+  const at = opts.get('at'), size = opts.get('size');
+  const am = at ? /^(\d+),(\d+)$/.exec(at) : null, sm = size ? /^(\d+)x(\d+)$/.exec(size) : null;
+  if (at && !am) throw new ProjectError(`${where}: at= is a point x,y`);
+  if (size && (!sm || Number(sm[1]) < 1 || Number(sm[2]) < 1)) throw new ProjectError(`${where}: size= is the placed area, like 72x48`);
+  const [x, y] = am ? [Number(am[1]), Number(am[2])] : [0, 0];
+  if (sm) return { x, y, w: Number(sm[1]), h: Number(sm[2]) };
+  return doc ? { x, y, w: doc.width, h: doc.height } : null;
 }
 
 const RESOLVED = /^\s*underlay\s+(generate|import)\b/;
@@ -377,6 +393,7 @@ export async function resolveUnderlays(p: Project, text: string, o: ResolveOptio
     for (const k of opts.keys()) if (!allowed.includes(k)) throw new ProjectError(`${where}: underlay ${sub} has no option '${k}' (options: ${allowed.join(', ')})`);
     const layer = opts.get('layer') ?? (sub === 'generate' ? 'mockup' : 'underlay');
     const place = `${opts.has('at') ? ` at=${opts.get('at')}` : ''}${opts.has('size') ? ` size=${opts.get('size')}` : ''}`;
+    const area = placedArea(opts, o.doc, where);
     // The layout: a PNG file (a flat template) or a layer of the document.
     let layoutImg: Rgba | null = null, layoutBlob: string | null = null;
     const layoutRef = opts.get('layout');
@@ -387,7 +404,7 @@ export async function resolveUnderlays(p: Project, text: string, o: ResolveOptio
         layoutImg = decodePng(bytes);
         layoutBlob = saveBlob(p, bytes, '.png');
       } else {
-        layoutImg = o.doc ? layerImage(o.doc, layoutRef) : null;
+        layoutImg = o.doc ? layerImage(o.doc, layoutRef, area ?? undefined) : null;
         if (!layoutImg) throw new ProjectError(`${where}: layout=${layoutRef} is neither a PNG file in the project nor a layer of the asset`);
         layoutBlob = saveBlob(p, encodePng(layoutImg), '.png');
       }
@@ -417,7 +434,7 @@ export async function resolveUnderlays(p: Project, text: string, o: ResolveOptio
       const m = /^(\d+)x(\d+)$/.exec(sizeText);
       if (!m) throw new ProjectError(`${where}: image= is the size to ask for, like 1536x1024`);
       return [Number(m[1]), Number(m[2])] as [number, number];
-    })() : sizeFor(o.doc);
+    })() : sizeFor(area ? [area.w, area.h] : null);
     const capRaw = opts.get('cap') ?? process.env.PIXELCLAW_UNDERLAY_CAP ?? (cfg.cap !== undefined ? String(cfg.cap) : undefined);
     const cap = capRaw !== undefined ? Number(capRaw) : DEFAULT_CAP;
     if (!Number.isFinite(cap) || cap < 0) throw new ProjectError(`${where}: cap= is US dollars, like 0.25`);
@@ -436,7 +453,7 @@ export async function resolveUnderlays(p: Project, text: string, o: ResolveOptio
     try {
       res = await provider.generate({
         prompt, size, model, quality, layout: layoutImg ? encodePng(stretch(layoutImg, size[0], size[1])) : null,
-        ...(o.doc ? { grid: [o.doc.width, o.doc.height] as [number, number], palette: o.doc.palette } : {}), layoutImage: layoutImg,
+        ...(o.doc ? { grid: [area!.w, area!.h] as [number, number], palette: o.doc.palette } : {}), layoutImage: layoutImg,
       }, o);
     } catch (e) {
       logCost(p, { ...base, ok: false, error: (e as Error).message });
