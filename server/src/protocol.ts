@@ -52,7 +52,7 @@ export interface WorkerStatus {
   /** Who started it (a person, or the CLI), and when. */
   by: string | null;
   startedAt: string | null;
-  /** Spent so far in this run, and the cap (US dollars). */
+  /** Spent on this project so far, over every run (worker-spend.jsonl), and the cap (US dollars). */
   spent: number;
   cap: number;
   sessions: number;

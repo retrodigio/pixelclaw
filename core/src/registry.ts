@@ -16,3 +16,9 @@ import './cmd-io.ts';
 import './cmd-plan.ts';
 import './cmd-font.ts';
 import './cmd-underlay.ts';
+import { COMMANDS } from './commands.ts';
+
+/** Every command's one-line form, from the registry (the headless worker's command reference). */
+export function commandReference(): string {
+  return [...COMMANDS.values()].map((c) => c.summary).join('\n');
+}

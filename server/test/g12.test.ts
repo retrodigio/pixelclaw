@@ -149,7 +149,7 @@ describe('requests and the work tool (§21 items 1, 2)', () => {
 });
 
 describe('the worker with a fake claude (§21 item 2)', () => {
-  const fake = (args: string[] = []) => ({ enabled: true, command: [process.execPath, FAKE], args, cap: 1 });
+  const fake = (opts: string[] = []) => ({ enabled: true, command: [process.execPath, FAKE, ...opts], cap: 1 });
   const seed = async (b: Box, n: number) => {
     expect((await b.call('plan', { manifest: { ...MANIFEST, scenes: undefined, assets: MANIFEST.assets.filter((a) => a.kind !== 'map') } })).isError).toBeFalsy();
     const page = await openPage(wsUrl(b.s.url));

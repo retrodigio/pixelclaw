@@ -6,6 +6,7 @@ export * from './palette.ts';
 export * from './parser.ts';
 export * from './commands.ts';
 export * from './engine.ts';
+export { commandReference } from './registry.ts';
 export * from './raster.ts';
 export * from './render.ts';
 export * from './png.ts';

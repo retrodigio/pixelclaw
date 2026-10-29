@@ -17,7 +17,7 @@ import {
 import type { Eye, ServerMessage, Snapshot, WorkerStatus } from './protocol.ts';
 import { checkCacheKey, readCheckCache, readStateCache, stateKey, writeCheckCache, writeStateCache } from './cache.ts';
 import { readRequests } from './requests.ts';
-import { workerSettings } from './worker-settings.ts';
+import { workerSettings, workerSpent } from './worker-settings.ts';
 import { manifestEntry, readManifest, styleDefaults } from './plan.ts';
 import { makeView, type View, type ViewMode, type ViewOptions } from './views.ts';
 import { blobImage, needsUnderlay, resolveUnderlays, type ProviderEnv } from './underlay.ts';
@@ -232,7 +232,9 @@ export class Writer {
   }
 
   workerStatus(): WorkerStatus {
-    return { enabled: workerSettings(this.project.dir).enabled, ...this.worker };
+    const s = workerSettings(this.project.dir);
+    // Between runs: the ledger's total and the cap as project.json sets it now.
+    return { enabled: s.enabled, ...this.worker, ...(this.worker.running ? {} : { spent: workerSpent(this.project.dir), cap: s.cap }) };
   }
 
   /** The worker controller's report (sent to the watchers). */
@@ -359,14 +361,14 @@ export class Writer {
    * `run`, after resolving the batch's `underlay generate` and `underlay import` lines (which call
    * an image provider or read a file, so they cannot run inside the synchronous batch).
    */
-  async runAsync(req: RunRequest, env: ProviderEnv = {}): Promise<RunOutcome> {
+  async runAsync(req: RunRequest, env: ProviderEnv = {}, o: { confined?: boolean } = {}): Promise<RunOutcome> {
     if (!needsUnderlay(req.commands)) return this.run(req);
     let doc: Doc | null = null;
     const name = req.asset;
     if (name && assetExists(this.project, name)) {
       try { doc = this.doc(name); } catch { doc = null; }
     }
-    const commands = await resolveUnderlays(this.project, req.commands, { ...env, doc, now: this.now() });
+    const commands = await resolveUnderlays(this.project, req.commands, { ...env, doc, now: this.now(), confined: o.confined });
     return this.run({ ...req, commands });
   }
 

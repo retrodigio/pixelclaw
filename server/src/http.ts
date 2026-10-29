@@ -145,8 +145,11 @@ export interface WatchOptions {
   /** How many ports after `port` to try when it is taken. */
   tries?: number;
   host?: string;
-  /** Serve MCP over HTTP at /mcp (the worker's connection), with the token as a bearer. */
-  mcp?: McpServerFactory;
+  /**
+   * Serve MCP over HTTP at /mcp, with the token as a bearer; the running worker's own token gets a
+   * server confined to the project (mcp.ts `confined`).
+   */
+  mcp?: (o: { confined: boolean }) => ReturnType<McpServerFactory>;
   /** The headless worker, started and stopped from the dashboard. */
   worker?: WorkerControl;
 }
@@ -163,7 +166,8 @@ export async function startWatchServer(o: WatchOptions): Promise<WatchServer> {
     for (const s of sockets) s.send(text);
   };
   const unsubscribe = o.writer.on(broadcast);
-  const mcpHandler = o.mcp ? createMcpHandler(o.mcp, { onerror: () => undefined }) : null;
+  const mcpHandler = o.mcp ? createMcpHandler(() => o.mcp!({ confined: false }), { onerror: () => undefined }) : null;
+  const workerHandler = o.mcp ? createMcpHandler(() => o.mcp!({ confined: true }), { onerror: () => undefined }) : null;
   const json = (res: ServerResponse, status: number, v: unknown) => {
     res.writeHead(status, { ...HEADERS, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
     res.end(JSON.stringify(v) + '\n');
@@ -173,7 +177,9 @@ export async function startWatchServer(o: WatchOptions): Promise<WatchServer> {
   const serveMcp = async (req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> => {
     const auth = String(req.headers.authorization ?? '');
     const given = auth.startsWith('Bearer ') ? auth.slice(7) : url.searchParams.get('token');
-    if (!mcpHandler || !tokenOk(given, o.token)) {
+    const workerToken = o.worker?.mcpToken() ?? null;
+    const handler = !mcpHandler ? null : tokenOk(given, o.token) ? mcpHandler : workerToken && tokenOk(given, workerToken) ? workerHandler : null;
+    if (!handler) {
       res.writeHead(mcpHandler ? 401 : 404, { ...HEADERS, 'Content-Type': 'text/plain' }).end(mcpHandler ? 'token required\n' : 'not found\n');
       return;
     }
@@ -182,7 +188,7 @@ export async function startWatchServer(o: WatchOptions): Promise<WatchServer> {
     for (const [k, v] of Object.entries(req.headers)) if (typeof v === 'string') headers.set(k, v); else if (Array.isArray(v)) headers.set(k, v.join(', '));
     const ac = new AbortController();
     res.on('close', () => ac.abort());
-    const r = await mcpHandler.fetch(new Request(url, { method: req.method, headers, body: body ? new Uint8Array(body) : undefined, signal: ac.signal }));
+    const r = await handler.fetch(new Request(url, { method: req.method, headers, body: body ? new Uint8Array(body) : undefined, signal: ac.signal }));
     const out: Record<string, string> = {};
     r.headers.forEach((v, k) => { out[k] = v; });
     res.writeHead(r.status, out);

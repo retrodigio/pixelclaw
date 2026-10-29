@@ -67,8 +67,8 @@ export async function serve(o: ServeOptions): Promise<Served> {
       log(`pixelclaw: now serving ${next}`);
     },
   };
-  const worker = new WorkerControl(writer, () => ({ url: `http://127.0.0.1:${web.port}/mcp`, token }));
-  web = await startWatchServer({ writer, token, port: o.port ?? DEFAULT_PORT, mcp: () => createMcpServer(host, VERSION), worker });
+  const worker = new WorkerControl(writer, () => ({ url: `http://127.0.0.1:${web.port}/mcp` }));
+  web = await startWatchServer({ writer, token, port: o.port ?? DEFAULT_PORT, mcp: (m) => createMcpServer(host, VERSION, m), worker });
   try {
     acquireLock(dir, web.url);
   } catch (e) {

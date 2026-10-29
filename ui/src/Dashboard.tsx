@@ -224,9 +224,9 @@ function WorkerPanel({ store }: { store: Store }) {
     <div className="worker" data-testid="worker">
       {w.running
         ? <button onClick={() => void act('stop')} disabled={busy} data-testid="worker-stop">■ Stop Claude</button>
-        : <button className="ask-claude" onClick={() => void act('start')} disabled={busy} data-testid="worker-start" title="Run Claude Code headless on the open requests, up to the budget cap (project.json worker)">▶ Start Claude</button>}
+        : <button className="ask-claude" onClick={() => void act('start')} disabled={busy} data-testid="worker-start" title="Run Claude Code headless on the open requests, with only the PixelClaw tools, up to the project's budget cap (project.json worker; docs/worker.md)">▶ Start Claude</button>}
       <span className="dim" data-testid="worker-status">
-        {w.running ? `working · $${w.spent.toFixed(2)} of $${w.cap.toFixed(2)} · session ${w.sessions}` : w.stopped ? `stopped: ${w.stopped}` : `cap $${(w.cap || 0).toFixed(2)} a run`}
+        {w.running ? `working · $${w.spent.toFixed(2)} of $${w.cap.toFixed(2)} spent · session ${w.sessions}` : `${w.stopped ? `stopped: ${w.stopped} · ` : ''}$${(w.spent || 0).toFixed(2)} of $${(w.cap || 0).toFixed(2)} cap spent`}
       </span>
       <button className={showLog ? 'on' : ''} onClick={() => setShowLog(!showLog)} data-testid="worker-log-toggle">Log</button>
       {showLog && <pre className="worker-log" ref={logRef} data-testid="worker-log">{store.workerLog.join('\n') || 'nothing yet'}</pre>}

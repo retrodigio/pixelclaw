@@ -120,11 +120,15 @@ wait in `requests.jsonl`; `plan` lists them first and `work` hands them out one 
 2. Draw or change it as for any asset (the house rules, the checks, a look at the game view).
    For a change, `changes` shows the person's own edits and notes on it.
 3. `work(action="done", text="…")` with what you did in a sentence the person can check against
-   the card; or `blocked` with a question. Then `plan`, and `work` again until it says there are
+   the card; or `blocked` with a question. `done` is refused while the asset fails a check: the
+   reply lists them; fix them, or block with a question when only the person can decide. Then `plan`, and `work` again until it says there are
    no open requests; then carry on with planned work.
 
 A headless worker (`pixelclaw work`, or Start Claude in the dashboard when the project enables
 it) follows the same routine with no one at the keyboard: never ask in chat, ask with `blocked`.
+It has only the PixelClaw tools (no shell, files or web; files outside the project are refused),
+its system prompt ends with every command of the language, and a session that makes no tool call
+for a while is stopped (docs/worker.md).
 
 ### Importing existing art
 

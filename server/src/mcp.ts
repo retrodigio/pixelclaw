@@ -4,7 +4,7 @@
 import { McpServer, type CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import { BUILTIN_SCHEMES, CHECK_IDS, cameraOf, checkSummary, drawScaleOf, ctxOf, diffPixels, diffText, type CheckResult, type Note, type TapeEntry } from '@pixelclaw/core';
-import { ProjectError, listAssets, readPaletteFile } from './project.ts';
+import { ProjectError, listAssets, needInsideProject, readPaletteFile } from './project.ts';
 import { formatChecks, formatSeeds } from './report.ts';
 import { writeReview } from './review.ts';
 import { EXPORT_FORMATS, exportAsset } from './export.ts';
@@ -195,8 +195,17 @@ export interface McpHost {
   open(dir: string, o: { create: boolean; name?: string }): void;
 }
 
-export function createMcpServer(host: McpHost, version: string): McpServer {
+export interface McpOptions {
+  /**
+   * The headless worker's connection (plan §26 item 1): every file path a tool takes must be inside
+   * the project folder, another project cannot be opened, and the image provider is not called.
+   */
+  confined?: boolean;
+}
+
+export function createMcpServer(host: McpHost, version: string, mo: McpOptions = {}): McpServer {
   const w = host.writer;
+  const fence = (path: string, what: string) => { if (mo.confined) needInsideProject(w.project, path, what); };
   const server = new McpServer({ name: SERVER_NAME, version }, { capabilities: { tools: {} }, instructions: INSTRUCTIONS });
 
   server.registerTool('project', {
@@ -212,8 +221,10 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
     }),
   }, (a) => w.enqueue(() => {
     try {
+      if (a.path && mo.confined) throw new ProjectError('the worker stays in its project: it cannot open another');
       if (a.path) host.open(a.path, { create: a.create ?? false, name: a.name });
       if (a.grid !== undefined) w.setGrid(a.grid);
+      for (const f of a.palettes ?? []) fence(f, 'palettes');
       if (a.palettes?.length) w.addPalettes(a.palettes.map(readPaletteFile));
       return { content: [text(projectSummary(w, host.url()))] };
     } catch (e) {
@@ -250,7 +261,7 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
         if (a.view && d.doc) content.push(...viewContent(makeView(d.doc, a.view, { frame: ctxOf(d.doc, AGENT).frame, tickRate: w.project.json.tickRate ?? 60 }, join(w.project.dir, 'views', 'dry'))));
         return { content };
       }
-      const r = await w.runAsync({ asset: a.asset, commands: a.commands, by: AGENT, replace: a.replace });
+      const r = await w.runAsync({ asset: a.asset, commands: a.commands, by: AGENT, replace: a.replace }, {}, { confined: mo.confined });
       if (!r.ok) {
         return fail(r.errors.map((e) => `${e.line}:${e.col}: error: ${e.message}`).join('\n') +
           `\n${r.errors.length} error${r.errors.length === 1 ? '' : 's'}; nothing was applied.`);
@@ -483,6 +494,8 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
     }),
   }, (a) => w.enqueue(() => {
     try {
+      if (a.dest) fence(a.dest, 'dest');
+      if (a.profile?.endsWith('.json')) fence(a.profile, 'profile');
       if (a.format) {
         if (!a.asset) throw new ProjectError('format= exports one asset: give asset');
         const files = exportAsset(w.doc(a.asset), w.assetDocs(), a.format, a.dest ?? join(w.project.dir, 'exports', a.format));
@@ -526,6 +539,7 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
   }, (a) => w.enqueue(() => {
     try {
       const pair = (v: string | undefined, sep: string) => (v ? (v.split(sep).map(Number) as [number, number]) : undefined);
+      fence(a.path, 'path');
       if (!a.profile) {
         const r = importIntoProject(w, {
           ...a, grid: pair(a.grid, 'x'), slice: a.slice ? { cell: pair(a.slice, 'x')!, offset: pair(a.offset, ','), gap: pair(a.gap, ',') } : undefined,

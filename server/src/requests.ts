@@ -121,6 +121,17 @@ export function agentWork(w: Writer, agent: string, q: AgentWork): { request: Wo
   }
   const id = q.id ?? mine(reqs, agent)?.id;
   if (!id) throw new ProjectError(`no claimed request to post ${q.action} on (give id)`);
+  const target = reqs.get(id);
+  if (q.action === 'done' && target && target.state === 'claimed' && target.claimedBy === agent) {
+    // Done means the asset passes its checks (plan §26 item 1); blocked stays open for anything else.
+    if (!assetExists(p, target.asset)) throw new ProjectError(`${id} is not done: ${target.asset} is not drawn yet. Draw it, or work(action="blocked", text=<one clear question>) if you cannot`);
+    const failing = w.checks(target.asset).results.filter((r) => r.status === 'fail');
+    if (failing.length) {
+      throw new ProjectError(`${id} is not done: ${target.asset} fails ${failing.length} check${failing.length === 1 ? '' : 's'}:\n` +
+        failing.map((r) => `  ${r.id} ${r.shown} (limit ${r.limit})${r.detail ? `: ${r.detail}` : ''}`).join('\n') +
+        `\nFix ${failing.length === 1 ? 'it' : 'them'} (check shows the pixels) and finish again, or work(action="blocked", text=<one clear question>) if you cannot.`);
+    }
+  }
   const r = appendRequest(p, { type: q.action, id, by: agent, at, text: q.text });
   return { request: r, message: `${id}: ${q.action}` };
 }

@@ -2,8 +2,8 @@
 // preview.png, checkpoints/}. Everything here is plain files so a project diffs well in git.
 
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join, resolve, sep } from 'node:path';
 import {
   deserializeDoc, tapeLang, encodePng, entryToJson, importPalette, paletteToJson, parseTape, renderFlat, serializeDoc, tapeToJsonl,
   type AssetState, type Doc, type Layer, type Note, type Palette, type PaletteSource, type SchemeJson, type StyleJson, type TapeEntry,
@@ -123,7 +123,36 @@ function projectScheme(dir: string, name: string): SchemeJson | undefined {
 }
 
 export function assetDir(p: Project, name: string): string {
+  // A name is one folder under assets/: never a path out of it.
+  if (!name || /[\\/]/.test(name) || name.startsWith('.')) throw new ProjectError(`'${name}' is not an asset name`);
   return join(p.dir, 'assets', name);
+}
+
+/** A path with its symlinks followed, as far as it exists (the rest appended as written). */
+function realish(f: string): string {
+  const rest: string[] = [];
+  let cur = f;
+  for (;;) {
+    try {
+      return join(realpathSync(cur), ...rest.reverse());
+    } catch {
+      const up = dirname(cur);
+      if (up === cur) return f;
+      rest.push(basename(cur));
+      cur = up;
+    }
+  }
+}
+
+/** Is this path (absolute, or relative to the process) inside the project folder, symlinks followed? */
+export function isInsideProject(p: Project, path: string): boolean {
+  const root = realish(resolve(p.dir)), r = realish(resolve(path));
+  return r === root || r.startsWith(root + sep);
+}
+
+/** The worker's fence (plan §26 item 1): a ProjectError unless the path is inside the project folder. */
+export function needInsideProject(p: Project, path: string, what: string): void {
+  if (!isInsideProject(p, path)) throw new ProjectError(`${what}: '${path}' is outside the project folder, and the worker stays inside it`);
 }
 
 export function listAssets(p: Project): string[] {

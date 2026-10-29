@@ -17,7 +17,7 @@ import {
   TRANSPARENT, Pcg32, createRgba, decodePng, encodePng, hashString, parse, quote, rgbOf,
   type Doc, type Palette, type Rgba,
 } from '@pixelclaw/core';
-import { ProjectError, type Project } from './project.ts';
+import { ProjectError, needInsideProject, type Project } from './project.ts';
 import { saveBlob } from './io.ts';
 
 // --- blobs as images
@@ -338,6 +338,8 @@ export interface ResolveOptions extends ProviderEnv {
   doc: Doc | null;
   /** The writer's clock, for the cost log. */
   now: string;
+  /** The worker's connection: files only from inside the project, and no image provider. */
+  confined?: boolean;
 }
 
 const SIZES: [number, number][] = [[1024, 1024], [1536, 1024], [1024, 1536]];
@@ -423,6 +425,7 @@ export async function resolveUnderlays(p: Project, text: string, o: ResolveOptio
       else throw new ProjectError(`${where}: underlay: unexpected '${t.t}'`);
     }
     const sub = pos.shift()!;
+    if (o.confined && sub === 'generate') throw new ProjectError(`${where}: the worker does not call the image provider (underlay generate); use underlay import with a file in the project, or ask the person`);
     const allowed = sub === 'generate' ? ['layer', 'layout', 'image', 'provider', 'model', 'quality', 'cap', 'at', 'size'] : ['layer', 'layout', 'at', 'size'];
     for (const k of opts.keys()) if (!allowed.includes(k)) throw new ProjectError(`${where}: underlay ${sub} has no option '${k}' (options: ${allowed.join(', ')})`);
     const layer = opts.get('layer') ?? (sub === 'generate' ? 'mockup' : 'underlay');
@@ -433,6 +436,7 @@ export async function resolveUnderlays(p: Project, text: string, o: ResolveOptio
     const layoutRef = opts.get('layout');
     if (layoutRef && layoutRef !== 'none') {
       const path = isAbsolute(layoutRef) ? layoutRef : resolve(p.dir, layoutRef);
+      if (o.confined && /\.png$/i.test(layoutRef)) needInsideProject(p, path, `${where}: layout`);
       if (/\.png$/i.test(layoutRef) && existsSync(path)) {
         const bytes = readFileSync(path);
         layoutImg = decodePng(bytes);
@@ -447,6 +451,7 @@ export async function resolveUnderlays(p: Project, text: string, o: ResolveOptio
       const file = pos[0];
       if (!file || pos.length > 1) throw new ProjectError(`${where}: underlay import <file.png>`);
       const path = isAbsolute(file) ? file : resolve(p.dir, file);
+      if (o.confined) needInsideProject(p, path, `${where}: underlay import`);
       if (!existsSync(path)) throw new ProjectError(`${where}: underlay import: no file ${file}`);
       const bytes = readFileSync(path);
       let img: Rgba;
