@@ -7,6 +7,18 @@ import type { Palette } from './palette.ts';
 
 type Kv = Extract<Token, { t: 'kv' }>;
 
+/**
+ * A region of a canvas or a map, in the one format every command, tool and flag takes (G15):
+ * "x,y WxH", "x,y,WxH" or "x,y,W,H". Null when it is none of them.
+ */
+export function parseRegionText(s: string): { x: number; y: number; w: number; h: number } | null {
+  const t = s.trim();
+  const m = /^(\d+),(\d+)(?:\s+|,)(\d+)x(\d+)$/.exec(t) ?? /^(\d+),(\d+),(\d+),(\d+)$/.exec(t);
+  if (!m) return null;
+  const [x, y, w, h] = m.slice(1).map(Number) as [number, number, number, number];
+  return { x, y, w, h };
+}
+
 /** floor(a / b) for integers, exact while a and b are below 2^53. */
 export function idiv(a: number, b: number): number {
   let q = Math.floor(a / b);

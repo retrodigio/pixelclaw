@@ -306,8 +306,8 @@ export function createMcpServer(host: McpHost, version: string, mo: McpOptions =
     inputSchema: z.object({
       asset: z.string(),
       mode: z.enum(VIEW_MODES).default('render'),
-      scale: z.number().int().min(1).max(64).optional().describe('render only: pixels per pixel'),
-      region: z.string().optional().describe('grid: part of the canvas, "x,y WxH" (e.g. "8,0 12x10"); map of a map document: cells to show at game scale'),
+      scale: z.number().int().min(1).max(64).optional().describe('render: pixels per pixel; tile3x3: the enlarged copy\'s scale (default 4); map, diff, family, anim, recolour, density: their scale'),
+      region: z.string().optional().describe('render, grid: part of the canvas, "x,y WxH" (e.g. "8,0 12x10"; "8,0,12x10" works too); map of a map document: a region of cells'),
       camera: z.string().regex(/^\d+,\d+$/).optional().describe('map of a map document: the camera\'s view around this cell, "x,y" (the screen size is project.json style.camera, default 16x9 cells of the project\'s grid: 384x216 at 24 px)'),
       since: z.number().int().min(0).optional().describe('diff only: compare with the document after this command number (default: before the latest group)'),
       frame: z.number().int().min(1).optional().describe('render, grid, tile3x3, game, recolour: the frame to show (default: the frame you are drawing on)'),
@@ -322,7 +322,7 @@ export function createMcpServer(host: McpHost, version: string, mo: McpOptions =
   }, (a) => w.enqueue(() => {
     try {
       const region = a.region ? parseRegion(a.region) : undefined;
-      if (region === null) return fail(`error: region must look like "8,0 12x10"`);
+      if (region === null) return fail(`error: region must look like "8,0 12x10" (or "8,0,12x10")`);
       const frame = a.frame !== undefined ? a.frame - 1 : ctxOf(w.doc(a.asset), AGENT).frame;
       const marks = parseMarks(a.marks);
       if (marks === null) return fail(`error: marks must be "failing" or check names (${CHECK_IDS.join(', ')})`);

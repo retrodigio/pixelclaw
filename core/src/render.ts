@@ -144,6 +144,8 @@ export interface ScaledOptions {
   theme?: Theme | null;
   /** The document's underlays composed over it (`composeUnderlay`), shown faded under transparent art. */
   underlay?: Rgba | null;
+  /** Only this part of the canvas (G15); the rulers keep the canvas's coordinates. */
+  region?: { x: number; y: number; w: number; h: number };
 }
 
 /**
@@ -187,11 +189,13 @@ export function renderScaled(doc: Doc, o: ScaledOptions = {}): Rgba {
   const grid = (o.grid ?? true) && s >= 4;
   const rulers = o.rulers ?? true;
   const f = s >= 6 ? 2 : 1;
-  const digits = String(Math.max(doc.width, doc.height)).length;
+  // The part shown: X0,Y0 of the canvas, RW x RH pixels (the whole canvas by default).
+  const { x: X0, y: Y0, w: RW, h: RH } = o.region ?? { x: 0, y: 0, w: doc.width, h: doc.height };
+  const digits = String(Math.max(X0 + RW, Y0 + RH)).length;
   const top = rulers ? 5 * f + 9 : 0;
   const left = rulers ? 2 + textWidth('0'.repeat(digits), f) + 3 + 5 : 0;
-  const W = doc.width * s;
-  const H = doc.height * s;
+  const W = RW * s;
+  const H = RH * s;
   const img = createRgba(left + W + 1, top + H + 1);
   rect(img, 0, 0, img.width, img.height, RULER_BG);
   const px = flatten(doc, o.frame ?? 0);
@@ -199,7 +203,9 @@ export function renderScaled(doc: Doc, o: ScaledOptions = {}): Rgba {
   const u = o.underlay ?? null;
   const pal = colourTable(doc, o.theme);
   const chk = Math.max(2, s >> 1);
-  for (let y = 0; y < doc.height; y++) for (let x = 0; x < doc.width; x++) {
+  const FW = doc.width * s, FH = doc.height * s;
+  for (let ry = 0; ry < RH; ry++) for (let rx = 0; rx < RW; rx++) {
+    const x = X0 + rx, y = Y0 + ry;
     const v = px[y * doc.width + x]!;
     const r = ref ? ref[y * doc.width + x]! : TRANSPARENT;
     for (let j = 0; j < s; j++) for (let i = 0; i < s; i++) {
@@ -209,43 +215,48 @@ export function renderScaled(doc: Doc, o: ScaledOptions = {}): Rgba {
         c = (((x * s + i) / chk | 0) + ((y * s + j) / chk | 0)) % 2 ? CHECK_A : CHECK_B;
         if (r !== TRANSPARENT) c = faded(pal[r]!, c);
         else if (u) {
-          const o = (Math.floor(((y * s + j) * u.height) / H) * u.width + Math.floor(((x * s + i) * u.width) / W)) * 4;
+          const o = (Math.floor(((y * s + j) * u.height) / FH) * u.width + Math.floor(((x * s + i) * u.width) / FW)) * 4;
           if (u.data[o + 3]! >= 128) c = faded([u.data[o]!, u.data[o + 1]!, u.data[o + 2]!], c);
         }
       }
-      put(img, left + x * s + i, top + y * s + j, c);
+      put(img, left + rx * s + i, top + ry * s + j, c);
     }
   }
   if (grid) {
-    for (let x = 0; x <= doc.width; x++) {
-      const a = x % 8 === 0 ? 80 : 30;
-      for (let y = 0; y < H; y++) shade(img, left + x * s, top + y, a);
+    for (let rx = 0; rx <= RW; rx++) {
+      const a = (X0 + rx) % 8 === 0 ? 80 : 30;
+      for (let y = 0; y < H; y++) shade(img, left + rx * s, top + y, a);
     }
-    for (let y = 0; y <= doc.height; y++) {
-      const a = y % 8 === 0 ? 80 : 30;
-      for (let x = 0; x < W + 1; x++) if ((x % s) !== 0 || x === W) shade(img, left + x, top + y * s, a);
+    for (let ry = 0; ry <= RH; ry++) {
+      const a = (Y0 + ry) % 8 === 0 ? 80 : 30;
+      for (let x = 0; x < W + 1; x++) if ((x % s) !== 0 || x === W) shade(img, left + x, top + ry * s, a);
     }
   }
   const sheet = doc.cellW < doc.width || doc.cellH < doc.height;
   if (sheet) {
-    for (let x = doc.cellW; x < doc.width; x += doc.cellW) for (let y = 0; y < H; y++) tint(img, left + x * s, top + y, CELL_LINE, 180);
-    for (let y = doc.cellH; y < doc.height; y += doc.cellH) for (let x = 0; x < W; x++) tint(img, left + x, top + y * s, CELL_LINE, 180);
+    for (let x = doc.cellW; x < doc.width; x += doc.cellW) if (x > X0 && x < X0 + RW) for (let y = 0; y < H; y++) tint(img, left + (x - X0) * s, top + y, CELL_LINE, 180);
+    for (let y = doc.cellH; y < doc.height; y += doc.cellH) if (y > Y0 && y < Y0 + RH) for (let x = 0; x < W; x++) tint(img, left + x, top + (y - Y0) * s, CELL_LINE, 180);
   }
-  if (o.marks?.length) drawMarks(img, left, top, s, o.marks, doc.width, doc.height);
+  if (o.marks?.length) {
+    const inside = o.marks.filter(([x, y]) => x >= X0 && y >= Y0 && x < X0 + RW && y < Y0 + RH).map(([x, y]) => [x - X0, y - Y0] as Pt);
+    if (inside.length) drawMarks(img, left, top, s, inside, RW, RH);
+  }
   if (rulers) {
-    for (let x = 0; x <= doc.width; x++) {
+    for (let rx = 0; rx <= RW; rx++) {
+      const x = X0 + rx;
       const major = x % 8 === 0;
       if (!major && s < 4) continue;
-      rect(img, left + x * s, top - (major ? 6 : 3), 1, major ? 6 : 3, major ? RULER_TEXT : RULER_TICK);
-      if (major && x < doc.width) text(img, left + x * s + 2, 2, String(x), RULER_TEXT, f);
+      rect(img, left + rx * s, top - (major ? 6 : 3), 1, major ? 6 : 3, major ? RULER_TEXT : RULER_TICK);
+      if (major && rx < RW) text(img, left + rx * s + 2, 2, String(x), RULER_TEXT, f);
     }
-    for (let y = 0; y <= doc.height; y++) {
+    for (let ry = 0; ry <= RH; ry++) {
+      const y = Y0 + ry;
       const major = y % 8 === 0;
       if (!major && s < 4) continue;
-      rect(img, left - (major ? 6 : 3), top + y * s, major ? 6 : 3, 1, major ? RULER_TEXT : RULER_TICK);
-      if (major && y < doc.height) {
+      rect(img, left - (major ? 6 : 3), top + ry * s, major ? 6 : 3, 1, major ? RULER_TEXT : RULER_TICK);
+      if (major && ry < RH) {
         const label = String(y);
-        text(img, left - 8 - textWidth(label, f), top + y * s + 2, label, RULER_TEXT, f);
+        text(img, left - 8 - textWidth(label, f), top + ry * s + 2, label, RULER_TEXT, f);
       }
     }
   }

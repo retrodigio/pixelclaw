@@ -9,7 +9,7 @@ import { Args, blockText, drawable, fn, needDoc, registerCommand, type CommandSp
 import { TRANSPARENT, ctxOf, flatten, type Doc } from './doc.ts';
 import { scaleIndices } from './density.ts';
 import { DiagError, quote, type BlockRow } from './parser.ts';
-import { intOpt } from './values.ts';
+import { intOpt, parseRegionText } from './values.ts';
 
 const importCmd: CommandSpec = {
   name: 'import',
@@ -33,9 +33,9 @@ const importCmd: CommandSpec = {
       const src = ctx.asset?.(assetOpt.value);
       if (!src) throw new DiagError(assetOpt.line, assetOpt.vcol, `import: no asset '${assetOpt.value}' to read (not this one)`);
       const reg = a.opts.get('region');
-      const m = reg ? /^(\d+),(\d+),(\d+)x(\d+)$/.exec(reg.value) : null;
-      if (!reg || !m) throw new DiagError(reg?.line ?? cmd.line, reg?.vcol ?? cmd.col, `import: give region=<x,y,WxH> of '${assetOpt.value}'`);
-      const [rx, ry, rw, rh] = m.slice(1).map(Number) as [number, number, number, number];
+      const m = reg ? parseRegionText(reg.value) : null;
+      if (!reg || !m) throw new DiagError(reg?.line ?? cmd.line, reg?.vcol ?? cmd.col, `import: give region=<x,y,WxH> of '${assetOpt.value}' (or "x,y WxH")`);
+      const { x: rx, y: ry, w: rw, h: rh } = m;
       if (rw < 1 || rh < 1 || rx + rw > src.width || ry + rh > src.height) throw new DiagError(reg.line, reg.vcol, `import: region ${reg.value} is outside '${src.name}' (${src.width}x${src.height})`);
       const layerOpt = a.opts.get('layer');
       const li = layerOpt ? src.layers.findIndex((l) => l.name === layerOpt.value) : -1;

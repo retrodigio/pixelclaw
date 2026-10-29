@@ -9,7 +9,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   animGifFrames, animText, diffPixels, diffText, encodeGif, encodePng, mapGifFrames, mapText, renderAnimSheet, renderDiff, renderFamilyView, renderGame, renderGrid, renderMap,
-  renderRecolour, renderDensity, renderScaled, renderTile3x3, layoutOf, schemeOf, cameraRegion, composeMapDoc, mapAscii, mapDiff, mapDocGifFrames, mapDocText, paintComposed,
+  renderRecolour, renderDensity, renderScaled, renderTile3x3, layoutOf, schemeOf, cameraRegion, composeMapDoc, mapAscii, mapDiff, mapDocGifFrames, mapDocText, paintComposed, parseRegionText,
   type Doc, type MapWorld, type Pt, type Region, type Rgba, type Theme,
 } from '@pixelclaw/core';
 import { ProjectError } from './project.ts';
@@ -57,11 +57,7 @@ export function isViewMode(s: string): s is ViewMode {
 
 /** "8,0 12x10" or "8,0,12x10" or "8,0,12,10"; null if it doesn't look like a region. */
 export function parseRegion(s: string): Region | null {
-  const t = s.trim();
-  const m = /^(\d+),(\d+)[ ,](\d+)x(\d+)$/.exec(t) ?? /^(\d+),(\d+),(\d+),(\d+)$/.exec(t);
-  if (!m) return null;
-  const [x, y, w, h] = m.slice(1).map(Number) as [number, number, number, number];
-  return { x, y, w, h };
+  return parseRegionText(s);
 }
 
 export function checkViewOptions(doc: Doc, o: ViewOptions): void {
@@ -153,12 +149,13 @@ export function makeView(doc: Doc, mode: ViewMode, o: ViewOptions, outDir: strin
     const text = `${animText(doc, { tickRate: o.tickRate })}\nanimated GIF (every sequence side by side, at game speed): ${gif}`;
     return { mode, kind: 'image', png, width: img.width, height: img.height, path, text, gif };
   }
-  const img = mode === 'render' ? renderScaled(doc, { scale: o.scale, frame: o.frame, marks: o.marks, theme: o.theme, underlay: o.underlay })
-    : mode === 'tile3x3' ? renderTile3x3(doc, o.frame, { marks: o.marks, theme: o.theme })
+  // render takes a region (the rulers keep the canvas's coordinates); tile3x3 a scale for its enlarged copy (G15).
+  const img = mode === 'render' ? renderScaled(doc, { scale: o.scale, frame: o.frame, marks: o.marks, theme: o.theme, underlay: o.underlay, ...(o.region ? { region: o.region } : {}) })
+    : mode === 'tile3x3' ? renderTile3x3(doc, o.frame, { marks: o.marks, theme: o.theme, ...(o.scale ? { scale: o.scale } : {}) })
     : mode === 'game' ? renderGame([...(o.game?.frames ?? [o.frame ?? 0]).map((f) => ({ doc, frame: f })), ...(o.game?.with ?? []).map((d) => ({ doc: d }))], { ground: o.game?.ground, scale: o.game?.scale ?? 2, theme: o.theme, marks: o.marks })
     : renderRecolour(doc, o.themes ?? [], { scale: o.scale, frame: o.frame });
   const png = encodePng(img);
-  const path = join(outDir, `${doc.name}.${mode}.png`);
+  const path = join(outDir, `${doc.name}.${mode}${mode === 'render' && o.region ? `.${o.region.x}-${o.region.y}-${o.region.w}x${o.region.h}` : ''}.png`);
   writeFileSync(path, png);
   return { mode, kind: 'image', png, width: img.width, height: img.height, path };
 }

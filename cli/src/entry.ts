@@ -70,6 +70,12 @@ export async function workMain(argv: string[]): Promise<number> {
 }
 
 export async function cli(argv: string[]): Promise<number> {
+  // A reader that stops early (`pixelclaw plan … | head`) closes the pipe: stop quietly, as Unix
+  // tools do, instead of failing on an unhandled EPIPE (G15).
+  process.stdout.on('error', (e: NodeJS.ErrnoException) => {
+    if (e.code === 'EPIPE') process.exit(0);
+    throw e;
+  });
   if (argv[0] === 'work') process.exit(await workMain(argv.slice(1)));
   if (argv[0] === 'serve') {
     const code = await serveMain(argv.slice(1));

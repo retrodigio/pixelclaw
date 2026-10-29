@@ -674,11 +674,17 @@ first three):
 - **render**: a nearest-neighbour PNG. The default scale gives about 192 px on the long side
   (8x for a 24 px tile). It has a faint pixel grid, stronger lines every 8 px, rulers labelled
   every 8 px, magenta cell lines on sheets, and a grey checkerboard for transparent pixels.
+  `--region` shows part of the canvas (G15), at the scale given, the rulers keeping the canvas's
+  coordinates.
 - **grid**: the text index grid. There is one character per pixel (its key; `.` for transparent),
   with column and row numbers and a legend of the keys used with pixel counts.
-  `--region x,y,WxH` shows part of the canvas.
-- **tile3x3**: the document repeated 3x3, at 1x and at 4x side by side, to show seams and
-  repetition.
+  `--region` shows part of the canvas.
+- **tile3x3**: the document repeated 3x3, at 1x and at 4x (or `--scale`) side by side, to show
+  seams and repetition.
+
+A region is written the same way everywhere (G15): `x,y WxH`, `x,y,WxH` or `x,y,W,H`, in
+`--region`, MCP `view region=`, and `import … region=` (quote the form with a space:
+`region="0,0 24x24"`).
 - **diff**: before and after side by side at the render scale. Each changed pixel is outlined in
   magenta on both, and open notes are outlined in yellow dashes. With more than 60 changed pixels a
   third panel shows them as a map (the after image dimmed, changes solid magenta). The text lists
