@@ -4,7 +4,7 @@
 // a tile changes. Terrain resolves through the family's autotile scheme exactly as the sample maps
 // do (`resolveMap`), each cell picks among a tile and its texture variants (§4.1) by its place,
 // objects are drawn in order of their base row and roof cells last. Also here: the map checks
-// (seams, repetition hot spots, footprints, draw order, coverage), Tiled `.tmx` export and the
+// (seams, repetition hot spots, lattices, footprints, draw order, coverage), Tiled `.tmx` export and the
 // `split` of an oversized asset into one-cell pieces.
 
 import { frameAtTick, loopTicks, playOrder, sequences } from './anim.ts';
@@ -662,7 +662,7 @@ export function mapTilesText(c: ComposedMap): string {
 // --- Map checks (plan §4.11): seams, repetition hot spots, footprints, draw order, coverage
 
 export interface MapCheck {
-  id: 'seam' | 'repetition' | 'footprint' | 'draworder' | 'coverage';
+  id: 'seam' | 'repetition' | 'lattice' | 'footprint' | 'draworder' | 'coverage';
   score: number;
   limit: number;
   pass: boolean;
@@ -675,7 +675,7 @@ export interface MapCheck {
 }
 
 /** Thresholds a map is held to (the style guide can change them as for any check). */
-export const MAP_LIMITS = { seam: 1, edgeRun: 4, motif: 10, window: 4 };
+export const MAP_LIMITS = { seam: 1, edgeRun: 4, motif: 10, window: 4, lattice: 0.3, latticeContrast: 18 };
 
 /** A content hash of each cell's ground pixels: equal cells look the same. */
 function cellKeys(c: ComposedMap): Int32Array {
@@ -807,6 +807,8 @@ export function mapChecks(d: Doc, world: MapWorld, limits: Partial<typeof MAP_LI
     ],
   });
 
+  out.push(latticeCheck(c, world, flat, L));
+
   // Footprints: overlapping, off the map, changed since placed, standing on an edge or the outside ground.
   const fpGroups: { label: string; cells: Pt[] }[] = [];
   const objCells = new Map<number, number>();
@@ -898,6 +900,143 @@ export function mapChecks(d: Doc, world: MapWorld, limits: Partial<typeof MAP_LI
     groups: covGroups, detail: covGroups.length ? covGroups.map((g) => g.label).join('; ') : 'every tile and object the map names exists and is drawn',
   });
   return out;
+}
+
+/**
+ * Map-scale lattices (G14): a mark (a few pixels well off their cell's median lightness) that comes
+ * back at the same spot of the cell, cell after cell, reads as a grid of dots across the ground,
+ * even when every tile passes its own checks and the map mixes several tiles (the marks sit on
+ * the tile pitch, whichever cells have them). Over the plain ground cells (not edges, not one
+ * colour), grouped by the ground they show (an asset and its texture variants are one ground), it
+ * counts at each spot of the cell the cells that show a mark there. The score is the worst spot's
+ * share of its ground's cells (at least eight of them). Sizes in pixels scale with the
+ * tile: a mark is at least t²/128 px (2 at 16 px, 18 at 48), "the same spot" allows t/16 - 1 px
+ * either way, and a mark longer than three quarters of the cell is structure (mortar, a plank
+ * line), not a mark.
+ */
+function latticeCheck(c: ComposedMap, world: MapWorld, flat: Uint8Array, L: typeof MAP_LIMITS): MapCheck {
+  const { t, cols, rows } = c;
+  const tt = t * t;
+  const minArea = Math.max(2, Math.round(tt / 128));
+  const tol = Math.max(0, Math.round(t / 16) - 1);
+  const maxSpan = Math.ceil(t * 0.75);
+  const lum = c.palette.map((e) => lstar(e.hex));
+  const rootOf = (name: string): string => {
+    let n = name;
+    for (let k = 0; k < 8; k++) { const v = world.get(n)?.variantOf; if (!v || !world.get(v)) break; n = v; }
+    return n;
+  };
+  // Each plain cell: its ground's key and its marks (and the marks grown by the tolerance).
+  const key: (string | null)[] = Array.from({ length: cols * rows }, () => null);
+  const marks: (Uint8Array | null)[] = Array.from({ length: cols * rows }, () => null);
+  const grown: (Uint8Array | null)[] = Array.from({ length: cols * rows }, () => null);
+  const ls = new Float64Array(tt);
+  for (let cy = 0; cy < rows; cy++) for (let cx = 0; cx < cols; cx++) {
+    const i = cy * cols + cx;
+    const top = c.top[i];
+    if (!top || top.edge || flat[i]) continue;
+    let opaque = 0;
+    for (let y = 0; y < t; y++) for (let x = 0; x < t; x++) {
+      const v = c.ground[(cy * t + y) * c.w + cx * t + x]!;
+      ls[y * t + x] = v === TRANSPARENT ? NaN : lum[v]!;
+      if (v !== TRANSPARENT) opaque++;
+    }
+    if (opaque < tt * 0.9) continue;
+    const sorted = Array.from(ls).filter((v) => !Number.isNaN(v)).sort((a, b) => a - b);
+    const med = sorted[sorted.length >> 1]!;
+    const on = new Uint8Array(tt);
+    for (let k = 0; k < tt; k++) if (Math.abs(ls[k]! - med) >= L.latticeContrast) on[k] = 1;
+    const m = new Uint8Array(tt);
+    const seen = new Uint8Array(tt);
+    let any = false;
+    for (let k0 = 0; k0 < tt; k0++) {
+      if (!on[k0] || seen[k0]) continue;
+      const comp: number[] = [k0];
+      seen[k0] = 1;
+      let x0 = t, y0 = t, x1 = -1, y1 = -1;
+      for (let q = 0; q < comp.length; q++) {
+        const k = comp[q]!, x = k % t, y = (k / t) | 0;
+        x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          const X = x + dx, Y = y + dy;
+          if (X < 0 || Y < 0 || X >= t || Y >= t) continue;
+          const n = Y * t + X;
+          if (on[n] && !seen[n]) { seen[n] = 1; comp.push(n); }
+        }
+      }
+      if (comp.length < minArea || x1 - x0 + 1 > maxSpan || y1 - y0 + 1 > maxSpan) continue;
+      for (const k of comp) m[k] = 1;
+      any = true;
+    }
+    key[i] = `${rootOf(top.asset)}.${top.variant ?? ''}`;
+    if (!any) continue;
+    marks[i] = m;
+    if (!tol) { grown[i] = m; continue; }
+    const g = new Uint8Array(tt);
+    for (let k = 0; k < tt; k++) {
+      if (!m[k]) continue;
+      const x = k % t, y = (k / t) | 0;
+      for (let dy = -tol; dy <= tol; dy++) for (let dx = -tol; dx <= tol; dx++) {
+        const X = x + dx, Y = y + dy;
+        if (X >= 0 && Y >= 0 && X < t && Y < t) g[Y * t + X] = 1;
+      }
+    }
+    grown[i] = g;
+  }
+  // Each ground's cells, and at each spot of the cell the cells that show a mark there (or within the tolerance).
+  const grounds = new Map<string, { cells: number; shown: Int32Array }>();
+  for (let i = 0; i < key.length; i++) {
+    const k = key[i];
+    if (!k) continue;
+    let g = grounds.get(k);
+    if (!g) grounds.set(k, (g = { cells: 0, shown: new Int32Array(tt) }));
+    g.cells++;
+    const m = grown[i];
+    if (m) for (let p = 0; p < tt; p++) if (m[p]) g.shown[p]!++;
+  }
+  const MIN_CELLS = 8;
+  let worst: { ground: string; share: number; n: number; cells: number; at: number } | null = null;
+  for (const [ground, g] of grounds) {
+    if (g.cells < MIN_CELLS) continue;
+    let at = 0;
+    for (let p = 1; p < tt; p++) if (g.shown[p]! > g.shown[at]!) at = p;
+    const share = g.shown[at]! / g.cells;
+    if (!worst || share > worst.share) worst = { ground, share, n: g.shown[at]!, cells: g.cells, at };
+  }
+  const pct = (v: number) => `${Math.round(v * 100)}%`;
+  const limitText = `≤ ${pct(L.lattice)}`;
+  const base = { id: 'lattice' as const, limit: L.lattice, limitText };
+  if (!worst || worst.n === 0) {
+    const n = [...grounds.values()].reduce((s, g) => s + (g.cells >= MIN_CELLS ? 1 : 0), 0);
+    return { ...base, score: 0, pass: true, shown: '0%', groups: [], detail: n ? `no mark comes back at the same spot of the cell (${n} ground${n === 1 ? '' : 's'} looked at)` : 'no stretch of plain ground big enough to show a lattice' };
+  }
+  // The worst spot: the cells that show it, and the mark's own pixels in them (where most of those cells have one).
+  const cells: Pt[] = [];
+  const from = new Map<string, number>();
+  const raw = new Int32Array(tt);
+  for (let i = 0; i < key.length; i++) {
+    if (key[i] !== worst.ground || !grown[i] || !grown[i]![worst.at]) continue;
+    cells.push([i % cols, Math.floor(i / cols)]);
+    const a = c.top[i]!.asset;
+    from.set(a, (from.get(a) ?? 0) + 1);
+    for (let p = 0; p < tt; p++) if (marks[i]![p]) raw[p]!++;
+  }
+  let x0 = t, y0 = t, x1 = -1, y1 = -1;
+  const most = raw.reduce((m, v) => Math.max(m, v), 0);
+  for (let p = 0; p < tt; p++) if (raw[p]! >= most * 0.75) {
+    const x = p % t, y = (p / t) | 0;
+    x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+  }
+  const [root] = worst.ground.split('.');
+  const pass = worst.share <= L.lattice;
+  const where = `${x0},${y0} ${x1 - x0 + 1}x${y1 - y0 + 1}`;
+  const label = `a mark at ${where} of the cell (${[...from].map(([a, n]) => `${a} ×${n}`).join(', ')}) comes back on the tile pitch`;
+  return {
+    ...base, score: Number(worst.share.toFixed(3)), pass, shown: pct(worst.share),
+    groups: pass ? [] : [{ label, cells }],
+    detail: `${pass ? `the mark most often at one spot: at ${where} of the cell (${[...from].map(([a, n]) => `${a} ×${n}`).join(', ')})` : label}: ${worst.n} of the ${worst.cells} cells of ${root}'s ground show it at the same spot` +
+      (pass ? '' : `; give ${root} texture variants that move or leave out the mark (variant of=${root}) and fill with a mix of them (tiles <layer> fill mix=${root}:1,<variant>:2,...), or soften the mark`),
+  };
 }
 
 // --- Texture variants (plan §4.1): the colour mix of a variant against its base, and its border

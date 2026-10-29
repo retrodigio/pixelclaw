@@ -139,7 +139,8 @@ cut`, heed the seam warning.
 `new map <name> 40x30 tile=24`, `tiles floor fill <ground tile>` (the floor in one line), terrain
 layers per family (`walkable=on` when a layer's filled ground is ground objects stand on, not sea),
 `terrain … rect|ellipse|brush`, `place`, `road`, `scatter`; look at it with `view map camera=x,y` (a player's screen); fix
-repetition hot spots with texture variants; consistency on a map compares the objects standing on
+repetition hot spots with texture variants, and a failing `lattice` (one mark at the same spot of
+most cells, a grid of dots at map scale) with variants that move or leave out the mark; consistency on a map compares the objects standing on
 it.
 
 ### A mockup underlay, snapped (optional; costs money with a real provider)

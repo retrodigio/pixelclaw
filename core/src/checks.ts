@@ -16,7 +16,7 @@ import { densityDiff, type ReducerOptions } from './density.ts';
 import { consistencyOf, isRecolour } from './consistency.ts';
 import { placements } from './map.ts';
 
-export const CHECK_IDS = ['palette', 'orphans', 'jaggies', 'banding', 'outline', 'seam', 'coverage', 'readability', 'revert', 'repetition', 'anim', 'views', 'fit', 'variant', 'footprint', 'draworder', 'density', 'consistency', 'font'] as const;
+export const CHECK_IDS = ['palette', 'orphans', 'jaggies', 'banding', 'outline', 'seam', 'coverage', 'readability', 'revert', 'repetition', 'lattice', 'anim', 'views', 'fit', 'variant', 'footprint', 'draworder', 'density', 'consistency', 'font'] as const;
 export type CheckId = (typeof CHECK_IDS)[number];
 
 export function isCheckId(s: string): s is CheckId {
@@ -151,6 +151,9 @@ const DEFAULTS: Record<CheckId, { all: Params } & Partial<Record<string, Params>
   // Maps: footprints and draw order without problems.
   footprint: { all: { max: 0 } },
   draworder: { all: { max: 0 } },
+  // Maps: the share of one ground's cells that show a mark at the same spot of the cell (a mark:
+  // pixels at least `contrast` ΔL* off their cell's median).
+  lattice: { all: { max: 0.3, contrast: 18 } },
   // A higher-density copy reduced to its base: the share of the base's pixels that differ (a lower
   // copy is authored, so some difference is expected; the report says where).
   density: { all: { max: 0.25 } },
@@ -1386,12 +1389,12 @@ function checkFont(img: Img, p: Params): CheckResult {
 const RUNNERS: Record<CheckId, (img: Img, p: Params, ctx: CheckContext) => CheckResult> = {
   palette: checkPalette, orphans: checkOrphans, jaggies: checkJaggies, banding: checkBanding, outline: checkOutline,
   seam: checkSeam, coverage: checkCoverage, readability: checkReadability, revert: checkRevert, repetition: checkRepetition,
-  anim: checkAnim, views: checkViews, fit: checkFit, variant: checkVariant, footprint: notMap('footprint'), draworder: notMap('draworder'), density: checkDensity,
+  anim: checkAnim, views: checkViews, fit: checkFit, variant: checkVariant, footprint: notMap('footprint'), lattice: notMap('lattice'), draworder: notMap('draworder'), density: checkDensity,
   consistency: checkConsistency, font: checkFont,
 };
 
 /** Checks of the whole document (every frame at once); the others read one frame's image. */
-const WHOLE = new Set<CheckId>(['font', 'consistency', 'coverage', 'anim', 'views', 'footprint', 'draworder']);
+const WHOLE = new Set<CheckId>(['font', 'consistency', 'coverage', 'anim', 'views', 'footprint', 'draworder', 'lattice']);
 
 /** The checks of a map document (plan §4.11), over the map composed from the assets it names. */
 /** A map's consistency: everything standing on it on one screen (§4.11): each object against the others. */
@@ -1423,8 +1426,9 @@ function runMapChecks(doc: Doc, ids: readonly CheckId[], ctx: CheckContext): Che
   if (!ctx.world) return ids.map((id) => skip(id, 'a map is checked with the project\'s assets'));
   const rep = checkParams('repetition', 'map', ctx.style, doc.name);
   const seamP = checkParams('seam', 'map', ctx.style, doc.name);
+  const lat = checkParams('lattice', 'map', ctx.style, doc.name);
   const composed = composeMapDoc(doc, ctx.world);
-  const ms = mapChecks(doc, ctx.world, { edgeRun: Number(rep.edgeRun), motif: Number(rep.motif), seam: Number(seamP.max) }, composed);
+  const ms = mapChecks(doc, ctx.world, { edgeRun: Number(rep.edgeRun), motif: Number(rep.motif), seam: Number(seamP.max), lattice: Number(lat.max), latticeContrast: Number(lat.contrast) }, composed);
   return ids.map((id) => {
     const p = checkParams(id, 'map', ctx.style, doc.name);
     if (p.off === true) return skip(id, 'turned off in the style guide');
