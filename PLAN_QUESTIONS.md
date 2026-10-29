@@ -1227,3 +1227,85 @@ Points where the plan was unclear or silent. Each has the reading that was follo
 184. **"A CLI export refused while a server holds the project"** (item 10). *Reading:* both
      `export` forms (profile and `--format`), like `run`, `new` and `import`; the message names MCP
      `export`. G9's test that exported by CLI beside a running server now exports through MCP.
+
+## G14 (plan §24: map-scale variety and 48 px)
+
+185. **"Autocorrelation at the pitch, or the same high-contrast cell at the same spot in most
+     cells"** (item 1). *Reading:* the second. A first version counted neighbouring pairs of cells
+     that show a mark at the same spot (autocorrelation at one pitch); it scored Fern Ledge's floor
+     4%, because the map's variant picking avoids equal neighbours and the pebbles sat in a near
+     checkerboard, which the eye still reads as a lattice (they are on the tile pitch whichever
+     cells have them). The check now counts, at each spot of the cell, the cells of one ground that
+     show a mark there (within t/16 − 1 px), over plain ground cells (not edges, not nearly one
+     colour), a ground being an asset and its texture variants (at least 8 cells). A mark: an
+     8-connected group of pixels at least 18 ΔL* (`contrast`) off its cell's median, at least
+     t²/128 px, and no longer than three quarters of the cell (longer is structure: mortar, planks).
+     Limit 30% (`max`): Fern Ledge's floor is 47%; a mix where each look with the mark is a quarter
+     or less passes. "Most cells" read as "too many"; 30% is a judgement, tunable per project.
+
+186. **"Runs in `check` on maps and in `run` summaries"** (item 1). *Reading:* a map check like the
+     others (a new check id, `lattice`), so it is in `check`, in a map's `run` summary, in the
+     check chips and in the map editor's hot spots. A tile's `run` summary does not run the checks
+     of the maps that use it (as before for the other map checks).
+
+187. **`fill mix=`: "across several tiles and their texture variants"** (item 2). *Reading:* each
+     tile named in the mix shares its weight evenly with its texture variants the mix does not name
+     (`variants=spread`, the default; `variants=named` keeps to the names). The line is written with
+     the shared-out weights, `variants=named` and the seed, so replay reads no asset. Each cell then
+     shows exactly the tile drawn for it (a new `exact` flag on the map entry, stored only when set,
+     so other maps' state bytes are unchanged): the map does not pick among the variants again, or
+     the weights would mean nothing.
+
+188. **"No two equal neighbours where it can help it"** (item 2). *Reading:* in row order, a cell
+     leaves out the tile to its left and the one above when another tile is left to draw; draws are
+     weighted by what each tile still has to lay of its share (weight × cells), so the counts follow
+     the weights as closely as the rule allows. A tile with half the weight or more cannot avoid
+     equal neighbours (two tiles at 1:1 make a checkerboard). Mix items are one-cell tiles only (not
+     `<family>.<variant>`).
+
+189. **"The map editor's fill tool can pick a mix"** (item 2). *Reading:* *mix…* at the end of the
+     fill tool's tile list shows a weight box per one-cell tile of the map's size (the chosen tile
+     and its variants start at 1, the rest at 0); a click or drag sends `tiles <layer> fill
+     mix=… variants=named`, as the person sees it.
+
+190. **"Record only the base's pieces and detached cells"** (item 3). *Reading:* `family band
+     from=` now records every cell of the sheet the family does not assemble from its pieces: the
+     pieces, the detached variants and any other cell with band art (`cells=` names them; empty
+     ones are left out and cleared), their rows side by side, frame after frame; the assembled
+     variants are built again by the family's sync after the line, so they equal the source's. The
+     G13 form (the whole band layer) still replays. 33,110 → 4,348 bytes for a sync on a 24 px
+     blob47 sheet (5 pieces and one detached variant recorded).
+
+191. **"Build a small original 48 px set through the existing commands"** (item 4). *Reading:* first
+     a scratch set through MCP as an agent would (`project`, `run`, `view`, `check`, `review`),
+     which found what is listed in PROGRESS; then the same set, cleaned up and checked, as
+     `examples/ember-moor.pclaw` (item 5), built by scripts through the CLI (the example test
+     rebuilds it), with its own original palette.
+
+192. **The project's grid** (item 4). *Reading:* project.json already had `grid` (24) but nothing
+     set it and little read it. It is now the size knob: `pixelclaw new <dir> --grid 48`, MCP
+     `project(grid=48)`; `new map` without `tile=` takes it (it was always 24), the camera defaults
+     to 16x9 cells of it (384x216 at 24, unchanged), and the draw scale to 2 below 48 px and 1 from
+     48 (a 48 px game draws its tiles at their size; a 24 px game at 2x fills the same screen). The
+     style guide's `camera` and `drawScale` still win. Projects left at 24 see no change.
+
+193. **"Check thresholds in px"** (item 4). *Reading:* limits in pixels or counts that grow with area
+     scale up from 24 px cells (16 px for icons) and never down, so nothing at 16 or 24 px changes:
+     the tile `jaggies` allowance (per 24x24 px: 8 at 48), `repetition`'s band widths (up to 6 per
+     24 px) and its width weighting (in lines of a 24 px tile, so a 2-line band at 48 scores as a
+     1-line band at 24, the same thing on screen at the default draw scales), icon stroke and
+     centre limits (× size/16), the height tolerance (× cell/24), `noise`'s default speck sizes
+     (2..6 at 48) and the lattice's mark size and tolerance. The seam, orphans (per 100 px) and
+     ΔL* limits are already scale-free.
+
+194. **"Font and icon sizes"** (item 4). *Reading:* the icon consistency limits above; nothing in
+     fonts assumed a size (`new font` takes any cell). The UI's own fonts and icons were looked at
+     in the 48 px screenshots and needed nothing; the canvases follow the art (the preview's island
+     is about 288 px across: 12x9 cells of 24, 6x5 of 48; the family's sample map, the camera view
+     and the gallery at the draw scale).
+
+195. **Fern Ledge is an "existing example map" the lattice fails** (re-running the examples).
+     *Reading:* it is built by `examples/demo-g13-agent.ts` into `out/`, not committed; its stand-in
+     is left as G13's "before" (its log in demo-g13.md gains a note), and the G14 demo fixes its
+     floor and its glade with mixes of variants rather than loosening the check. The committed
+     examples' maps (mossy-ruins' village: 1%) pass; Kiln Hollow has no map.

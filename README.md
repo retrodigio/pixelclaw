@@ -176,7 +176,7 @@ checked in:
 moor with its own palette ([`examples/ember-moor/`](examples/ember-moor/): theme, palette and the
 scripts that build it), its project grid set to 48: a moor ground and two texture variants forked
 from it, bog water, a blob47 bog pool, a waystone two cells tall, and a 20x12 map whose floor is a
-`fill mix=` of the moor's looks ([the map](docs/screenshots/g14-ember-moor-map.png)). The skill's
+`fill mix=` of the moor's looks ([the map](docs/screenshots/g14-moor-map.png)). The skill's
 *Per-size defaults* table says what changes with the tile size.
 
 The G2 demo ([examples/demo-g2.md](examples/demo-g2.md)) draws the same tile through MCP while you
@@ -223,6 +223,13 @@ band**, a map whose floor is **filled** in one line and whose ground is **walkab
 with a **corner order**, **path shapes** and a **per-colour output map** (five tones).
 Screenshots: [the map](docs/screenshots/g13-fern-ledge-map.png), [the fill tool](docs/screenshots/g13-map-fill.png),
 [walkable](docs/screenshots/g13-map-walkable.png), [the tones](docs/screenshots/g13-export-tones.png).
+
+The G14 demo ([examples/demo-g14.md](examples/demo-g14.md)) fixes what that map showed: Fern
+Ledge's floor passes every per-tile check but shows a lattice of pebbles; the map-scale **lattice**
+check fails it, and two more looks of the bed laid with **`fill mix=`** pass it. Then the **48 px**
+example, Ember Moor, its project grid 48. Screenshots: [before](docs/screenshots/g14-fern-before.png)
+and [after](docs/screenshots/g14-fern-after.png), [the fill tool's mix](docs/screenshots/g14-map-fill-mix.png),
+[Ember Moor](docs/screenshots/g14-moor-map.png).
 
 ## Packages
 

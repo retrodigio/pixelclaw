@@ -206,6 +206,12 @@ Status of plan features touched so far. Steps refer to the build plan (§10).
 | No part of the key written; input-image tokens priced | §23 (9), G13 | done | `server/test/g13.test.ts` (item 9), `server/test/g11.test.ts` | Scrubs the key, `sk-…` shapes (masked too) and any run of 4+ of its first or last characters. An edit's estimate adds the layout's input tokens (and the prompt's). Token prices added for gpt-image-1.5 and -mini (to be checked by a reader); the line's cost is now usage-based for 1.5. |
 | Smaller items: consistency on small sets; face coverage template; review `cells.txt`; CLI export refused under a server | §23 (10), G13 | done | `core/test/g13.test.ts` (item 10), `cli/test/g13.test.ts`, `server/test/g9.test.ts` | The whole set's median (itself included); faces drawn in the template's top half; `mapCellsText` (ground as shown, objects as capitals); `export` (profile and format) call the server lock check. |
 | Demo: Fern Ledge (items 1-8) | §23, G13 | done | `examples/demo-g13-agent.ts` (run by hand), `examples/demo-g13.md` | Screenshots `docs/screenshots/g13-*.png` (`scripts/screenshots-g13.ts`). Every asset of the set passes its checks; the pillar is left a draft on purpose. |
+| Map-scale `lattice` check | §24 (1), G14 | done | `core/test/g14.test.ts` (item 1: fails Fern Ledge's floor at 47%, passes it mixed; scales at 48 px), `server/test/g14.test.ts` | A mark (≥ 18 ΔL* off its cell's median, ≥ t²/128 px, under ¾ of a cell) at the same spot (± t/16 − 1 px) in more than 30% of one ground's cells (an asset and its variants). In `check`, map `run` summaries, chips and hot spots. Plan question 185. |
+| `tiles <layer> fill mix=<tile>:<weight>,…` and the fill tool's mix | §24 (2), G14 | done | `core/test/g14.test.ts` (item 2), `e2e/map.spec.ts` (G14 test) | Seeded; equal neighbours avoided where another tile is left; counts follow the weights; weights shared with unnamed variants (`variants=spread`); cells drawn exactly as named (`exact` entries). Plan questions 187-189. |
+| Inheriting variants record only pieces and detached cells | §24 (3), G14 | done | `server/test/g14.test.ts` (item 3), `server/test/g13.test.ts` (item 8, line form updated) | `family band from=… cells=<names> <<` rows side by side `>>`; 33,110 → 4,348 bytes per sync on a 24 px blob47 sheet; the G13 form still replays. Plan question 190. |
+| 48 px audit: the project's grid and what assumed 16 or 24 px | §24 (4), G14 | done | `server/test/g14.test.ts` (item 4), `core/test/g14.test.ts` (item 4), `cli/test/cli.test.ts` (`--grid`), `e2e/g14.spec.ts` | `--grid` / `project(grid=)`; `new map` tile, camera (16x9 cells), draw scale (1x from 48), family map and camera view at the draw scale, game view once at 1x, noise specks, repetition bands, jaggies allowance, icon/height limits, preview island, gallery scale, map cells text layer order. Plan questions 191-194. |
+| 48 px example `examples/ember-moor.pclaw`; the skill's per-size defaults | §24 (5), G14 | done | `cli/test/ember-moor.test.ts` (verify, every check, scripts rebuild it, the skill's table) | Original palette and theme (`examples/ember-moor/`); moor + 2 forked variants, bog, blob47 pool, waystone, 20x12 map with `fill mix=`. |
+| Demo: Fern Ledge's floor before and after a mix; the 48 px set on a map | §24, G14 | done | `examples/demo-g14-agent.ts` (run by hand), `examples/demo-g14.md` | Screenshots `docs/screenshots/g14-*.png` (`scripts/screenshots-g14.ts`). The G13 stand-in is left as the "before" (plan question 195). |
 
 ## Notes for G8
 
@@ -376,3 +382,24 @@ What the acceptance project (§10 A1) will need, from G11's side:
   paints); a review's `cells.txt` is by what each cell shows.
 - **Cost of this step**: not measured.
 
+
+## Notes for the next step (after G14)
+
+- **The lattice limit (30%) is a judgement.** It fails Fern Ledge's floor (47%) and passes mixes
+  where each look carrying a mark is a quarter or less. A reader should look at a map near the
+  limit (the glade after the fix is 28%) and say whether the pebbles still read as a grid; the
+  limit is `style.checks.lattice.max`, the mark's contrast `contrast`.
+- **`fill mix=` pins each cell to the tile drawn for it.** A variant added later is not used by a
+  mixed floor until it is filled again (`replace`); a plain `fill <tile>` still picks among all of
+  a tile's variants at draw time.
+- **48 px variants: fork, then change the inside.** Independent noise tiles side by side seam at
+  48 px (the moor's three looks scored 1.1-1.5 on the map before they were forked; 0.35 after):
+  bigger specks are cut by the border. The skill says so; a `variant` helper that keeps the border
+  ring automatically would make it the default.
+- **The map editor at 48 px** has 1x and 2x only: a 20x12 map at 1x (960 px) is wider than the
+  pane and scrolls. A "fit" zoom would help larger maps at any size.
+- **A2's 48 px run** should start with `project(grid=48)` (or `--grid 48`): the camera, the draw
+  scale and new maps follow it; the manifest's sizes still say each asset's own size.
+- **A map's preview.png** (the dashboard card) is the cell grid, one pixel per cell: dark and
+  tiny at any size. Showing the composed map there would help the dashboard.
+- **Cost of this step**: not measured.

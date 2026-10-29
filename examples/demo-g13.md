@@ -123,6 +123,10 @@ Every check:
 (the project is in out/demo-g13.pclaw)
 ```
 
+Since G14, `check` also runs the map-scale `lattice` check: here it fails `fern_ledge` (47%) and
+`glade` (46%), the pebble at the same spot of half the stream bed's cells. This stand-in is left
+as it was, as the "before"; [demo-g14.md](demo-g14.md) fixes both with a mix of variants.
+
 Notes on the log:
 
 - **The seed table** lists every check that applies, with each seed's score; a limit in brackets is
