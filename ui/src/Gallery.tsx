@@ -5,7 +5,7 @@
 // just that family of assets. Looking here changes nothing.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { STATUSES, type Status } from '@pixelclaw/core';
+import { STATUSES, drawScaleOf, type Status } from '@pixelclaw/core';
 import type { PlanAsset } from '@pixelclaw/server/protocol';
 import type { Store } from './store.ts';
 import { STATUS_TEXT, usePlan } from './Dashboard.tsx';
@@ -65,7 +65,7 @@ export function Gallery({ store }: { store: Store }) {
   const [picked, setPicked] = useState<string[]>([]);
   const [comparing, setComparing] = useState(false);
   const [zoom, setZoom] = useState(1);
-  const scale = Math.max(1, Math.min(4, store.style.drawScale ?? 2));
+  const scale = Math.max(1, Math.min(4, drawScaleOf(store.style, store.project?.grid)));
   const list = useMemo(() => {
     if (!plan) return [];
     const rel = related ? plan.assets.find((a) => a.name === related) : null;

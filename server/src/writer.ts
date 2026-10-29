@@ -11,7 +11,7 @@ import {
   type TapeEntry, type Theme, type Token,
 } from '@pixelclaw/core';
 import {
-  ProjectError, addPalettes, assetExists, forkOf, latestCheckpoint, listAssets, paletteSource, readReads, readTape, readTapeFile, saveAsset, writeReads,
+  ProjectError, addPalettes, assetExists, setGrid, forkOf, latestCheckpoint, listAssets, paletteSource, readReads, readTape, readTapeFile, saveAsset, writeReads,
   type Project,
 } from './project.ts';
 import type { Eye, ServerMessage, Snapshot, WorkerStatus } from './protocol.ts';
@@ -283,6 +283,11 @@ export class Writer {
     this.keys.clear();
     this.live = null;
     this.lastEye = null;
+    this.emit({ type: 'hello', snapshot: this.snapshot() });
+  }
+
+  setGrid(grid: number): void {
+    setGrid(this.project, grid);
     this.emit({ type: 'hello', snapshot: this.snapshot() });
   }
 
@@ -742,7 +747,7 @@ export class Writer {
       const f = req.frame ?? 0;
       const here = doc.views.find((v) => v.from <= f && f <= v.to);
       const dirs = [f, ...[...doc.views].sort((x, y) => VIEW_NAMES.indexOf(x.name as never) - VIEW_NAMES.indexOf(y.name as never)).flatMap((v) => (v === here ? [] : [v.from]))];
-      o.game = { ground: ground?.doc ?? null, with: others.map((x) => x.doc), scale: drawScaleOf(style), frames: [...new Set(dirs)] };
+      o.game = { ground: ground?.doc ?? null, with: others.map((x) => x.doc), scale: drawScaleOf(style, this.project.json.grid), frames: [...new Set(dirs)] };
     }
     if (mode === 'density') {
       // The base and its copies, whichever of them this is.
@@ -753,11 +758,13 @@ export class Writer {
       const d = style?.density ?? {};
       o.density = { base, copies: all.filter((a) => a.doc.densityOf?.of === baseName).map((a) => a.doc), reducer: d.reducer, ink: d.ink, share: d.share };
     }
-    if (mode === 'diff' && doc.map) o.mapDoc = { doc, world: mapWorld(this.assetDocs()), screen: cameraOf(style), drawScale: drawScaleOf(style) };
+    // A family's sample map is drawn at the game's draw scale (the style guide's, else by the grid).
+    if (mode === 'map' && doc.family && req.scale === undefined) o.scale = drawScaleOf(style, this.project.json.grid);
+    if (mode === 'diff' && doc.map) o.mapDoc = { doc, world: mapWorld(this.assetDocs()), screen: cameraOf(style, this.project.json.grid), drawScale: drawScaleOf(style, this.project.json.grid) };
     if (mode === 'map' && (doc.map || doc.kind === 'object' || doc.footprint)) {
       const all = this.assetDocs();
       const world = mapWorld(all);
-      const base = { world, region: req.region, camera: req.camera, screen: cameraOf(style), drawScale: drawScaleOf(style) };
+      const base = { world, region: req.region, camera: req.camera, screen: cameraOf(style, this.project.json.grid), drawScale: drawScaleOf(style, this.project.json.grid) };
       if (doc.map) o.mapDoc = { doc, ...base };
       else {
         if (req.camera) throw new ProjectError('camera= is for a map document');
@@ -847,7 +854,7 @@ export class Writer {
     this.freshStyle();
     const assets = this.assets().map((name) => ({ name, entries: this.states.get(name)?.entries ?? readTape(this.project, name) }));
     return {
-      project: { name: this.project.json.name, dir: this.project.dir, tickRate: this.project.json.tickRate ?? 60 },
+      project: { name: this.project.json.name, dir: this.project.dir, tickRate: this.project.json.tickRate ?? 60, grid: this.project.json.grid ?? 24 },
       palettes: [...this.project.palettes.values()],
       defaultPalette: this.project.json.defaultPalette,
       style: this.project.json.style ?? {},

@@ -23,7 +23,7 @@ export interface StyleJson {
   outline?: string[];
   ground?: string;
   drawScale?: number;
-  /** The engine's screen in art pixels ("384x216"): the map camera's view. */
+  /** The engine's screen in art pixels ("384x216"): the map camera's view (default 16x9 cells of the project's grid). */
   camera?: string;
   sizes?: Record<string, string>;
   /** Densities (plan §4.7): the reducer the density check runs, and its options. */
@@ -68,16 +68,19 @@ export interface AssetDoc {
   forkOf?: string | null;
 }
 
-/** The engine's draw scale for the game view. */
-export function drawScaleOf(json: StyleJson | undefined): number {
+/**
+ * The engine's draw scale for the game view: the style guide's, else by the project's grid (G14):
+ * 2 below 48 px, 1 from 48 px (a game with 48 px tiles draws them at their size).
+ */
+export function drawScaleOf(json: StyleJson | undefined, grid = 24): number {
   const k = json?.drawScale;
-  return typeof k === 'number' && Number.isInteger(k) && k >= 1 && k <= 16 ? k : 2;
+  return typeof k === 'number' && Number.isInteger(k) && k >= 1 && k <= 16 ? k : grid >= 48 ? 1 : 2;
 }
 
-/** The camera's screen size in art pixels (default 384x216: 16x9 cells of 24). */
-export function cameraOf(json: StyleJson | undefined): [number, number] {
+/** The camera's screen size in art pixels: the style guide's, else 16x9 cells of the project's grid (384x216 at 24 px, 768x432 at 48). */
+export function cameraOf(json: StyleJson | undefined, grid = 24): [number, number] {
   const m = /^(\d+)x(\d+)$/.exec(json?.camera ?? '');
-  return m && Number(m[1]) > 0 && Number(m[2]) > 0 ? [Number(m[1]), Number(m[2])] : [384, 216];
+  return m && Number(m[1]) > 0 && Number(m[2]) > 0 ? [Number(m[1]), Number(m[2])] : [16 * grid, 9 * grid];
 }
 
 /**

@@ -24,9 +24,9 @@ You are reviewing pixel art for a game, with fresh eyes. Judge only what you see
 
 - \`assets/<name>.png\`: each asset enlarged with a pixel grid and rulers (numbers every 8 pixels,
   from 0 at the top left), for reading coordinates.
-- \`assets/<name>.game.png\`: each asset at its real size (1x) and at the game's draw scale (${o.scale}x).
+- \`assets/<name>.game.png\`: each asset at ${o.scale === 1 ? 'its real size, which is the game\'s draw scale (1x)' : `its real size (1x) and at the game's draw scale (${o.scale}x)`}.
 - \`tiles/<name>.3x3.png\`: each tile repeated 3x3, at 1x and 4x, as it will cover the ground.
-- \`scenes/<name>.png\`: each sprite on its usual ground beside the rest of its set, at 1x and ${o.scale}x.
+- \`scenes/<name>.png\`: each sprite on its usual ground beside the rest of its set, at ${o.scale === 1 ? '1x (the draw scale)' : `1x and ${o.scale}x`}.
 - \`anim/<name>.png\`: each animated asset's frames, one row per sequence (a direction or a named
   loop), each frame with its length in game ticks (${o.tickRate} a second) and the frame before it
   tinted red underneath; \`anim/<name>.gif\` plays them at the game's speed.
@@ -137,7 +137,7 @@ export function writeReview(w: Writer, o: { assets?: string[]; set?: string; nam
     files.push(rel);
   };
   const style = w.project.json.style;
-  const scale = drawScaleOf(style);
+  const scale = drawScaleOf(style, w.project.json.grid);
   const tiles = chosen.filter((a) => a.doc.wrap);
   const families = chosen.filter((a) => a.doc.family);
   const overlays = chosen.filter((a) => a.doc.overlay).map((a) => a.doc);
@@ -181,7 +181,7 @@ export function writeReview(w: Writer, o: { assets?: string[]; set?: string; nam
     const c = composeMapDoc(a.doc, world);
     save(`scenes/${a.name}.png`, encodePng(paintComposed(c, { scale: 1 })));
     save(`scenes/${a.name}.cells.txt`, `The cells of scenes/${a.name}.png (${c.t} px each at 1x).\n\n${mapCellsText(a.doc, c)}\n`);
-    const [sw, sh] = cameraOf(style);
+    const [sw, sh] = cameraOf(style, w.project.json.grid);
     const used = c.top.map((t, i) => (t && t.variant !== 'outside' ? i : -1)).filter((i) => i >= 0);
     const xs = used.map((i) => i % c.cols), ys = used.map((i) => Math.floor(i / c.cols));
     const box = used.length ? { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) } : { x0: 0, y0: 0, x1: c.cols - 1, y1: c.rows - 1 };

@@ -74,7 +74,9 @@ const noiseCmd: CommandSpec = {
     a.done();
     const { ramp, weights } = rampAndWeights(a, doc, cmd);
     const co = a.opts.get('cluster');
-    const [cmin, cmax] = co ? rangeOpt(co, 1, 64) : [1, 3];
+    // Specks scale with the cell (G14): 1..3 px up to 47 px cells, 2..6 at 48, and so on.
+    const k = Math.max(1, Math.floor(doc.cellW / 24));
+    const [cmin, cmax] = co ? rangeOpt(co, 1, 64) : [k, 3 * k];
     const dOpt = a.opts.get('density');
     const density = dOpt ? fraction(dOpt) : { num: 15, den: 100, text: '0.15' };
     const bo = a.opts.get('base');

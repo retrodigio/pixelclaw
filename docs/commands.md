@@ -125,7 +125,7 @@ so notes and coordinates are cells), and its layers say what they hold:
 
 | Command | Normal form | Notes |
 |---|---|---|
-| `new map <name> <C>x<R> [tile=<T>] [palette=]` | `new map village 40x30 tile=24 palette=ruins-shore <<` rows `>>` | Starts with one tiles layer, `floor`. |
+| `new map <name> <C>x<R> [tile=<T>] [palette=]` | `new map village 40x30 tile=24 palette=ruins-shore <<` rows `>>` | Starts with one tiles layer, `floor`. `tile=` defaults to the project's grid (project.json `grid`, 24 unless set; G14). |
 | `layer add <name> terrain=<family> [outside=on\|off] [walkable=on\|off]` | `layer add sea terrain=shore outside=on above=floor` | A terrain layer: cells are the family's terrain or not; when the map is drawn the family's scheme picks every edge tile, exactly as `resolveMap` does for sample maps. With `outside=on` the cells outside the terrain show the family's outside texture (the layer fills the map); otherwise they show what is below (a face scheme's faces are drawn either way). **`walkable=on`** (G13): the filled ground and its edges are ground, not sea: objects may stand on them (the `footprint` check). `layer set <name> walkable=on\|off` changes it. |
 | `tiles <tiles layer> fill <tile>\|<family>.<variant> [<x,y> <W>x<H>] [replace]` | `tiles floor fill grass 0,0 40x30 cells=1x1 anchor=0,0` | (G13) A one-cell tile on every empty cell of the layer (or the box): the floor in one line. `replace` also covers one-cell tiles already there; multi-cell tiles stay. The cells are worked out when the line is written, so replay reads no other asset; the map picks among the tile's texture variants cell by cell. |
 | `tiles <tiles layer> fill mix=<tile>:<weight>,... [<x,y> <W>x<H>] [replace] [variants=spread\|named] [seed=]` | `tiles floor fill mix=bed:1,bed_b:2,bed_c:1 0,0 12x8 cells=1x1 anchor=0,0 variants=named seed=812` | (G14) A seeded scatter of several one-cell tiles by weight (a weight left out is 1): each cell draws a tile, leaving out the tile to its left and the one above where another is left to draw, weighted by what each tile still has to lay of its share, so the counts follow the weights as closely as that rule allows (a tile over half the mix cannot avoid equal neighbours). Each tile's weight is shared evenly with its texture variants the mix does not name (`variants=spread`, the default): `mix=bed:3,gravel:1` with bed's variants bed_b and bed_c is written `mix=bed:1,bed_b:1,bed_c:1,gravel:1`. The line is written with the shared-out weights, `variants=named` and the seed, so it replays without reading any asset. Each cell shows exactly the tile drawn for it (the map does not pick among its variants again). Fixes a failing `lattice`. |
@@ -141,7 +141,7 @@ so notes and coordinates are cells), and its layers say what they hold:
 
 Drawing commands (`px`, `rect`, …) are refused on a map. `view map` shows a map whole at 1x, a
 region of cells (`region=`) or the camera (`camera=x,y`: the engine's screen, project.json
-`style.camera`, default `384x216`, around that cell) at the game's draw scale, with the cells as
+`style.camera`, default 16x9 cells of the project's grid: `384x216` at 24 px, `768x432` at 48, around that cell) at the game's draw scale, with the cells as
 text; `export` writes a map for Tiled (the `tiled` profile) and splits an oversized asset (see docs/mcp.md and docs/profiles.md).
 
 ## Commands
@@ -421,7 +421,7 @@ so a texture fills a tile seamlessly by construction.
 
 - `noise ramp=<ramp> weights=<w,...> cluster=a..b density=<share> base=<entry>|keep`: fills the box
   with `base` (default: the entry with the largest weight; `keep` leaves the pixels as they are),
-  then grows clusters of a..b pixels (default 1..3) in the other ramp colours, chosen by weight,
+  then grows clusters of a..b pixels (default 1..3; on cells of 48 px and up it scales with the cell, 2..6 at 48, G14) in the other ramp colours, chosen by weight,
   until about `density` of the box is covered (default 0.15).
 - `scatter stamp=<name>[,<name>...] count=<n> minDist=<d>`: places stamps (chosen at random from
   the list) at points at least `minDist` apart (on a torus with wrap), each by its middle;
@@ -687,7 +687,7 @@ first three):
   documents with frames it compares every frame: one row per frame that changed (numbered at the
   left), and the text says which (`f2 12,5 ink→wood2`).
 - **game**: the asset on its usual ground tile (repeated under it) beside the rest of its set,
-  at 1x (real size) and again at the engine's draw scale (`style.drawScale`, default 2). The
+  at 1x (real size) and again at the engine's draw scale (`style.drawScale`, default 2, or 1 when the project's grid is 48 px or more; at 1 the scene is shown once). The
   ground is `--ground`, else the style guide's (`style.ground`, or per asset), else the first
   tile; the set is `--with` (repeatable), else every other asset of the same kind and size that
   does not wrap, leaving out branches of the same asset. A sprite with views shows its other

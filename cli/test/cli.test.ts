@@ -29,6 +29,16 @@ afterAll(() => {
 });
 
 describe('pixelclaw CLI', () => {
+  it('new <project> --grid sets the tile size new maps, the camera and the draw scale follow (G14)', () => {
+    const g = join(root, 'grid48.pclaw');
+    expect(cli(['new', g, '--palette', join(root, 'dusk.gpl'), '--grid', '48']).code).toBe(0);
+    expect(JSON.parse(readFileSync(join(g, 'project.json'), 'utf8')).grid).toBe(48);
+    expect(cli(['new', g, 'map', 'm', '10x8']).code).toBe(0);
+    expect(readFileSync(join(g, 'assets', 'm', 'tape.jsonl'), 'utf8')).toMatch(/new map m 10x8 tile=48 /);
+    expect(() => main(['new', join(root, 'bad.pclaw'), '--grid', '3'], { out: () => undefined, err: () => undefined, stdin: () => '', now: () => '' })).not.toThrow();
+    expect(cli(['new', join(root, 'bad.pclaw'), '--grid', '3']).code).not.toBe(0);
+  });
+
   it('new <project> creates the §7.1 layout with imported palettes', () => {
     const r = cli(['new', proj, '--palette', join(root, 'dusk.gpl'), '--palette', join(root, 'extra.hex')]);
     expect(r.code).toBe(0);

@@ -58,6 +58,7 @@ size, wrap, palette, commands and groups) and the watch link.
 | `create` | boolean, optional | With `path`: create the project if it does not exist. |
 | `name` | string, optional | With `create`: the project's name (default: the folder name without `.pclaw`). |
 | `palettes` | string[], optional | Palette files (`.json`, Lospec `.json`, `.hex`, `.gpl`) to add. The first becomes the default if the project has none. |
+| `grid` | integer 4..256, optional | The project's grid: its tile size in px (project.json `grid`, default 24). New maps without `tile=`, the camera (16x9 cells) and the draw scale (2 below 48 px, 1 from 48) follow it (G14). The summary's second line says what they are. |
 
 ```
 project 'mossy-ruins' at /Users/me/art/mossy-ruins.pclaw
@@ -159,7 +160,7 @@ the image under `blobs/`, and writes the line as `underlay <layer> blob=<sha256>
 | `mode` | `render` (default) \| `grid` \| `tile3x3` \| `diff` \| `game` \| `recolour` \| `anim` \| `map` \| `family` | See [commands.md, Views](commands.md#views). `game` shows the sprite's other directions beside it. `anim` returns the contact sheet (a row per sequence; each frame with its ticks, the frame before it tinted red underneath, the pivot and ground line in cyan, and the share of pixels changed from the frame before), the numbers as text, and saves `views/<asset>.anim.gif` (every sequence side by side at the project's tick rate) for the person. `map` puts a family on a random island (a tile: repeated; an overlay: over the first family or `ground=`) at the game's draw scale, with the seam score over the map and the variants it used as text, and saves `views/<asset>.map.gif` (at most four seconds) when its frames or overlays move. `family` shows every variant among the 3x3 neighbours that call for it, and lists where every cell is on the sheet. `map` of a **map document**: the whole map at 1x (or `region=` cells, or `camera=` the engine's screen around a cell, at the draw scale), its layers and placements and every cell as a character grid; `marks="failing"` outlines the map checks' hot spots. `map` of an **object**: it stands on its ground (`ground=`) among plain tiles at game scale, its footprint in words. `diff` of a map: before and after of the cells that changed, at game scale, and what moved, was placed or taken away, or painted. |
 | `scale` | 1..64, optional | `render` and `diff`. Default: about 192 px on the long side. |
 | `region` | string, optional | `grid`: `"x,y WxH"`, e.g. `"8,0 12x10"`. `map` of a map document: cells to show at game scale. |
-| `camera` | string, optional | `map` of a map document: `"x,y"`, the camera's view around that cell (project.json `style.camera`, default `384x216` art pixels), at game scale. |
+| `camera` | string, optional | `map` of a map document: `"x,y"`, the camera's view around that cell (project.json `style.camera`, default 16x9 cells of the project's grid: `384x216` art pixels at 24 px), at game scale. |
 | `since` | integer, optional | `diff` only: compare with the document after this command (default: before the latest group). |
 | `frame` | integer from 1, optional | The frame to show. Default: the frame the agent draws on (`frame <n>`). |
 | `marks` | string, optional | `render`, `tile3x3`, `game`: circle the pixels checks flag in magenta: `"failing"`, or check names (`"orphans,jaggies"`). |

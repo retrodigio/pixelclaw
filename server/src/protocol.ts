@@ -22,7 +22,7 @@ export interface Eye {
 
 /** Everything a page needs to start: sent on connect, and again when the project changes. */
 export interface Snapshot {
-  project: { name: string; dir: string; /** Game ticks per second (frame durations are in ticks). */ tickRate?: number };
+  project: { name: string; dir: string; /** Game ticks per second (frame durations are in ticks). */ tickRate?: number; /** The project's grid (cell size in px). */ grid?: number };
   palettes: Palette[];
   defaultPalette: string | null;
   /** The style guide's check and preview settings (project.json `style`). */

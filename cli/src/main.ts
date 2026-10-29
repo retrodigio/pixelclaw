@@ -30,8 +30,9 @@ const nodeIo: Io = {
 
 export const USAGE = `pixelclaw: a pixel art editor driven by commands
 
-  pixelclaw new <project> [--name <name>] [--palette <file.json|.hex|.gpl>]...
-      Create a project folder. The first palette becomes the default.
+  pixelclaw new <project> [--name <name>] [--palette <file.json|.hex|.gpl>]... [--grid <px>]
+      Create a project folder. The first palette becomes the default. --grid is the tile size
+      (default 24): new maps, the camera (16x9 cells) and the draw scale (1x from 48 px) follow it.
   pixelclaw new <project> <kind> <name> <W>x<H> [palette=..] [wrap=on|off] [cell=WxH] [bg=..] [--replace]
       Create an asset (kinds: tile, sprite, sheet, icon, object, map, …). Same as running a 'new' command.
   pixelclaw run <project> (<script.pclaw> | - | -e "<commands>") [--asset <name>] [--replace] [--by <author>] [--view <mode>]
@@ -136,7 +137,9 @@ function printErrors(io: Io, source: string, errors: { line: number; col: number
 
 function cmdNewProject(io: Io, dir: string, p: Parsed): number {
   const palettes = (p.flags.get('palette') ?? []).map(readPaletteFile);
-  const proj = createProject(dir, { name: one(p, 'name'), palettes });
+  const g = one(p, 'grid');
+  if (g !== undefined && (!/^\d+$/.test(g) || Number(g) < 4 || Number(g) > 256)) throw new UsageError('new: --grid is the tile size in pixels, 4..256');
+  const proj = createProject(dir, { name: one(p, 'name'), palettes, ...(g !== undefined ? { grid: Number(g) } : {}) });
   io.out(`created project '${proj.json.name}' at ${dir}\n`);
   for (const pal of proj.palettes.values()) io.out(`  palette ${pal.name}: ${pal.entries.length} entries${pal.name === proj.json.defaultPalette ? ' (default)' : ''}\n`);
   return 0;
@@ -602,7 +605,7 @@ export function main(argv: string[], io: Io = nodeIo): number {
   try {
     switch (cmd) {
       case 'new': {
-        const p = parseArgs(rest, ['name', 'palette', 'by'], ['replace']);
+        const p = parseArgs(rest, ['name', 'palette', 'by', 'grid'], ['replace']);
         if (!p.pos[0]) throw new UsageError('new: give a project folder');
         return p.pos.length === 1 ? cmdNewProject(io, p.pos[0], p) : cmdNewAsset(io, p.pos[0], p);
       }

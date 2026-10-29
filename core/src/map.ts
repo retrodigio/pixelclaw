@@ -580,22 +580,28 @@ export function mapAscii(d: Doc, c?: ComposedMap): string {
     taken.add(ch);
     return ch;
   };
-  d.layers.forEach((l, li) => {
-    if (l.map?.kind !== 'terrain' || l.hidden) return;
-    const ch = letter(l.name, false);
-    legend.push(`${ch} ${l.name}`);
-    const cel = d.cels[li]![0]!;
-    for (let i = 0; i < cel.length; i++) if (cel[i] === 1) g[i] = ch;
-  });
+  // Layer by layer, bottom up, so a layer covers the ones below it (a terrain over a filled floor shows).
   const names = new Map<string, string>();
-  for (const p of placements(d)) {
-    const e = d.map!.entries[p.entry]!;
-    const full = `${e.name}${e.variant ? `.${e.variant}` : ''}`;
-    if (!names.has(full)) names.set(full, letter(e.name, true));
-    const b = entryBox(e, p.x, p.y);
-    for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) if (x >= 0 && y >= 0 && x < W && y < H) g[y * W + x] = '+';
-    if (p.x >= 0 && p.y >= 0 && p.x < W && p.y < H) g[p.y * W + p.x] = names.get(full)!;
-  }
+  const placed = placements(d);
+  d.layers.forEach((l, li) => {
+    if (l.hidden) return;
+    if (l.map?.kind === 'terrain') {
+      const ch = letter(l.name, false);
+      legend.push(`${ch} ${l.name}`);
+      const cel = d.cels[li]![0]!;
+      for (let i = 0; i < cel.length; i++) if (cel[i] === 1) g[i] = ch;
+      return;
+    }
+    for (const p of placed) {
+      if (p.layer !== li) continue;
+      const e = d.map!.entries[p.entry]!;
+      const full = `${e.name}${e.variant ? `.${e.variant}` : ''}`;
+      if (!names.has(full)) names.set(full, letter(e.name, true));
+      const b = entryBox(e, p.x, p.y);
+      for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) if (x >= 0 && y >= 0 && x < W && y < H) g[y * W + x] = '+';
+      if (p.x >= 0 && p.y >= 0 && p.x < W && p.y < H) g[p.y * W + p.x] = names.get(full)!;
+    }
+  });
   void c;
   const tens = '     ' + Array.from({ length: W }, (_, x) => (x % 10 === 0 ? String(Math.floor(x / 10) % 10) : ' ')).join('');
   const ones = '     ' + Array.from({ length: W }, (_, x) => String(x % 10)).join('');

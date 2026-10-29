@@ -6,7 +6,7 @@
 // change what you see.
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { mapText, renderMap, renderVariant, schemeOf, type Doc, type Rgba, type Theme } from '@pixelclaw/core';
+import { drawScaleOf, mapText, renderMap, renderVariant, schemeOf, type Doc, type Rgba, type Theme } from '@pixelclaw/core';
 import { Editor } from './editor.ts';
 import type { Store } from './store.ts';
 
@@ -89,7 +89,8 @@ export function FamilyMap({ doc, store, frame }: { doc: Doc; store: Store; frame
     const id = setInterval(() => setTick(Math.floor(((performance.now() - start) * rate) / 1000)), 1000 / 15);
     return () => clearInterval(id);
   }, [play, moves, rate]);
-  const o = { cols, rows, seed, overlays: chosen, theme: store.themeObj(), scale: 2, tick, ...(moves && play ? {} : { frame }) };
+  // At the game's draw scale (2 below 48 px, 1 from 48, unless the style guide says).
+  const o = { cols, rows, seed, overlays: chosen, theme: store.themeObj(), scale: drawScaleOf(store.style, store.project?.grid), tick, ...(moves && play ? {} : { frame }) };
   const img = renderMap(doc, o);
   const text = mapText(doc, { ...o, tick: 0 });
   return (

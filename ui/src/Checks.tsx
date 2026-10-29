@@ -159,7 +159,10 @@ export function PreviewPanel({ doc, frame, store, marks }: { doc: Doc; frame: nu
       const all = store.assetDocs();
       const under = doc.overlay ? (all.find((a) => a.doc.family) ?? groundOf(name, all, store.style)) : null;
       if (doc.family || under) {
-        img = renderMap(doc, { cols: 12, rows: 9, seed: 1, scale: 1, theme: store.themeObj(), ground: under?.doc ?? null });
+        // About 288 px across whatever the tile (12x9 cells of 24, 6x5 of 48).
+        const t = doc.family?.tile ?? under?.doc.cellW ?? 24;
+        const cols = Math.max(6, Math.min(12, Math.round(288 / t)));
+        img = renderMap(doc, { cols, rows: Math.round((cols * 3) / 4), seed: 1, scale: 1, theme: store.themeObj(), ground: under?.doc ?? null });
         note = doc.family ? `a random island; the seam and more in the map view (toolbar)` : `over ${under!.name}`;
       } else note = 'no family or tile to show it over';
     } else if (tab === 'density') {
@@ -175,8 +178,8 @@ export function PreviewPanel({ doc, frame, store, marks }: { doc: Doc; frame: nu
       const all = store.assetDocs();
       const ground = groundOf(name, all, store.style);
       const set = setOf(name, doc, all, store.style).slice(0, 5);
-      img = renderGame([{ doc, frame }, ...set.map((a) => ({ doc: a.doc }))], { ground: ground?.doc ?? null, scale: drawScaleOf(store.style), theme: store.themeObj(), marks });
-      note = `${ground ? `on ${ground.name}` : 'no ground tile'}${set.length ? `, beside ${set.map((a) => a.name).join(', ')}` : ''}; 1x and ${drawScaleOf(store.style)}x`;
+      img = renderGame([{ doc, frame }, ...set.map((a) => ({ doc: a.doc }))], { ground: ground?.doc ?? null, scale: drawScaleOf(store.style, store.project?.grid), theme: store.themeObj(), marks });
+      note = `${ground ? `on ${ground.name}` : 'no ground tile'}${set.length ? `, beside ${set.map((a) => a.name).join(', ')}` : ''}; ${drawScaleOf(store.style, store.project?.grid) === 1 ? 'at 1x, the draw scale' : `1x and ${drawScaleOf(store.style, store.project?.grid)}x`}`;
     } else {
       img = renderRecolour(doc, store.themes.slice(0, 6), { frame, scale: Math.max(1, Math.min(2, Math.floor(48 / Math.max(doc.width, doc.height)))) });
       note = hasRoles(doc.palette) ? store.themes.slice(0, 6).map((t) => t.name).join(' · ') : 'no role colours: the art looks the same under every theme';

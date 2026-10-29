@@ -590,7 +590,10 @@ function checkJaggies(img: Img, p: Params, ctx: CheckContext = {}): CheckResult 
   // Each doubled corner, spike and notch is one defect; so is an irregular run, however long.
   const runs = runSets.size;
   const n = corners + runs + spikes.length + notches.length;
-  const max = Number(p.max);
+  // A texture's allowance is per 24x24 px of cell (G14): a 48 px tile has four times the room of a 24 px one.
+  const d = img.doc;
+  const per = Number(p.max) > 0 && (d.wrap || d.family) ? Math.max(1, Math.floor((d.cellW * d.cellH) / 576)) : 1;
+  const max = Number(p.max) * per;
   return result('jaggies', {
     status: n <= max ? 'pass' : 'fail', score: n, shown: String(n), limit: `≤ ${max}`, groups,
     detail: (n === 0 ? 'lines and outlines step evenly' : `${corners} doubled L-corners, ${runs} irregular step runs, ${spikes.length} spikes, ${notches.length} notches`) +
@@ -1026,7 +1029,9 @@ export function repetitionScore(doc: Doc, frame = 0, contrast = DEFAULTS.repetit
     const n = axis === 'rows' ? h : w;
     const len = axis === 'rows' ? w : h;
     const at = (k: number, i: number) => (axis === 'rows' ? v[k * w + i]! : v[i * w + k]!);
-    for (let width = 1; width <= Math.min(6, Math.floor(n / 4)) || width === 1; width++) {
+    const unit = Math.max(1, Math.floor(n / 24));
+    // Bands of 1 to 6 lines, up to a quarter of the tile; from 48 px, up to 6 lines per 24 px (G14: 12 at 48).
+    for (let width = 1; width <= Math.min(6 * Math.max(1, Math.floor(n / 24)), Math.floor(n / 4)) || width === 1; width++) {
       const cross = new Float64Array(len);
       for (let k = 0; k < n; k++) {
         // The band's cross-section: the mean of its `width` lines at each position along it.
@@ -1039,8 +1044,9 @@ export function repetitionScore(doc: Doc, frame = 0, contrast = DEFAULTS.repetit
         for (let j = 0; j < len; j++) ss += (cross[j]! - m) ** 2;
         const spread = Math.sqrt(ss / len);
         const delta = m - mu;
-        const score = Math.abs(delta) * Math.sqrt(width);
-        const limit = Math.max(max, contrast * spread * Math.sqrt(width / len));
+        // Width in lines of a 24 px tile (G14): a 2-line band at 48 px weighs what a 1-line band does at 24.
+        const score = Math.abs(delta) * Math.sqrt(width / unit);
+        const limit = Math.max(max, contrast * spread * Math.sqrt(width / unit / len));
         const ratio = score / limit;
         if (ratio > bestRatio + 1e-9) { bestRatio = ratio; best = { score, axis, from: k, width, delta, spread, limit }; }
       }
@@ -1288,11 +1294,13 @@ function checkConsistency(img: Img, p: Params, ctx: CheckContext): CheckResult {
   const d = img.doc;
   if (d.family || d.overlay) return skip('consistency', 'judged on its maps');
   const peers = (ctx.peers ?? []).filter((x) => x.doc !== d && x.name !== d.name);
-  const icon = d.kind === 'icon' ? { maxStroke: Number(p.maxStroke), maxFill: Number(p.maxFill), maxCentre: Number(p.maxCentre) } : undefined;
+  // Limits in pixels are set for 16 px icons and 24 px cells and grow with bigger ones (G14).
+  const iconK = Math.max(1, Math.min(d.width, d.height) / 16), cellK = Math.max(1, d.cellH / 24);
+  const icon = d.kind === 'icon' ? { maxStroke: Number(p.maxStroke) * iconK, maxFill: Number(p.maxFill), maxCentre: Number(p.maxCentre) * iconK } : undefined;
   if (!peers.length && ctx.expect?.height === undefined && !icon) return skip('consistency', 'no set to compare with (plan it in the manifest)');
   const r = consistencyOf(d, peers, {
     ink: ctx.style?.outline ?? ['ink', 'outline', 'black'], light: ctx.style?.light, height: ctx.expect?.height,
-    maxL: Number(p.maxL), maxOutline: Number(p.maxOutline), maxAngle: Number(p.maxAngle), maxCluster: Number(p.maxCluster), maxSteps: Number(p.maxSteps), heightTol: Number(p.heightTol), ...(icon ? { icon } : {}),
+    maxL: Number(p.maxL), maxOutline: Number(p.maxOutline), maxAngle: Number(p.maxAngle), maxCluster: Number(p.maxCluster), maxSteps: Number(p.maxSteps), heightTol: Math.round(Number(p.heightTol) * cellK), ...(icon ? { icon } : {}),
   });
   const bad = r.parts.filter((x) => x.pass === false);
   const groups: FlagGroup[] = [];

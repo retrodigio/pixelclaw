@@ -66,12 +66,12 @@ function writeJson(path: string, v: unknown): void {
   writeFileSync(path, JSON.stringify(v, null, 2) + '\n');
 }
 
-export function createProject(dir: string, o: { name?: string; palettes: Palette[] }): Project {
+export function createProject(dir: string, o: { name?: string; palettes: Palette[]; grid?: number }): Project {
   if (existsSync(join(dir, 'project.json'))) throw new ProjectError(`${dir} is already a project`);
   const base = dir.replace(/[\\/]+$/, '').split(/[\\/]/).pop()!.replace(/\.pclaw$/, '');
   const json: ProjectJson = {
     format: PROJECT_FORMAT, version: 1, name: o.name ?? base, tickRate: 60,
-    defaultPalette: o.palettes[0]?.name ?? null, grid: 24, style: {}, profiles: [],
+    defaultPalette: o.palettes[0]?.name ?? null, grid: o.grid ?? 24, style: {}, profiles: [],
   };
   mkdirSync(join(dir, 'palettes'), { recursive: true });
   mkdirSync(join(dir, 'assets'), { recursive: true });
@@ -183,6 +183,13 @@ export function readPaletteFile(file: string): Palette {
   } catch (e) {
     throw new ProjectError(`${file}: ${(e as Error).message}`);
   }
+}
+
+/** The project's grid: the cell size in pixels that new maps, the camera and the draw scale default to (G14). */
+export function setGrid(p: Project, grid: number): void {
+  if (!Number.isInteger(grid) || grid < 4 || grid > 256) throw new ProjectError('grid must be the cell size in pixels, 4..256');
+  p.json.grid = grid;
+  writeJson(join(p.dir, 'project.json'), p.json);
 }
 
 /** Add palettes to a project (palettes/<name>.json); the first becomes the default if none is set. */

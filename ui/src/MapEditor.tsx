@@ -5,7 +5,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
-  TRANSPARENT, cameraOf, cameraRegion, composeMapDoc, entryBox, footprintOf, mapChecks, mapWorld, paintComposed, placedAt, type Doc, type Pt,
+  TRANSPARENT, cameraOf, cameraRegion, drawScaleOf, composeMapDoc, entryBox, footprintOf, mapChecks, mapWorld, paintComposed, placedAt, type Doc, type Pt,
 } from '@pixelclaw/core';
 import type { Editor } from './editor.ts';
 import type { Store } from './store.ts';
@@ -60,10 +60,11 @@ export function MapEditor({ doc, store, ed, editable }: { doc: Doc; store: Store
   const chosen = asset && placeable.some((a) => a.name === asset) ? asset : placeable.find((a) => a.doc.kind === 'object')?.name ?? placeable[0]?.name ?? null;
   const terrainInfo = doc.layers.find((l) => l.name === terrainLayer)?.map;
   const walkable = terrainInfo?.kind === 'terrain' && !!terrainInfo.walkable;
-  const screen = cameraOf(store.style);
+  const screen = cameraOf(store.style, store.project?.grid);
   const cam = camera && showCam ? cameraRegion(composed, camera[0], camera[1], screen[0], screen[1]) : null;
   const region = cam ? { x: cam.x, y: cam.y, w: cam.w, h: cam.h } : { x: 0, y: 0, w: doc.width, h: doc.height };
-  const k = cam ? Math.max(scale, 2) : scale;
+  // The camera view at the game's draw scale (2 below 48 px, 1 from 48, unless the style guide says).
+  const k = cam ? Math.max(scale, drawScaleOf(store.style, store.project?.grid)) : scale;
   const checks = useMemo(() => (marks ? mapChecks(doc, world, {}, composed) : []), [marks, doc, world, composed]);
   const marked = checks.filter((c) => !c.pass).flatMap((c) => c.groups.flatMap((g) => g.cells));
 

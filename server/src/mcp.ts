@@ -3,7 +3,7 @@
 
 import { McpServer, type CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { BUILTIN_SCHEMES, CHECK_IDS, checkSummary, ctxOf, diffPixels, diffText, type CheckResult, type Note, type TapeEntry } from '@pixelclaw/core';
+import { BUILTIN_SCHEMES, CHECK_IDS, cameraOf, checkSummary, drawScaleOf, ctxOf, diffPixels, diffText, type CheckResult, type Note, type TapeEntry } from '@pixelclaw/core';
 import { ProjectError, listAssets, readPaletteFile } from './project.ts';
 import { formatChecks, formatSeeds } from './report.ts';
 import { writeReview } from './review.ts';
@@ -126,7 +126,8 @@ function viewContent(v: View): CallToolResult['content'] {
 
 export function projectSummary(w: Writer, url: string): string {
   const p = w.project;
-  const lines = [`project '${p.json.name}' at ${p.dir}`, `watch live: ${url}  (give this link to the person watching)`, ''];
+  const g = p.json.grid ?? 24;
+  const lines = [`project '${p.json.name}' at ${p.dir}`, `grid ${g} px (new maps' tile; camera ${cameraOf(p.json.style, g).join('x')}; draw scale ${drawScaleOf(p.json.style, g)}x)`, `watch live: ${url}  (give this link to the person watching)`, ''];
   if (p.palettes.size === 0) lines.push('palettes: none yet. Add one with project(palettes: ["/path/to/palette.json|.hex|.gpl"]).');
   for (const pal of p.palettes.values()) {
     lines.push(`palette ${pal.name}${pal.name === p.json.defaultPalette ? ' (default)' : ''}: ${pal.entries.length} colours`);
@@ -143,7 +144,7 @@ export function projectSummary(w: Writer, url: string): string {
     lines.push(`export profiles: ${(e as Error).message}`);
   }
   const assets = listAssets(p);
-  lines.push('', assets.length ? `assets (${assets.length}):` : `assets: none yet. Create one with run(asset, "new tile <name> 24x24 ...").`);
+  lines.push('', assets.length ? `assets (${assets.length}):` : `assets: none yet. Create one with run(asset, "new tile <name> ${g}x${g} ...").`);
   for (const a of assets) {
     try {
       const { doc, entries } = w.state(a);
@@ -201,16 +202,18 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
   server.registerTool('project', {
     title: 'Project',
     description: 'Show the open project: its palettes (keys and names), its assets, and the live watch link for the person. ' +
-      'With path, open another project folder (create: true makes a new one). With palettes, add palette files (.json, Lospec .json, .hex, .gpl) to the project.',
+      'With path, open another project folder (create: true makes a new one). With palettes, add palette files (.json, Lospec .json, .hex, .gpl) to the project. With grid, set the project\'s tile size in px (48 for a 48 px game).',
     inputSchema: z.object({
       path: z.string().optional().describe('A project folder to open (conventionally named *.pclaw)'),
       create: z.boolean().optional().describe('Create the project at path if it does not exist'),
       name: z.string().optional().describe('The new project\'s name (with create)'),
       palettes: z.array(z.string()).optional().describe('Palette files to add to the project'),
+      grid: z.number().int().min(4).max(256).optional().describe('The project\'s grid: its tile size in px (default 24). New maps, the camera (16x9 cells) and the draw scale (2 below 48 px, 1 from 48) follow it'),
     }),
   }, (a) => w.enqueue(() => {
     try {
       if (a.path) host.open(a.path, { create: a.create ?? false, name: a.name });
+      if (a.grid !== undefined) w.setGrid(a.grid);
       if (a.palettes?.length) w.addPalettes(a.palettes.map(readPaletteFile));
       return { content: [text(projectSummary(w, host.url()))] };
     } catch (e) {
@@ -294,7 +297,7 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
       mode: z.enum(VIEW_MODES).default('render'),
       scale: z.number().int().min(1).max(64).optional().describe('render only: pixels per pixel'),
       region: z.string().optional().describe('grid: part of the canvas, "x,y WxH" (e.g. "8,0 12x10"); map of a map document: cells to show at game scale'),
-      camera: z.string().regex(/^\d+,\d+$/).optional().describe('map of a map document: the camera\'s view around this cell, "x,y" (the screen size is project.json style.camera, default 384x216)'),
+      camera: z.string().regex(/^\d+,\d+$/).optional().describe('map of a map document: the camera\'s view around this cell, "x,y" (the screen size is project.json style.camera, default 16x9 cells of the project\'s grid: 384x216 at 24 px)'),
       since: z.number().int().min(0).optional().describe('diff only: compare with the document after this command number (default: before the latest group)'),
       frame: z.number().int().min(1).optional().describe('render, grid, tile3x3, game, recolour: the frame to show (default: the frame you are drawing on)'),
       marks: z.string().optional().describe('render, tile3x3, game: circle the pixels checks flag in magenta: "failing", or check names ("orphans,jaggies")'),

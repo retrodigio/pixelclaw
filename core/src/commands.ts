@@ -69,6 +69,8 @@ export interface StyleDefaults {
   outline?: string[];
   /** `map gen` with no objects=: the assets the manifest says this map uses (objects are stood on it). */
   mapObjects?(map: string): string[];
+  /** `new map` with no tile=: the project's grid (G14). */
+  grid?: number;
 }
 
 export type Op =
@@ -359,7 +361,7 @@ const newCmd: CommandSpec = {
       // The size is in cells; the canvas is the grid of cells (plan §4.11).
       if (size.w > 512 || size.h > 512) throw new DiagError(size.line, size.col, `a map is at most 512x512 cells`);
       for (const o of [schemeOpt, mapOpt, cellOpt, a.opts.get('wrap'), bgOpt]) if (o) throw new DiagError(o.line, o.col, `new map takes no ${o.key}= (its cells are tile= px)`);
-      let tile = 24;
+      let tile = ctx.defaults?.grid ?? 24;
       if (tileOpt) {
         if (!/^\d+$/.test(tileOpt.value) || Number(tileOpt.value) < 4 || Number(tileOpt.value) > 256) throw new DiagError(tileOpt.line, tileOpt.vcol, `tile= must be the cell size in pixels, 4..256`);
         tile = Number(tileOpt.value);

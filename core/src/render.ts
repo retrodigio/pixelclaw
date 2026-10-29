@@ -499,14 +499,17 @@ export function renderGame(items: { doc: Doc; frame?: number }[], o: { ground?: 
     ox += it.doc.width + gap;
   }
   const pad = 8;
-  const img = createRgba(pad + Math.max(sceneW, sceneW * k) + pad, pad + sceneH + pad + sceneH * k + pad);
+  // At a draw scale of 1 (48 px games, G14) the scene is shown once, not twice at the same size.
+  const once = k === 1;
+  const top = once ? 0 : sceneH + pad;
+  const img = createRgba(pad + Math.max(sceneW, sceneW * k) + pad, pad + top + sceneH * k + pad);
   rect(img, 0, 0, img.width, img.height, RULER_BG);
   for (let y = 0; y < sceneH; y++) for (let x = 0; x < sceneW; x++) {
     const c = scene[y * sceneW + x]!;
-    put(img, pad + x, pad + y, c);
-    for (let j = 0; j < k; j++) for (let i = 0; i < k; i++) put(img, pad + x * k + i, pad + sceneH + pad + y * k + j, c);
+    if (!once) put(img, pad + x, pad + y, c);
+    for (let j = 0; j < k; j++) for (let i = 0; i < k; i++) put(img, pad + x * k + i, pad + top + y * k + j, c);
   }
-  if (o.marks?.length && items[0]) drawMarks(img, pad + firstAt[0] * k, pad + sceneH + pad + firstAt[1] * k, k, o.marks, items[0].doc.width, items[0].doc.height);
+  if (o.marks?.length && items[0]) drawMarks(img, pad + firstAt[0] * k, pad + top + firstAt[1] * k, k, o.marks, items[0].doc.width, items[0].doc.height);
   return img;
 }
 

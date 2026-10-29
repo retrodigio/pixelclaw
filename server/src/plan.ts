@@ -85,6 +85,7 @@ export function styleDefaults(p: Project, m: Manifest | null): StyleDefaults {
     },
     ...(style.light ? { light: style.light } : {}),
     ...(style.outline ? { outline: style.outline } : {}),
+    grid,
     mapObjects: (map) => {
       const e = manifestEntry(m, map);
       return e?.kind === 'map' ? (e.uses ?? []).filter((n) => ['object', 'sprite'].includes(manifestEntry(m, n)?.kind ?? '')) : [];
@@ -274,7 +275,7 @@ export function writeTemplates(w: Writer, o: { seed?: number } = {}): { dir: str
   const files: string[] = [];
   const save = (f: string, b: Uint8Array | string) => { writeFileSync(join(dir, f), b); files.push(f); };
   const grid = p.json.grid ?? 24;
-  const [sw, sh] = cameraOf(p.json.style);
+  const [sw, sh] = cameraOf(p.json.style, grid);
   const scheme = schemeFor(p);
   const index = new Map(m.assets.map((a, i) => [a.name, i]));
   const colour = (a: ManifestAsset) => flatColour(p, a, index.get(a.name) ?? 0);
