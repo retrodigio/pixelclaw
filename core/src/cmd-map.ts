@@ -292,6 +292,9 @@ function unlockBand(d: Doc): void {
  * of the cell to its left and the one above where another tile is left to draw. Draws are weighted
  * by what each tile still has to lay of its share (weight × cells), so the counts follow the weights
  * as closely as the neighbour rule allows (a tile over half the mix cannot have no equal neighbours).
+ * Two tiles (G15): that rule leaves no choice at all, a strict checkerboard, which reads as a
+ * pattern of its own (and banning only an L of three alike still locks rows into alternation); a
+ * cell then leaves out only the tile that would complete a 2x2 block of one tile.
  */
 export function scatterMix(items: MixItem[], cells: number[], width: number, seed: number, named: (i: number) => string | null): string[] {
   const rng = new Pcg32(seed, 0x6d6978);
@@ -310,7 +313,9 @@ export function scatterMix(items: MixItem[], cells: number[], width: number, see
   };
   return cells.map((i) => {
     const x = i % width;
-    const avoid = new Set([x > 0 ? at(i - 1) : null, at(i - width)].filter((v): v is string => !!v));
+    const toLeft = x > 0 ? at(i - 1) : null, above = at(i - width), corner = x > 0 ? at(i - width - 1) : null;
+    const two = items.length === 2 ? (toLeft && toLeft === above && toLeft === corner ? [toLeft] : []) : [toLeft, above];
+    const avoid = new Set(two.filter((v): v is string => !!v));
     const open = items.filter((o) => !avoid.has(o.name));
     const from = open.length ? open : items;
     const o = draw(from, left) ?? draw(from, (q) => q.weight)!;

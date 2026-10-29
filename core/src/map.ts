@@ -137,7 +137,8 @@ export function layerTerrain(d: Doc, layer: number, s: Scheme): Terrain {
 /**
  * A terrain layer's inside mix (G15): each inside cell takes a tile by weight from a hash of its
  * place and the seed, drawn again (once) when it would equal both the cell to its left and the one
- * above, so one look seldom clumps and two tiles do not fall into a checkerboard. The choice is the
+ * above (two tiles: when it would complete a 2x2 block of one), so one look seldom clumps and two
+ * tiles do not fall into a checkerboard. The choice is the
  * cell's own: painting terrain elsewhere does not move it. `outside(k)` says a neighbour is not a
  * mix cell (off the map, or not inside).
  */
@@ -156,7 +157,9 @@ export function mixPicker(items: { name: string; weight: number }[], seed: numbe
     if (hit !== undefined) return hit;
     let name = byWeight(hash32(x, y, seed, 0x6d6978), items);
     const left = at(x - 1, y, outside), up = at(x, y - 1, outside);
-    if (name === left && name === up && items.length > 1) name = byWeight(hash32(x, y, seed, 0x6d6979), items.filter((o) => o.name !== name));
+    // Two tiles: only a 2x2 block of one is drawn again (the L rule would lock rows into a checkerboard).
+    const clump = name === left && name === up && (items.length > 2 || name === at(x - 1, y - 1, outside));
+    if (clump && items.length > 1) name = byWeight(hash32(x, y, seed, 0x6d6979), items.filter((o) => o.name !== name));
     memo.set(k, name);
     return name;
   };

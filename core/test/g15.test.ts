@@ -156,3 +156,43 @@ describe('item 4: terrain on maps', () => {
     expect(schemeOf(r.doc!.family!).variants.length).toBe(176);
   });
 });
+
+describe('item 5: a two-tile mix is not a strict checkerboard', () => {
+  const docs = { bed: bed('bed', 3, [6, 9]), gravel: bed('gravel', 8, null) };
+  const cells = (text: string) => {
+    const d = run(EMPTY, `new map floor 12x8 tile=16\n${text}`, docs).doc!;
+    const li = d.layers.findIndex((l) => l.name === 'floor');
+    const cel = d.cels[li]![0]!;
+    return Array.from({ length: 96 }, (_, i) => d.map!.entries[cel[i]!]!.name);
+  };
+  const stats = (c: string[]) => {
+    let same = 0, block = 0;
+    for (let i = 0; i < 96; i++) {
+      const x = i % 12, left = x > 0 ? c[i - 1] : null, up = i >= 12 ? c[i - 12] : null, corner = x > 0 && i >= 12 ? c[i - 13] : null;
+      if (left === c[i]) same++;
+      if (up === c[i]) same++;
+      if (left === c[i] && up === c[i] && corner === c[i]) block++;
+    }
+    return { same, block, bed: c.filter((n) => n === 'bed').length };
+  };
+
+  it('1:1 scatters with equal neighbours here and there, never a 2x2 block of one tile, and about half each', () => {
+    for (const seed of [1, 2, 3, 4]) {
+      const s = stats(cells(`tiles floor fill mix=bed:1,gravel:1 seed=${seed}`));
+      expect(s.same, `seed ${seed}`).toBeGreaterThan(50); // a checkerboard has none; random would have about 86 of 172
+      expect(s.block).toBe(0);
+      expect(Math.abs(s.bed - 48)).toBeLessThanOrEqual(6);
+    }
+  });
+
+  it('2:1 follows the weights; three tiles keep G14\'s rule (no equal neighbours where it can help)', () => {
+    const s = stats(cells('tiles floor fill mix=bed:2,gravel:1 seed=5'));
+    expect(s.block).toBe(0);
+    expect(Math.abs(s.bed - 64)).toBeLessThanOrEqual(6);
+    const three = { ...docs, bed_b: bed('bed_b', 41, null, 'bed') };
+    const d = run(EMPTY, 'new map floor 12x8 tile=16\ntiles floor fill mix=bed:1,bed_b:1,gravel:1 variants=named seed=5', three).doc!;
+    const cel = d.cels[d.layers.findIndex((l) => l.name === 'floor')]![0]!;
+    const names = Array.from({ length: 96 }, (_, i) => d.map!.entries[cel[i]!]!.name);
+    expect(stats(names).same).toBe(0);
+  });
+});
