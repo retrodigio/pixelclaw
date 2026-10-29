@@ -28,6 +28,8 @@ export function MapEditor({ doc, store, ed, editable }: { doc: Doc; store: Store
   const [scale, setScale] = useState(1);
   const [layer, setLayer] = useState<string | null>(null);
   const [asset, setAsset] = useState<string | null>(null);
+  // The fill tool's mix (G14): a weight per one-cell tile, or null for a single tile.
+  const [mix, setMix] = useState<Record<string, number> | null>(null);
   const [camera, setCamera] = useState<Pt | null>(null);
   const [showCam, setShowCam] = useState(false);
   const [marks, setMarks] = useState(false);
@@ -45,6 +47,14 @@ export function MapEditor({ doc, store, ed, editable }: { doc: Doc; store: Store
   const fillable = placeable.filter((a) => { const fp = footprintOf(a.doc); return fp.cols === 1 && fp.rows === 1 && a.doc.kind === 'tile'; });
   const fillLayer = layer && tilesLayers.includes(layer) ? layer : tilesLayers[0] ?? null;
   const fillTile = asset && fillable.some((a) => a.name === asset) ? asset : fillable[0]?.name ?? null;
+  // The mix as written: the tiles with a weight, each named (the mix's own weights, nothing shared out).
+  const mixText = mix ? fillable.filter((a) => (mix[a.name] ?? 0) > 0).map((a) => `${a.name}:${mix[a.name]}`).join(',') : '';
+  const startMix = () => {
+    // The chosen tile and its texture variants, one each.
+    const w: Record<string, number> = {};
+    for (const a of fillable) w[a.name] = a.name === fillTile || (fillTile && a.doc.variantOf === fillTile) ? 1 : 0;
+    setMix(w);
+  };
   const terrainLayer = layer && terrains.includes(layer) ? layer : terrains[0] ?? null;
   const placeLayer = layer && holders.includes(layer) ? layer : holders.find((n) => doc.layers.find((l) => l.name === n)!.map!.kind === 'objects') ?? holders[0] ?? null;
   const chosen = asset && placeable.some((a) => a.name === asset) ? asset : placeable.find((a) => a.doc.kind === 'object')?.name ?? placeable[0]?.name ?? null;
@@ -144,10 +154,10 @@ export function MapEditor({ doc, store, ed, editable }: { doc: Doc; store: Store
     } else if (tool === 'rect' && terrainLayer) {
       const r = norm(d.from, d.to);
       send(`terrain ${terrainLayer} rect ${r.x},${r.y} ${r.w}x${r.h}${d.shift ? ' erase' : ''}`);
-    } else if (tool === 'fill' && fillLayer && fillTile) {
+    } else if (tool === 'fill' && fillLayer && (mixText || (!mix && fillTile))) {
       // A click fills the whole layer's empty cells; a drag fills a box.
       const r = norm(d.from, d.to);
-      send(`tiles ${fillLayer} fill ${fillTile}${r.w > 1 || r.h > 1 ? ` ${r.x},${r.y} ${r.w}x${r.h}` : ''}`);
+      send(`tiles ${fillLayer} fill ${mix ? `mix=${mixText} variants=named` : fillTile}${r.w > 1 || r.h > 1 ? ` ${r.x},${r.y} ${r.w}x${r.h}` : ''}`);
     } else if (tool === 'move') {
       const li = doc.layers.findIndex((l) => l.name === placeLayer);
       const p = placedAt(doc, li, d.from[0], d.from[1]) ?? doc.layers.map((_, i) => placedAt(doc, i, d.from[0], d.from[1])).find(Boolean) ?? null;
@@ -180,9 +190,20 @@ export function MapEditor({ doc, store, ed, editable }: { doc: Doc; store: Store
             <select value={fillLayer ?? ''} onChange={(e) => setLayer(e.target.value)} data-testid="map-fill-layer" title="The tiles layer you fill">
               {tilesLayers.map((n) => <option key={n}>{n}</option>)}
             </select>
-            <select value={fillTile ?? ''} onChange={(e) => setAsset(e.target.value)} data-testid="map-fill-tile" title="The one-cell tile laid on every empty cell (the map picks among its texture variants)">
+            <select value={mix ? '(mix)' : fillTile ?? ''} onChange={(e) => { if (e.target.value === '(mix)') startMix(); else { setMix(null); setAsset(e.target.value); } }} data-testid="map-fill-tile" title="The one-cell tile laid on every empty cell (the map picks among its texture variants), or a mix of tiles by weight">
               {fillable.map((a) => <option key={a.name} value={a.name}>{a.name}</option>)}
+              <option value="(mix)">mix…</option>
             </select>
+            {mix && (
+              <span className="mix" data-testid="map-fill-mix" title="A seeded scatter of these tiles by weight, no two equal neighbours where it can help it (tiles <layer> fill mix=<tile>:<weight>,...); 0 leaves a tile out">
+                {fillable.map((a) => (
+                  <label key={a.name} className={(mix[a.name] ?? 0) > 0 ? 'on' : ''}>
+                    {a.name}
+                    <input type="number" min={0} max={99} value={mix[a.name] ?? 0} data-testid={`map-mix-${a.name}`} onChange={(e) => setMix({ ...mix, [a.name]: Math.max(0, Math.min(99, Math.floor(Number(e.target.value) || 0))) })} />
+                  </label>
+                ))}
+              </span>
+            )}
           </>
         )}
         {(tool === 'place' || tool === 'move') && (

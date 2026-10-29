@@ -537,7 +537,10 @@ layer (`terrain <layer> brush …`), *▭ rect* paints a rectangle (Shift: erase
 the chosen object or tile by its anchor cell (its footprint outlined under the pointer; an overlap
 is refused with the reason), *✣ move* drags something placed to another cell (`move x,y x,y`),
 *✕ remove* takes it away. *▦ fill* lays the chosen one-cell tile on every empty cell of a tiles
-layer (a click: the whole layer; a drag: a box; `tiles <layer> fill <tile>`). While painting a
+layer (a click: the whole layer; a drag: a box; `tiles <layer> fill <tile>`); *mix…* in its tile
+list gives each one-cell tile a weight (the chosen tile and its texture variants start at 1, 0
+leaves a tile out) and fills with a seeded scatter of them (`tiles <layer> fill mix=<tile>:<weight>,…
+variants=named`, G14). While painting a
 terrain layer, *walkable* says objects may stand on its filled ground (`layer set <layer>
 walkable=on|off`). Each is one line on the tape, written as you. *▣ camera* stands the
 camera on a cell (the engine's screen outlined; *camera view* shows only it, at game scale),

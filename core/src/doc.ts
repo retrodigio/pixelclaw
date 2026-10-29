@@ -84,6 +84,8 @@ export interface MapEntry {
   cols: number;
   rows: number;
   anchor: [number, number];
+  /** Drawn as named: the map does not pick among the tile's texture variants (a `tiles … fill mix=` cell, G14). */
+  exact?: boolean;
 }
 
 /**
@@ -507,7 +509,7 @@ export function serializeDoc(d: Doc): Uint8Array {
     ...(d.footprint ? { footprint: [d.footprint.cols, d.footprint.rows, d.footprint.at, d.footprint.anchor, d.footprint.flags] } : {}),
     ...(d.variantOf ? { variantOf: d.variantOf } : {}),
     ...(d.densityOf ? { densityOf: [d.densityOf.of, d.densityOf.d] } : {}),
-    ...(d.map ? { map: { tile: d.map.tile, entries: d.map.entries.map((e) => [e.name, e.variant, e.cols, e.rows, e.anchor]) } } : {}),
+    ...(d.map ? { map: { tile: d.map.tile, entries: d.map.entries.map((e) => (e.exact ? [e.name, e.variant, e.cols, e.rows, e.anchor, 1] : [e.name, e.variant, e.cols, e.rows, e.anchor])) } } : {}),
     ...(d.marks.length ? { marks: d.marks.map((m) => [m.name, m.seq, m.by, m.text, m.art]) } : {}),
     ...(d.iconMode ? { iconMode: d.iconMode } : {}),
     ...(d.font ? { font: [d.font.chars.join(','), d.font.cols, d.font.baseline, d.font.line, d.font.spacing, Object.keys(d.font.advances).map(Number).sort((a, b) => a - b).map((c) => [c, d.font!.advances[c]])] } : {}),
@@ -552,7 +554,7 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
     footprint?: [number, number, [number, number], [number, number], string[]];
     variantOf?: string;
     densityOf?: [string, number];
-    map?: { tile: number; entries: [string, string | null, number, number, [number, number]][] };
+    map?: { tile: number; entries: ([string, string | null, number, number, [number, number]] | [string, string | null, number, number, [number, number], 1])[] };
     marks?: [string, number, string, string, string][];
     iconMode?: IconMode;
     font?: [string, number, number, number, number, [number, number][]];
@@ -606,7 +608,7 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
     footprint: h.footprint ? { cols: h.footprint[0], rows: h.footprint[1], at: h.footprint[2], anchor: h.footprint[3], flags: h.footprint[4] } : null,
     variantOf: h.variantOf ?? null,
     densityOf: h.densityOf ? { of: h.densityOf[0], d: h.densityOf[1] } : null,
-    map: h.map ? { tile: h.map.tile, entries: h.map.entries.map(([name, variant, cols, rows, anchor]) => ({ name, variant, cols, rows, anchor })) } : null,
+    map: h.map ? { tile: h.map.tile, entries: h.map.entries.map(([name, variant, cols, rows, anchor, exact]) => ({ name, variant, cols, rows, anchor, ...(exact ? { exact: true } : {}) })) } : null,
     marks: (h.marks ?? []).map(([name, seq, by, text, art]) => ({ name, seq, by, text, art })),
     iconMode: h.iconMode ?? null,
     font: h.font ? {

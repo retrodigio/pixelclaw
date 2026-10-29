@@ -136,7 +136,8 @@ cut`, heed the seam warning.
 
 ### A map
 
-`new map <name> 40x30 tile=24`, `tiles floor fill <ground tile>` (the floor in one line), terrain
+`new map <name> 40x30 tile=24`, `tiles floor fill <ground tile>` (the floor in one line; `tiles floor fill mix=bed:2,bed_b:1,bed_c:1`
+scatters several looks by weight, the cure for a failing `lattice`), terrain
 layers per family (`walkable=on` when a layer's filled ground is ground objects stand on, not sea),
 `terrain … rect|ellipse|brush`, `place`, `road`, `scatter`; look at it with `view map camera=x,y` (a player's screen); fix
 repetition hot spots with texture variants, and a failing `lattice` (one mark at the same spot of

@@ -179,7 +179,7 @@ function entryText(e: { cols: number; rows: number; anchor: [number, number] }):
 /** The entry's index in the map's table, adding it when new. */
 function entryIndex(d: Doc, e: MapEntry): number {
   const m = d.map!;
-  let i = m.entries.findIndex((x) => x.name === e.name && x.variant === e.variant && x.cols === e.cols && x.rows === e.rows && x.anchor[0] === e.anchor[0] && x.anchor[1] === e.anchor[1]);
+  let i = m.entries.findIndex((x) => x.name === e.name && x.variant === e.variant && x.cols === e.cols && x.rows === e.rows && x.anchor[0] === e.anchor[0] && x.anchor[1] === e.anchor[1] && !x.exact === !e.exact);
   if (i < 0) { m.entries.push({ ...e, anchor: [e.anchor[0], e.anchor[1]] }); i = m.entries.length - 1; }
   return i;
 }
@@ -286,18 +286,87 @@ function unlockBand(d: Doc): void {
 
 // --- tiles fill
 
+/** One tile of a `fill mix=` and its weight. */
+interface MixItem { name: string; weight: number }
+
+const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
+
+/**
+ * A mix's tiles, each tile's weight spread evenly over it and its texture variants that the mix
+ * does not name itself (unless `variants=named`): whole-number weights, in lowest terms.
+ */
+function spreadMix(items: MixItem[], ctx: NormaliseContext): MixItem[] {
+  const named = new Set(items.map((x) => x.name));
+  const names = ctx.assetNames?.() ?? [];
+  const groups = items.map((x) => [x.name, ...names.filter((n) => n !== x.name && !named.has(n) && ctx.asset?.(n)?.variantOf === x.name && ctx.asset?.(n)?.kind === 'tile').sort()]);
+  // A variant of two named tiles (it cannot be) or of none: each name once, in the order given.
+  const lcm = groups.reduce((m, g) => (m * g.length) / gcd(m, g.length), 1);
+  const out: MixItem[] = [];
+  groups.forEach((g, k) => { for (const n of g) if (!out.some((o) => o.name === n)) out.push({ name: n, weight: (items[k]!.weight * lcm) / g.length }); });
+  const d = out.reduce((m, o) => gcd(m, o.weight), 0) || 1;
+  return out.map((o) => ({ name: o.name, weight: o.weight / d }));
+}
+
+/**
+ * A seeded scatter of a mix over cells (in row order): each cell draws a tile, leaving out the tile
+ * of the cell to its left and the one above where another tile is left to draw. Draws are weighted
+ * by what each tile still has to lay of its share (weight × cells), so the counts follow the weights
+ * as closely as the neighbour rule allows (a tile over half the mix cannot have no equal neighbours).
+ */
+export function scatterMix(items: MixItem[], cells: number[], width: number, seed: number, named: (i: number) => string | null): string[] {
+  const rng = new Pcg32(seed, 0x6d6978);
+  const got = new Map<number, string>();
+  const at = (i: number) => got.get(i) ?? named(i);
+  const W = items.reduce((s, o) => s + o.weight, 0);
+  const used = new Map(items.map((o) => [o.name, 0]));
+  // What a tile still has to lay, in units of 1/W cell: weight × cells − laid × W.
+  const left = (o: MixItem) => Math.max(0, o.weight * cells.length - used.get(o.name)! * W);
+  const draw = (from: MixItem[], w: (o: MixItem) => number): MixItem | null => {
+    const total = from.reduce((s, o) => s + w(o), 0);
+    if (!total) return null;
+    let r = rng.nextInt(total);
+    for (const o of from) { if (r < w(o)) return o; r -= w(o); }
+    return null;
+  };
+  return cells.map((i) => {
+    const x = i % width;
+    const avoid = new Set([x > 0 ? at(i - 1) : null, at(i - width)].filter((v): v is string => !!v));
+    const open = items.filter((o) => !avoid.has(o.name));
+    const from = open.length ? open : items;
+    const o = draw(from, left) ?? draw(from, (q) => q.weight)!;
+    got.set(i, o.name);
+    used.set(o.name, used.get(o.name)! + 1);
+    return o.name;
+  });
+}
+
+function parseMix(o: Kv): MixItem[] {
+  const out: MixItem[] = [];
+  for (const part of o.value.split(',')) {
+    const m = /^([a-z][a-z0-9_-]*)(?::(\d+))?$/.exec(part);
+    if (!m) throw new DiagError(o.line, o.vcol, `mix= is a list of one-cell tiles with weights: mix=<tile>:<weight>,<tile>:<weight>,... ('${part}' is not <tile> or <tile>:<weight>)`);
+    const w = m[2] === undefined ? 1 : Number(m[2]);
+    if (w < 1 || w > 1000) throw new DiagError(o.line, o.vcol, `mix=: ${m[1]}'s weight must be 1..1000`);
+    if (out.some((x) => x.name === m[1])) throw new DiagError(o.line, o.vcol, `mix=: ${m[1]} is named twice`);
+    out.push({ name: m[1]!, weight: w });
+  }
+  if (out.length > 64) throw new DiagError(o.line, o.vcol, `mix=: at most 64 tiles`);
+  return out;
+}
+
 const tilesCmd: CommandSpec = {
   name: 'tiles',
-  summary: 'tiles <tiles layer> fill <asset>|<family>.<variant> [<x,y> <W>x<H>] [replace]   (lays a one-cell tile on every empty cell of the layer, or of the box; replace also covers one-cell tiles already there; the map picks among the tile\'s texture variants)',
+  summary: 'tiles <tiles layer> fill <asset>|<family>.<variant>|mix=<tile>:<weight>,... [<x,y> <W>x<H>] [replace] [variants=spread|named] [seed=]   (lays a one-cell tile on every empty cell of the layer, or of the box; replace also covers one-cell tiles already there; the map picks among the tile\'s texture variants. mix=: a seeded scatter of several tiles by weight, no two equal neighbours where it can help it; each tile\'s weight is shared with its texture variants the mix does not name, unless variants=named; each cell shows the tile drawn for it)',
   normalise(cmd, ctx) {
     const doc = mapOf(cmd, ctx);
-    const a = new Args(cmd, ['cells', 'anchor'], ['replace']);
+    const a = new Args(cmd, ['cells', 'anchor', 'mix', 'seed', 'variants'], ['replace']);
     const lt = a.take('word', 'a tiles layer');
     const li = layerNamed(doc, lt, ['tiles']);
     const how = a.take('word', 'fill');
     if (how.v !== 'fill') throw new DiagError(how.line, how.col, `tiles: expected fill`);
-    const what = a.take('word', 'an asset name');
-    const thing = thingName(what);
+    const mixOpt = a.opts.get('mix');
+    const what = mixOpt ? null : a.take('word', 'an asset name (or mix=<tile>:<weight>,...)');
+    const thing = what ? thingName(what) : null;
     let box = { x: 0, y: 0, w: doc.width, h: doc.height };
     if (a.peek()?.t === 'point') {
       const p = a.take('point', 'a corner x,y');
@@ -307,9 +376,21 @@ const tilesCmd: CommandSpec = {
     }
     a.done();
     const replace = a.flags.some((f) => f.v === 'replace');
-    const fp = footprintFor(a, ctx, thing.name, thing.variant, what, 'tiles');
-    if (fp.cols !== 1 || fp.rows !== 1) throw new DiagError(what.line, what.col, `tiles fill lays one-cell tiles; '${thing.name}' is ${fp.cols}x${fp.rows} cells (place it instead)`);
-    const e: MapEntry = { name: thing.name, variant: thing.variant, ...fp };
+    for (const k of ['seed', 'variants']) if (!mixOpt && a.opts.get(k)) throw new DiagError(a.opts.get(k)!.line, a.opts.get(k)!.col, `${k}= goes with mix=`);
+    const vo = a.opts.get('variants');
+    if (vo && vo.value !== 'spread' && vo.value !== 'named') throw new DiagError(vo.line, vo.vcol, `variants= is spread (a tile's weight shared with its texture variants) or named (only the tiles the mix names)`);
+    // The tiles: one, or the mix (each a one-cell tile, drawn exactly as named).
+    const items = mixOpt ? parseMix(mixOpt) : null;
+    const mix = items ? (vo?.value === 'named' ? items : spreadMix(items, ctx)) : null;
+    const fp = footprintFor(a, ctx, mix ? mix[0]!.name : thing!.name, thing?.variant ?? null, (what ?? mixOpt)!, 'tiles');
+    if (mix && !a.opts.get('cells')) {
+      for (const m of mix) {
+        const f = footprintFor(a, ctx, m.name, null, mixOpt!, 'tiles');
+        const src = ctx.asset?.(m.name);
+        if (f.cols !== 1 || f.rows !== 1 || (src && src.kind !== 'tile')) throw new DiagError(mixOpt!.line, mixOpt!.vcol, `mix= takes one-cell tiles; '${m.name}' is ${src && src.kind !== 'tile' ? `a ${src.kind}` : `${f.cols}x${f.rows} cells`}`);
+      }
+    }
+    if (fp.cols !== 1 || fp.rows !== 1) throw new DiagError(what!.line, what!.col, `tiles fill lays one-cell tiles; '${thing!.name}' is ${fp.cols}x${fp.rows} cells (place it instead)`);
     // The cells to fill, worked out now so the line replays without the asset.
     const { grid, placed } = occupancy(doc, li);
     const cells: number[] = [];
@@ -319,12 +400,33 @@ const tilesCmd: CommandSpec = {
       const q = placed[k]!, o = doc.map!.entries[q.entry]!;
       if (replace && o.cols === 1 && o.rows === 1 && q.x === x && q.y === y) cells.push(y * doc.width + x);
     }
+    const tail = `${box.x},${box.y} ${box.w}x${box.h} ${entryText(fp)}${replace ? ' replace' : ''}`;
+    if (!mix) {
+      const e: MapEntry = { name: thing!.name, variant: thing!.variant, ...fp };
+      return {
+        text: `tiles ${lt.v} fill ${what!.v} ${tail}`,
+        op: fn((d) => {
+          const v = entryIndex(d, e);
+          const cel = d.cels[li]![0]!;
+          for (const i of cells) cel[i] = v;
+        }),
+      };
+    }
+    const seed = seedOf(a, ctx);
+    const fillSet = new Set(cells);
+    const named = (i: number): string | null => {
+      if (i < 0 || fillSet.has(i)) return null;
+      const k = grid[i]!;
+      return k < 0 ? null : doc.map!.entries[placed[k]!.entry]!.name;
+    };
+    const chosen = scatterMix(mix, cells, doc.width, seed, named);
     return {
-      text: `tiles ${lt.v} fill ${what.v} ${box.x},${box.y} ${box.w}x${box.h} ${entryText(fp)}${replace ? ' replace' : ''}`,
+      text: `tiles ${lt.v} fill mix=${mix.map((m) => `${m.name}:${m.weight}`).join(',')} ${tail} variants=named seed=${seed}`,
       op: fn((d) => {
-        const v = entryIndex(d, e);
+        const ids = new Map<string, number>();
+        const id = (n: string) => ids.get(n) ?? ids.set(n, entryIndex(d, { name: n, variant: null, ...fp, exact: true })).get(n)!;
         const cel = d.cels[li]![0]!;
-        for (const i of cells) cel[i] = v;
+        cells.forEach((i, k) => { cel[i] = id(chosen[k]!); });
       }),
     };
   },

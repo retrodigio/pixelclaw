@@ -301,6 +301,10 @@ header .crumbs { white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 /* The map editor (G8): tools above, the map scrolling below. */
 .map-editor { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .map-editor .map-tools { flex-wrap: wrap; gap: 6px; }
+.map-editor .mix { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.map-editor .mix label { display: inline-flex; align-items: center; gap: 3px; font: 11px var(--mono); color: #8a909a; padding: 1px 4px; border: 1px solid var(--line); border-radius: 4px; }
+.map-editor .mix label.on { color: #e6e8eb; border-color: #4a6a8a; }
+.map-editor .mix input { width: 3.2em; font: 11px var(--mono); background: transparent; color: inherit; border: none; border-bottom: 1px solid var(--line); }
 .map-editor .map-body { flex: 1; overflow: auto; padding: 8px; }
 .map-editor canvas { image-rendering: pixelated; display: block; }
 

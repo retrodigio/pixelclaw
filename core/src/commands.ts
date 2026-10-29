@@ -44,6 +44,8 @@ export interface NormaliseContext {
   depth?: number;
   /** Another asset's document, for commands that copy from one (`family texture … from=`); the line records the pixels. */
   asset?(name: string): Doc | undefined;
+  /** The project's asset names (a `fill mix=` spreads a tile's weight over its texture variants). */
+  assetNames?(): string[];
   /** An image blob by its sha256 (underlays and snap read them; the line records what they need, so replay never does). */
   image?(blob: string): Rgba | undefined;
   /** A project scheme by name (a `new family` line copies it into the tape). */

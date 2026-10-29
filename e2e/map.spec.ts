@@ -20,6 +20,7 @@ const SETUP: [string, string][] = [
   ['hut', [`new object hut 16x16 cell=${T}x${T}`, 'rect 0,0 16x8 c=soil2 fill', 'rect 2,8 12x8 c=stone3 fill', 'footprint 2x1 anchor=0,0 <<\n  rr\n  bb\n>>'].join('\n')],
   ['bush', [`new object bush ${T}x${T}`, 'ellipse 1,1 6x6 c=moss3 fill'].join('\n')],
   ['turf', [`new tile turf ${T}x${T}`, `rect 0,0 ${T}x${T} c=moss1 fill`, 'px 2,3 5,6 c=moss2'].join('\n')],
+  ['turf_b', [`new tile turf_b ${T}x${T}`, 'variant of=turf', `rect 0,0 ${T}x${T} c=moss1 fill`, 'px 5,1 1,5 c=moss2'].join('\n')],
   ['isle', ['new map isle 12x9 tile=8', 'layer add sea terrain=land outside=on above=floor', 'layer add props objects above=sea', 'terrain sea rect 2,2 8x5'].join('\n')],
 ];
 
@@ -132,4 +133,21 @@ test('G13: the fill tool lays a tile on every empty cell of a tiles layer; walka
   await page.mouse.move(...await at(0, 0));
   await expect(page.getByTestId('map-status')).toContainText('(walkable)');
   await act(page, () => page.getByTestId('map-walkable').uncheck(), ['layer set sea walkable=off']);
+});
+
+test('G14: the fill tool lays a mix of tiles by weight (tiles <layer> fill mix=)', async ({ page }) => {
+  const at = await open(page);
+  await page.locator('[data-tool="fill"]').click();
+  await page.getByTestId('map-fill-tile').selectOption('(mix)');
+  // The chosen tile and its texture variants start at one each.
+  await expect(page.getByTestId('map-mix-turf')).toHaveValue('1');
+  await expect(page.getByTestId('map-mix-turf_b')).toHaveValue('1');
+  await page.getByTestId('map-mix-turf_b').fill('2');
+  await act(page, async () => {
+    await page.mouse.move(...await at(0, 0)); await page.mouse.down(); await page.mouse.move(...await at(3, 2), { steps: 2 }); await page.mouse.up();
+  }, [/^tiles floor fill mix=turf:1,turf_b:2 0,0 4x3 cells=1x1 anchor=0,0 variants=named seed=\d+$/]);
+  await act(page, async () => { await page.mouse.click(...await at(8, 6)); }, [/^tiles floor fill mix=turf:1,turf_b:2 0,0 12x9 cells=1x1 anchor=0,0 variants=named seed=\d+$/]);
+  // Back to one tile.
+  await page.getByTestId('map-fill-tile').selectOption('turf');
+  await expect(page.getByTestId('map-fill-mix')).toHaveCount(0);
 });

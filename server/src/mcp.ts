@@ -84,6 +84,7 @@ Oversized tiles and objects (48x48, 24x48, …; cell= the grid): new object hous
 Maps (plan §4.11: cells of tile px holding names; a map redraws itself when a tile changes):
   new map <name> <C>x<R> tile=24   layer add <name> terrain=<family> [outside=on] [walkable=on] | tiles | objects | overlay=<overlay> on=<terrain layer>[:out]|all   (walkable: objects may stand on its filled ground; layer set <layer> walkable=on|off)
   tiles <tiles layer> fill <tile> [<x,y> <W>x<H>] [replace]   a one-cell tile on every empty cell (the floor in one line)
+  tiles <tiles layer> fill mix=<tile>:<weight>,... [box] [variants=named]   a seeded scatter of several tiles by weight, no two equal neighbours where it can help it (a tile's weight is shared with its variants the mix does not name)
   terrain <layer> rect <x,y> <W>x<H> | ellipse … | brush <x,y>... [size=n] | fill <x,y> | paint <x,y> << # terrain, - not, . leave >> | clear   [erase]   the scheme picks the edge tiles
   place <asset>|<family>.<variant> <x,y> [layer=]   by its anchor cell; footprints may not overlap   |   move <x,y> <x,y>   |   remove <x,y>
   road <terrain layer> <x,y> <x,y>... [width=n]   |   scatter <asset>[,<asset>] count=<n> [on=<terrain layer>] [minDist=n] [layer=] [seed=]   |   map gen island|village|dungeon [layers=a,b,c] [seed=]

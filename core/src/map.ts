@@ -328,7 +328,8 @@ export function composeMapDoc(d: Doc, world: MapWorld, o: ComposeOptions = {}): 
         if (k === TRANSPARENT) continue;
         const e = m.entries[k]!;
         const x = i % cols, y = Math.floor(i / cols);
-        const fam = need(e.name);
+        // A mix's cell shows the tile drawn for it, not one of its texture variants.
+        const fam = e.exact && world.get(e.name) ? [world.get(e.name)!] : need(e.name);
         if (!fam.length) continue;
         const b = entryBox(e, x, y);
         if (e.variant) {

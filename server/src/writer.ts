@@ -538,7 +538,7 @@ export class Writer {
       try { return this.doc(n); } catch { return undefined; }
     };
     const defaults = styleDefaults(this.project, readManifest(this.project).manifest);
-    const r = runBatch(state, req.commands, { by: req.by, at: this.now(), palettes: paletteSource(this.project), assets, defaults, images: (b) => blobImage(this.project, b) });
+    const r = runBatch(state, req.commands, { by: req.by, at: this.now(), palettes: paletteSource(this.project), assets, assetNames: () => this.assets(), defaults, images: (b) => blobImage(this.project, b) });
     if (!r.ok) return { ok: false, errors: r.errors };
     if (r.state.doc && r.added.length && r.state.doc.name !== name) throw new ProjectError(`the commands create '${r.state.doc.name}' but the asset is '${name}'`);
     return { ok: true, name, creates, r };
