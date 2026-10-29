@@ -7,7 +7,7 @@
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  foldRequests, nextRequestId, openRequests, quote, requestProblem, validateManifest, type RequestKind, type RequestRecord, type WorkRequest,
+  foldRequests, nextRequestId, openRequests, quote, requestProblem, validateManifest, type ManifestAsset, type RequestKind, type RequestRecord, type WorkRequest,
 } from '@pixelclaw/core';
 import { ProjectError, assetExists, type Project } from './project.ts';
 import { MANIFEST_FILE, knownFor, manifestEntry, readManifest, writeManifest } from './plan.ts';
@@ -94,6 +94,40 @@ export function personRequest(w: Writer, by: string, q: PersonRequest): WorkRequ
   const r = w.run({ asset: q.asset, commands: `mark rejected ${quote(note)}`, by });
   if (!r.ok) throw new ProjectError(r.errors.map((e) => e.message).join('; '));
   return appendRequest(p, { ...rec, mark: r.added.at(-1)?.seq });
+}
+
+/** A request as one line: `r3 change urn: "taller" (from human:ana at …; claimed by claude)`. */
+export function requestLine(q: WorkRequest): string {
+  const what = q.kind === 'draw' ? `draw ${q.asset}` : q.kind === 'change' ? `change ${q.asset}` : `new asset ${q.asset}`;
+  const state = q.state === 'claimed' ? `claimed by ${q.claimedBy}` : q.state === 'blocked' ? `blocked: "${q.question}"` : q.state;
+  return `${q.id} ${what}${q.note ? `: "${q.note}"` : ''} (from ${q.by} at ${q.at}; ${state})`;
+}
+
+/**
+ * A request, reply or cancel from the CLI or MCP (plan §26 item 2) as the dashboard's message:
+ * kind draw, change or add (`new`, with its manifest entry). Checked here for shape; personRequest
+ * checks it against the project.
+ */
+export function toPersonRequest(a: { action?: string; kind?: string; asset?: string; note?: string; entry?: Record<string, unknown>; id?: string; text?: string }): PersonRequest {
+  const action = a.action ?? 'request';
+  if (action === 'reply' || action === 'cancel') {
+    if (!a.id || !/^r\d+$/.test(a.id)) throw new ProjectError(`${action}: give the request's id (like r3)`);
+    if (action === 'reply') {
+      if (!a.text?.trim()) throw new ProjectError('reply: give the answer (text)');
+      return { action, id: a.id, text: a.text };
+    }
+    return { action, id: a.id, ...(a.text?.trim() ? { text: a.text } : {}) };
+  }
+  if (action !== 'request') throw new ProjectError(`unknown action '${action}' (request, reply, cancel)`);
+  const kind = a.kind === 'new' ? 'add' : a.kind;
+  if (kind === 'add') {
+    if (!a.entry || typeof a.entry !== 'object') throw new ProjectError('add: give the new asset\'s manifest entry (name, kind, size, set, description)');
+    return { action, kind: 'new', entry: a.entry as unknown as ManifestAsset, ...(a.note?.trim() ? { note: a.note } : {}) };
+  }
+  if (kind !== 'draw' && kind !== 'change') throw new ProjectError('a request\'s kind is draw, change or add');
+  if (!a.asset) throw new ProjectError(`${kind}: give the asset`);
+  if (kind === 'change') return { action, kind, asset: a.asset, note: a.note ?? '' };
+  return { action, kind, asset: a.asset, ...(a.note?.trim() ? { note: a.note } : {}) };
 }
 
 /** The agent's side (the MCP `work` tool). */

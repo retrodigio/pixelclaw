@@ -52,7 +52,7 @@ describe('item 10: export while a server owns the project', () => {
     writeFileSync(join(proj, '.pixelclaw.lock'), JSON.stringify({ pid: process.ppid, url: 'http://127.0.0.1:7417/' }) + '\n');
     const r = cli(['export', proj, '--profile', 'png']);
     expect(r.code).toBe(1);
-    expect(r.err).toMatch(/a pixelclaw server \(pid \d+\) owns .*send commands through it \(MCP: run, export, import\)/);
+    expect(r.err).toMatch(/a pixelclaw server \(pid \d+\) owns .*send commands through it \(MCP: run, export, import, request; or its dashboard\)/);
     expect(existsSync(join(proj, 'exports'))).toBe(false);
     const f = cli(['export', proj, 'turf', '--format', 'png']);
     expect(f.code).toBe(1);

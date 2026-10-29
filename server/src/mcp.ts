@@ -9,7 +9,7 @@ import { formatChecks, formatSeeds } from './report.ts';
 import { writeReview } from './review.ts';
 import { EXPORT_FORMATS, exportAsset } from './export.ts';
 import { exportWithProfile, importIntoProject, importSummary, planImport, projectProfiles, projectSchemes } from './io.ts';
-import { agentWork, readRequests } from './requests.ts';
+import { agentWork, personRequest, readRequests, requestLine, toPersonRequest } from './requests.ts';
 import { openRequests, type WorkRequest } from '@pixelclaw/core';
 import { manifestEntry, planReport, planText, readManifest, writeManifest, writeTemplates } from './plan.ts';
 import { readFileSync } from 'node:fs';
@@ -93,7 +93,7 @@ Colours: an entry name (c=stone3), its key (c=3), its exact hex, or none. Coordi
 
 The project pipeline: \`plan\` shows the asset plan (manifest.json) and each asset's status (planned → drafted → checked → reviewed → approved → exported) by set; plan(manifest=…) writes a manifest (schema-checked), plan(templates=true) draws a flat mockup screen and coverage maps. A planned asset's \`new\` may leave out its size, palette and scheme. After a blind review's findings are dealt with: mark reviewed "…". A person approves in the dashboard (the watch link with &tab=dashboard), writing mark approved, or asks for changes (mark rejected "…"): read it with \`changes\`. The consistency check holds each asset to its set and to its planned height. docs/pipeline.md.
 
-Requests: people ask for work in the dashboard (Draw this, Ask for changes, Add an asset); \`plan\` lists open requests first. Take them before planned work: \`work\` claims the next open request and says what is asked; post progress with work(action="progress", text=…); finish with work(action="done", text=<what changed>) or, when you need the person, work(action="blocked", text=<one clear question>). Call \`plan\` at the start of a session and after each finished asset.
+Requests: people ask for work in the dashboard (Draw this, Ask for changes, Add an asset); \`plan\` lists open requests first. Take them before planned work: \`work\` claims the next open request and says what is asked; post progress with work(action="progress", text=…); finish with work(action="done", text=<what changed>) (refused while the asset fails a check) or, when you need the person, work(action="blocked", text=<one clear question>). Call \`plan\` at the start of a session and after each finished asset. \`request\` files work the same way (draw, change, add; reply, cancel), e.g. to plan a set and leave the drawing to the worker.
 
 Habits: after each meaningful batch, look once at an image (render or tile3x3), and use the grid to check exact pixels. Never judge a tile alone when it will be seen tiled; judge a sprite in the game view, on its ground. Keep the checks green, but do not stop at green: look at the 3x3 or the game view and judge it as a player would.
 
@@ -559,6 +559,32 @@ export function createMcpServer(host: McpHost, version: string, mo: McpOptions =
     }
   }));
 
+  // Filing, answering and withdrawing requests (plan §26 item 2): what the dashboard's buttons do.
+  // Not on the worker's own connection: it takes requests, it does not file or answer them.
+  if (!mo.confined) server.registerTool('request', {
+    title: 'File, answer or withdraw a request',
+    description: 'Ask for work the way the dashboard does (plan §21, §26): kind "draw" a planned asset not drawn yet; "change" a drawn one (note says what; this also writes `mark rejected "<note>"` on its tape); ' +
+      '"add" a new asset (entry: its manifest entry, validated with the whole manifest; nothing is written if it has problems). action "reply" answers a blocked request (id, text) and opens it again; ' +
+      '"cancel" withdraws one (id, optional text). The worker (`pixelclaw work`, Start Claude) or an agent with `work` takes open requests. Returns the request as it stands.',
+    inputSchema: z.object({
+      action: z.enum(['request', 'reply', 'cancel']).optional().describe('Default request'),
+      kind: z.enum(['draw', 'change', 'add']).optional(),
+      asset: z.string().optional().describe('draw, change: the asset'),
+      note: z.string().optional().describe('change: what should change; draw, add: anything to know'),
+      entry: z.record(z.string(), z.unknown()).optional().describe('add: the manifest entry, e.g. { "name": "crate", "kind": "sprite", "size": "16x16", "set": "props", "description": "…" }'),
+      id: z.string().regex(/^r\d+$/).optional().describe('reply, cancel: the request'),
+      text: z.string().optional().describe('reply: the answer; cancel: why'),
+    }),
+  }, (a) => w.enqueue(() => {
+    try {
+      const q = personRequest(w, AGENT, toPersonRequest(a));
+      w.requestsChanged();
+      return { content: [text(requestLine(q))] };
+    } catch (e) {
+      return errorResult(e);
+    }
+  }));
+
   server.registerTool('work', {
     title: 'Work on requests',
     description: 'The request queue (plan §21): what people asked for in the dashboard (draw a planned asset, change a drawn one, a new asset). ' +
@@ -652,12 +678,6 @@ export function createMcpServer(host: McpHost, version: string, mo: McpOptions =
   }));
 
   return server;
-}
-
-function requestLine(q: WorkRequest): string {
-  const what = q.kind === 'draw' ? `draw ${q.asset}` : q.kind === 'change' ? `change ${q.asset}` : `new asset ${q.asset}`;
-  const state = q.state === 'claimed' ? `claimed by ${q.claimedBy}` : q.state === 'blocked' ? `blocked: "${q.question}"` : q.state;
-  return `${q.id} ${what}${q.note ? `: "${q.note}"` : ''} (from ${q.by} at ${q.at}; ${state})`;
 }
 
 /** What a claimed request asks, with what the project knows about its asset. */

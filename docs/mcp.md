@@ -245,6 +245,19 @@ Draw it: run with `new sprite urn_blue` (the manifest fills in its size and pale
 If you cannot go on without the person, work(action="blocked", text=<one clear question>).
 ```
 
+### `request`
+
+File, answer or withdraw a request as the dashboard's buttons do (G15; [pipeline.md](pipeline.md#requests-from-the-cli-and-mcp)):
+`kind: "draw"` with `asset` (planned, not drawn), `"change"` with `asset` and `note` (also writes
+`mark rejected "<note>"` on its tape), `"add"` with `entry` (a manifest entry, validated with the
+whole manifest); `action: "reply"` with `id` and `text` (a blocked request opens again) or
+`"cancel"` with `id`. Returns the request's line, e.g.
+`r1 draw urn: "squat" (from claude at 2026-10-29T12:00:00Z; open)`. Not offered on the worker's
+connection.
+
+`work(action: "done")` is refused while the asset fails a check (or is not drawn yet): the reply
+lists the failing checks; fix them, or `blocked` with a question.
+
 ### `export`
 
 Write assets through an export profile (see [profiles.md](profiles.md)); each asset written is

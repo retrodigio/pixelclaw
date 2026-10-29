@@ -1,17 +1,17 @@
-// pixelclaw: new | run | view | check | review | plan | export | import | verify | upgrade | skill (work and serve: entry.ts). A thin layer over @pixelclaw/core and the project folder.
+// pixelclaw: new | run | view | check | review | plan | request | reply | cancel | export | import | verify | upgrade | skill (work and serve: entry.ts). A thin layer over @pixelclaw/core and the project folder.
 
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  CHECK_IDS, LANG_VERSION, TapeCursor, tapeLang, Timeline, checkSummary, isCheckId, replay, serializeDoc, serializeDocV1, upgradeTape, type AssetState, type CheckId, type Doc,
+  CHECK_IDS, LANG_VERSION, TapeCursor, openRequests, tapeLang, Timeline, checkSummary, isCheckId, replay, serializeDoc, serializeDocV1, upgradeTape, type AssetState, type CheckId, type Doc,
   type TapeEntry,
 } from '@pixelclaw/core';
 import {
   AssetExistsError, NoAssetError, ProjectError, VIEW_MODES, Writer, assetDir, checkpointNames, createProject, formatChecks, isViewMode, listAssets,
   loadProject, lockHolder, paletteSource, parseRegion, prefixHash, previewPng, readAssetJson, readCheckpoints, readPaletteFile,
-  needsUnderlay, resolveUnderlays, formatSeeds, readTape, readTapeFile, readStateCacheRaw, stateKey, saveAsset, sha256, writeReview, planReport, planText, writeManifest, writeTemplates, SUMMARY_BUDGET, EXPORT_FORMATS, exportAsset, exportWithProfile, importIntoProject, importSummary, planImport, type ExportFormat, type Project, type ViewMode,
+  needsUnderlay, resolveUnderlays, formatSeeds, readTape, readTapeFile, readStateCacheRaw, stateKey, saveAsset, sha256, writeReview, planReport, planText, writeManifest, writeTemplates, SUMMARY_BUDGET, EXPORT_FORMATS, exportAsset, exportWithProfile, importIntoProject, importSummary, planImport, personRequest, readRequests, requestLine, toPersonRequest, type ExportFormat, type Project, type ViewMode,
 } from '@pixelclaw/server';
 
 export interface Io {
@@ -65,6 +65,13 @@ export const USAGE = `pixelclaw: a pixel art editor driven by commands
       approved, exported; requests from people first; what is left and what is failing (by set, or
       scene by scene with what each still needs). --manifest writes a manifest (checked first);
       --templates draws the flat templates (mockup screen, coverage maps) into templates/.
+  pixelclaw request <project> [draw <asset> | change <asset> --note "<what>" | add <name> --kind <k> --size WxH [--set <s>] [--description "…"] [--height N]] [--note "…"] [--by <author>]
+      Ask for work as the dashboard does: draw a planned asset, change a drawn one (also writes
+      mark rejected "<note>" on its tape), or add a new asset (its manifest entry, validated first).
+      Without a kind, lists the requests still open, claimed or blocked. Refused while a server
+      owns the project (use its dashboard or MCP request).
+  pixelclaw reply <project> <id> "<answer>" [--by <author>]      answer a blocked request (it opens again)
+  pixelclaw cancel <project> <id> ["<why>"] [--by <author>]       withdraw a request
   pixelclaw work <project> [--port N]
       Work the request queue with a headless Claude Code session (claude -p with the PixelClaw MCP
       server and the skill) until it is empty or the budget cap is reached. Runs only when
@@ -152,7 +159,7 @@ function loadState(proj: Project, name: string): AssetState {
 /** A running server is the single writer for its project; the CLI does not write behind its back. */
 function assertNoServer(proj: Project): void {
   const held = lockHolder(proj.dir);
-  if (held) throw new ProjectError(`a pixelclaw server (pid ${held.pid}) owns ${proj.dir}; send commands through it (MCP: run, export, import), or stop it first`);
+  if (held) throw new ProjectError(`a pixelclaw server (pid ${held.pid}) owns ${proj.dir}; send commands through it (MCP: run, export, import, request; or its dashboard), or stop it first`);
 }
 
 function apply(io: Io, proj: Project, text: string, source: string, o: { asset?: string; replace: boolean; by: string; dry?: boolean }): { code: number; doc?: Doc } {
@@ -361,6 +368,46 @@ function cmdReview(io: Io, p: Parsed): number {
   const map = { ...(sm ? { cols: Number(sm[1]), rows: Number(sm[2]) } : {}), ...(seed ? { seed } : {}) };
   const r = writeReview(new Writer(loadProject(dir), { now: io.now }), { assets: names.length ? names : undefined, set: one(p, 'set'), name: one(p, 'name'), map });
   io.out(`wrote ${r.files.length} files to ${r.dir}\n${r.files.map((f) => `  ${f}\n`).join('')}Hand the folder to a fresh reviewer: "Review the art in ${r.dir} by following rubric.md."\n`);
+  return 0;
+}
+
+/** `request`: file one (draw, change, add) as the dashboard's buttons do, or list the open ones. */
+function cmdRequest(io: Io, p: Parsed): number {
+  const [dir, kind, name, ...extra] = p.pos;
+  if (!dir) throw new UsageError('request: give a project folder');
+  if (extra.length) throw new UsageError(`request: unexpected argument '${extra[0]}'`);
+  const proj = loadProject(dir);
+  if (!kind) {
+    const open = openRequests(readRequests(proj));
+    io.out(open.length ? open.map((q) => requestLine(q) + '\n').join('') : 'no open requests\n');
+    return 0;
+  }
+  if (!['draw', 'change', 'add'].includes(kind)) throw new UsageError(`request: the kind is draw, change or add (not '${kind}')`);
+  if (!name) throw new UsageError(`request ${kind}: give the asset${kind === 'add' ? "'s name" : ''}`);
+  if (kind !== 'add') for (const k of ['kind', 'size', 'set', 'description', 'height']) if (one(p, k) !== undefined) throw new UsageError(`request ${kind}: --${k} is for add`);
+  let entry: Record<string, unknown> | undefined;
+  if (kind === 'add') {
+    const height = one(p, 'height');
+    if (height !== undefined && !/^\d+$/.test(height)) throw new UsageError('--height is a number of pixels');
+    entry = { name, kind: one(p, 'kind'), size: one(p, 'size'), ...(one(p, 'set') ? { set: one(p, 'set') } : {}), ...(one(p, 'description') ? { description: one(p, 'description') } : {}), ...(height ? { height: Number(height) } : {}) };
+  }
+  assertNoServer(proj);
+  const w = new Writer(proj, { now: io.now });
+  const q = personRequest(w, one(p, 'by') ?? 'claude', toPersonRequest({ action: 'request', kind, asset: name, note: one(p, 'note'), entry }));
+  io.out(`${requestLine(q)}\n`);
+  return 0;
+}
+
+/** `reply` and `cancel`: answer a blocked request, or withdraw one. */
+function cmdAnswer(io: Io, action: string, p: Parsed): number {
+  const [dir, id, text, ...extra] = p.pos;
+  if (!dir || !id) throw new UsageError(`${action}: give a project folder and a request id`);
+  if (extra.length) throw new UsageError(`${action}: put the text in quotes (unexpected '${extra[0]}')`);
+  const proj = loadProject(dir);
+  assertNoServer(proj);
+  const w = new Writer(proj, { now: io.now });
+  const q = personRequest(w, one(p, 'by') ?? 'claude', toPersonRequest({ action, id, text }));
+  io.out(`${requestLine(q)}\n`);
   return 0;
 }
 
@@ -627,6 +674,10 @@ export function main(argv: string[], io: Io = nodeIo): number {
         return cmdReview(io, parseArgs(rest, ['name', 'set', 'size', 'seed'], []));
       case 'plan':
         return cmdPlan(io, parseArgs(rest, ['set', 'manifest', 'seed', 'order'], ['json', 'templates']));
+      case 'request':
+        return cmdRequest(io, parseArgs(rest, ['note', 'by', 'kind', 'size', 'set', 'description', 'height'], []));
+      case 'reply': case 'cancel':
+        return cmdAnswer(io, cmd, parseArgs(rest, ['by'], []));
       case 'skill':
         return cmdSkill(io, parseArgs(rest, ['dest', 'project'], []));
       case 'verify':

@@ -184,7 +184,7 @@ not fit is refused before it is written:
 |---|---|---|
 | open | `request`, or `reply` to a blocked one | a person |
 | claimed | `claim` (open only; the claimer may claim again); `progress` posts a note | the agent |
-| done | `done` with what changed (claimed, by the claimer) | the agent |
+| done | `done` with what changed (claimed, by the claimer; refused while the asset fails a check or is not drawn, G15) | the agent |
 | blocked | `blocked` with a question (claimed, by the claimer) | the agent |
 | cancelled | `cancel` (open, claimed or blocked) | a person |
 
@@ -195,6 +195,25 @@ first) and takes them with the MCP `work` tool; the skill's routine takes reques
 planned work and calls `plan` after each finished asset.
 
 ![Each state: urn_blue done, the goat blocked on a question, Claude working on the jar](screenshots/g12-states.png)
+
+### Requests from the CLI and MCP
+
+The same requests, checked the same way (G15, plan §26 item 2), for an agent or a script that
+plans the work and leaves the drawing to the worker:
+
+```sh
+pixelclaw request harbour.pclaw draw crab_pot --note "rope handles"
+pixelclaw request harbour.pclaw change shingle --note "fewer white pebbles"     # also: mark rejected "…" on its tape
+pixelclaw request harbour.pclaw add buoy --kind sprite --size 24x24 --set props --description "a red float" --height 18
+pixelclaw request harbour.pclaw                     # what is still open, claimed or blocked
+pixelclaw reply harbour.pclaw r4 "Rope, brown."    # answer a blocked request: it opens again
+pixelclaw cancel harbour.pclaw r5 "not needed"
+```
+
+The author is `claude` unless `--by human:<name>` says otherwise; refused while a server owns the
+project (use its dashboard, or MCP). MCP's `request` tool takes `kind` draw, change or add (with
+`entry`, the manifest entry), or `action` reply or cancel with `id` and `text`. The worker's own
+connection does not offer it: the worker takes requests, it does not file or answer them.
 
 ### Claude without a session: the worker
 

@@ -339,6 +339,45 @@ describe('worker discipline (§26 item 1)', () => {
   });
 });
 
+describe('requests from MCP (§26 item 2)', () => {
+  it('an agent files, answers and withdraws requests as the dashboard does; the worker\'s own connection has no request tool', async () => {
+    const { root, dir } = scratch({ enabled: true, cap: 1 });
+    const s = await serve({ project: dir, port: 0, mcp: false, log: () => undefined });
+    const c = new Client({ name: 'agent', version: '1' });
+    try {
+      await c.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${s.port}/mcp`), { requestInit: { headers: { Authorization: `Bearer ${s.token}` } } }));
+      const call = async (args: Record<string, unknown>) => (await c.callTool({ name: 'request', arguments: args })) as { content: Content; isError?: boolean };
+      expect(texts((await call({ kind: 'draw', asset: 'urn', note: 'squat' })).content)).toMatch(/^r1 draw urn: "squat" \(from claude at .*; open\)$/);
+      expect((await c.callTool({ name: 'run', arguments: { asset: 'turf', commands: 'new tile turf\nfill 0,0 c=moss1' } }) as { isError?: boolean }).isError).toBeFalsy();
+      expect(texts((await call({ kind: 'change', asset: 'turf', note: 'more tufts' })).content)).toMatch(/^r2 change turf: "more tufts"/);
+      expect(readFileSync(join(dir, 'assets', 'turf', 'tape.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).at(-1)).toMatchObject({ by: 'claude', cmd: 'mark rejected "more tufts"' });
+      expect(texts((await call({ kind: 'add', entry: { name: 'crate', kind: 'sprite', size: '16x16', set: 'props' } })).content)).toMatch(/^r3 new asset crate/);
+      let r = await call({ kind: 'add', entry: { name: 'crate2', kind: 'sprite' } });
+      expect(r.isError).toBe(true);
+      expect(texts(r.content)).toMatch(/the new entry has problems/);
+      r = await call({ kind: 'change', asset: 'turf' });
+      expect(texts(r.content)).toMatch(/say what should change/);
+      expect(texts((await call({ action: 'cancel', id: 'r3', text: 'later' })).content)).toMatch(/cancelled\)$/);
+      expect(texts((await call({ action: 'reply', id: 'r1', text: 'x' })).content)).toMatch(/only a blocked request takes a reply/);
+      expect(readRequestRecords(loadProject(dir)).map((x) => `${x.type} ${x.id}`)).toEqual(['request r1', 'request r2', 'request r3', 'cancel r3']);
+      // The worker's connection (its own token, fenced) does not offer the tool.
+      const rec = join(root, 'probe.jsonl');
+      process.env.FAKE_CLAUDE_RECORD = rec;
+      process.env.FAKE_CLAUDE_PROBE = JSON.stringify([['request', { kind: 'draw', asset: 'jar' }]]);
+      const pj = JSON.parse(readFileSync(join(dir, 'project.json'), 'utf8'));
+      writeFileSync(join(dir, 'project.json'), JSON.stringify({ ...pj, worker: { ...pj.worker, command: [process.execPath, FAKE, '--fake-mode', 'probe'] } }));
+      await s.worker.start('human:ana');
+      expect(records(rec).find((x) => x.probe)!.probe![0]).toMatchObject({ error: true, text: expect.stringMatching(/Tool request not found/i) });
+    } finally {
+      delete process.env.FAKE_CLAUDE_RECORD;
+      delete process.env.FAKE_CLAUDE_PROBE;
+      await c.close();
+      await s.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 60_000);
+});
+
 describe('the stall watchdog and the spend ledger (§26 item 1)', () => {
   const run = async (dir: string, opts: string[], worker: Record<string, unknown> = {}) => {
     const pj = JSON.parse(readFileSync(join(dir, 'project.json'), 'utf8'));
@@ -353,15 +392,15 @@ describe('the stall watchdog and the spend ledger (§26 item 1)', () => {
     try {
       ask(dir, ['urn']);
       process.env.FAKE_CLAUDE_RECORD = rec;
-      const why = await run(dir, ['--fake-mode', 'stall'], { stall: 0.01 });
+      const why = await run(dir, ['--fake-mode', 'stall'], { stall: 0.05 });
       expect(why).toBe('the queue is empty');
       const log = readFileSync(join(dir, 'logs', 'worker.log'), 'utf8');
-      expect(log).toMatch(/watchdog: no tool call for 0\.01 min; stopping the session/);
-      expect(log).toMatch(/session 1: no tool call for 0\.01 min; stopped it; resuming it once/);
+      expect(log).toMatch(/watchdog: no tool call for 0\.05 min; stopping the session/);
+      expect(log).toMatch(/session 1: no tool call for 0\.05 min; stopped it; resuming it once/);
       const argvs = records(rec).map((r) => r.argv!);
       expect(argvs).toHaveLength(2);
       expect(after(argvs[1]!, '--resume')).toMatch(/^fake-\d+$/);
-      expect(after(argvs[1]!, '-p')).toMatch(/You made no tool call for 0\.01 minutes/);
+      expect(after(argvs[1]!, '-p')).toMatch(/You made no tool call for 0\.05 minutes/);
       expect(after(argvs[1]!, '--tools')).toBe('');
       expect(readRequestRecords(loadProject(dir)).filter((x) => x.type === 'done').map((x) => x.id)).toEqual(['r1']);
       // The stopped session reported no cost: its tokens are charged at the dearest rates (an upper bound).
@@ -375,9 +414,9 @@ describe('the stall watchdog and the spend ledger (§26 item 1)', () => {
     const { root, dir } = scratch();
     try {
       ask(dir, ['urn']);
-      expect(await run(dir, ['--fake-mode', 'stall', '--fake-stall-again'], { stall: 0.01 })).toBe('the queue is empty');
+      expect(await run(dir, ['--fake-mode', 'stall', '--fake-stall-again'], { stall: 0.05 })).toBe('the queue is empty');
       const blocked = readRequestRecords(loadProject(dir)).filter((x) => x.type === 'blocked');
-      expect(blocked).toEqual([expect.objectContaining({ id: 'r1', by: 'claude', text: expect.stringMatching(/The worker stalled on this \(no tool call for 0\.01 min, twice\)/) })]);
+      expect(blocked).toEqual([expect.objectContaining({ id: 'r1', by: 'claude', text: expect.stringMatching(/The worker stalled on this \(no tool call for 0\.05 min, twice\)/) })]);
       expect(readFileSync(join(dir, 'logs', 'worker.log'), 'utf8')).toMatch(/stalled again; r1 marked blocked/);
     } finally { rmSync(root, { recursive: true, force: true }); }
   }, 60_000);

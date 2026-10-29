@@ -94,7 +94,13 @@ async function finish(id: string, what: string, asset: string, brief: string): P
 if (mode === 'probe') {
   const probes = JSON.parse(process.env.FAKE_CLAUDE_PROBE ?? '[]') as [string, Record<string, unknown>][];
   const answers: { tool: string; error: boolean; text: string }[] = [];
-  for (const [tool, args] of probes) answers.push({ tool, ...(await call(tool, args)) });
+  for (const [tool, args] of probes) {
+    try {
+      answers.push({ tool, ...(await call(tool, args)) });
+    } catch (e) {
+      answers.push({ tool, error: true, text: (e as Error).message }); // a tool the server does not offer
+    }
+  }
   record({ probe: answers });
 } else if (resumed && mode === 'stall') {
   if (argv.includes('--fake-stall-again')) await quiet();
