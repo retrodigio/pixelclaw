@@ -1116,3 +1116,114 @@ Points where the plan was unclear or silent. Each has the reading that was follo
 166. **A dropped folder.** *Reading:* the browser reads a dropped folder's PNG and `.aseprite`
      files (nested folders too, by name), and they are imported as a folder: one asset per file,
      named by the file (or the pattern), unless a single sheet is sliced.
+
+## G13 (plan §23: fixes from the acceptance run)
+
+167. **"A threshold scaled to the tile's contrast"** (item 1). *Reading:* the contrast is the
+     band's own, along its length: the limit is the larger of `max` (3) and `contrast` (3) × the
+     standard deviation of the band's cross-section means × √(width / length), i.e. a band fails
+     only when its difference stands out from its own spread by 3 standard errors. One mark on a
+     calm tile makes its rows differ but varies a lot along them, so the limit rises; a band even
+     along its length keeps 3. A tile-wide contrast was tried and let real stripes through on busy
+     tiles. Loud random noise still fails (G5's test kept). The band reported is the one nearest to
+     failing; `contrast: 0` restores G5's rule.
+
+168. **The `seeds` tool** (item 1). *Reading:* one generator command (any the normaliser writes a
+     seed into), seeds `from`..`from+count-1` (default 1..8, at most 64) or a list, each a dry run on
+     the asset as it is; ranked by the number of failing checks, then the sum of how far the failing
+     ones are over their limits, then the closest a passing check comes to its limit. `apply=true`
+     runs the best as one group; `before` adds commands to the same batch; `checks` narrows the
+     ranking. Also a CLI command (`pixelclaw seeds`).
+
+169. **`run dry=true`** (item 1). *Reading:* everything `run` does up to saving (normal form,
+     warnings, checks with the copy standing in for the asset, also for the checks of other assets
+     that read it), then nothing is written or sent. `underlay generate|import` lines are refused in
+     a dry run (they would spend money or copy files); a view is `render`, `grid` or `tile3x3` of the
+     copy. CLI `run --dry` works while a server owns the project (it writes nothing).
+
+170. **Face cells "whatever the terrain layer's fill setting"** (item 2). *Reading:* with
+     `outside=off`, a face cell draws its face art (every visible art layer of the family but the
+     ground layer of textures), so the floor shows under the face's transparent pixels. Found in the
+     demo and fixed too: `family band … draw=on` no longer clears the face pieces (they are art drawn
+     by hand, outside the terrain).
+
+171. **"Underlays sized from the placed area"** (item 3). *Reading:* the area is `size=` (else the
+     whole canvas, as the underlay command places it), and the request size is the supported size
+     nearest its aspect; `image=` and project.json `underlay.size` still win. A layer layout is cut to
+     the area, and the fake provider's grid is the area.
+
+172. **"Snap constrained to the placement's grid"** (item 4). *Reading:* by default the pitch is the
+     image's size over the placed size, exactly one block per placed pixel, and only the offset is
+     fitted (less than half a block either way), so the draft lands on the placement. `fit=free`
+     keeps G11's search. Kiln Hollow's recorded G11 snap stays as it was made; the rebuild test runs
+     the recorded line and checks that the new default gives the same rows (it does; only the
+     recorded pitch and offset round differently).
+
+173. **"Warn when the seam after a `family cut` is high"** (item 4). *Reading:* after a batch with
+     `family cut`, the cut family's `seam` check (over its sample island) against its limit; a
+     warning when it fails, with what to do. Dry runs warn too.
+
+174. **"A fill command for tiles layers"** (item 5). *Reading:* `tiles <layer> fill <tile>
+     [<x,y> <W>x<H>] [replace]`: one-cell tiles (or a family's variant) on every empty cell; multi-cell
+     tiles are refused (place them). The cells are worked out when the line is written, so it
+     replays alone; `replace` also covers one-cell tiles already there. The map editor has a fill
+     tool (a click fills the layer, a drag a box).
+
+175. **"A walkable ground flag"** (item 5). *Reading:* a terrain layer option, `walkable=on` (on
+     `layer add` or `layer set`): its filled ground (the outside of an `outside=on` layer) and its
+     edge tiles no longer stop a footprint. Stored only when on, so existing state bytes are
+     unchanged.
+
+176. **Profiles' "corner-order field"** and **"path dead ends named apart"** (item 6). *Reading:*
+     `autotile.<scheme>.corners: "nw,ne,se,sw"` (the four corners, comma-separated) orders the
+     `{corners}` suffixes. Dead ends: a template per shape of a side-letter variant (`shapes`: lone,
+     end, straight, corner, tee, cross) and a `{shape}` placeholder; without them names are as
+     before.
+
+177. **"A per-colour output map (palette entry → output colour or tone)"** (item 6). *Reading:*
+     `colours: { "<entry>" | "<palette>.<entry>": "#rrggbb" | "<role>" }`; a role is written as
+     `roles` gives it (it must give it), so an engine's tones are the five role colours. Applied
+     wherever role colours were (every layout, and import reads them back; entries written as one
+     colour read back as the first, with a note).
+
+178. **"A jitter option on the band"** (item 7). *Reading:* `family band … jitter=<n> [seed=]`:
+     every band edge moves in or out by up to n px, by 1-D value noise along each edge (lattice about
+     five pixels apart, integer interpolation) that repeats every tile, so neighbours still join. A
+     2-D field was tried first and broke one-pixel bands. The seed is written in, so `seeds` can
+     choose it.
+
+179. **"Variants that inherit the band and override only the texture, following later fixes"**
+     (item 8). *Reading:* `variant of=<base> band=inherit` on a family's texture variant. Replay never
+     reads another asset, so following is the writer's: after every batch that changes the base, it
+     writes `family band from=<base>` (geometry, detached variants and the band layer, recorded in
+     the line) on each inheriting variant whose band differs, by the same author, as its own group,
+     and the run's result names them. The variant's band layer is locked, and `family band`, `cut`,
+     `detach` and `attach` are refused on it; `band=own` undoes it. Frames copied: as many as both
+     have.
+
+180. **"The provider never writes any part of the key"; "price the input-image tokens"** (item 9).
+     *Reading:* scrub the key, anything shaped like an API key (`sk-`, `rk-`, `pk-` followed by key
+     characters or `*`), runs of `****`, and any run of 4 or more of the key's first or last
+     characters, from every message and log line. Input tokens of an edit's layout image by
+     OpenAI's vision rule (fit 2048, short side 768, 170 per 512 px tile plus 85) and of the prompt
+     (4 characters a token) are added to the estimate at the model's token prices; token prices
+     were added for `gpt-image-1.5` and `gpt-image-1-mini` (to be checked, see PROGRESS), which
+     also makes their lines' `cost=` the usage price when usage is reported (G11's test updated).
+
+181. **"Consistency stable on small sets"** (item 10). *Reading:* each asset is held to the median
+     of the whole set, itself included, so all members share one centre: in a set of three, the odd
+     one out fails rather than two. This only loosens the rule, so nothing that passed fails.
+
+182. **"Face coverage template draws faces"** (item 10). *Reading:* the flat template paints a face
+     cell's top half in a darker band colour on the outside (the face's height is the artist's;
+     half a tile is a placeholder).
+
+183. **"Review `cells.txt` correct"** (item 10). *Reading:* `cells.txt` said "a letter per ground, a
+     capital where an object stands" but lettered terrain layers, left a filled layer's outside as
+     nothing, and gave tiles capitals as if they were objects. It now letters the ground each cell
+     shows (a tile, a terrain, a terrain's outside ground) and gives capitals only to objects
+     (objects layers). `view map`'s text keeps its layer view.
+
+184. **"A CLI export refused while a server holds the project"** (item 10). *Reading:* both
+     `export` forms (profile and `--format`), like `run`, `new` and `import`; the message names MCP
+     `export`. G9's test that exported by CLI beside a running server now exports through MCP.

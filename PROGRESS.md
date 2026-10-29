@@ -193,6 +193,19 @@ Status of plan features touched so far. Steps refer to the build plan (§10).
 | `map gen` places manifest objects | §21 (6), G10 notes, G12 | done | `g12.test.ts` (core: on the inner ground, off the lanes, apart, replayed byte for byte; the manifest's objects written into the line; refusals; server: through MCP) | `objects=`, `layer=`, `fp=` in the line (question 164). |
 | `plan` faster: check results cached by state hash | §21 (6), G11 notes, G12 | done | `g12.test.ts` (server: the cached plan equals a plan with no cache, and is faster; a changed tape runs its checks again) | `.cache/checks/<asset>.json` (question 165). A CLI `plan` on mossy-ruins: 3.8 s with no check cache, 0.8 s with it; Kiln Hollow 1.0 s and 0.7 s (most of what is left is Node starting). |
 | Demo: a person imports a sheet into the gallery, asks for two planned assets and a change; the agent takes them through `plan` and `work`: one done, one blocked, one in progress | G12 | done | `kiln-hollow.test.ts` (verify; rebuild of the G12 work; the requests fold to done, blocked, claimed; 3 exported, 9 checked, 3 drafted, 14 planned of 29) | `examples/demo-g12.md`, `examples/demo-g12-agent.ts` (run by hand); screenshots `docs/screenshots/g12-*.png` and `scripts/screenshots-g12.ts` (the worker with the fake). |
+| `repetition`: the limit scales with the band's spread along its length (one mark on a calm tile is not a stripe) | §23 (1), G13 | done | `core/test/checks.test.ts` (G13 case), `cli/test/check.test.ts` | `contrast` 3 standard errors (0: the old rule); the band reported is the one nearest to failing, so grass_b's faint rows now read "rows 1-2 … 3.7" (still failing). |
+| MCP `seeds` and `pixelclaw seeds`: a generator line tried with N seeds as dry runs, ranked by the checks | §23 (1), G13 | done | `server/test/g13.test.ts`, `cli/test/g13.test.ts` | Fewest failing, then least over the limits, then most room. `apply` runs the best; `before` runs commands first; any line the normaliser writes a seed into (noise, scatter, voronoi, bricks, map gen, family coverage, family band jitter). |
+| `run dry=true` and `pixelclaw run --dry` | §23 (1), G13 | done | `server/test/g13.test.ts`, `cli/test/g13.test.ts` | The checks see the copy in place of the asset; nothing reaches the tape, the files, the caches or the watchers. Underlay generate/import refused in a dry run. |
+| Face cells drawn on maps whatever the terrain layer's fill | §23 (2), G13 | done | `core/test/g13.test.ts` (item 2) | With `outside=off` a face cell draws its face art (every layer but the ground textures). Also: `family band draw=on` leaves face pieces alone (found in the demo). |
+| Underlays sized from the placed area | §23 (3), G13 | done | `server/test/g13.test.ts` (item 3) | `size=` (else the canvas) picks 1536x1024, 1024x1536 or 1024x1024; a layer layout is cut to the area; the fake draft's grid is the area. |
+| Snap on the placement's grid; a seam warning after `family cut` | §23 (4), G13 | done | `server/test/g13.test.ts` (item 4), `cli/test/kiln-hollow.test.ts` | `fit=placement` (default): one block per placed pixel, only the offset fitted; `fit=free` is G11's search. The cut warning runs the family's seam over a sample island (also in dry runs). |
+| `tiles <layer> fill <tile> [box] [replace]`; `walkable=on` terrain layers | §23 (5), G13 | done | `core/test/g13.test.ts` (item 5), `e2e/map.spec.ts` (G13) | One-cell tiles; the cells are worked out when the line is written. Walkable: the layer's filled ground and edges are ground for `footprint`. Map editor: ▦ fill tool and a walkable box. |
+| Profiles: `autotile.<scheme>.corners`, `shapes` and `{shape}`; `colours` (per-colour output map) | §23 (6), G13 | done | `core/test/g13.test.ts` (item 6) | Shapes: lone, end, straight, corner, tee, cross (a path's dead ends apart from its straights). `colours`: entry (or palette.entry) to `#rrggbb` or a role `roles` gives; import reads them back. |
+| `family band … jitter=<n> [seed=]` | §23 (7), G13 | done | `core/test/g13.test.ts` (item 7) | A 1-D value-noise field along each edge (vertical edges vary with y, horizontal with x), repeating every tile, integer maths; every band edge moves with it. |
+| `variant of=<base> band=inherit`, `family band from=<family>`, the writer's follow-up | §23 (8), G13 | done | `server/test/g13.test.ts` (item 8) | The band (geometry, detached, band layer) is copied into the variant's tape; after every batch that changes the base the writer writes `family band from=<base>` on each inheriting variant (same author, its own group). Band layer locked; band edits refused there; `band=own` undoes it. |
+| No part of the key written; input-image tokens priced | §23 (9), G13 | done | `server/test/g13.test.ts` (item 9), `server/test/g11.test.ts` | Scrubs the key, `sk-…` shapes (masked too) and any run of 4+ of its first or last characters. An edit's estimate adds the layout's input tokens (and the prompt's). Token prices added for gpt-image-1.5 and -mini (to be checked by a reader); the line's cost is now usage-based for 1.5. |
+| Smaller items: consistency on small sets; face coverage template; review `cells.txt`; CLI export refused under a server | §23 (10), G13 | done | `core/test/g13.test.ts` (item 10), `cli/test/g13.test.ts`, `server/test/g9.test.ts` | The whole set's median (itself included); faces drawn in the template's top half; `mapCellsText` (ground as shown, objects as capitals); `export` (profile and format) call the server lock check. |
+| Demo: Fern Ledge (items 1-8) | §23, G13 | done | `examples/demo-g13-agent.ts` (run by hand), `examples/demo-g13.md` | Screenshots `docs/screenshots/g13-*.png` (`scripts/screenshots-g13.ts`). Every asset of the set passes its checks; the pillar is left a draft on purpose. |
 
 ## Notes for G8
 
@@ -342,3 +355,24 @@ What the acceptance project (§10 A1) will need, from G11's side:
 - **Worker log retention.** `logs/worker.log` grows without bound (the dashboard shows the last
   200 lines); rotate it if runs become routine.
 - **Cost of this step**: not measured.
+
+## Notes for the next step (after G13)
+
+- **Check the new token prices.** `DEFAULT_PRICES` now has token prices for `gpt-image-1.5`
+  ($5 text in, $8 image in, $32 image out per million) and `gpt-image-1-mini` ($2, $2.50, $8),
+  from memory of OpenAI's page. With usage reported, a line's `cost=` is the usage price: a reader
+  should compare one live call's `logs/underlay-costs.jsonl` with the bill before A1's arm (b).
+- **Arm (b) with a working key.** Snap now fits the placement's grid by default, and the image is
+  asked for in the area's shape; the open risk stays a generated draft without a crisp grid (low
+  R²). `fit=free` is still there to compare.
+- **Inheriting variants are followed by the writer, not by replay.** A variant's tape holds a copy
+  of the band at each change (big lines on large sheets: about 30 KB for a 24 px blob47 sheet). If
+  many variants follow one base, consider recording only the pieces and detached cells.
+- **`seeds` ranks, it does not judge.** It orders by failing checks and how far over; two seeds that
+  both pass are ordered by the room left on their closest check. A look at the 3x3 still decides.
+- **Repetition's reported band** is now the band nearest to failing, not the darkest stripe; a pass
+  may name a faint row of the noise rather than a mark. The detail says when a limit was raised.
+- **Map views and `cells.txt`** differ on purpose: `view map`'s text is by layer (what the agent
+  paints); a review's `cells.txt` is by what each cell shows.
+- **Cost of this step**: not measured.
+
