@@ -1,0 +1,126 @@
+// Requests from the dashboard (plan §21): requests.jsonl in the project, one record a line, only
+// ever appended. People open requests (Draw this, Ask for changes, Add an asset), answer a blocked
+// one or withdraw one; the agent claims, posts progress and finishes them through the MCP `work`
+// tool. Every record is checked against the state the file is in before it is written (core's
+// state machine), so the file only holds records that fit.
+
+import { appendFileSync, existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import {
+  foldRequests, nextRequestId, openRequests, quote, requestProblem, validateManifest, type RequestKind, type RequestRecord, type WorkRequest,
+} from '@pixelclaw/core';
+import { ProjectError, assetExists, type Project } from './project.ts';
+import { MANIFEST_FILE, knownFor, manifestEntry, readManifest, writeManifest } from './plan.ts';
+import type { PersonRequest } from './protocol.ts';
+import type { Writer } from './writer.ts';
+
+export const REQUESTS_FILE = 'requests.jsonl';
+
+/** Every record in the file, in order (a line that is not JSON is skipped). */
+export function readRequestRecords(p: Project): RequestRecord[] {
+  const f = join(p.dir, REQUESTS_FILE);
+  if (!existsSync(f)) return [];
+  const out: RequestRecord[] = [];
+  for (const line of readFileSync(f, 'utf8').split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      out.push(JSON.parse(line) as RequestRecord);
+    } catch {
+      // a broken line (a hand edit): foldRequests reports nothing for it, it is simply not a record
+    }
+  }
+  return out;
+}
+
+export function readRequests(p: Project): Map<string, WorkRequest> {
+  return foldRequests(readRequestRecords(p)).requests;
+}
+
+/** Append one record if it fits; returns the request as it now stands. */
+export function appendRequest(p: Project, r: RequestRecord): WorkRequest {
+  const reqs = readRequests(p);
+  const problem = requestProblem(reqs, r);
+  if (problem) throw new ProjectError(problem);
+  appendFileSync(join(p.dir, REQUESTS_FILE), JSON.stringify(r) + '\n');
+  return foldRequests([...readRequestRecords(p)]).requests.get(r.id)!;
+}
+
+/**
+ * A person's request, reply or cancel. "Draw this" is for a planned asset not drawn yet; "Ask for
+ * changes" writes `mark rejected "…"` on the asset's tape with the person's name (as G10's button
+ * did) and records the request with that mark; "Add an asset" adds the manifest entry (the whole
+ * manifest validated first; nothing is written if it has problems) and asks for it to be drawn.
+ * Run inside the writer's queue.
+ */
+export function personRequest(w: Writer, by: string, q: PersonRequest): WorkRequest {
+  const p = w.project;
+  const at = w.stamp();
+  if (q.action === 'reply') return appendRequest(p, { type: 'reply', id: q.id, by, at, text: String(q.text ?? '') });
+  if (q.action === 'cancel') return appendRequest(p, { type: 'cancel', id: q.id, by, at, ...(q.text ? { text: q.text } : {}) });
+  const reqs = readRequests(p);
+  const id = nextRequestId(reqs);
+  const note = (q.note ?? '').trim();
+  const active = (asset: string, kind: RequestKind) => [...reqs.values()].find((x) => x.asset === asset && x.kind === kind && ['open', 'claimed', 'blocked'].includes(x.state));
+  if (q.kind === 'new') {
+    const e = q.entry;
+    const mr = readManifest(p);
+    if (!mr.manifest) throw new ProjectError(mr.exists ? `manifest.json has problems; fix it first (${mr.errors.map((x) => `${x.path}: ${x.message}`).join('; ')})` : 'there is no manifest yet: the agent writes the plan first');
+    if (manifestEntry(mr.manifest, e?.name)) throw new ProjectError(`'${e.name}' is already in the manifest`);
+    if (e?.name && assetExists(p, e.name)) throw new ProjectError(`an asset '${e.name}' already exists`);
+    const next = { ...mr.manifest, assets: [...mr.manifest.assets, e] };
+    const v = validateManifest(next, knownFor(p));
+    if (!v.manifest) throw new ProjectError(`the new entry has problems: ${v.errors.map((x) => `${x.path}: ${x.message}`).join('; ')}`);
+    // Check the record first, so a bad one writes nothing.
+    const rec: RequestRecord = { type: 'request', id, asset: e.name, kind: 'new', note, by, at };
+    const problem = requestProblem(reqs, rec);
+    if (problem) throw new ProjectError(problem);
+    writeManifest(p, next);
+    w.planChanged();
+    return appendRequest(p, rec);
+  }
+  const m = readManifest(p).manifest;
+  if (q.kind === 'draw') {
+    if (!manifestEntry(m, q.asset)) throw new ProjectError(`'${q.asset}' is not planned in ${MANIFEST_FILE}`);
+    if (assetExists(p, q.asset)) throw new ProjectError(`'${q.asset}' is drawn already: ask for changes instead`);
+    const dup = active(q.asset, 'draw');
+    if (dup) throw new ProjectError(`${dup.id} already asks for '${q.asset}' (${dup.state})`);
+    return appendRequest(p, { type: 'request', id, asset: q.asset, kind: 'draw', note, by, at });
+  }
+  if (!assetExists(p, q.asset)) throw new ProjectError(`'${q.asset}' is not drawn yet: ask for it to be drawn instead`);
+  if (!note) throw new ProjectError('say what should change');
+  const rec: RequestRecord = { type: 'request', id, asset: q.asset, kind: 'change', note, by, at };
+  const problem = requestProblem(reqs, rec);
+  if (problem) throw new ProjectError(problem);
+  const r = w.run({ asset: q.asset, commands: `mark rejected ${quote(note)}`, by });
+  if (!r.ok) throw new ProjectError(r.errors.map((e) => e.message).join('; '));
+  return appendRequest(p, { ...rec, mark: r.added.at(-1)?.seq });
+}
+
+/** The agent's side (the MCP `work` tool). */
+export type AgentWork =
+  | { action: 'next'; id?: string }
+  | { action: 'progress' | 'done' | 'blocked'; id?: string; text: string }
+  | { action: 'list' };
+
+/** The request this agent has claimed and not finished (the newest), if any. */
+function mine(reqs: Map<string, WorkRequest>, agent: string): WorkRequest | undefined {
+  return [...reqs.values()].filter((q) => q.state === 'claimed' && q.claimedBy === agent).at(-1);
+}
+
+export function agentWork(w: Writer, agent: string, q: AgentWork): { request: WorkRequest | null; message: string } {
+  const p = w.project;
+  const reqs = readRequests(p);
+  const at = w.stamp();
+  if (q.action === 'list') return { request: null, message: '' };
+  if (q.action === 'next') {
+    const held = q.id ? undefined : mine(reqs, agent);
+    if (held) return { request: held, message: `you already have ${held.id}; finish it (done or blocked) before taking another` };
+    const target = q.id ? reqs.get(q.id) : openRequests(reqs).find((x) => x.state === 'open');
+    if (!target) return { request: null, message: q.id ? `no request ${q.id}` : 'no open requests' };
+    return { request: appendRequest(p, { type: 'claim', id: target.id, by: agent, at }), message: `claimed ${target.id}` };
+  }
+  const id = q.id ?? mine(reqs, agent)?.id;
+  if (!id) throw new ProjectError(`no claimed request to post ${q.action} on (give id)`);
+  const r = appendRequest(p, { type: q.action, id, by: agent, at, text: q.text });
+  return { request: r, message: `${id}: ${q.action}` };
+}

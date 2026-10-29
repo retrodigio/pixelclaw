@@ -499,12 +499,58 @@ export function genLayout(kind: string, W: number, H: number, seed: number, laye
   return [land, inner, lanes, ...Array.from({ length: Math.max(0, layers - 3) }, () => new Uint8Array(W * H))].slice(0, Math.max(1, layers));
 }
 
+/**
+ * Where `map gen` stands objects: well inside the ground it laid (village: the inner ground off the
+ * lanes; island: the land a cell in from its shore; dungeon: the floor a cell in from its walls).
+ */
+function genGround(kind: string, W: number, H: number, seed: number): Uint8Array {
+  const [land, inner, lanes] = genLayout(kind, W, H, seed, 3);
+  if (kind === 'village') return inner!.map((v, i) => (v && !lanes![i] ? 1 : 0));
+  return erode(land!, W, H, 1);
+}
+
+const OBJ_RE = /^([a-z][a-z0-9_-]*)(?::(\d+))?$/;
+
+/**
+ * Seeded spots for objects on the allowed cells: larger footprints first, every footprint cell
+ * allowed, free on the layer, and a free cell between any two of them.
+ */
+function genPlacements(doc: Doc, li: number, objs: { name: string; count: number; fp: { cols: number; rows: number; anchor: [number, number] } }[], allowed: Uint8Array, seed: number): { x: number; y: number; k: number }[] {
+  const rng = new Pcg32(seed, 0x0b1e);
+  const W = doc.width, H = doc.height;
+  const taken = new Uint8Array(W * H);
+  const { grid } = occupancy(doc, li);
+  for (let i = 0; i < W * H; i++) if (grid[i]! >= 0) taken[i] = 1;
+  const order = objs.map((o, k) => ({ o, k })).sort((a, b) => b.o.fp.cols * b.o.fp.rows - a.o.fp.cols * a.o.fp.rows || a.k - b.k);
+  const spots: { x: number; y: number; k: number }[] = [];
+  for (const { o, k } of order) {
+    for (let n = 0; n < o.count; n++) {
+      for (let tries = 0; tries < 400; tries++) {
+        const x = rng.nextInt(W), y = rng.nextInt(H);
+        const b = entryBox({ name: o.name, variant: null, ...o.fp }, x, y);
+        if (b.x < 0 || b.y < 0 || b.x + b.w > W || b.y + b.h > H) continue;
+        let ok = true;
+        for (let yy = b.y - 1; yy <= b.y + b.h && ok; yy++) for (let xx = b.x - 1; xx <= b.x + b.w; xx++) {
+          const inside = xx >= b.x && xx < b.x + b.w && yy >= b.y && yy < b.y + b.h;
+          if (inside && (!allowed[yy * W + xx] || taken[yy * W + xx])) { ok = false; break; }
+          if (!inside && inMap(doc, xx, yy) && taken[yy * W + xx]) { ok = false; break; }
+        }
+        if (!ok) continue;
+        for (let yy = b.y; yy < b.y + b.h; yy++) for (let xx = b.x; xx < b.x + b.w; xx++) taken[yy * W + xx] = 1;
+        spots.push({ x, y, k });
+        break;
+      }
+    }
+  }
+  return spots;
+}
+
 const mapCmd: CommandSpec = {
   name: 'map',
-  summary: 'map gen island|village|dungeon [layers=<terrain layer>,..] [seed=<n>]   (lays out the terrain layers for a quick test scene; edit it after)',
+  summary: 'map gen island|village|dungeon [layers=<terrain layer>,..] [objects=<asset>[:<n>],..] [layer=<objects layer>] [seed=<n>]   (lays out the terrain layers for a quick scene and stands the objects on it (default: the objects the manifest says the map uses); edit it after)',
   normalise(cmd, ctx) {
     const doc = mapOf(cmd, ctx);
-    const a = new Args(cmd, ['layers', 'seed']);
+    const a = new Args(cmd, ['layers', 'seed', 'objects', 'layer', 'fp']);
     const how = a.take('word', 'gen');
     if (how.v !== 'gen') throw new DiagError(how.line, how.col, `map: expected gen`);
     const kind = a.take('word', GEN_KINDS.join(', '));
@@ -515,11 +561,62 @@ const mapCmd: CommandSpec = {
     const want = lo ? lo.value.split(',') : terrains.slice(0, kind.v === 'village' ? 3 : 1);
     if (!want.length) throw new DiagError(cmd.line, cmd.col, `map gen: the map has no terrain layers (layer add <name> terrain=<family>)`);
     const idx = want.map((n) => layerNamed(doc, { v: n, line: lo?.line ?? cmd.line, col: lo?.vcol ?? cmd.col }, ['terrain']));
+    // The objects: given, else the manifest's (those the map uses that are drawn objects).
+    const oo = a.opts.get('objects');
+    const at = oo ? { line: oo.line, col: oo.vcol } : { line: cmd.line, col: cmd.col };
+    let objs: { name: string; count: number }[] = [];
+    if (oo) {
+      objs = oo.value.split(',').map((s) => {
+        const m = OBJ_RE.exec(s);
+        if (!m) throw new DiagError(oo.line, oo.vcol, `objects= is a list like well,house:2,tree:3`);
+        return { name: m[1]!, count: m[2] ? Math.max(1, Math.min(64, Number(m[2]))) : 1 };
+      });
+    } else {
+      const dflt = ctx.defaults?.mapObjects?.(doc.name) ?? [];
+      const hasLayer = doc.layers.some((l) => l.map?.kind === 'objects');
+      if (hasLayer) objs = dflt.filter((n) => { const d = ctx.asset?.(n); return !!d && !d.map && !d.family && !d.overlay; }).map((name) => ({ name, count: 1 }));
+    }
     const seed = seedOf(a, ctx);
     const cells = genLayout(kind.v, doc.width, doc.height, seed, idx.length);
+    const terrainOp = (d: Doc) => idx.forEach((li, k) => { d.cels[li]![0]!.set(Uint16Array.from(cells[k]!, (v) => (v ? 1 : TRANSPARENT))); });
+    if (!objs.length) {
+      if (a.opts.get('layer') || a.opts.get('fp')) throw new DiagError(cmd.line, cmd.col, 'map gen: layer= and fp= go with objects=');
+      return { text: `map gen ${kind.v} layers=${want.join(',')} seed=${seed}`, op: fn(terrainOp) };
+    }
+    const lyo = a.opts.get('layer');
+    let li: number;
+    if (lyo) li = layerNamed(doc, { v: lyo.value, line: lyo.line, col: lyo.vcol }, ['objects']);
+    else {
+      li = doc.layers.findIndex((l) => l.map?.kind === 'objects');
+      if (li < 0) throw new DiagError(at.line, at.col, `map gen: the map has no objects layer to stand objects on (layer add <name> objects)`);
+    }
+    if (doc.layers[li]!.locked) throw new DiagError(at.line, at.col, `layer '${doc.layers[li]!.name}' is locked`);
+    const fo = a.opts.get('fp');
+    let fps: { cols: number; rows: number; anchor: [number, number] }[];
+    if (fo) {
+      const parts = fo.value.split('/');
+      if (parts.length !== objs.length) throw new DiagError(fo.line, fo.vcol, `fp= needs one footprint per object, like 2x2:0,1/1x1:0,0`);
+      fps = parts.map((s) => {
+        const m = FP_RE.exec(s);
+        if (!m || Number(m[3]) >= Number(m[1]) || Number(m[4]) >= Number(m[2])) throw new DiagError(fo.line, fo.vcol, `fp= footprints look like 2x2:0,1 (cells, then the anchor)`);
+        return { cols: Number(m[1]), rows: Number(m[2]), anchor: [Number(m[3]), Number(m[4])] as [number, number] };
+      });
+    } else {
+      fps = objs.map((o) => {
+        const src = ctx.asset?.(o.name);
+        if (!src) throw new DiagError(at.line, at.col, `map gen: no asset '${o.name}' to stand on the map`);
+        const fp = footprintOf(src);
+        return { cols: fp.cols, rows: fp.rows, anchor: fp.anchor };
+      });
+    }
+    const list = objs.map((o, k) => ({ ...o, fp: fps[k]! }));
+    const spots = genPlacements(doc, li, list, genGround(kind.v, doc.width, doc.height, seed), seed);
     return {
-      text: `map gen ${kind.v} layers=${want.join(',')} seed=${seed}`,
-      op: fn((d) => idx.forEach((li, k) => { d.cels[li]![0]!.set(Uint16Array.from(cells[k]!, (v) => (v ? 1 : TRANSPARENT))); })),
+      text: `map gen ${kind.v} layers=${want.join(',')} objects=${objs.map((o) => (o.count > 1 ? `${o.name}:${o.count}` : o.name)).join(',')} layer=${doc.layers[li]!.name} fp=${fps.map((f) => `${f.cols}x${f.rows}:${f.anchor[0]},${f.anchor[1]}`).join('/')} seed=${seed}`,
+      op: fn((d) => {
+        terrainOp(d);
+        for (const s of spots) d.cels[li]![0]![s.y * d.width + s.x] = entryIndex(d, { name: list[s.k]!.name, variant: null, ...list[s.k]!.fp });
+      }),
     };
   },
 };

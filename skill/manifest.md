@@ -44,6 +44,11 @@ nothing when it has problems (each reported with its path, like `assets[3].size`
 | `flat` | all | its colour in the flat templates: a palette entry name or `#rrggbb` |
 | `chars` | font | its characters (the characters themselves, or `"32-126"`, `"U+0041-U+005A"`) |
 
+Scenes (optional, top level): `"scenes": [{ "name": "kiln_yard", "description": "…", "uses":
+["clay", "urn", …], "map": "hollow" }]`: the places the game shows, the assets each needs, and the
+map document that builds it (its own `uses` count too). The dashboard shows each scene's missing
+assets; `plan(order="scene")` lists the work scene by scene.
+
 What the manifest gives the tools:
 - `new <kind> <name>` with no size, palette or scheme takes them from the asset's entry (and an
   object's cell grid is the project's grid); the line records them, so replay never reads the
@@ -51,6 +56,8 @@ What the manifest gives the tools:
 - `consistency` compares an asset with the rest of its set (like with like: ground tiles, figures,
   icons) and with its `height`; plan icons as one set so they share a stroke weight and box fill; a set's check
   thresholds can be set in `project.json` `style.sets.<set>.checks`.
+- `map gen …` on a map the manifest plans stands the objects its `uses` lists (drawn objects and
+  sprites, once each) on the generated ground; the line records them as `objects=… fp=…`.
 - `review(set=…)` reviews a set's drawn assets, with a brief from the theme and descriptions.
 - `plan(templates=true)` draws `templates/mockup.png` (one game screen in flat colours, the
   camera's size), `mockup@2x.png` (labelled) and `mockup.txt`, and `<family>.coverage.png|txt`

@@ -14,8 +14,10 @@ import {
   ProjectError, addPalettes, assetExists, forkOf, latestCheckpoint, listAssets, paletteSource, readReads, readTape, readTapeFile, saveAsset, writeReads,
   type Project,
 } from './project.ts';
-import type { Eye, ServerMessage, Snapshot } from './protocol.ts';
-import { readStateCache, stateKey, writeStateCache } from './cache.ts';
+import type { Eye, ServerMessage, Snapshot, WorkerStatus } from './protocol.ts';
+import { checkCacheKey, readCheckCache, readStateCache, stateKey, writeCheckCache, writeStateCache } from './cache.ts';
+import { readRequests } from './requests.ts';
+import { workerSettings } from './worker-settings.ts';
 import { manifestEntry, readManifest, styleDefaults } from './plan.ts';
 import { makeView, type View, type ViewMode, type ViewOptions } from './views.ts';
 import { blobImage, needsUnderlay, resolveUnderlays, type ProviderEnv } from './underlay.ts';
@@ -135,6 +137,8 @@ const words = (args: Token[]): string[] => args.flatMap((t) => (t.t === 'word' ?
 export interface WriterOptions {
   /** The clock for tape `at` stamps (UTC, whole seconds). */
   now?: () => string;
+  /** Keep check results on disk by state hash (default true; off to compare with a fresh run). */
+  checkCache?: boolean;
 }
 
 const utcNow = (): string => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
@@ -152,11 +156,36 @@ export class Writer {
   private readonly versions = new Map<string, number>();
   private clock = 0;
   private readonly checkMemo = new Map<string, { key: string; out: { results: CheckResult[]; problems: string[] } }>();
+  /** Each loaded asset's state key (its tape and the engine): what the check cache is keyed by. */
+  private readonly keys = new Map<string, string>();
+  private readonly checkCache: boolean;
   lastEye: Eye | null = null;
+  /** The headless worker's run, as the worker controller reports it. */
+  worker: Omit<WorkerStatus, 'enabled'> = { running: false, by: null, startedAt: null, spent: 0, cap: 0, sessions: 0, stopped: null };
 
   constructor(project: Project, o: WriterOptions = {}) {
     this.project = project;
     this.now = o.now ?? utcNow;
+    this.checkCache = o.checkCache ?? true;
+  }
+
+  /** Tell the watchers requests.jsonl changed. */
+  requestsChanged(): void {
+    this.emit({ type: 'requests', requests: [...readRequests(this.project).values()] });
+  }
+
+  workerStatus(): WorkerStatus {
+    return { enabled: workerSettings(this.project.dir).enabled, ...this.worker };
+  }
+
+  /** The worker controller's report (sent to the watchers). */
+  setWorker(s: Partial<Omit<WorkerStatus, 'enabled'>>): void {
+    this.worker = { ...this.worker, ...s };
+    this.emit({ type: 'worker', status: this.workerStatus() });
+  }
+
+  workerLog(lines: string[]): void {
+    if (lines.length) this.emit({ type: 'workerLog', lines });
   }
 
   /** The writer's clock (UTC, whole seconds), as tape lines are stamped. */
@@ -194,6 +223,7 @@ export class Writer {
     this.states.clear();
     this.timelines.clear();
     this.checkMemo.clear();
+    this.keys.clear();
     this.live = null;
     this.lastEye = null;
     this.emit({ type: 'hello', snapshot: this.snapshot() });
@@ -214,6 +244,7 @@ export class Writer {
     if (cached) return cached;
     const { bytes, entries } = readTapeFile(this.project, name);
     const key = stateKey(this.project, bytes, tapeLang(entries));
+    this.keys.set(name, key);
     const hit = entries.length ? readStateCache(this.project, name, key) : null;
     if (hit) {
       this.timeline(name).seed(entries, entries.length, hit);
@@ -328,7 +359,9 @@ export class Writer {
       return at.doc;
     }, creates);
     this.writePalettes(saved);
-    writeStateCache(this.project, name, stateKey(this.project, Buffer.from(tapeToJsonl(r.state.entries), 'utf8'), tapeLang(r.state.entries)), serializeDoc(r.state.doc));
+    const key = stateKey(this.project, Buffer.from(tapeToJsonl(r.state.entries), 'utf8'), tapeLang(r.state.entries));
+    this.keys.set(name, key);
+    writeStateCache(this.project, name, key, serializeDoc(r.state.doc));
     this.states.set(name, r.state);
     this.versions.set(name, ++this.clock);
     this.live = name;
@@ -498,8 +531,18 @@ export class Writer {
     const key = plain ? JSON.stringify([this.project.json.style, m, deps.map(v), all.length, [...this.project.palettes.keys()]]) : '';
     const hit = plain ? this.checkMemo.get(asset) : undefined;
     if (hit && hit.key === key) return hit.out;
+    // On disk, by the state keys of everything the checks read (a fresh process skips the work).
+    const diskKey = plain && this.checkCache && deps.every((n) => this.keys.has(n))
+      ? checkCacheKey([this.project.json.style, m, [...new Set(deps)].sort().map((n) => [n, this.keys.get(n)]), all.map((a) => a.name), [...this.project.palettes.values()].map(paletteToJson), problems])
+      : null;
+    const disk = diskKey ? readCheckCache<{ results: CheckResult[]; problems: string[] }>(this.project, asset, diskKey) : null;
+    if (disk) {
+      this.checkMemo.set(asset, { key, out: disk });
+      return disk;
+    }
     const out = { results: runChecks(doc, o.checks ?? CHECK_IDS, { ...ctx, budget: o.budget, focus: o.focus }), problems };
     if (plain) this.checkMemo.set(asset, { key, out });
+    if (diskKey) writeCheckCache(this.project, asset, diskKey, out);
     return out;
   }
 
@@ -648,6 +691,7 @@ export class Writer {
       assets,
       live: this.live,
       eye: this.lastEye,
+      worker: this.workerStatus(),
     };
   }
 }

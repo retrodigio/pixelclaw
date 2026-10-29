@@ -1,4 +1,4 @@
-// pixelclaw: new | run | view | check | review | plan | export | import | verify | upgrade | skill. A thin layer over @pixelclaw/core and the project folder.
+// pixelclaw: new | run | view | check | review | plan | export | import | verify | upgrade | skill (work and serve: entry.ts). A thin layer over @pixelclaw/core and the project folder.
 
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -11,7 +11,7 @@ import {
 import {
   AssetExistsError, NoAssetError, ProjectError, VIEW_MODES, Writer, assetDir, checkpointNames, createProject, formatChecks, isViewMode, listAssets,
   loadProject, lockHolder, paletteSource, parseRegion, prefixHash, previewPng, readAssetJson, readCheckpoints, readPaletteFile,
-  needsUnderlay, resolveUnderlays, readTape, readTapeFile, readStateCacheRaw, stateKey, saveAsset, sha256, writeReview, planReport, planText, writeManifest, writeTemplates, SUMMARY_BUDGET, EXPORT_FORMATS, exportAsset, exportWithProfile, importSummary, planImport, type ExportFormat, type Project, type ViewMode,
+  needsUnderlay, resolveUnderlays, readTape, readTapeFile, readStateCacheRaw, stateKey, saveAsset, sha256, writeReview, planReport, planText, writeManifest, writeTemplates, SUMMARY_BUDGET, EXPORT_FORMATS, exportAsset, exportWithProfile, importIntoProject, importSummary, planImport, type ExportFormat, type Project, type ViewMode,
 } from '@pixelclaw/server';
 
 export interface Io {
@@ -55,10 +55,17 @@ export const USAGE = `pixelclaw: a pixel art editor driven by commands
   pixelclaw review <project> [<asset>...] [--set <manifest set>] [--name <name>] [--size CxR] [--seed N]
       Write a blind review bundle under <project>/reviews/<date>-<name>/ (rubric.md inside; brief.md
       from the manifest). --set reviews a manifest set's drawn assets.
-  pixelclaw plan <project> [--set <set>] [--json] [--manifest <file.json>] [--templates [--seed N]]
+  pixelclaw plan <project> [--set <set>] [--order set|scene] [--json] [--manifest <file.json>] [--templates [--seed N]]
       The asset plan (manifest.json) and each asset's status: planned, drafted, checked, reviewed,
-      approved, exported; what is left and what is failing. --manifest writes a manifest (checked
-      first); --templates draws the flat templates (mockup screen, coverage maps) into templates/.
+      approved, exported; requests from people first; what is left and what is failing (by set, or
+      scene by scene with what each still needs). --manifest writes a manifest (checked first);
+      --templates draws the flat templates (mockup screen, coverage maps) into templates/.
+  pixelclaw work <project> [--port N]
+      Work the request queue with a headless Claude Code session (claude -p with the PixelClaw MCP
+      server and the skill) until it is empty or the budget cap is reached. Runs only when
+      project.json has "worker": { "enabled": true } (it spends money; cap, command and args are
+      settings there; docs/worker.md). Never two at once; with a server running, use its
+      dashboard's Start Claude button instead. The log is logs/worker.log (shown in the dashboard).
   pixelclaw skill install [--dest <dir> | --project <dir>]
       Install the Claude Code skill (workflows, house rules, the blind-review hand-off) into
       ~/.claude/skills/pixelclaw (or <dir>/.claude/skills/pixelclaw). skill path prints where it is.
@@ -70,9 +77,13 @@ export const USAGE = `pixelclaw: a pixel art editor driven by commands
       split: an oversized asset as one-cell pieces plus a stamp; png: a map at 1x or a first frame;
       strip: a font as a glyph strip (red separator columns) plus its characters; bmfont: a font as .fnt + page.
   pixelclaw import <project> <file.png|file.aseprite|folder> [--profile <name>] [--as <name>] [--kind <kind>]
-         [--palette <name> | --build] [--grid WxH [--cells]] [--by <author>] [--replace]
+         [--palette <name> | --build] [--grid WxH [--cells]] [--slice WxH [--offset x,y] [--gap x,y]]
+         [--pattern '{name}_{n}' | --names a,b,c | --names-from manifest] [--set <set>] [--wrap] [--no-manifest] [--by <author>] [--replace]
       A PNG or .aseprite file becomes a new asset quantised to a palette (--build: one made from
-      the image); --grid slices a sheet into frames (--cells: one image with that cell grid). With
+      the image); --grid slices a sheet into frames (--cells: one image with that cell grid);
+      --slice cuts a sheet into separate assets, one per non-empty cell, named by a pattern, a
+      list, or the manifest's planned entries (of --set) in order. A folder imports every PNG and
+      .aseprite in it. New assets get manifest entries (in --set) and every check is run. With
       --profile, a folder an export wrote is read back by name and compared with the project;
       images no asset exports become new assets.
   pixelclaw upgrade <project> [<asset>...]
@@ -331,8 +342,10 @@ function cmdPlan(io: Io, p: Parsed): number {
     const t = writeTemplates(w, { seed });
     io.out(`wrote ${t.files.length} templates to ${t.dir}\n${t.files.map((f) => `  ${f}\n`).join('')}`);
   }
+  const order = one(p, 'order');
+  if (order !== undefined && order !== 'set' && order !== 'scene') throw new UsageError('--order is set or scene');
   const r = planReport(w, { set: one(p, 'set') });
-  io.out(p.flags.has('json') ? JSON.stringify(r, null, 2) + '\n' : planText(r) + '\n');
+  io.out(p.flags.has('json') ? JSON.stringify(r, null, 2) + '\n' : planText(r, { order }) + '\n');
   return r.manifest.errors.length ? 1 : 0;
 }
 
@@ -398,15 +411,32 @@ function cmdImport(io: Io, p: Parsed): number {
   const proj = loadProject(dir);
   assertNoServer(proj);
   const w = new Writer(proj, { now: io.now });
-  const grid = one(p, 'grid');
-  if (grid && !/^\d+x\d+$/.test(grid)) throw new UsageError('--grid is a size like 24x24');
-  const plan = planImport(proj, w.assetDocs(), {
-    path, profile: one(p, 'profile'), as: one(p, 'as'), kind: one(p, 'kind'), palette: one(p, 'palette'), build: p.flags.has('build'),
-    grid: grid ? (grid.split('x').map(Number) as [number, number]) : undefined, cells: p.flags.has('cells'),
-  });
+  const pair = (k: string, re: RegExp, sep: string, what: string): [number, number] | undefined => {
+    const v = one(p, k);
+    if (v === undefined) return undefined;
+    if (!re.test(v)) throw new UsageError(`--${k} is ${what}`);
+    return v.split(sep).map(Number) as [number, number];
+  };
+  const grid = pair('grid', /^\d+x\d+$/, 'x', 'a size like 24x24');
+  const cell = pair('slice', /^\d+x\d+$/, 'x', 'a size like 24x24');
+  const offset = pair('offset', /^\d+,\d+$/, ',', 'a point like 2,2');
+  const gap = pair('gap', /^\d+,\d+$/, ',', 'a point like 1,1');
+  const namesFrom = one(p, 'names-from');
+  if (namesFrom !== undefined && namesFrom !== 'manifest') throw new UsageError('--names-from takes manifest');
+  const by = one(p, 'by') ?? 'claude';
+  const common = { as: one(p, 'as'), kind: one(p, 'kind'), palette: one(p, 'palette'), build: p.flags.has('build'), grid, cells: p.flags.has('cells') };
+  if (!one(p, 'profile')) {
+    const r = importIntoProject(w, {
+      path, ...common, slice: cell ? { cell, offset, gap } : undefined, pattern: one(p, 'pattern'), names: one(p, 'names')?.split(','), namesFrom: namesFrom as 'manifest' | undefined,
+      set: one(p, 'set'), wrap: p.flags.has('wrap'), manifest: p.flags.has('no-manifest') ? false : undefined, replace: p.flags.has('replace'),
+    }, by);
+    io.out((r.text || 'nothing to import') + '\n');
+    return 0;
+  }
+  const plan = planImport(proj, w.assetDocs(), { path, profile: one(p, 'profile'), ...common });
   const created: string[] = [];
   for (const c of plan.create) {
-    const r = w.run({ asset: c.name, commands: c.tape, by: one(p, 'by') ?? 'claude', replace: p.flags.has('replace') });
+    const r = w.run({ asset: c.name, commands: c.tape, by, replace: p.flags.has('replace') });
     if (!r.ok) throw new ProjectError(`${c.name}: ${r.errors.map((e) => `${e.line}:${e.col} ${e.message}`).join('; ')}`);
     created.push(c.name);
   }
@@ -540,13 +570,13 @@ export function main(argv: string[], io: Io = nodeIo): number {
         return one(p, 'format') ? cmdExport(io, p) : cmdExportProfile(io, p);
       }
       case 'import':
-        return cmdImport(io, parseArgs(rest, ['profile', 'as', 'kind', 'palette', 'grid', 'by'], ['build', 'cells', 'replace']));
+        return cmdImport(io, parseArgs(rest, ['profile', 'as', 'kind', 'palette', 'grid', 'by', 'slice', 'offset', 'gap', 'pattern', 'names', 'names-from', 'set'], ['build', 'cells', 'replace', 'wrap', 'no-manifest']));
       case 'check':
         return cmdCheck(io, parseArgs(rest, ['checks', 'frame', 'ground', 'ref'], ['marks']));
       case 'review':
         return cmdReview(io, parseArgs(rest, ['name', 'set', 'size', 'seed'], []));
       case 'plan':
-        return cmdPlan(io, parseArgs(rest, ['set', 'manifest', 'seed'], ['json', 'templates']));
+        return cmdPlan(io, parseArgs(rest, ['set', 'manifest', 'seed', 'order'], ['json', 'templates']));
       case 'skill':
         return cmdSkill(io, parseArgs(rest, ['dest', 'project'], []));
       case 'verify':

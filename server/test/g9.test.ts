@@ -71,7 +71,7 @@ describe('export, import and densities through MCP', () => {
     const png = join(s.root, 'sheet.png');
     writeFileSync(png, encodePng({ width: 16, height: 8, data }));
     const r = await call('import', { path: png, as: 'sheet_imp', grid: '8x8' });
-    expect(texts(r.content)).toMatch(/created sheet_imp: 1 pixels were not palette colours/);
+    expect(texts(r.content)).toMatch(/created sheet_imp \(sprite 8x8\), 1 pixels quantised to the nearest palette colour: /);
     const h = await call('history', { asset: 'sheet_imp' });
     expect(texts(h.content)).toMatch(/import 0,0 from="sheet.png" blob=[0-9a-f]{64} <</);
     expect(existsSync(join(s.proj, 'blobs'))).toBe(true);
@@ -82,7 +82,7 @@ describe('export, import and densities through MCP', () => {
     const ase = join(s.root, 'blink.aseprite');
     writeFileSync(ase, writeAseprite(doc.state.doc!, 60));
     const r2 = await call('import', { path: ase, build: true });
-    expect(texts(r2.content)).toMatch(/created blink: every pixel a palette colour/);
+    expect(texts(r2.content)).toMatch(/created blink \(sprite 8x8\): (all \d+ checks pass|failing )/);
     const h2 = texts((await call('history', { asset: 'blink', last: 40 })).content);
     expect(h2).toMatch(/layer add top/);
     expect(h2).toMatch(/frame set 2 ticks=20/);

@@ -65,6 +65,8 @@ export interface StyleDefaults {
   light?: string;
   /** `outline` with no c=: the style guide's outline colours (the first the palette has). */
   outline?: string[];
+  /** `map gen` with no objects=: the assets the manifest says this map uses (objects are stood on it). */
+  mapObjects?(map: string): string[];
 }
 
 export type Op =

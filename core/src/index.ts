@@ -34,3 +34,5 @@ export * from './templates.ts';
 export * from './consistency.ts';
 export * from './font.ts';
 export * from './snap.ts';
+export * from './requests.ts';
+export * from './slice.ts';

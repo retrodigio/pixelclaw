@@ -8,10 +8,15 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from 'node:net';
 import { extname, join, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { HUMAN_RE, type ClientMessage, type ServerMessage } from './protocol.ts';
+import { createMcpHandler, type McpServerFactory } from '@modelcontextprotocol/server';
+import { createRgba, encodePng, renderFlat } from '@pixelclaw/core';
+import { HUMAN_RE, type ClientMessage, type PersonRequest, type ServerMessage } from './protocol.ts';
 import { ProjectError } from './project.ts';
 import type { Writer } from './writer.ts';
 import { planReport } from './plan.ts';
+import { personRequest } from './requests.ts';
+import { importIntoProject, type ImportOptions } from './io.ts';
+import { workerLogTail, type WorkerControl } from './worker.ts';
 import { acceptWebSocket, type WsConnection } from './ws.ts';
 
 const TYPES: Record<string, string> = {
@@ -76,6 +81,49 @@ export async function runFromPage(w: Writer, m: Extract<ClientMessage, { type: '
   });
 }
 
+/** A request, reply or cancel from a page, written as the page's person. */
+export async function requestFromPage(w: Writer, m: Extract<ClientMessage, { type: 'request' }>): Promise<ServerMessage> {
+  if (typeof m.by !== 'string' || !HUMAN_RE.test(m.by)) return { type: 'answer', id: m.id, ok: false, error: 'a page writes as human:<name>' };
+  return w.enqueue((): ServerMessage => {
+    try {
+      const request = personRequest(w, m.by, m.body as PersonRequest);
+      w.requestsChanged();
+      return { type: 'answer', id: m.id, ok: true, request };
+    } catch (e) {
+      return { type: 'answer', id: m.id, ok: false, error: e instanceof ProjectError ? e.message : `internal error: ${(e as Error).message}` };
+    }
+  });
+}
+
+/** Every frame of an asset side by side at 1x (the gallery plays them by their ticks). */
+export function framesStrip(w: Writer, name: string): Uint8Array {
+  const d = w.doc(name);
+  if (d.frameCount <= 1 || d.map || d.family) return encodePng(renderFlat(d));
+  const img = createRgba(d.width * d.frameCount, d.height);
+  for (let f = 0; f < d.frameCount; f++) {
+    const fr = renderFlat(d, f);
+    for (let y = 0; y < d.height; y++) img.data.set(fr.data.subarray(y * d.width * 4, (y + 1) * d.width * 4), (y * img.width + f * d.width) * 4);
+  }
+  return encodePng(img);
+}
+
+/** Largest upload (an import's files, base64 in JSON). */
+const MAX_UPLOAD = 32 * 1024 * 1024;
+
+function readBody(req: IncomingMessage, max: number): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const parts: Buffer[] = [];
+    let n = 0;
+    req.on('data', (d: Buffer) => {
+      n += d.length;
+      if (n > max) { reject(new ProjectError('too large')); req.destroy(); return; }
+      parts.push(d);
+    });
+    req.on('end', () => resolve(Buffer.concat(parts)));
+    req.on('error', reject);
+  });
+}
+
 export interface WatchServer {
   url: string;
   port: number;
@@ -92,6 +140,10 @@ export interface WatchOptions {
   /** How many ports after `port` to try when it is taken. */
   tries?: number;
   host?: string;
+  /** Serve MCP over HTTP at /mcp (the worker's connection), with the token as a bearer. */
+  mcp?: McpServerFactory;
+  /** The headless worker, started and stopped from the dashboard. */
+  worker?: WorkerControl;
 }
 
 export async function startWatchServer(o: WatchOptions): Promise<WatchServer> {
@@ -106,6 +158,42 @@ export async function startWatchServer(o: WatchOptions): Promise<WatchServer> {
     for (const s of sockets) s.send(text);
   };
   const unsubscribe = o.writer.on(broadcast);
+  const mcpHandler = o.mcp ? createMcpHandler(o.mcp, { onerror: () => undefined }) : null;
+  const json = (res: ServerResponse, status: number, v: unknown) => {
+    res.writeHead(status, { ...HEADERS, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    res.end(JSON.stringify(v) + '\n');
+  };
+
+  /** MCP over HTTP: the web request handed to the SDK's handler, its response streamed back. */
+  const serveMcp = async (req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> => {
+    const auth = String(req.headers.authorization ?? '');
+    const given = auth.startsWith('Bearer ') ? auth.slice(7) : url.searchParams.get('token');
+    if (!mcpHandler || !tokenOk(given, o.token)) {
+      res.writeHead(mcpHandler ? 401 : 404, { ...HEADERS, 'Content-Type': 'text/plain' }).end(mcpHandler ? 'token required\n' : 'not found\n');
+      return;
+    }
+    const body = req.method === 'POST' ? await readBody(req, 8 * 1024 * 1024) : undefined;
+    const headers = new Headers();
+    for (const [k, v] of Object.entries(req.headers)) if (typeof v === 'string') headers.set(k, v); else if (Array.isArray(v)) headers.set(k, v.join(', '));
+    const ac = new AbortController();
+    res.on('close', () => ac.abort());
+    const r = await mcpHandler.fetch(new Request(url, { method: req.method, headers, body: body ? new Uint8Array(body) : undefined, signal: ac.signal }));
+    const out: Record<string, string> = {};
+    r.headers.forEach((v, k) => { out[k] = v; });
+    res.writeHead(r.status, out);
+    if (!r.body) { res.end(); return; }
+    const reader = r.body.getReader();
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        res.write(value);
+      }
+    } catch {
+      // the client went away
+    }
+    res.end();
+  };
 
   const handle = (req: IncomingMessage, res: ServerResponse): void => {
     // Only localhost names: a page on another site can't reach us by rebinding a DNS name.
@@ -115,8 +203,39 @@ export async function startWatchServer(o: WatchOptions): Promise<WatchServer> {
     }
     const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
     const authed = tokenOk(url.searchParams.get('token'), o.token);
+    if (url.pathname === '/mcp') {
+      serveMcp(req, res, url).catch((e: unknown) => { if (!res.headersSent) json(res, 500, { error: (e as Error).message }); else res.end(); });
+      return;
+    }
+    if (url.pathname === '/api/import' && req.method === 'POST') {
+      // An import from the dashboard: { files: [{ name, data (base64) }], options, by }.
+      if (!authed) { json(res, 401, { error: 'token required' }); return; }
+      readBody(req, MAX_UPLOAD).then(async (b) => {
+        const body = JSON.parse(b.toString('utf8')) as { files?: { name: string; data: string }[]; options?: ImportOptions; by?: string };
+        if (typeof body.by !== 'string' || !HUMAN_RE.test(body.by)) throw new ProjectError('a page writes as human:<name>');
+        if (!Array.isArray(body.files) || !body.files.length) throw new ProjectError('no files');
+        const files = body.files.map((f) => ({ name: String(f.name), bytes: new Uint8Array(Buffer.from(String(f.data), 'base64')) }));
+        const r = await o.writer.enqueue(() => importIntoProject(o.writer, { ...(body.options ?? {}), files }, body.by!));
+        json(res, 200, r);
+      }).catch((e: unknown) => json(res, e instanceof ProjectError || e instanceof SyntaxError ? 400 : 500, { error: (e as Error).message }));
+      return;
+    }
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       res.writeHead(405, HEADERS).end();
+      return;
+    }
+    if (url.pathname === '/api/worker') {
+      if (!authed) { json(res, 401, { error: 'token required' }); return; }
+      json(res, 200, { status: o.writer.workerStatus(), log: workerLogTail(o.writer.project.dir) });
+      return;
+    }
+    const sm = /^\/api\/strip\/([a-z][a-z0-9_-]*)\.png$/.exec(url.pathname);
+    if (sm) {
+      if (!authed) { json(res, 401, { error: 'token required' }); return; }
+      void o.writer.enqueue(() => framesStrip(o.writer, sm[1]!)).then((png) => {
+        res.writeHead(200, { ...HEADERS, 'Content-Type': 'image/png', 'Cache-Control': 'no-store' });
+        res.end(png);
+      }, () => { res.writeHead(404, { ...HEADERS, 'Content-Type': 'text/plain' }).end('not found\n'); });
       return;
     }
     if (url.pathname === '/' || url.pathname === '/index.html') {
@@ -217,6 +336,21 @@ export async function startWatchServer(o: WatchOptions): Promise<WatchServer> {
       }
       if (m.type === 'ping') ws.send(JSON.stringify({ type: 'pong' } satisfies ServerMessage));
       else if (m.type === 'run') void runFromPage(o.writer, m).then((r) => ws.send(JSON.stringify(r)));
+      else if (m.type === 'request') void requestFromPage(o.writer, m).then((r) => ws.send(JSON.stringify(r)));
+      else if (m.type === 'worker') {
+        const answer = (ok: boolean, error?: string) => ws.send(JSON.stringify({ type: 'answer', id: m.id, ok, ...(error ? { error } : {}) } satisfies ServerMessage));
+        if (typeof m.by !== 'string' || !HUMAN_RE.test(m.by)) answer(false, 'a page writes as human:<name>');
+        else if (!o.worker) answer(false, 'this server runs no worker');
+        else {
+          try {
+            if (m.action === 'stop') o.worker.stop(m.by);
+            else void o.worker.start(m.by).catch(() => undefined);
+            answer(true);
+          } catch (e) {
+            answer(false, (e as Error).message);
+          }
+        }
+      }
     };
     ws.send(JSON.stringify({ type: 'hello', snapshot: o.writer.snapshot() } satisfies ServerMessage));
   });
@@ -250,6 +384,7 @@ export async function startWatchServer(o: WatchOptions): Promise<WatchServer> {
     clients: () => sockets.size,
     close: () => new Promise<void>((resolve) => {
       unsubscribe();
+      void mcpHandler?.close();
       for (const s of sockets) s.close(1001);
       server.close(() => resolve());
       server.closeAllConnections();

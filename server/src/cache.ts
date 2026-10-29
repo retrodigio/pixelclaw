@@ -88,3 +88,40 @@ export function writeStateCache(p: Project, name: string, key: string, body: Uin
 export function dropStateCache(p: Project, name: string): void {
   rmSync(stateCacheFile(p, name), { force: true });
 }
+
+// Check results (plan §21 item 6): each asset's plain check run (every check, every frame) kept in
+// .cache/checks/<asset>.json under a key made of the engine, the style guide, the manifest, the
+// palettes and the state keys of every asset the checks read (the asset, its ground, its set and
+// peers, or every asset for map checks). `plan` in a fresh process reads them instead of running
+// every check on every asset again.
+
+export function checkCacheFile(p: Project, name: string): string {
+  return join(p.dir, CACHE_DIR, 'checks', `${name}.json`);
+}
+
+export function checkCacheKey(parts: unknown): string {
+  return sha256(Buffer.from(JSON.stringify([engineStamp(), parts]), 'utf8'));
+}
+
+export function readCheckCache<T>(p: Project, name: string, key: string): T | null {
+  try {
+    const j = JSON.parse(readFileSync(checkCacheFile(p, name), 'utf8')) as { key: string; out: T };
+    return j.key === key ? j.out : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeCheckCache(p: Project, name: string, key: string, out: unknown): void {
+  const f = checkCacheFile(p, name);
+  try {
+    const root = join(p.dir, CACHE_DIR);
+    mkdirSync(dirname(f), { recursive: true });
+    if (!existsSync(join(root, '.gitignore'))) writeFileSync(join(root, '.gitignore'), '*\n');
+    const tmp = `${f}.${process.pid}.tmp`;
+    writeFileSync(tmp, JSON.stringify({ key, out }));
+    renameSync(tmp, f);
+  } catch {
+    // a read-only project: checks run every time
+  }
+}

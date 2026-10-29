@@ -1,6 +1,6 @@
 ---
 name: pixelclaw
-description: Make pixel art for a game with PixelClaw, an indexed-colour editor driven by commands through its MCP tools (project, run, view, check, changes, history, plan, review, export, import), while a person watches and edits in the browser. Use when asked to draw or fix tiles, sprites, autotile families, maps or a game's whole art set, to plan a set from a theme (manifest and style guide), to review pixel art blind, or to export it to a game.
+description: Make pixel art for a game with PixelClaw, an indexed-colour editor driven by commands through its MCP tools (project, run, view, check, changes, history, plan, work, review, export, import), while a person watches, edits and asks for work in the browser. Use when asked to draw or fix tiles, sprites, autotile families, maps or a game's whole art set, to plan a set from a theme (manifest and style guide), to review pixel art blind, or to export it to a game.
 ---
 
 # PixelClaw
@@ -21,7 +21,14 @@ If the tools are missing, the server is not connected:
 2. `changes` at the start of every turn while someone watches, and whenever they say they did
    something. Carry on from their edits; never silently redo their pixels. Close a note you have
    dealt with: `note done <id>`.
-3. `plan` when the project has a manifest: it says what is left and what is failing.
+3. `plan` at the start of the session and again after each finished asset: it lists the
+   **requests** people made in the dashboard first, then what is left and what is failing.
+4. **Requests before planned work.** `work` claims the next open request and says what is asked
+   (draw a planned asset, change a drawn one, or a new asset the person added to the manifest).
+   Do it, then `work(action="done", text=<what changed>)`. If you cannot go on without the person
+   (a choice only they can make), `work(action="blocked", text=<one clear question>)` and move on;
+   their answer opens the request again. Post `work(action="progress", text=…)` on long ones: the
+   person sees it on the card.
 
 ## House rules
 
@@ -73,6 +80,30 @@ If the tools are missing, the server is not connected:
 Statuses are worked out, never set by hand: planned → drafted (exists) → checked (every check
 passes) → reviewed → approved → exported. A change to the art after a mark or an export sends the
 asset back down, and `plan` says why.
+
+### Requests from the dashboard
+
+People ask for work without talking to you: "Draw this" on a planned card, "Ask for changes" on
+a drawn one (also a `mark rejected "…"` on its tape), "Add an asset" (a new manifest entry). They
+wait in `requests.jsonl`; `plan` lists them first and `work` hands them out one at a time.
+
+1. `work` → read what is asked, the asset's plan entry and status, and any answer to an earlier
+   question.
+2. Draw or change it as for any asset (the house rules, the checks, a look at the game view).
+   For a change, `changes` shows the person's own edits and notes on it.
+3. `work(action="done", text="…")` with what you did in a sentence the person can check against
+   the card; or `blocked` with a question. Then `plan`, and `work` again until it says there are
+   no open requests; then carry on with planned work.
+
+A headless worker (`pixelclaw work`, or Start Claude in the dashboard when the project enables
+it) follows the same routine with no one at the keyboard: never ask in chat, ask with `blocked`.
+
+### Importing existing art
+
+`import(path=<sheet.png>, slice="24x24", set=…)` cuts a sheet into one asset per non-empty cell
+(names by `pattern`, a `names` list, or `namesFrom="manifest"` for the planned entries of a set);
+a folder imports every PNG and .aseprite in it. New assets get manifest entries and every check
+is run; fix what fails by coordinates like any drafted asset.
 
 ### A tile
 

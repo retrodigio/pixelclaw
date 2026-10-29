@@ -10,6 +10,7 @@ import { startWatchServer, type WatchServer } from './http.ts';
 import { createMcpServer } from './mcp.ts';
 import { ProjectError, acquireLock, createProject, loadProject, releaseLock, type Project } from './project.ts';
 import { Writer } from './writer.ts';
+import { WorkerControl } from './worker.ts';
 
 export const VERSION = '0.2.0';
 export const DEFAULT_PORT = 7417;
@@ -31,7 +32,9 @@ export interface Served {
   token: string;
   writer: Writer;
   web: WatchServer;
-  /** Stop everything: MCP, the web server and the project lock. */
+  /** The headless worker (started from the dashboard, or by \`pixelclaw work\`). */
+  worker: WorkerControl;
+  /** Stop everything: MCP, the worker, the web server and the project lock. */
   close(): Promise<void>;
   /** Resolves once the server has stopped (stdin closed, a signal, or close()). */
   closed: Promise<void>;
@@ -49,7 +52,23 @@ export async function serve(o: ServeOptions): Promise<Served> {
   const token = o.token ?? randomBytes(16).toString('hex');
   const dir = resolve(o.project);
   const writer = new Writer(openProject(dir, true, undefined, log));
-  const web = await startWatchServer({ writer, token, port: o.port ?? DEFAULT_PORT });
+  let web!: WatchServer;
+  const host = {
+    writer,
+    url: () => web.url,
+    open(path: string, oo: { create: boolean; name?: string }) {
+      const next = resolve(path);
+      if (next === writer.project.dir) return;
+      if (worker.running()) throw new ProjectError('the worker is running on this project; stop it before opening another');
+      const p = openProject(next, oo.create, oo.name, log);
+      acquireLock(next, web.url);
+      releaseLock(writer.project.dir);
+      writer.setProject(p);
+      log(`pixelclaw: now serving ${next}`);
+    },
+  };
+  const worker = new WorkerControl(writer, () => ({ url: `http://127.0.0.1:${web.port}/mcp`, token }));
+  web = await startWatchServer({ writer, token, port: o.port ?? DEFAULT_PORT, mcp: () => createMcpServer(host, VERSION), worker });
   try {
     acquireLock(dir, web.url);
   } catch (e) {
@@ -66,6 +85,8 @@ export async function serve(o: ServeOptions): Promise<Served> {
       process.stdin.off('end', onEnd);
       process.off('SIGINT', onSignal);
       process.off('SIGTERM', onSignal);
+      if (worker.running()) worker.stop('the server stopping');
+      await worker.settled();
       releaseLock(writer.project.dir);
       await mcp?.close().catch(() => undefined);
       await web.close();
@@ -79,24 +100,11 @@ export async function serve(o: ServeOptions): Promise<Served> {
   process.on('SIGTERM', onSignal);
 
   if (o.mcp ?? true) {
-    const host = {
-      writer,
-      url: () => web.url,
-      open(path: string, oo: { create: boolean; name?: string }) {
-        const next = resolve(path);
-        if (next === writer.project.dir) return;
-        const p = openProject(next, oo.create, oo.name, log);
-        acquireLock(next, web.url);
-        releaseLock(writer.project.dir);
-        writer.setProject(p);
-        log(`pixelclaw: now serving ${next}`);
-      },
-    };
     mcp = serveStdio(() => createMcpServer(host, VERSION), { onerror: (e) => log(`pixelclaw: mcp: ${e.message}`) });
     // When the agent goes away (stdin closes), so does the server.
     process.stdin.on('end', onEnd);
   }
   log(`pixelclaw: serving ${dir}`);
   log(`pixelclaw: watch at ${web.url}`);
-  return { url: web.url, port: web.port, token, writer, web, close, closed };
+  return { url: web.url, port: web.port, token, writer, web, worker, close, closed };
 }

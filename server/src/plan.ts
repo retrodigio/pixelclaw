@@ -7,11 +7,12 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  BUILTIN_SCHEMES, FLAT_COLOURS, STATUSES, artHash, coverageTemplate, encodePng, loadScheme, mockupScreen, parseSize, rgbOf, setName, statusOf, validateManifest,
+  BUILTIN_SCHEMES, FLAT_COLOURS, STATUSES, artHash, openRequests, sceneGaps, coverageTemplate, encodePng, loadScheme, mockupScreen, parseSize, rgbOf, setName, statusOf, validateManifest,
   cameraOf, type Doc, type Manifest, type ManifestAsset, type ManifestError, type ManifestKnown, type Scheme, type Status, type StyleDefaults,
 } from '@pixelclaw/core';
 import { projectProfiles, projectSchemes, readExported } from './io.ts';
-import type { PlanAsset, PlanReport } from './protocol.ts';
+import type { PlanAsset, PlanReport, PlanScene } from './protocol.ts';
+import { readRequests } from './requests.ts';
 export type { PlanAsset, PlanReport } from './protocol.ts';
 import { ProjectError, type Project } from './project.ts';
 import type { Writer } from './writer.ts';
@@ -84,7 +85,22 @@ export function styleDefaults(p: Project, m: Manifest | null): StyleDefaults {
     },
     ...(style.light ? { light: style.light } : {}),
     ...(style.outline ? { outline: style.outline } : {}),
+    mapObjects: (map) => {
+      const e = manifestEntry(m, map);
+      return e?.kind === 'map' ? (e.uses ?? []).filter((n) => ['object', 'sprite'].includes(manifestEntry(m, n)?.kind ?? '')) : [];
+    },
   };
+}
+
+/** What a document draws from other assets: a map's placed assets, terrain families and overlays. */
+export function docUses(d: Doc): string[] {
+  const out = new Set<string>();
+  if (d.map) for (const e of d.map.entries) out.add(e.name);
+  for (const l of d.layers) {
+    if (l.map?.kind === 'terrain') out.add(l.map.family);
+    else if (l.map?.kind === 'overlay') out.add(l.map.overlay);
+  }
+  return [...out].sort();
 }
 
 // --- the report
@@ -130,6 +146,7 @@ export function planReport(w: Writer, o: { set?: string } = {}): PlanReport {
     }
     const art = doc ? artHash(doc) : null;
     const ex = exported[a.name] ?? null;
+    const last = seq !== null ? w.state(a.name).entries.at(-1) : undefined;
     const st = statusOf({ exists: !!doc, checksPass: pass, marks: doc?.marks ?? [], art, exportedArt: ex?.art ?? null });
     if (doc && a.planned) {
       const want = parseSize(a.size);
@@ -141,20 +158,48 @@ export function planReport(w: Writer, o: { set?: string } = {}): PlanReport {
     out.push({
       name: a.name, kind: a.kind, size: a.size, set, description: a.description ?? '', status: st.status, next: st.next, flags: [...flags, ...st.flags],
       planned: a.planned, exists: !!doc, failing, checks, notes: doc?.notes.length ?? 0, seq, exported: ex,
+      at: last?.at ?? null, by: last?.by ?? null,
+      width: doc?.width ?? 0, height: doc?.height ?? 0, frames: doc?.frameCount ?? 0, ticks: doc && doc.frameCount > 1 ? [...doc.ticks] : [],
+      uses: doc ? docUses(doc) : [...(a.uses ?? [])], usedBy: [], scenes: [],
     });
   }
+  for (const x of out) for (const u of x.uses) out.find((y) => y.name === u)?.usedBy.push(x.name);
+  const statusNamed = (n: string) => out.find((x) => x.name === n)?.status ?? 'planned';
+  const scenes: PlanScene[] = (m?.scenes ?? []).map((sc) => ({ name: sc.name, description: sc.description ?? '', map: sc.map ?? null, ...sceneGaps(m!, sc, statusNamed) }));
+  for (const sc of scenes) for (const n of sc.needs) out.find((y) => y.name === n)?.scenes.push(sc.name);
+  const requests = [...readRequests(p).values()];
   const counts = Object.fromEntries(STATUSES.map((s) => [s, out.filter((x) => x.planned && x.status === s).length])) as Record<Status, number>;
   const setNames = [...new Set(out.map((x) => x.set))];
   return {
     project: p.json.name, theme: m?.theme ?? null, manifest: { exists: mr.exists, errors: mr.errors },
     sets: setNames.map((s) => ({ name: s, description: m?.sets?.[s]?.description ?? '', assets: out.filter((x) => x.set === s).map((x) => x.name) })),
-    assets: out, counts,
+    assets: out, counts, scenes, requests,
   };
 }
 
-/** The report as text (the MCP `plan` tool and `pixelclaw plan`): what is left and what is failing. */
-export function planText(r: PlanReport): string {
+/** One asset's line in the plan's text. */
+function assetLine(a: PlanAsset): string {
+  const why = [a.failing.length ? `failing: ${a.failing.join(', ')}` : '', ...a.flags].filter(Boolean).join('; ');
+  return `  ${a.status.padEnd(8)} ${a.name} (${a.kind} ${a.size})${a.status !== 'exported' ? ` → ${a.next}` : a.exported ? ` → ${a.exported.profile} in ${a.exported.dir}` : ''}${why ? `  [${why}]` : ''}`;
+}
+
+/**
+ * The report as text (the MCP `plan` tool and `pixelclaw plan`): requests from people first, then
+ * what is left and what is failing, by set; or (order "scene") scene by scene, each with what it
+ * still needs, then what no scene needs.
+ */
+export function planText(r: PlanReport, o: { order?: 'set' | 'scene' } = {}): string {
   const lines: string[] = [];
+  const active = openRequests(new Map(r.requests.map((q) => [q.id, q])));
+  if (active.length) {
+    lines.push(`Requests from people (${active.length}): take these before planned work, with \`work\` (it claims the next open one):`);
+    for (const q of active) {
+      const what = q.kind === 'draw' ? `draw ${q.asset}` : q.kind === 'change' ? `change ${q.asset}` : `new asset ${q.asset}`;
+      const state = q.state === 'claimed' ? `claimed by ${q.claimedBy}` : q.state === 'blocked' ? `blocked, waiting for ${q.by}: "${q.question}"` : 'open';
+      lines.push(`  ${q.id} ${what}${q.note ? `: "${q.note}"` : ''} (from ${q.by}; ${state})`);
+    }
+    lines.push('');
+  }
   if (!r.manifest.exists) {
     lines.push(`project '${r.project}' has no manifest.json yet. Write one (plan with manifest=…): format "pixelclaw-manifest", version 1, a theme paragraph, and the assets (name, kind, size, set, …; docs/pipeline.md).`);
   } else if (r.manifest.errors.length) {
@@ -165,12 +210,32 @@ export function planText(r: PlanReport): string {
   if (planned.length) {
     lines.push('', `${planned.length} planned: ${STATUSES.map((s) => `${r.counts[s]} ${s}`).join(' · ')}`);
   }
-  for (const s of r.sets) {
-    lines.push('', `${s.name}${s.description ? ` (${s.description})` : ''}:`);
-    for (const n of s.assets) {
-      const a = r.assets.find((x) => x.name === n)!;
-      const why = [a.failing.length ? `failing: ${a.failing.join(', ')}` : '', ...a.flags].filter(Boolean).join('; ');
-      lines.push(`  ${a.status.padEnd(8)} ${a.name} (${a.kind} ${a.size})${a.status !== 'exported' ? ` → ${a.next}` : a.exported ? ` → ${a.exported.profile} in ${a.exported.dir}` : ''}${why ? `  [${why}]` : ''}`);
+  const byName = (n: string) => r.assets.find((x) => x.name === n);
+  if (o.order === 'scene' && r.scenes.length) {
+    const shown = new Set<string>();
+    for (const sc of r.scenes) {
+      const gaps = [sc.missing.length ? `missing ${sc.missing.join(', ')}` : '', sc.unfinished.length ? `failing checks: ${sc.unfinished.join(', ')}` : ''].filter(Boolean).join('; ');
+      lines.push('', `scene ${sc.name}${sc.description ? ` (${sc.description})` : ''}${sc.map ? `, built by the map ${sc.map}` : ''}: ${gaps || 'everything it needs is drawn and checked'}`);
+      for (const n of sc.needs) {
+        const a = byName(n);
+        if (!a) continue;
+        lines.push(assetLine(a) + (shown.has(n) ? '  (above)' : ''));
+        shown.add(n);
+      }
+    }
+    const rest = r.assets.filter((a) => !shown.has(a.name));
+    if (rest.length) {
+      lines.push('', 'in no scene:');
+      for (const a of rest) lines.push(assetLine(a));
+    }
+  } else {
+    for (const s of r.sets) {
+      lines.push('', `${s.name}${s.description ? ` (${s.description})` : ''}:`);
+      for (const n of s.assets) lines.push(assetLine(byName(n)!));
+    }
+    if (r.scenes.length) {
+      lines.push('', `scenes (plan order=scene works scene by scene):`);
+      for (const sc of r.scenes) lines.push(`  ${sc.name}: ${sc.missing.length ? `missing ${sc.missing.join(', ')}` : 'nothing missing'}${sc.unfinished.length ? `; failing checks: ${sc.unfinished.join(', ')}` : ''}`);
     }
   }
   const left = planned.filter((a) => a.status !== 'exported').length;

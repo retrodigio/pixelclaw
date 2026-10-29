@@ -12,3 +12,6 @@ export * from './io.ts';
 export * from './cache.ts';
 export * from './plan.ts';
 export * from './underlay.ts';
+export * from './requests.ts';
+export * from './worker.ts';
+export * from './worker-settings.ts';

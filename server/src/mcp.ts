@@ -8,8 +8,10 @@ import { ProjectError, listAssets, readPaletteFile } from './project.ts';
 import { formatChecks } from './report.ts';
 import { writeReview } from './review.ts';
 import { EXPORT_FORMATS, exportAsset } from './export.ts';
-import { exportWithProfile, importSummary, planImport, projectProfiles, projectSchemes } from './io.ts';
-import { planReport, planText, writeManifest, writeTemplates } from './plan.ts';
+import { exportWithProfile, importIntoProject, importSummary, planImport, projectProfiles, projectSchemes } from './io.ts';
+import { agentWork, readRequests } from './requests.ts';
+import { openRequests, type WorkRequest } from '@pixelclaw/core';
+import { manifestEntry, planReport, planText, readManifest, writeManifest, writeTemplates } from './plan.ts';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { VIEW_MODES, parseRegion, type View, type ViewMode } from './views.ts';
@@ -86,6 +88,8 @@ Maps (plan §4.11: cells of tile px holding names; a map redraws itself when a t
 Colours: an entry name (c=stone3), its key (c=3), its exact hex, or none. Coordinates wrap on wrap=on documents (tiles by default). @cell(cx,cy) after a command name offsets it to a cell of the cell grid. Generators write their seed into the tape line; give seed= to choose one (another seed is another variant). Your layer, frame, selection, symmetry and brush are yours alone: people in the watch view have their own.
 
 The project pipeline: \`plan\` shows the asset plan (manifest.json) and each asset's status (planned → drafted → checked → reviewed → approved → exported) by set; plan(manifest=…) writes a manifest (schema-checked), plan(templates=true) draws a flat mockup screen and coverage maps. A planned asset's \`new\` may leave out its size, palette and scheme. After a blind review's findings are dealt with: mark reviewed "…". A person approves in the dashboard (the watch link with &tab=dashboard), writing mark approved, or asks for changes (mark rejected "…"): read it with \`changes\`. The consistency check holds each asset to its set and to its planned height. docs/pipeline.md.
+
+Requests: people ask for work in the dashboard (Draw this, Ask for changes, Add an asset); \`plan\` lists open requests first. Take them before planned work: \`work\` claims the next open request and says what is asked; post progress with work(action="progress", text=…); finish with work(action="done", text=<what changed>) or, when you need the person, work(action="blocked", text=<one clear question>). Call \`plan\` at the start of a session and after each finished asset.
 
 Habits: after each meaningful batch, look once at an image (render or tile3x3), and use the grid to check exact pixels. Never judge a tile alone when it will be seen tiled; judge a sprite in the game view, on its ground. Keep the checks green, but do not stop at green: look at the 3x3 or the game view and judge it as a player would.
 
@@ -429,23 +433,40 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
 
   server.registerTool('import', {
     title: 'Import images',
-    description: 'Bring art in (plan §4.9). A PNG becomes a new asset quantised to a palette (palette=, default the project\'s; build=true makes one from the image); grid="24x24" slices a sheet into frames ' +
-      '(cells=true keeps it one image with that cell grid). An .aseprite file keeps its layers, frames, durations, tags and views. With profile=, path is a folder a profile wrote: each image is read back by name ' +
-      'into the asset it came from and the result says which match the project exactly; images no asset exports become new assets. The new tapes start with import commands; the files are kept under blobs/.',
+    description: 'Bring art in (plan §4.9, §21). A PNG becomes a new asset quantised to a palette (palette=, default the project\'s; build=true makes one from the image); grid="24x24" slices a sheet into frames ' +
+      '(cells=true keeps it one image with that cell grid); slice="24x24" instead cuts a sheet into separate assets, one per non-empty cell (offset="x,y", gap="x,y"), named by pattern ("{name}_{n}", "{name}_{col}_{row}"), names (a list, in reading order), or namesFrom="manifest" (the planned, undrawn entries of set=, in order). ' +
+      'A folder (without profile) imports every .png and .aseprite in it. An .aseprite file keeps its layers, frames, durations, tags and views. New assets the manifest does not plan get entries (in set=; manifest=false leaves the manifest alone), and every check is run on each. ' +
+      'With profile=, path is a folder a profile wrote: each image is read back by name into the asset it came from and the result says which match the project exactly; images no asset exports become new assets. The new tapes start with import commands; the files are kept under blobs/.',
     inputSchema: z.object({
-      path: z.string().describe('A .png or .aseprite file, or (with profile) the folder an export wrote'),
+      path: z.string().describe('A .png or .aseprite file, a folder of them, or (with profile) the folder an export wrote'),
       profile: z.string().optional(),
-      as: z.string().regex(/^[a-z][a-z0-9_-]*$/).optional().describe('The new asset\'s name (default: the file\'s)'),
+      as: z.string().regex(/^[a-z][a-z0-9_-]*$/).optional().describe('The new asset\'s name (one file; default: the file\'s)'),
       kind: z.enum(['sprite', 'tile', 'object', 'icon', 'sheet']).optional(),
       palette: z.string().optional(),
       build: z.boolean().optional(),
       grid: z.string().regex(/^\d+x\d+$/).optional(),
       cells: z.boolean().optional(),
+      slice: z.string().regex(/^\d+x\d+$/).optional().describe('Cut the sheet into assets of this cell size'),
+      offset: z.string().regex(/^\d+,\d+$/).optional(),
+      gap: z.string().regex(/^\d+,\d+$/).optional(),
+      pattern: z.string().optional(),
+      names: z.array(z.string().regex(/^[a-z][a-z0-9_-]*$/)).optional(),
+      namesFrom: z.enum(['manifest']).optional(),
+      set: z.string().optional().describe('The manifest set for new entries (and for namesFrom)'),
+      wrap: z.boolean().optional().describe('Tiles: on a wrapping canvas'),
+      manifest: z.boolean().optional().describe('Add manifest entries for the new assets (default: when there is a manifest)'),
       replace: z.boolean().optional().describe('Start an existing asset\'s tape again'),
     }),
   }, (a) => w.enqueue(() => {
     try {
-      const plan = planImport(w.project, w.assetDocs(), { ...a, grid: a.grid ? (a.grid.split('x').map(Number) as [number, number]) : undefined });
+      const pair = (v: string | undefined, sep: string) => (v ? (v.split(sep).map(Number) as [number, number]) : undefined);
+      if (!a.profile) {
+        const r = importIntoProject(w, {
+          ...a, grid: pair(a.grid, 'x'), slice: a.slice ? { cell: pair(a.slice, 'x')!, offset: pair(a.offset, ','), gap: pair(a.gap, ',') } : undefined,
+        }, AGENT);
+        return { content: [text(r.text || 'nothing to import')] };
+      }
+      const plan = planImport(w.project, w.assetDocs(), { ...a, grid: pair(a.grid, 'x'), slice: undefined });
       const created: string[] = [];
       for (const c of plan.create) {
         const r = w.run({ asset: c.name, commands: c.tape, by: AGENT, replace: a.replace });
@@ -453,6 +474,38 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
         created.push(c.name);
       }
       return { content: [text(importSummary(plan, created) || 'nothing to import')] };
+    } catch (e) {
+      return errorResult(e);
+    }
+  }));
+
+  server.registerTool('work', {
+    title: 'Work on requests',
+    description: 'The request queue (plan §21): what people asked for in the dashboard (draw a planned asset, change a drawn one, a new asset). ' +
+      'With no action (or action "next"), claim the next open request (or the one named by id) and get what is asked, with the asset\'s plan entry and status. ' +
+      'action "progress" posts a short note the person sees; "done" finishes it with what changed; "blocked" stops it with one clear question for the person (they answer in the dashboard and it opens again). ' +
+      '"list" shows every request still open, claimed or blocked. Take requests before planned work; call plan after each one.',
+    inputSchema: z.object({
+      action: z.enum(['next', 'progress', 'done', 'blocked', 'list']).optional(),
+      id: z.string().regex(/^r\d+$/).optional().describe('A request id (default: the next open one, or the one you claimed)'),
+      text: z.string().optional().describe('progress: a short note; done: what changed; blocked: the question'),
+    }),
+  }, (a) => w.enqueue(() => {
+    try {
+      const action = a.action ?? 'next';
+      if (action === 'list') {
+        const active = openRequests(readRequests(w.project));
+        return { content: [text(active.length ? active.map((q) => requestLine(q)).join('\n') : 'no open requests')] };
+      }
+      const r = action === 'next' ? agentWork(w, AGENT, { action, id: a.id }) : agentWork(w, AGENT, { action, id: a.id, text: a.text ?? '' });
+      w.requestsChanged();
+      if (!r.request) return { content: [text(`${r.message}. Carry on with the plan (call plan for what is left).`)] };
+      const q = r.request;
+      if (action !== 'next') {
+        const left = openRequests(readRequests(w.project)).filter((x) => x.state === 'open').length;
+        return { content: [text(`${r.message}${action === 'progress' ? '' : `. ${left ? `${left} open request${left === 1 ? '' : 's'} left: call work for the next.` : 'No open requests left.'}`}`)] };
+      }
+      return { content: [text(`${r.message}\n${requestBrief(w, q)}`)] };
     } catch (e) {
       return errorResult(e);
     }
@@ -493,6 +546,7 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
       manifest: z.record(z.string(), z.unknown()).optional().describe('Write this manifest (validated)'),
       templates: z.boolean().optional().describe('Draw the flat templates from the manifest'),
       seed: z.number().int().min(1).optional().describe('Templates: the layout\'s seed (default 1)'),
+      order: z.enum(['set', 'scene']).optional().describe('List the work by set (default) or scene by scene (what each scene still needs)'),
     }),
   }, (a) => w.enqueue(() => {
     try {
@@ -509,7 +563,7 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
         content.push({ type: 'image', data: readFileSync(`${t.dir}/mockup@2x.png`).toString('base64'), mimeType: 'image/png' });
         content.push(text(readFileSync(`${t.dir}/mockup.txt`, 'utf8')));
       }
-      content.push(text(planText(planReport(w, { set: a.set }))));
+      content.push(text(planText(planReport(w, { set: a.set }), { order: a.order })));
       content.push(text(`the dashboard (for the person): ${host.url()}&tab=dashboard`));
       return { content };
     } catch (e) {
@@ -518,6 +572,26 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
   }));
 
   return server;
+}
+
+function requestLine(q: WorkRequest): string {
+  const what = q.kind === 'draw' ? `draw ${q.asset}` : q.kind === 'change' ? `change ${q.asset}` : `new asset ${q.asset}`;
+  const state = q.state === 'claimed' ? `claimed by ${q.claimedBy}` : q.state === 'blocked' ? `blocked: "${q.question}"` : q.state;
+  return `${q.id} ${what}${q.note ? `: "${q.note}"` : ''} (from ${q.by} at ${q.at}; ${state})`;
+}
+
+/** What a claimed request asks, with what the project knows about its asset. */
+function requestBrief(w: Writer, q: WorkRequest): string {
+  const out = [requestLine(q)];
+  const e = manifestEntry(readManifest(w.project).manifest, q.asset);
+  if (e) out.push(`plan: ${q.asset} is a ${e.kind} ${e.size}${e.set ? ` in set ${e.set}` : ''}${e.description ? `: ${e.description}` : ''}${e.height ? ` (drawn height ${e.height} px)` : ''}`);
+  const a = planReport(w).assets.find((x) => x.name === q.asset);
+  if (a) out.push(`status: ${a.status} → ${a.next}${a.failing.length ? `; failing: ${a.failing.join(', ')}` : ''}${a.flags.length ? `; ${a.flags.join('; ')}` : ''}`);
+  if (q.kind === 'draw' || q.kind === 'new') out.push(`Draw it: run with \`new ${e?.kind ?? 'sprite'} ${q.asset}\` (the manifest fills in its size and palette), look, check, fix; then work(action="done", text=<what you drew>).`);
+  else out.push(`Change it as asked (the request is also a \`mark rejected\` on its tape${q.mark ? ` at #${q.mark}` : ''}; \`changes\` shows the person's edits and notes); then work(action="done", text=<what changed>).`);
+  if (q.events.some((x) => x.type === 'reply')) out.push(`The person answered: "${q.events.filter((x) => x.type === 'reply').at(-1)!.text}"`);
+  out.push('If you cannot go on without the person, work(action="blocked", text=<one clear question>).');
+  return out.join('\n');
 }
 
 /** "failing" or a comma list of check names; undefined for none, null when something is not a check. */

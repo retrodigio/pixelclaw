@@ -1,7 +1,7 @@
 // Messages between the server and the watch view (WebSocket, JSON). Types only, so the UI can
 // import them without pulling in any Node code.
 
-import type { Diag, ManifestError, Palette, Status, StyleJson, TapeEntry, Theme } from '@pixelclaw/core';
+import type { Diag, ManifestAsset, ManifestError, Palette, Status, StyleJson, TapeEntry, Theme, WorkRequest } from '@pixelclaw/core';
 
 export interface AssetTape {
   name: string;
@@ -33,6 +33,31 @@ export interface Snapshot {
   /** The asset written most recently, if any. */
   live: string | null;
   eye: Eye | null;
+  /** The headless worker (\`pixelclaw work\`): whether it may run, and whether it is running. */
+  worker: WorkerStatus;
+}
+
+/** What a person can ask from the dashboard (plan §21). */
+export type PersonRequest =
+  | { action: 'request'; kind: 'draw'; asset: string; note?: string }
+  | { action: 'request'; kind: 'change'; asset: string; note: string }
+  | { action: 'request'; kind: 'new'; entry: ManifestAsset; note?: string }
+  | { action: 'reply'; id: string; text: string }
+  | { action: 'cancel'; id: string; text?: string };
+
+export interface WorkerStatus {
+  /** project.json \`worker.enabled\`: the Start Claude button shows only when true. */
+  enabled: boolean;
+  running: boolean;
+  /** Who started it (a person, or the CLI), and when. */
+  by: string | null;
+  startedAt: string | null;
+  /** Spent so far in this run, and the cap (US dollars). */
+  spent: number;
+  cap: number;
+  sessions: number;
+  /** Why the last run stopped. */
+  stopped: string | null;
 }
 
 export type ServerMessage =
@@ -51,6 +76,13 @@ export type ServerMessage =
   | { type: 'result'; id: number; ok: true; asset: string; group: string | null; seq: number | null }
   | { type: 'result'; id: number; ok: false; errors: Diag[] }
   | { type: 'pong' }
+  /** requests.jsonl changed: every request as it stands. */
+  | { type: 'requests'; requests: WorkRequest[] }
+  | { type: 'worker'; status: WorkerStatus }
+  /** New lines of the worker's log. */
+  | { type: 'workerLog'; lines: string[] }
+  /** The answer to a page's request or worker message (only to that page). */
+  | { type: 'answer'; id: number; ok: boolean; error?: string; request?: WorkRequest }
   /** The plan changed outside a batch (the manifest was written, assets were exported): the dashboard reloads it. */
   | { type: 'plan' };
 
@@ -60,7 +92,11 @@ export const HUMAN_RE = /^human:[A-Za-z0-9_.-]{1,32}$/;
 export type ClientMessage =
   | { type: 'ping' }
   /** Commands from a person: applied by the single writer as one undo group, written `by`. */
-  | { type: 'run'; id: number; asset: string; commands: string; by: string };
+  | { type: 'run'; id: number; asset: string; commands: string; by: string }
+  /** A request, a reply or a cancel from the dashboard (plan §21), written \`by\`. */
+  | { type: 'request'; id: number; by: string; body: PersonRequest }
+  /** Start or stop the headless worker (only when project.json worker.enabled). */
+  | { type: 'worker'; id: number; by: string; action: 'start' | 'stop' };
 
 // The plan (plan §7.3), as the dashboard and the MCP `plan` tool show it.
 
@@ -89,9 +125,31 @@ export interface PlanAsset {
   failing: string[];
   checks: { id: string; status: string; shown: string }[];
   notes: number;
-  /** The tape's last command. */
+  /** The tape's last command, when it was written and by whom. */
   seq: number | null;
+  at: string | null;
+  by: string | null;
   exported: ExportRecord | null;
+  /** The document's canvas (0 when not drawn), its frames and their ticks (animated: more than one frame). */
+  width: number;
+  height: number;
+  frames: number;
+  ticks: number[];
+  /** The assets it draws from (a map's) and the maps that draw it. */
+  uses: string[];
+  usedBy: string[];
+  /** The scenes that need it. */
+  scenes: string[];
+}
+
+export interface PlanScene {
+  name: string;
+  description: string;
+  map: string | null;
+  needs: string[];
+  /** Not drawn yet; drawn with failing checks. */
+  missing: string[];
+  unfinished: string[];
 }
 
 export interface PlanReport {
@@ -101,5 +159,8 @@ export interface PlanReport {
   sets: { name: string; description: string; assets: string[] }[];
   assets: PlanAsset[];
   counts: Record<Status, number>;
+  scenes: PlanScene[];
+  /** Every request from requests.jsonl, as it stands. */
+  requests: WorkRequest[];
 }
 

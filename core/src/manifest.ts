@@ -66,6 +66,17 @@ export interface Manifest {
   /** The export profile (and folder) the project ships through. */
   export?: { profile: string; dest?: string };
   assets: ManifestAsset[];
+  /** Places the game shows (plan §21): what each needs, and the map that builds it. */
+  scenes?: ManifestScene[];
+}
+
+export interface ManifestScene {
+  name: string;
+  description?: string;
+  /** The assets the scene needs (names in the manifest). */
+  uses: string[];
+  /** The map document that builds it (a manifest map), if any. */
+  map?: string;
 }
 
 export interface ManifestError {
@@ -88,7 +99,8 @@ const ASSET_KEYS = new Set([
   'name', 'kind', 'size', 'set', 'description', 'palette', 'scheme', 'inside', 'outside', 'band', 'frames', 'ticks', 'views', 'mirror', 'cells',
   'height', 'variantOf', 'recolourOf', 'uses', 'flat', 'chars',
 ]);
-const TOP_KEYS = new Set(['format', 'version', 'theme', 'sets', 'export', 'assets']);
+const TOP_KEYS = new Set(['format', 'version', 'theme', 'sets', 'export', 'assets', 'scenes']);
+const SCENE_KEYS = new Set(['name', 'description', 'uses', 'map']);
 
 export function parseSize(s: string): [number, number] | null {
   const m = SIZE_RE.exec(s);
@@ -209,7 +221,46 @@ export function validateManifest(json: unknown, known: ManifestKnown = {}): { ma
     if (typeof a.flat === 'string' && !HEX_RE.test(a.flat) && !NAME_RE.test(a.flat.toLowerCase())) err(at('flat'), 'a palette entry name or #rrggbb');
     if (typeof a.set === 'string' && sets && typeof sets === 'object' && !(a.set in (sets as object))) err(at('set'), `no set '${a.set}' in sets`);
   });
+  if (m.scenes !== undefined) {
+    if (!Array.isArray(m.scenes)) err('scenes', 'a list of scenes');
+    else {
+      const seen = new Set<string>();
+      (m.scenes as unknown[]).forEach((x, i) => {
+        const at = (k: string) => `scenes[${i}]${k ? `.${k}` : ''}`;
+        if (!x || typeof x !== 'object' || Array.isArray(x)) { err(at(''), 'a scene is { "name", "description", "uses": [...], "map" }'); return; }
+        const sc = x as Record<string, unknown>;
+        for (const k of Object.keys(sc)) if (!SCENE_KEYS.has(k)) err(at(k), `unknown field '${k}' (fields: ${[...SCENE_KEYS].join(', ')})`);
+        if (typeof sc.name !== 'string' || !NAME_RE.test(sc.name)) err(at('name'), 'a name uses a-z, 0-9, _ and -, starting with a letter');
+        else if (seen.has(sc.name)) err(at('name'), `scene '${sc.name}' is already listed`);
+        else seen.add(sc.name);
+        if (sc.description !== undefined && typeof sc.description !== 'string') err(at('description'), 'text');
+        if (!Array.isArray(sc.uses) || !sc.uses.every((u) => typeof u === 'string')) err(at('uses'), 'a list of asset names');
+        else for (const u of sc.uses as string[]) if (!names.has(u)) err(at('uses'), `no asset '${u}' in the manifest`);
+        if (sc.map !== undefined) {
+          if (typeof sc.map !== 'string' || !names.has(sc.map)) err(at('map'), `no asset '${String(sc.map)}' in the manifest`);
+          else if (kindOf(sc.map) !== 'map') err(at('map'), `'${sc.map}' is a ${kindOf(sc.map)}, not a map`);
+        }
+      });
+    }
+  }
   return { manifest: errors.length ? null : (m as unknown as Manifest), errors };
+}
+
+/**
+ * What a scene still needs: every asset it uses (and its map), with the map's own `uses`, that is
+ * not drawn yet (missing) or drawn but not yet past `checked` (unfinished). In the scene's order.
+ */
+export function sceneGaps(m: Manifest, scene: ManifestScene, status: (name: string) => Status): { needs: string[]; missing: string[]; unfinished: string[] } {
+  const needs: string[] = [];
+  const add = (n: string) => { if (!needs.includes(n)) needs.push(n); };
+  for (const u of scene.uses) add(u);
+  if (scene.map) {
+    for (const u of m.assets.find((a) => a.name === scene.map)?.uses ?? []) add(u);
+    add(scene.map);
+  }
+  const missing = needs.filter((n) => status(n) === 'planned');
+  const unfinished = needs.filter((n) => status(n) === 'drafted');
+  return { needs, missing, unfinished };
 }
 
 /** The set an asset belongs to (default: its kind). */
