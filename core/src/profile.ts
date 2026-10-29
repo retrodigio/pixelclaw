@@ -41,8 +41,13 @@ export interface ProfileJson {
   exclude?: string[];
   /** Naming templates: {asset}, {n}, {view}, {cx}, {cy}. */
   names?: { single?: string; frame?: string; view?: string; piece?: string; start?: number };
-  /** Per scheme (or "*"): names by variant, else a template with {asset}, {variant}, {sides}, {corners}; `sides` orders the side letters. */
-  autotile?: Record<string, { names?: Record<string, string>; template?: string; sides?: string }>;
+  /**
+   * Per scheme (or "*"): names by variant, else a template with {asset}, {variant}, {sides},
+   * {corners}, {shape}; `sides` orders the side letters, `corners` the corner suffixes
+   * ("nw,ne,se,sw"); `shapes` gives a template per shape (lone, end, straight, corner, tee,
+   * cross), so a path's dead ends are named apart from its straights.
+   */
+  autotile?: Record<string, { names?: Record<string, string>; template?: string; sides?: string; corners?: string; shapes?: Partial<Record<Shape, string>> }>;
   /** Texture variants (`variant of=`): numbered frames of their base ("frames"), or under their own names. */
   variants?: 'frames' | 'names';
   /** Mirror views: written as flipped frames ("bake"), or left out with the source marked ("flag"). */
@@ -51,6 +56,13 @@ export interface ProfileJson {
   oversized?: 'sprite' | 'split';
   /** Role entries are written as these colours. */
   roles?: Partial<Record<Role, string>>;
+  /**
+   * A palette entry's output colour (G13): entry name, or `<palette>.<entry>`, to `#rrggbb` or a
+   * role (written as `roles` gives it): an engine that draws in tones is targeted by mapping each
+   * colour to its tone. Over `roles`; import reads the colours back (two entries as one colour are
+   * noted and read back as the first).
+   */
+  colours?: Record<string, string>;
   /** Density levels (1, 2, 4): file names carry `suffix` except at `plain`; lower levels may be reduced from a higher authored copy. */
   density?: { levels: number[]; plain?: number; suffix?: string; reduce?: boolean; reducer?: string } & ReducerOptions;
   /** Atlas and sheet pages: name, file, width (at 1x), padding, trim, sheet columns. */
@@ -75,7 +87,12 @@ export class ProfileError extends Error {}
 export const RECORD_COLUMNS = ['sprite', 'x', 'y', 'w', 'h', 'cropX', 'cropY', 'frameW', 'frameH', 'pivotX', 'pivotY', 'page', 'asset', 'frame', 'n', 'view', 'mirror', 'ticks', 'ms', 'd', 'cols', 'rows', 'anchorX', 'anchorY', 'flags', 'variant', 'kind', 'mode'] as const;
 export const DEFAULT_COLUMNS = ['sprite', 'x', 'y', 'w', 'h', 'cropX', 'cropY', 'frameW', 'frameH', 'pivotX', 'pivotY'];
 const SNIPPET_VARS = ['asset', 'name', 'kind', 'mode', 'frames', 'names', 'first', 'ticks', 'ms', 'frameTicks', 'loop', 'tags', 'views', 'directions', 'mirror', 'w', 'h', 'cols', 'rows', 'anchorX', 'anchorY', 'pivotX', 'pivotY', 'variants', 'scheme'];
-const ITEM_VARS = ['asset', 'n', 'view', 'cx', 'cy', 'variant', 'sides', 'corners', 'name', 'd', 'page', 'stem'];
+const ITEM_VARS = ['asset', 'n', 'view', 'cx', 'cy', 'variant', 'sides', 'corners', 'shape', 'name', 'd', 'page', 'stem'];
+
+/** A side-letter variant's shape by its joined sides: none, one, two opposite, two beside, three, four. */
+export type Shape = 'lone' | 'end' | 'straight' | 'corner' | 'tee' | 'cross';
+export const SHAPES: readonly Shape[] = ['lone', 'end', 'straight', 'corner', 'tee', 'cross'];
+const CORNERS = ['ne', 'se', 'sw', 'nw'];
 
 /** Fill `{var}` placeholders; `{{` and `}}` are literal braces; any other `{` is literal. */
 export function fillTemplate(t: string, vars: Record<string, string | number>, allowed?: readonly string[]): string {
@@ -100,9 +117,20 @@ export function loadProfile(j: ProfileJson): ProfileJson {
   for (const [s, a] of Object.entries(j.autotile ?? {})) {
     for (const t of [a.template, ...Object.values(a.names ?? {})]) if (t) fillTemplate(t, Object.fromEntries(ITEM_VARS.map((v) => [v, ''])), ITEM_VARS);
     if (a.sides && !/^(?=.*n)(?=.*e)(?=.*s)(?=.*w)[nesw]{4}$/.test(a.sides)) throw new ProfileError(`${where}: autotile.${s}.sides orders the letters n, e, s and w`);
+    if (a.corners !== undefined && (typeof a.corners !== 'string' || [...new Set(a.corners.split(','))].sort().join() !== [...CORNERS].sort().join() || a.corners.split(',').length !== 4)) throw new ProfileError(`${where}: autotile.${s}.corners orders the corners ne, se, sw and nw, like "nw,ne,se,sw"`);
+    for (const [k, t] of Object.entries(a.shapes ?? {})) {
+      if (!(SHAPES as readonly string[]).includes(k)) throw new ProfileError(`${where}: autotile.${s}.shapes.${k} is not a shape (${SHAPES.join(', ')})`);
+      fillTemplate(String(t), Object.fromEntries(ITEM_VARS.map((v) => [v, ''])), ITEM_VARS);
+    }
   }
   for (const r of Object.keys(j.roles ?? {})) if (!(ROLES as readonly string[]).includes(r)) throw new ProfileError(`${where}: roles.${r} is not a role (${ROLES.join(', ')})`);
   for (const [r, h] of Object.entries(j.roles ?? {})) if (!/^#[0-9a-fA-F]{6}$/.test(String(h))) throw new ProfileError(`${where}: roles.${r} must be #rrggbb`);
+  for (const [e, v] of Object.entries(j.colours ?? {})) {
+    if (!/^([a-z][a-z0-9_-]*\.)?[a-z][a-z0-9_]*$/i.test(e)) throw new ProfileError(`${where}: colours: '${e}' is not an entry name (or <palette>.<entry>)`);
+    if (/^#[0-9a-fA-F]{6}$/.test(String(v))) continue;
+    if (!(ROLES as readonly string[]).includes(String(v))) throw new ProfileError(`${where}: colours.${e} must be #rrggbb or a role (${ROLES.join(', ')})`);
+    if (!j.roles?.[v as Role]) throw new ProfileError(`${where}: colours.${e} is the role '${v}', which roles does not give a colour`);
+  }
   if (j.density) {
     if (!Array.isArray(j.density.levels) || !j.density.levels.length || j.density.levels.some((d) => ![1, 2, 3, 4, 6, 8].includes(d))) throw new ProfileError(`${where}: density.levels lists sizes like 1, 2, 4`);
   }
@@ -150,26 +178,33 @@ const lc = (s: string) => s.toLowerCase();
 const flipView = (d: Doc, name: string) => d.views.find((v) => v.mirror === name)?.name ?? null;
 
 /** Side letters and corner suffixes of a generic variant name (`nes_ne` → `nes`, `_ne`), or null. */
-function sidesCorners(v: string, order = 'nesw'): { sides: string; corners: string } | null {
+function sidesCorners(v: string, order = 'nesw', cornerOrder?: string): { sides: string; corners: string; shape: Shape } | null {
   const [first, ...rest] = v.split('_');
+  const corners = (cs: string[]) => {
+    const ord = cornerOrder ? cornerOrder.split(',') : null;
+    return (ord ? [...cs].sort((a, b) => ord.indexOf(a) - ord.indexOf(b)) : cs).map((r) => `_${r}`).join('');
+  };
   if (!/^(o|[nesw]+)$/.test(first!) || rest.some((r) => !/^(ne|se|sw|nw)$/.test(r))) {
-    if (/^(ne|se|sw|nw)$/.test(first!) && rest.every((r) => /^(ne|se|sw|nw)$/.test(r))) return { sides: '', corners: [first!, ...rest].map((r) => `_${r}`).join('') };
+    if (/^(ne|se|sw|nw)$/.test(first!) && rest.every((r) => /^(ne|se|sw|nw)$/.test(r))) return { sides: '', corners: corners([first!, ...rest]), shape: 'lone' };
     return null;
   }
   const sides = first === 'o' ? '' : [...order].filter((c) => first!.includes(c)).join('');
-  return { sides, corners: rest.map((r) => `_${r}`).join('') };
+  const opposite = sides.length === 2 && (/n/.test(sides) === /s/.test(sides));
+  const shape: Shape = ['lone', 'end', opposite ? 'straight' : 'corner', 'tee', 'cross'][sides.length] as Shape;
+  return { sides, corners: corners(rest), shape };
 }
 
 function variantName(p: ProfileJson, d: Doc, cell: string): string {
   const scheme = d.family!.def?.name ?? d.family!.scheme;
   const spec = p.autotile?.[scheme] ?? p.autotile?.['*'];
-  const base = { asset: d.name, variant: cell, sides: '', corners: '' };
+  const base = { asset: d.name, variant: cell, sides: '', corners: '', shape: '' };
   const named = spec?.names?.[cell];
   if (named) return fillTemplate(named, base);
   if (cell === 'inside' || cell === 'outside') return `${d.name}_${cell}`;
-  if (spec?.template) {
-    const sc = sidesCorners(cell, spec.sides);
-    if (sc) return fillTemplate(spec.template, { ...base, ...sc });
+  const sc = spec?.template || spec?.shapes ? sidesCorners(cell, spec.sides, spec.corners) : null;
+  if (sc) {
+    const t = spec!.shapes?.[sc.shape] ?? spec!.template;
+    if (t) return fillTemplate(t, { ...base, ...sc });
   }
   return `${d.name}_${cell}`;
 }
@@ -193,9 +228,16 @@ const fontFormat = (p: ProfileJson) => p.fonts?.format ?? 'strip';
  * The colours an asset is written in: role entries through the profile's encoding, except icons
  * in full or channel mode, which are written exactly as drawn (plan §4.5).
  */
-export function exportColours(d: Doc, roles?: ProfileJson['roles']): string[] {
+export function exportColours(d: Doc, roles?: ProfileJson['roles'], colours?: ProfileJson['colours']): string[] {
   if (d.kind === 'icon' && iconModeOf(d) !== 'tone') return d.palette.entries.map((e) => e.hex);
-  return encodedColours(d.palette, roles);
+  const out = encodedColours(d.palette, roles);
+  if (!colours) return out;
+  // The per-colour output map, by `<palette>.<entry>` first, then the entry's name.
+  return d.palette.entries.map((e, i) => {
+    const v = colours[`${d.palette.name}.${e.name}`] ?? colours[e.name];
+    if (v === undefined) return out[i]!;
+    return /^#/.test(v) ? v.toLowerCase() : roles![v as Role]!;
+  });
 }
 
 export function exportItems(p: ProfileJson, docs: Doc[]): Item[] {
@@ -405,7 +447,7 @@ export function exportProfile(prof: ProfileJson, docs: Doc[], o: ExportOptions =
   const coloursOf = (d: Doc) => {
     let c = colours.get(d);
     if (!c) {
-      c = exportColours(d, p.roles);
+      c = exportColours(d, p.roles, p.colours);
       const seen = new Map<string, string>();
       d.palette.entries.forEach((e, i) => {
         const k = c![i]!.toLowerCase(), was = seen.get(k);
@@ -900,7 +942,7 @@ export function importProfile(prof: ProfileJson, files: Map<string, Uint8Array>,
       const doc = docs.find((d) => d.name === stem) ?? docs.find((d) => levelStem(p, d.densityOf?.of ?? '', d.densityOf?.d ?? 0) === stem);
       if (!doc) { notes.push(`${f}: no asset named '${stem}'`); continue; }
       const parts = aseParts(readAseprite(files.get(f)!));
-      const cols = exportColours(doc, p.roles);
+      const cols = exportColours(doc, p.roles, p.colours);
       let inexact = 0;
       const frames = parts.ms.map((_, fr) => {
         const flat = new Uint16Array(parts.width * parts.height).fill(TRANSPARENT);
@@ -931,7 +973,7 @@ export function importProfile(prof: ProfileJson, files: Map<string, Uint8Array>,
     const d = im.d;
     let a = assets.get(target.name);
     if (!a) assets.set(target.name, (a = { frames: Array.from({ length: target.frameCount }, () => new Uint16Array(target.width * target.height).fill(TRANSPARENT)), inexact: 0, images: 0 }));
-    const q = quantise(im.img, it.doc.palette, exportColours(it.doc, p.roles));
+    const q = quantise(im.img, it.doc.palette, exportColours(it.doc, p.roles, p.colours));
     a.inexact += q.inexact;
     a.images++;
     const px = target === it.doc ? q.px : remapByName(q.px, it.doc.palette, target.palette);
