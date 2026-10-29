@@ -257,6 +257,7 @@ export function createMcpServer(host: McpHost, version: string): McpServer {
         out.push(`tape: ${r.commands} commands in ${r.groups} groups`);
       }
       out.push(r.warnings.length ? `warnings: ${r.warnings.join('; ')}` : 'warnings: none');
+      if (r.followed?.length) out.push(`variants that inherit the band, brought up to date: ${r.followed.join(', ')} (family band from=${r.asset})`);
       // Every frame, unless the canvas is large: then the frame being drawn on (`check` covers all).
       if (r.doc) out.push(checkSummary(w.checks(r.asset, { budget: SUMMARY_BUDGET, focus: ctxOf(r.doc, AGENT).frame }).results));
       const content: CallToolResult['content'] = [text(out.join('\n'))];

@@ -170,6 +170,7 @@ function apply(io: Io, proj: Project, text: string, source: string, o: { asset?:
   io.out(`${r.asset}: applied ${r.added.length} command${r.added.length === 1 ? '' : 's'} as group ${r.group}; ${r.changed} px changed\n`);
   io.out(`  tape: ${r.commands} commands in ${r.groups} group${r.groups === 1 ? '' : 's'}; preview: ${join(r.dir!, 'preview.png')}\n`);
   for (const wn of r.warnings) io.out(`  warning: ${wn}\n`);
+  if (r.followed?.length) io.out(`  variants that inherit the band, brought up to date: ${r.followed.join(', ')}\n`);
   io.out(`  ${checkSummary(w.checks(r.asset, { budget: SUMMARY_BUDGET }).results)}\n`);
   return { code: 0, doc: r.doc };
 }

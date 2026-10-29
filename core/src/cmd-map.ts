@@ -279,6 +279,11 @@ const removeCmd: CommandSpec = {
   },
 };
 
+function unlockBand(d: Doc): void {
+  const bl = d.layers.find((l) => l.name === 'band');
+  if (bl) bl.locked = false;
+}
+
 // --- tiles fill
 
 const tilesCmd: CommandSpec = {
@@ -718,14 +723,14 @@ const footprintCmd: CommandSpec = {
 
 const variantCmd: CommandSpec = {
   name: 'variant',
-  summary: 'variant of=<asset> | variant off   (this asset is a texture variant of another: maps pick among them cell by cell; check variant compares their colour mix)',
+  summary: 'variant of=<asset> [band=inherit|own] | variant off   (this asset is a texture variant of another: maps pick among them cell by cell; check variant compares their colour mix; band=inherit: a family variant takes its band from the base, now and after every change to it, and overrides only the textures)',
   normalise(cmd, ctx) {
     const doc = needDoc(cmd, ctx);
-    const a = new Args(cmd, ['of']);
+    const a = new Args(cmd, ['of', 'band']);
     if (a.peek()?.t === 'word' && (a.peek() as { v: string }).v === 'off') {
       a.take('word', 'off');
       a.done();
-      return { text: 'variant off', op: fn((d) => { d.variantOf = null; }) };
+      return { text: 'variant off', op: fn((d) => { d.variantOf = null; if (d.family?.bandOf) { delete d.family.bandOf; unlockBand(d); } }) };
     }
     a.done();
     const of = a.opts.get('of');
@@ -733,7 +738,24 @@ const variantCmd: CommandSpec = {
     if (!/^[a-z][a-z0-9_-]*$/.test(of.value)) throw new DiagError(of.line, of.vcol, `'${of.value}' is not an asset name`);
     if (of.value === doc.name) throw new DiagError(of.line, of.vcol, `an asset is not a variant of itself`);
     if (doc.map) throw new DiagError(cmd.line, cmd.col, `variant: a map has no variants`);
-    return { text: `variant of=${of.value}`, op: fn((d) => { d.variantOf = of.value; }) };
+    const band = a.choice('band', ['inherit', 'own'], 'own');
+    if (band === 'inherit') {
+      if (!doc.family) throw new DiagError(a.opts.get('band')!.line, a.opts.get('band')!.col, `variant: band=inherit is for a family's texture variant`);
+      const src = ctx.asset?.(of.value);
+      if (src && (!src.family || src.family.scheme !== doc.family.scheme || src.family.tile !== doc.family.tile)) {
+        throw new DiagError(of.line, of.vcol, `variant: '${of.value}' is not a ${doc.family.scheme} family of ${doc.family.tile}px tiles, so its band does not fit`);
+      }
+    }
+    // band=inherit locks the band layer: the band is the base's (family band from=<base> copies it;
+    // the server does after every change to the base), and only the textures are the variant's own.
+    return {
+      text: `variant of=${of.value}${band === 'inherit' ? ' band=inherit' : ''}`,
+      op: fn((d) => {
+        d.variantOf = of.value;
+        if (!d.family) return;
+        if (band === 'inherit') { d.family.bandOf = of.value; const bl = d.layers.find((l) => l.name === 'band'); if (bl) bl.locked = true; } else if (d.family.bandOf) { delete d.family.bandOf; unlockBand(d); }
+      }),
+    };
   },
 };
 

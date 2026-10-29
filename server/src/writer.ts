@@ -92,6 +92,8 @@ export type RunOutcome =
     groups: number;
     /** The asset folder, when something was written. */
     dir: string | null;
+    /** Texture variants that inherit this family's band and were brought up to date (G13). */
+    followed?: string[];
   }
   | { ok: false; errors: Diag[] };
 
@@ -399,7 +401,8 @@ export class Writer {
       type: 'batch', asset: name, by: req.by, group: r.group!, entries: creates ? r.state.entries : r.added,
       changed: r.changed, reset: creates,
     });
-    return { ok: true, ...base, warnings, ...totals(r.state), dir };
+    const followed = this.follow(name, req.by, r.added.some((e) => /^variant of=\S+ band=inherit/.test(e.cmd)));
+    return { ok: true, ...base, warnings, ...totals(r.state), dir, ...(followed.length ? { followed } : {}) };
   }
 
   /**
@@ -460,6 +463,48 @@ export class Writer {
     const seam = this.checks(name, { checks: ['seam'] }, dry).results[0];
     if (!seam || seam.status !== 'fail') return [];
     return [`family cut: the cut family's seam is ${seam.shown} (limit ${seam.limit}) on a sample island: its tiles do not join; look at view map, fix the band or the textures by coordinates (check seam), or cut again from a cleaner map`];
+  }
+
+  /**
+   * Texture variants that inherit a family's band (variant of=<base> band=inherit) follow every
+   * change to it: each gets `family band from=<base>` (the band copied into its own tape) when
+   * its band differs, as one undo group by the same author. With `self`, the asset itself is
+   * brought up to its base too (it has just been made to inherit).
+   */
+  private following = false;
+  private follow(base: string, by: string, self: boolean): string[] {
+    if (this.following) return [];
+    this.following = true;
+    const out: string[] = [];
+    try {
+      const queue = [base];
+      const seen = new Set<string>();
+      const sync = (v: string, from: string) => {
+        const cur = this.doc(v);
+        const d = this.dry({ asset: v, commands: `family band from=${from}`, by });
+        if (!d.ok || !d.doc || Buffer.compare(Buffer.from(serializeDoc(d.doc)), Buffer.from(serializeDoc(cur))) === 0) return;
+        const r = this.run({ asset: v, commands: `family band from=${from}`, by });
+        if (r.ok) { out.push(v); queue.push(v); }
+      };
+      if (self) {
+        const f = this.doc(base).family;
+        if (f?.bandOf && this.assets().includes(f.bandOf)) sync(base, f.bandOf);
+      }
+      while (queue.length) {
+        const b = queue.shift()!;
+        if (seen.has(b)) continue;
+        seen.add(b);
+        for (const v of this.assets()) {
+          if (v === b || seen.has(v)) continue;
+          let f;
+          try { f = this.doc(v).family; } catch { continue; }
+          if (f?.bandOf === b) sync(v, b);
+        }
+      }
+    } finally {
+      this.following = false;
+    }
+    return out;
   }
 
   /** Parse and apply a batch to the asset's state (or a new one), without saving anything. */
