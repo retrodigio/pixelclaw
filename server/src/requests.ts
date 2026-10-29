@@ -162,7 +162,7 @@ export function agentWork(w: Writer, agent: string, q: AgentWork): { request: Wo
     const failing = w.checks(target.asset).results.filter((r) => r.status === 'fail');
     if (failing.length) {
       throw new ProjectError(`${id} is not done: ${target.asset} fails ${failing.length} check${failing.length === 1 ? '' : 's'}:\n` +
-        failing.map((r) => `  ${r.id} ${r.shown} (limit ${r.limit})${r.detail ? `: ${r.detail}` : ''}`).join('\n') +
+        failing.map((r) => `  ${r.id}${r.score !== null ? ` ${r.shown}` : ''}${r.limit ? ` (limit ${r.limit})` : ''}${r.detail ? `: ${r.detail}` : ''}`).join('\n') +
         `\nFix ${failing.length === 1 ? 'it' : 'them'} (check shows the pixels) and finish again, or work(action="blocked", text=<one clear question>) if you cannot.`);
     }
   }

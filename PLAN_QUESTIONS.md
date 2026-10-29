@@ -1309,3 +1309,133 @@ Points where the plan was unclear or silent. Each has the reading that was follo
      is left as G13's "before" (its log in demo-g13.md gains a note), and the G14 demo fixes its
      floor and its glade with mixes of variants rather than loosening the check. The committed
      examples' maps (mossy-ruins' village: 1%) pass; Kiln Hollow has no map.
+
+## G15 (plan §26: the worker, requests and maps)
+
+196. **"Give it only PixelClaw's MCP tools (`--tools` / `--disallowedTools` for every built-in)"**
+     (item 1). *Reading:* both, and two more locks. `--tools ""` leaves the session no built-in tool
+     at all; `--disallowedTools` names every built-in as well (in case a version ignores the
+     first); `--permission-mode dontAsk` refuses whatever is not pre-approved instead of asking;
+     `--setting-sources user` keeps the project folder's (and its parents') `.claude/` settings,
+     hooks and `CLAUDE.md` out, so a project someone sends cannot pre-approve tools. The user's own
+     settings and `~/.claude/CLAUDE.md` still load (Claude Code's context for any session; `--bare`
+     would drop them but also OAuth logins). Checked against the installed Claude Code 2.1.312: its
+     `--help` documents every flag, and run against a stand-in model it offered only the twelve
+     PixelClaw tools; with G12's flags the same stand-in ran `cat project.json` in a shell.
+
+197. **"A test that a shell call is refused"** (item 1). *Reading:* the test runs the real Claude
+     Code (when installed; skipped otherwise) with the worker's own command line, its model a local
+     fake of the model API (`server/test/fake-model-api.ts`: a throwaway `HOME`, a dummy key, so no
+     account and no money); the fake asks for `Bash`, `Read`, `Glob`, `Grep`, `Write`, `Edit`, the
+     web, `Agent`/`Task` and `NotebookEdit`, and checks every answer is "No such tool available" and
+     that nothing from outside the project reached it. A fake `claude` on the PATH records the
+     argument list `pixelclaw work` passes (always run).
+
+198. **Reach through PixelClaw's own tools** (item 1, beyond the plan's "built-in"). *Reading:* the
+     brief says the worker must not read files outside its project, and some MCP tools take paths.
+     Each run gets its own MCP token (not the watch link's), and the server gives that connection
+     fenced tools: `project path=` refused, `palettes=`, `import path=`, `export dest=` and
+     `profile=<file>`, `underlay import <file>` and `layout=<file.png>` must be inside the project
+     (symlinks followed), `underlay generate` refused (it spends on another account), the `request`
+     tool not offered (the worker takes requests; it does not file or answer them). Asset names
+     with a path in them are refused for everyone.
+
+199. **Settings that could undo it** (item 1). *Reading:* `worker.args` may hold only `--model`,
+     `--fallback-model` and `--effort` (each with a value); `worker.command` may be any program but
+     may not pass a tool, permission, directory, MCP, settings, plugin, agent, prompt or session
+     flag. Start is refused with the reason. A wrapper script as `command` is trusted (it is the
+     person's own choice), and docs/worker.md says so.
+
+200. **"`work done` is refused while the asset's checks fail"** (item 1). *Reading:* any check of
+     the request's asset with status fail (every frame; a map's map checks too), or the asset not
+     drawn; the reply lists each failing check with score, limit and detail. It holds for any agent
+     using `work`, not only the worker (the G12 e2e now has its done refused once). `blocked` is
+     always open.
+
+201. **"A stall watchdog (no tool call for N minutes: stop and resume once, then mark the request
+     blocked)"** (item 1). *Reading:* N is `worker.stall` (minutes, default 10); a tool call is a
+     tool use or tool result line in the session's stream, and the clock starts at spawn. The
+     session is stopped (SIGTERM, SIGKILL after 5 s) and resumed with `--resume <its session id>`
+     and a "carry on" prompt, with the same flags. If that stalls too, the request the worker holds
+     gets `blocked` by `claude` with why, and the run goes on. A stopped session reports no cost; it
+     is charged an estimate from the token counts it streamed at the dearest Claude rates ($15 in,
+     $18.75 cache writes, $1.50 cache reads, $75 out per million; Opus 4's list prices, from memory:
+     an upper bound by design, but check them).
+
+202. **"A project-level spend ledger, so the cap is a total across runs"** (item 1). *Reading:*
+     `worker-spend.jsonl` in the project (beside `requests.jsonl`, not under `logs/`), a line per
+     session; `cap` is the total it may reach; start is refused once it has, and the dashboard shows
+     "$x of $y cap spent". A session that ends without reporting its cost is now charged its
+     estimate, not the rest of the cap as in G12: with a lasting ledger that would lock the worker
+     out of the project for good after one crash.
+
+203. **"Append the command reference to its prompt"** (item 1). *Reading:* every command's one-line
+     form from the editor's own registry (`commandReference()`, 63 lines), after the skill in
+     `--append-system-prompt`, so it cannot drift from the code. The MCP server's instructions (the
+     cheat sheet) still come as well.
+
+204. **Requests from the CLI and MCP** (item 2). *Reading:* `pixelclaw request <project> draw|change
+     |add …` (`add` takes `--kind --size --set --description --height`; without a kind it lists
+     what is open), `pixelclaw reply <project> <id> "<answer>"`, `pixelclaw cancel <project> <id>
+     ["<why>"]`; the author is `claude` unless `--by` says otherwise (as for every CLI command);
+     refused while a server owns the project. MCP `request` takes `kind` draw|change|add (`entry`
+     for add) or `action` reply|cancel. Both go through the dashboard's own `personRequest`.
+
+205. **"Measure colour difference (ΔE)"** (item 3). *Reading:* CIE76 ΔE from the cell's median
+     colour (the median of L*, a* and b* separately), with the same `contrast` 18: ΔE is never less
+     than ΔL* from the same median lightness, so every G14 mark is still a mark.
+
+206. **"Revisit the ±2 px widening"** (item 3). *Reading:* marks are matched by their centres (a
+     cell shows a mark at a spot when one of its marks is centred within t/16 − 1 px of it) instead
+     of growing every mark pixel by the tolerance, and each cell counts by that mark's share of its
+     marked pixels. A dense shingle of forks that share their border scores about a tenth per
+     border pebble; a lone pebble in every fork still fails. A dense texture of one tile filled alone
+     now passes the lattice and fails `repetition` (its 4x4 motif), which already names it.
+
+207. **"The map border counts as the edge cell's own value"** (item 4). *Reading:* the new default
+     for maps (`border=same`, not written into lines); `border=not` is G14's rule, `border=terrain`
+     counts past the edge as terrain. Edge schemes clamp the neighbour to the nearest map cell;
+     corner schemes (whose corner grid already took the edge cell's value) take the outer corners
+     as terrain or not when told. A family's sample island keeps "outside is outside". Composed maps
+     whose terrain touches the border look different on purpose; map documents' state, the tapes
+     and the Tiled export are unchanged (the example village's `.tmx` is byte-identical).
+
+208. **"A terrain layer's inside takes `mix=`"** (item 4). *Reading:* `layer add … mix=` or `layer
+     set <layer> mix=…|none`: the fully inside cells show one-cell tiles of the map's tile size by
+     weight (shared with texture variants unless `variants=named`, as `tiles fill mix=`), each cell
+     by a hash of its place and the seed, drawn again when it would equal its left and upper
+     neighbours (two tiles: complete a 2x2 block). Unlike `tiles fill mix=`, nothing is stored per
+     cell, so painting terrain elsewhere does not reshuffle it. Edges still come from the family;
+     mix tiles that match the family's inside texture join cleanly.
+
+209. **"Family textures follow their source tiles (like `band=inherit`)"** (item 4). *Reading:* by
+     default, with no flag: for each family frame, the latest `family texture inside|outside` line
+     drawn on it decides; when it copied `from=<tile>` and the tile changes, the writer runs the same
+     line again on that frame (one undo group, the same author, the author's frame put back). A
+     texture drawn from rows is the family's own and stops the following.
+
+210. **"`blob47-round` built in, as the docs say"** (item 4). *Reading:* generated into
+     `core/schemes/` beside the others; a project scheme of the same name wins over it, so the
+     example project (which keeps its own copy) writes its family lines with `def=` as before.
+
+211. **"A two-tile mix is not a strict checkerboard"** (item 5). *Reading:* with two tiles a cell
+     leaves out only the tile that would complete a 2x2 block of one (banning only an L of three
+     still locks rows into alternation); three or more tiles keep G14's rule. A two-tile `fill
+     mix=` line written before G15 replays the new way; no committed tape has one (Ember Moor's
+     mix has three tiles).
+
+212. **"`view render` region and scale ignored on tiles"** (item 6). *Reading:* `render` ignored a
+     region on every asset (now it shows that part, at the scale given, rulers keeping the canvas's
+     coordinates), and `tile3x3` ignored the scale (now its enlarged copy takes it). Regions are
+     `x,y WxH`, `x,y,WxH` or `x,y,W,H` everywhere (`--region`, MCP `view`, `import … region=`).
+     `plan | head` (any command, in fact) now exits 0 quietly on EPIPE.
+
+213. **The demo's "stand-in model"**. *Reading:* the real Claude Code with the worker's command line
+     and a local fake of the model API that plays a careless agent (the same helper as the test);
+     the tests' fake `claude` stands in when Claude Code is not installed.
+
+214. **"Every example asset still verifies and passes its checks"**. *Reading:* all three example
+     projects verify and every asset passes, except Kiln Hollow's three imported `shards_*` drafts,
+     which fail `jaggies` as they have since G12 (PROGRESS's G12 notes: "the shards need their
+     jaggies fixed (drafted)"); G15 changes neither their tapes nor that check, so they are left as
+     the G12 example's drafted state.

@@ -197,7 +197,7 @@ export function MapEditor({ doc, store, ed, editable }: { doc: Doc; store: Store
         )}
         {(tool === 'brush' || tool === 'rect' || tool === 'erase') && terrainLayer && (
           <label className="chk" title="The terrain's inside cells as a seeded scatter of one-cell tiles by weight, e.g. meadow:2,clover:1 (each tile's weight shared with its texture variants); empty: the family's own inside (layer set <layer> mix=…|none). Enter to apply">
-            inside <input key={`${terrainLayer}:${insideMix}`} defaultValue={insideMix} placeholder="family's own" disabled={!editable} data-testid="map-inside-mix" size={18}
+            inside <input key={`${terrainLayer}:${insideMix}`} defaultValue={insideMix} placeholder="family's own" disabled={!editable} data-testid="map-inside-mix" size={30}
               onKeyDown={(e) => { if (e.key === 'Enter') { const v = e.currentTarget.value.trim(); send(`layer set ${terrainLayer} mix=${v || 'none'}`); } }} />
           </label>
         )}

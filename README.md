@@ -232,6 +232,14 @@ example, Ember Moor, its project grid 48. Screenshots: [before](docs/screenshots
 and [after](docs/screenshots/g14-fern-after.png), [the fill tool's mix](docs/screenshots/g14-map-fill-mix.png),
 [Ember Moor](docs/screenshots/g14-moor-map.png).
 
+The G15 demo ([examples/demo-g15.md](examples/demo-g15.md)): requests **filed from the CLI**; the
+worker run with the real Claude Code and a **stand-in model** that has `done` **refused while a check
+fails**, fixes it and finishes, and finds it has **no shell and no files** (only PixelClaw's tools,
+fenced to the project; see [docs/worker.md](docs/worker.md)); a terrain map with **no band along the
+map's border** and its **inside a mix** of tiles. Screenshots: [before](docs/screenshots/g15-hollow-before.png)
+and [after](docs/screenshots/g15-hollow-after.png), [the terrain tools](docs/screenshots/g15-map-terrain-tools.png),
+[the worker's log](docs/screenshots/g15-worker-log.png).
+
 ## Packages
 
 - `core`: the document (layers, frames, each author's context), palettes, command parser and

@@ -7,7 +7,6 @@
 
 import { execFile, execFileSync, spawnSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { createServer, type Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -16,6 +15,7 @@ import { COMMANDS, commandReference, encodePng, createRgba, flatten, layoutOf } 
 import { serve, type Served } from '../src/serve.ts';
 import { BUILTIN_TOOLS, SANDBOX_FLAGS, WORKER_SPEND, Writer, loadProject, readRequestRecords, readSpend, workerSettings, workerSettingsProblem, workerSpent } from '../src/index.ts';
 import { BIN, PALETTE, texts, until, type Content } from './spawn.ts';
+import { fakeModelEnv, startFakeModel } from './fake-model-api.ts';
 
 const FAKE = join(import.meta.dirname, 'fake-claude.ts');
 
@@ -233,48 +233,12 @@ describe('the worker cannot run a shell or read files outside its project (§26 
       ['mcp__pixelclaw__run', { asset: 'urn', commands: 'new sprite urn\nellipse 3,3 10x10 c=stone3 fill\noutline c=ink' }],
       ['mcp__pixelclaw__work', { action: 'done', text: 'drew the urn' }],
     ];
-    const seen: { tools: string[]; body: string }[] = [];
-    let n = 0;
-    const api: Server = createServer((req, res) => {
-      let body = '';
-      req.on('data', (d) => { body += d; });
-      req.on('end', () => {
-        let j: { tools?: { name: string }[]; messages?: { content: unknown }[]; stream?: boolean; model?: string } = {};
-        try { j = JSON.parse(body); } catch { /* not JSON */ }
-        const tools = (j.tools ?? []).map((t) => t.name);
-        seen.push({ tools, body });
-        if (!req.url?.startsWith('/v1/messages') || req.url.includes('count_tokens')) { res.writeHead(200, { 'content-type': 'application/json' }).end('{"input_tokens":10}'); return; }
-        const main = tools.includes('mcp__pixelclaw__work');
-        const k = (j.messages ?? []).filter((m) => JSON.stringify(m.content).includes('"tool_result"')).length;
-        const step = main ? script[k] : undefined;
-        const block = step ? { type: 'tool_use', id: `toolu_${++n}`, name: step[0], input: step[1] } : { type: 'text', text: 'done' };
-        const stop = step ? 'tool_use' : 'end_turn';
-        const msg = { id: `msg_${++n}`, type: 'message', role: 'assistant', model: j.model, content: [] as unknown[], stop_reason: null, usage: { input_tokens: 10, output_tokens: 1 } };
-        if (!j.stream) { res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ ...msg, content: [block], stop_reason: stop })); return; }
-        res.writeHead(200, { 'content-type': 'text/event-stream' });
-        const ev = (t: string, d: Record<string, unknown>) => res.write(`event: ${t}\ndata: ${JSON.stringify({ type: t, ...d })}\n\n`);
-        ev('message_start', { message: msg });
-        if (step) {
-          ev('content_block_start', { index: 0, content_block: { type: 'tool_use', id: block.id, name: step[0], input: {} } });
-          ev('content_block_delta', { index: 0, delta: { type: 'input_json_delta', partial_json: JSON.stringify(step[1]) } });
-        } else {
-          ev('content_block_start', { index: 0, content_block: { type: 'text', text: '' } });
-          ev('content_block_delta', { index: 0, delta: { type: 'text_delta', text: 'done' } });
-        }
-        ev('content_block_stop', { index: 0 });
-        ev('message_delta', { delta: { stop_reason: stop }, usage: { output_tokens: 5 } });
-        ev('message_stop', {});
-        res.end();
-      });
-    });
-    await new Promise<void>((r) => api.listen(0, '127.0.0.1', () => r()));
+    const api = await startFakeModel((results) => script[results.length] ?? null);
+    const seen = api.requests;
     const home = join(root, 'home');
     mkdirSync(home);
     try {
-      const r = await work(dir, {
-        HOME: home, CLAUDE_CONFIG_DIR: join(home, '.claude'), ANTHROPIC_API_KEY: 'sk-ant-test-not-a-key',
-        ANTHROPIC_BASE_URL: `http://127.0.0.1:${(api.address() as { port: number }).port}`, CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
-      });
+      const r = await work(dir, fakeModelEnv(api.url, home));
       expect(r.stderr).toMatch(/worker stopped/);
       const main = seen.filter((x) => x.tools.includes('mcp__pixelclaw__work'));
       expect(main.length).toBeGreaterThan(script.length);
@@ -300,7 +264,7 @@ describe('the worker cannot run a shell or read files outside its project (§26 
       expect(readSpend(dir)).toHaveLength(1);
       expect(readFileSync(join(dir, 'logs', 'worker.log'), 'utf8')).toMatch(/tools: 12 PixelClaw, nothing else/);
     } finally {
-      api.close();
+      await api.close();
       rmSync(root, { recursive: true, force: true });
     }
   }, 120_000);

@@ -212,6 +212,16 @@ Status of plan features touched so far. Steps refer to the build plan (§10).
 | 48 px audit: the project's grid and what assumed 16 or 24 px | §24 (4), G14 | done | `server/test/g14.test.ts` (item 4), `core/test/g14.test.ts` (item 4), `cli/test/cli.test.ts` (`--grid`), `e2e/g14.spec.ts` | `--grid` / `project(grid=)`; `new map` tile, camera (16x9 cells), draw scale (1x from 48), family map and camera view at the draw scale, game view once at 1x, noise specks, repetition bands, jaggies allowance, icon/height limits, preview island, gallery scale, map cells text layer order. Plan questions 191-194. |
 | 48 px example `examples/ember-moor.pclaw`; the skill's per-size defaults | §24 (5), G14 | done | `cli/test/ember-moor.test.ts` (verify, every check, scripts rebuild it, the skill's table) | Original palette and theme (`examples/ember-moor/`); moor + 2 forked variants, bog, blob47 pool, waystone, 20x12 map with `fill mix=`. |
 | Demo: Fern Ledge's floor before and after a mix; the 48 px set on a map | §24, G14 | done | `examples/demo-g14-agent.ts` (run by hand), `examples/demo-g14.md` | Screenshots `docs/screenshots/g14-*.png` (`scripts/screenshots-g14.ts`). The G13 stand-in is left as the "before" (plan question 195). |
+| The worker's sandbox: no built-in tools, only PixelClaw's | §26 (1), G15 | done | `server/test/g15.test.ts` (`pixelclaw work` with a recording `claude` on the PATH; the installed CLI's `--help` names every flag; the real Claude Code against a stand-in model refuses `Bash`, `Read`, `Glob`, `Grep`, `Write`, `Edit`, the web, `Agent`/`Task`, `NotebookEdit`) | `--tools ""`, every built-in in `--disallowedTools`, `--allowedTools mcp__pixelclaw`, `--permission-mode dontAsk`, `--setting-sources user`, `--strict-mcp-config`. `args` only `--model`/`--fallback-model`/`--effort`; `command` may not pass tool or permission flags. What it can and cannot reach: docs/worker.md. Plan questions 196-199. |
+| The worker's MCP connection fenced to the project | §26 (1), G15 | done | `server/test/g15.test.ts` (probes: another project, palettes, import, export dest and profile, underlay import and layout outside, underlay generate, a path as an asset name; the watch token not fenced; a stranger's token refused) | A token per run; no `request` tool on it. Plan question 198. |
+| `work done` refused while the asset fails a check | §26 (1), G15 | done | `server/test/g15.test.ts` (worker discipline), `e2e/g12.spec.ts` (done refused once) | The reply lists the failing checks; not drawn is refused too; `blocked` always open. Plan question 200. |
+| Stall watchdog; spend ledger; command reference in the prompt | §26 (1), G15 | done | `server/test/g15.test.ts` (stalled and resumed; stalled twice and blocked; three runs to the cap and a refused start; the reference is every command) | `worker.stall` minutes; `--resume <session>`; an estimate at the dearest rates for a stopped session; `worker-spend.jsonl`, the cap a total; dashboard "$x of $y cap spent". Plan questions 201-203. |
+| Requests from the CLI and MCP | §26 (2), G15 | done | `cli/test/g15.test.ts` (draw, change with its mark, add with its entry, the list, refusals, reply, cancel, a server owning the project), `server/test/g15.test.ts` (MCP `request`; not on the worker's connection) | `pixelclaw request draw\|change\|add`, `reply`, `cancel`; MCP `request`. Plan question 204. |
+| Lattice: ΔE, marks by centre, weighed by their share | §26 (3), G15 | done | `core/test/g15.test.ts` (item 3: Fern Ledge fails then passes after its mix; a puddle grid fails, 0% → 100%; a dense four-fork pebble floor passes, 100% → 10%) | Example maps: mossy-ruins village 1% → 1%; ember-moor moor_map 0% → 26% (its purple heather clump, which ΔL* could not see); Fern Ledge (out/, G13's stand-in) floor 47% → 47%, glade 46% → 46%; after G14's mixes 23% → 23% and 28% → 28%. Plan questions 205-206. |
+| Terrain on maps: border rule, inside mix, textures follow their tiles, blob47-round built in | §26 (4), G15 | done | `core/test/g15.test.ts` (item 4), `core/test/map.test.ts` (random terrains under all three border rules), `server/test/g15.test.ts` (textures follow, frame by frame), `e2e/g15.spec.ts` (the terrain tools) | `layer add\|set … border=same\|terrain\|not`, `mix=…`; the map editor's terrain tools set both. Plan questions 207-210. |
+| A two-tile mix is not a strict checkerboard | §26 (5), G15 | done | `core/test/g15.test.ts` (item 5) | Two tiles: no 2x2 block of one; three or more keep G14's rule. Plan question 211. |
+| `plan` EPIPE; `view render` region, `tile3x3` scale; one region format; orphans' 2 px rule | §26 (6), G15 | done | `cli/test/g15.test.ts` (the smaller items) | docs/checks.md (orphans), docs/commands.md (views, regions). Plan question 212. |
+| Demo: requests from the CLI, the worker with a stand-in model, a terrain map | §26, G15 | done | `examples/demo-g15-agent.ts` (run by hand), `examples/demo-g15.md` | The real Claude Code with a stand-in model; screenshots `docs/screenshots/g15-*.png` (`scripts/screenshots-g15.ts`). Plan question 213. |
 
 ## Notes for G8
 
@@ -402,4 +412,29 @@ What the acceptance project (§10 A1) will need, from G11's side:
   scale and new maps follow it; the manifest's sizes still say each asset's own size.
 - **A map's preview.png** (the dashboard card) is the cell grid, one pixel per cell: dark and
   tiny at any size. Showing the composed map there would help the dashboard.
+- **Cost of this step**: not measured.
+
+
+## Notes for the next step (after G15)
+
+- **Run the fenced worker once for real** (a reader, cap $1 on a scratch copy): the flags were checked
+  against Claude Code 2.1.312's help and its behaviour with a stand-in model, not with a real model.
+  Watch that the session still does its work with only PixelClaw's tools (it has never had a shell
+  to lean on now), that `done` refusals are fixed rather than turned into `blocked`, and that the
+  log's first session line says `tools: 12 PixelClaw, nothing else`.
+- **The stall estimate's prices** are Opus 4's list rates from memory, chosen as an upper bound;
+  compare one stopped session's estimate with the account's usage. The default `stall` (10 min)
+  is a guess too; A2's one stall lasted 57 minutes.
+- **The ledger is for the project, forever.** Raising `worker.cap` is the only way on once it is
+  spent; a reset (or a ledger per month) may be wanted if the worker becomes routine.
+- **User-level context still reaches the worker**: your `~/.claude/CLAUDE.md` and user settings
+  (hooks included) load into its session, as for any Claude Code session. `--bare` would drop them
+  but breaks OAuth logins; a worker-specific `CLAUDE_CONFIG_DIR` could be an option.
+- **Lattice weights**: a mark now counts by its share of its cell's marking. Ember Moor's map rose
+  to 26% (its heather clump, now seen in colour), close to the 30% limit; the demo's hollow sits at
+  26% too (clover's lichen dots). A reader should look at both.
+- **The border rule changed every composed map** whose terrain touches the edge (on purpose):
+  composed views and checks differ, tapes and exports do not. Mossy Ruins' village passes every check
+  as it did.
+- **Kiln Hollow's `shards_*`** still fail `jaggies` (imported drafts since G12).
 - **Cost of this step**: not measured.

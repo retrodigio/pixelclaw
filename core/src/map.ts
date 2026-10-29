@@ -1108,7 +1108,7 @@ function latticeCheck(c: ComposedMap, world: MapWorld, flat: Uint8Array, L: type
     ...base, score: Number(worst.share.toFixed(3)), pass, shown: pct(worst.share),
     groups: pass ? [] : [{ label, cells }],
     detail: `${pass ? `the mark most often at one spot: at ${where} of the cell (${[...from].map(([a, n]) => `${a} ×${n}`).join(', ')})` : label}: ${worst.n} of the ${worst.cells} cells of ${root}'s ground show it at the same spot${weightText}` +
-      (pass ? '' : `; give ${root} texture variants that move or leave out the mark (variant of=${root}) and fill with a mix of them (tiles <layer> fill mix=${root}:1,<variant>:2,...), or soften the mark`),
+      (pass ? '' : `; give ${root} texture variants that move or leave out the mark (variant of=${root}) and fill with a mix of them (tiles <layer> fill mix=${root}:1,<variant>:2,...; a terrain's inside: layer set <layer> mix=…), or soften the mark`),
   };
 }
 
