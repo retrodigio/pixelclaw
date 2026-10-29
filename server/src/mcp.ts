@@ -65,7 +65,7 @@ Underlays (an image under the art, never exported) and snap:
   underlay generate "<prompt>" [layout=templates/mockup.png|<layer>] [image=1536x1024] [provider=openai|fake] [model=] [quality=low|medium|high] [cap=<usd>] [layer=mockup]
       calls the image provider (the key is the server's OPENAI_API_KEY; a cost cap per call, logged in logs/underlay-costs.jsonl); the tape gets underlay <layer> blob=<sha256> …
   underlay import <file.png> [layout=<template.png|layer>] [layer=underlay] [at=x,y] [size=WxH]    any image (a sketch, a photo of a drawing) as an underlay
-  snap [from=<underlay layer>] [into=draft]   fits the image's pixel grid and quantises it to the palette on a new draft layer; reports block R² and the material match against the layout (below 0.8 / 0.85: reroll)
+  snap [from=<underlay layer>] [into=draft] [fit=placement|free]   fits the image's pixel grid (by default the placement's: one block per placed pixel) and quantises it to the palette on a new draft layer; reports block R² and the material match against the layout (below 0.8 / 0.85: reroll)
   import <x,y> asset=<name> region=<x,y,WxH> [layer=<layer>]   copy a region of another asset (cut a tile from a snapped scene)
 Fonts and icons:
   new font <name> <W>x<H> chars="ABC…"|32-126 [cols=16] [baseline=<row>] [line=<px>] [spacing=1]   a glyph sheet: one W x H cell per character
@@ -74,14 +74,16 @@ Fonts and icons:
 Autotile families (a sheet of every variant of a scheme: blob47, wang16-corner, path, bridge8, single, face):
   new family <name> <T>x<T> scheme=<scheme> [map=<C>x<R>]   layers ground (the textures, laid by the band) and band (the band's art)
   family texture inside|outside from=<tile asset> [frame=<n>]    copy a seamless tile into the inside or outside texture
-  family band <w>:<colour|outside|inside>... [radius=<r>] [inset=<n>] [draw=on|off]   the band from the edge in (3:outside 1:foam 2:sand1); draws it on the pieces
+  family band <w>:<colour|outside|inside>... [radius=<r>] [inset=<n>] [jitter=<n> [seed=]] [draw=on|off]   the band from the edge in (3:outside 1:foam 2:sand1); draws it on the pieces; jitter: edges wobble up to n px (try seeds with the seeds tool)
+  family band from=<family>   copy another family's band (variant of=<base> band=inherit does this after every change to the base: a texture variant that follows later fixes)
   layer band ; paint @cell(o) 0,0 << ... >>   hand-detail a piece (cells by name: @cell(inside), @cell(nesw)); every other variant is built from the pieces' quadrants, live
   family detach|attach <variant>|all   draw a variant by hand instead   |   family coverage [seed=] [copies=] [fill=on] (a coverage map to paint)   |   family cut [textures=on]
   new overlay <name> <W>x<H> ; overlay set mode=cycle|pingpong|wave|sparkle on=outside|inside|all [anchor=x,y] [spread=4x2] [every=3]   sub-tile sprites over a map (view map with=)
 Oversized tiles and objects (48x48, 24x48, …; cell= the grid): new object house 48x48 cell=24x24 ; footprint 2x1 [at=<cx,cy>] [anchor=<x,y>] << a row per art cell row: . b (blocks) r (roof, drawn above actors) x (both) >>
-  variant of=<asset>   this asset is a texture variant of another (fork it, change the inside, keep the border): maps pick among them cell by cell
+  variant of=<asset> [band=inherit]   this asset is a texture variant of another (fork it, change the inside, keep the border): maps pick among them cell by cell; band=inherit (families): the band stays the base's, now and after later fixes
 Maps (plan §4.11: cells of tile px holding names; a map redraws itself when a tile changes):
-  new map <name> <C>x<R> tile=24   layer add <name> terrain=<family> [outside=on] | tiles | objects | overlay=<overlay> on=<terrain layer>[:out]|all
+  new map <name> <C>x<R> tile=24   layer add <name> terrain=<family> [outside=on] [walkable=on] | tiles | objects | overlay=<overlay> on=<terrain layer>[:out]|all   (walkable: objects may stand on its filled ground; layer set <layer> walkable=on|off)
+  tiles <tiles layer> fill <tile> [<x,y> <W>x<H>] [replace]   a one-cell tile on every empty cell (the floor in one line)
   terrain <layer> rect <x,y> <W>x<H> | ellipse … | brush <x,y>... [size=n] | fill <x,y> | paint <x,y> << # terrain, - not, . leave >> | clear   [erase]   the scheme picks the edge tiles
   place <asset>|<family>.<variant> <x,y> [layer=]   by its anchor cell; footprints may not overlap   |   move <x,y> <x,y>   |   remove <x,y>
   road <terrain layer> <x,y> <x,y>... [width=n]   |   scatter <asset>[,<asset>] count=<n> [on=<terrain layer>] [minDist=n] [layer=] [seed=]   |   map gen island|village|dungeon [layers=a,b,c] [seed=]

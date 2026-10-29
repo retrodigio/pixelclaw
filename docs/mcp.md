@@ -81,6 +81,11 @@ Apply command text (see [commands.md](commands.md)) to an asset as one undo grou
 | `commands` | string | One or more lines of the command language. |
 | `view` | `render` \| `grid` \| `tile3x3` \| `diff` \| `game` \| `recolour`, optional | Also return this view of the result. |
 | `replace` | boolean, optional | With a leading `new` for an asset that exists: start its tape again. |
+| `dry` | boolean, optional | Apply to a copy, check it and report, then discard: nothing is written to the tape, the files or the watchers (G13). The view, if asked, is `render`, `grid` or `tile3x3` of the copy. |
+
+A dry run answers `turf: dry run of 1 command; 24 px would change; nothing was kept`, the commands
+as they would be written, the warnings and the check summary of the copy. Try a change this way
+before keeping it (a pebble on a calm tile, a walkable flag on a map, a `family cut`).
 
 The result lists the commands as written to the tape (normal form, with their numbers), the
 pixels changed, the totals and any warnings, then the view if one was asked for:
@@ -102,9 +107,13 @@ If any line has an error, nothing is applied and every error is listed with its 
 1 error; nothing was applied.
 ```
 
-Warnings so far: `the batch changed no pixels`, and after a `snap` below block R² 0.8 or material
+Warnings so far: `the batch changed no pixels`; after a `snap` below block R² 0.8 or material
 match 0.85, `snap: … the draft is unreliable: reroll the underlay (a new prompt or seed) or trace
-over it instead`. The last line is the check summary: every check that applies to the asset, with
+over it instead`; after a `family cut` whose family's seam over a sample island is over its limit,
+`family cut: the cut family's seam is … on a sample island: its tiles do not join; …` (G13). A
+batch on a family that texture variants inherit their band from (`variant of=<it> band=inherit`)
+also says `variants that inherit the band, brought up to date: …`: each got `family band
+from=<it>` on its own tape. The last line is the check summary: every check that applies to the asset, with
 its score and ✓ or ✗ against the style guide (see [checks.md](checks.md)).
 
 #### Underlays and the OpenAI provider
@@ -115,17 +124,22 @@ the image under `blobs/`, and writes the line as `underlay <layer> blob=<sha256>
 (no key, over the cap, the provider's error), nothing is applied.
 
 - **The key** is read from `OPENAI_API_KEY` in the environment of the PixelClaw server (the
-  process Claude Code starts with `pixelclaw serve`, or the CLI for `pixelclaw run`). It is
-  never stored in the project, written to the tape, the cost log, a result or an error: it goes
-  only into the request's `Authorization` header, and any provider message that echoes it is
-  scrubbed to `[key]`. Without it, `underlay generate` with `provider=openai` is refused before
+  process Claude Code starts with `pixelclaw serve`, or the CLI for `pixelclaw run`). No part of
+  it is ever stored in the project, written to the tape, the cost log, a result or an error: it
+  goes only into the request's `Authorization` header. A provider message that echoes it, whole
+  or masked (OpenAI's 401 shows its first and last characters), is scrubbed to `[key]`: anything
+  shaped like an API key (`sk-…`, masked or not) and any run of four or more of the key's own
+  first or last characters. Without it, `underlay generate` with `provider=openai` is refused before
   any request; `provider=fake` needs nothing.
 - **Requests**: with a `layout=` the flat template is sent to `POST /v1/images/edits` (stretched
   to the requested size, so the image follows its composition); without one, `POST
   /v1/images/generations`. One image (`n: 1`), the answer's `b64_json`.
 - **The cost cap**: before the call the cost is estimated from a price table (US dollars per
   image by model, quality and size: `gpt-image-1.5`, `gpt-image-1`, `gpt-image-1-mini`, as
-  published when this was written; check https://openai.com/api/pricing/). Over the cap the call
+  published when this was written; check https://openai.com/api/pricing/). An edit also pays for
+  the layout image it sends: its input tokens (scaled to fit 2048 px and 768 px on the short side,
+  170 tokens per 512 px tile plus 85: 1105 for 1536x1024) and the prompt's (about 4 characters a
+  token) at the model's token prices are added to the estimate (G13). Over the cap the call
   is refused; a model with no price is refused too, since the cap cannot be checked. The cap is
   $0.25 a call unless `cap=` on the line, `PIXELCLAW_UNDERLAY_CAP`, or project.json
   `underlay.cap` says otherwise. project.json `underlay` also sets `provider`, `model`, `quality`,
@@ -267,6 +281,38 @@ exactly and which differ; images no asset exports become new assets. `as` names 
 (default the file's name), `kind` sets its kind (default `sprite`), `replace` starts an existing
 asset's tape again. A new asset's tape starts with `import` commands; the file is kept under
 `blobs/`. CLI: `pixelclaw import <project> <path> [--profile] [--as] [--kind] [--palette|--build] [--grid WxH [--cells]] [--slice WxH [--offset x,y] [--gap x,y]] [--pattern … | --names a,b | --names-from manifest] [--set] [--wrap] [--no-manifest] [--replace]`.
+
+### `seeds`
+
+Try one generator line with several seeds, each as a dry run on the asset, and rank them by the
+checks (G13): fewest failing first, then the least over their limits, then the most room on the
+rest. Nothing is kept unless `apply` is true.
+
+| Argument | Type | Does |
+|---|---|---|
+| `asset` | string | The asset the line is tried on (as it is now). |
+| `line` | string | One generator command: `noise`, `scatter`, `voronoi`, `bricks`, `map gen`, `family coverage`, `family band … jitter=` …; any `seed=` in it is replaced. A command that takes no seed is refused. |
+| `before` | string, optional | Commands run first in the same batch (a selection, a clear). |
+| `count`, `from` | integers, optional | Seeds `from` .. `from+count-1` (default 1 and 8, at most 64). |
+| `seeds` | integers, optional | These seeds instead. |
+| `checks` | check ids, optional | Rank by these checks only (default all). |
+| `apply` | boolean, optional | Run the best seed for real, as one undo group. |
+| `view` | view mode, optional | With `apply`: return this view of the result. |
+
+```
+bed: 8 seeds ranked by the checks (fewest failing, then least over, then most room)
+limits: seam ≤ 1, repetition ≤ 4.6, palette ≤ 0, orphans ≤ 2%, jaggies ≤ 2, coverage ≤ 0 (…)
+seed  seam         repetition   palette      orphans      jaggies      coverage     failing
+3     0.37 ✓       3.8 ✓        0 ✓          0% ✓         0 ✓          0 ✓          none
+4     0.75 ✓       3 (≤ 3.5) ✓  0 ✓          0.4% ✓       1 ✓          0 ✓          none
+…
+1     1.59 ✗       3.5 (≤ 3) ✗  0 ✓          0% ✓         0 ✓          0 ✓          seam,repetition
+best: noise 0,0 16x16 ramp=soil weights=1,6,3 cluster=1..2 density=0.25 base=soil1 wrap=on seed=3
+```
+
+A limit in brackets is that seed's own (repetition's limit rises with the band's spread). The CLI
+is `pixelclaw seeds <project> <asset> <line> [--count N] [--from N | --seeds a,b] [--checks a,b]
+[--before "…"] [--apply]`.
 
 ### `history`
 
@@ -490,7 +536,10 @@ it names, at 1x or the game's scale. *✎ paint* and *⌫ erase* drag over cells
 layer (`terrain <layer> brush …`), *▭ rect* paints a rectangle (Shift: erases it), *⊕ place* puts
 the chosen object or tile by its anchor cell (its footprint outlined under the pointer; an overlap
 is refused with the reason), *✣ move* drags something placed to another cell (`move x,y x,y`),
-*✕ remove* takes it away. Each is one line on the tape, written as you. *▣ camera* stands the
+*✕ remove* takes it away. *▦ fill* lays the chosen one-cell tile on every empty cell of a tiles
+layer (a click: the whole layer; a drag: a box; `tiles <layer> fill <tile>`). While painting a
+terrain layer, *walkable* says objects may stand on its filled ground (`layer set <layer>
+walkable=on|off`). Each is one line on the tape, written as you. *▣ camera* stands the
 camera on a cell (the engine's screen outlined; *camera view* shows only it, at game scale),
 and *hot spots* outlines the cells the map checks flag; the zoom, the camera and the hot spots
 are only for looking. The line under the tools names the cell under the pointer: its ground

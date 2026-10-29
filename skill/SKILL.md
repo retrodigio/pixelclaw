@@ -1,6 +1,6 @@
 ---
 name: pixelclaw
-description: Make pixel art for a game with PixelClaw, an indexed-colour editor driven by commands through its MCP tools (project, run, view, check, changes, history, plan, work, review, export, import), while a person watches, edits and asks for work in the browser. Use when asked to draw or fix tiles, sprites, autotile families, maps or a game's whole art set, to plan a set from a theme (manifest and style guide), to review pixel art blind, or to export it to a game.
+description: Make pixel art for a game with PixelClaw, an indexed-colour editor driven by commands through its MCP tools (project, run, seeds, view, check, changes, history, plan, work, review, export, import), while a person watches, edits and asks for work in the browser. Use when asked to draw or fix tiles, sprites, autotile families, maps or a game's whole art set, to plan a set from a theme (manifest and style guide), to review pixel art blind, or to export it to a game.
 ---
 
 # PixelClaw
@@ -40,6 +40,10 @@ If the tools are missing, the server is not connected:
   primitives, `mirror … live` for symmetric shapes. Count and quote coordinates.
 - **Texture by generators, not by hand:** `noise` (clustered, on a ramp), `scatter`, `voronoi`,
   `bricks`; tiles are `wrap=on` so they tile by construction. Another seed is another variant.
+- **Choose seeds by the checks, not by hand:** `seeds(asset, line, count=8)` tries a generator
+  line with N seeds as dry runs and ranks them (fewest failing, least over, most room);
+  `apply=true` keeps the best. **Try before you keep:** `run(…, dry=true)` applies to a copy,
+  checks it, and keeps nothing (a pebble, a walkable flag, a `family cut`).
 - **Helpers apply the style guide exactly:** `outline` (the style guide's ink when you leave out
   `c=`), `shade` (its light when you leave out `light=`), `clean orphans`, pixel-perfect lines.
 - **Keep the checks green, but do not stop at green.** Look at the 3x3 or the game view and judge
@@ -107,9 +111,10 @@ is run; fix what fails by coordinates like any drafted asset.
 
 ### A tile
 
-`new tile <name> 24x24 bg=<base>` → `noise`/`scatter` on its ramp → `view tile3x3` → fix stripes
-and repeated marks (`check` repetition, seam) → a variant or two with another seed
-(`fork`, `variant of=<name>`) so maps do not weave.
+`new tile <name> 24x24 bg=<base>` → `seeds` on its `noise`/`scatter` line (apply the best) →
+`view tile3x3` → fix stripes and repeated marks (`check` repetition, seam; one mark on a calm
+tile is fine: the limit rises with the band's spread) → a variant or two by `seeds` from another
+`from=` (`new tile <name>_b …`, `variant of=<name>`) so maps do not weave.
 
 ### A sprite or prop
 
@@ -121,14 +126,19 @@ frames=…`, `view W mirror=E`, `view anim`; the anim check (8-35 % change per f
 ### An autotile family
 
 `new family <name> 24x24 scheme=blob47` (or the manifest's), `family texture inside|outside
-from=<tile>`, `family band 3:outside 1:foam 2:sand1 radius=3`, then hand-detail the pieces on the
-band layer (`paint @cell(o) …`); every variant follows. Judge on `view map` (seam ≤ 1, ideally
-≤ 0.5) and `view family`. Rounder corners: a scheme with fillets (`blob47-round`).
+from=<tile>`, `family band 3:outside 1:foam 2:sand1 radius=3 jitter=2` (jitter: edges that are not
+ruler-straight; pick its seed with `seeds`), then hand-detail the pieces on the band layer (`paint
+@cell(o) …`); every variant follows. Judge on `view map` (seam ≤ 1, ideally ≤ 0.5) and `view
+family`. Rounder corners: a scheme with fillets (`blob47-round`). Cliffs: `scheme=face`, paint
+`@cell(face_o)` and `@cell(face_ew)`. A texture variant that should follow later band fixes:
+`fork <f> <f>_b`, `variant of=<f> band=inherit`, then change only its textures. After a `family
+cut`, heed the seam warning.
 
 ### A map
 
-`new map <name> 40x30 tile=24`, terrain layers per family, `terrain … rect|ellipse|brush`,
-`place`, `road`, `scatter`; look at it with `view map camera=x,y` (a player's screen); fix
+`new map <name> 40x30 tile=24`, `tiles floor fill <ground tile>` (the floor in one line), terrain
+layers per family (`walkable=on` when a layer's filled ground is ground objects stand on, not sea),
+`terrain … rect|ellipse|brush`, `place`, `road`, `scatter`; look at it with `view map camera=x,y` (a player's screen); fix
 repetition hot spots with texture variants; consistency on a map compares the objects standing on
 it.
 
@@ -178,7 +188,7 @@ The tool calls no model. You hand its bundle to a fresh agent and bring the find
 ## Tools in one line each
 
 `project` open/list · `run` a batch (one undo group; any error applies nothing; ends with a check
-summary) · `view` render, grid, diff, tile3x3, game, recolour, anim, map, family, density ·
+summary; `dry=true` keeps nothing) · `seeds` rank a generator line's seeds by the checks · `view` render, grid, diff, tile3x3, game, recolour, anim, map, family, density ·
 `check` the full table with coordinates · `changes` the person's edits and notes · `history` the
 tape · `plan` the manifest and statuses (write a manifest, draw templates) · `review` a blind
 bundle · `export` / `import` through profiles. The command language: commands.md beside this

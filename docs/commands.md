@@ -83,7 +83,8 @@ draw it by hand.
 | Command | Normal form | Notes |
 |---|---|---|
 | `family texture inside\|outside from=<tile> [frame=<n>]` | `family texture inside from=sand frame=1 <<` rows `>>` | Copies a tile asset (the family's tile size; colours matched by name, else by exact colour) into the texture cell on your frame. The line records the pixels, so replay needs no other asset; a block of rows can be given instead of `from=`. |
-| `family band <w>:<fill> ... [radius=] [inset=] [draw=on\|off]` | `family band 3:outside 1:foam 2:sand0 radius=3 inset=0 draw=on` | **Route 1, a band profile**: the band from the terrain's edge inward, each part a width and a colour, `outside` (the outside texture carries on) or `inside`; then the inside texture. `radius` rounds the band's inner edge at outer corners (the outer contours are wider arcs about the same centre); `inset` moves the edge in from the tile's (path and bridge strips; default the scheme's). Inset, band and radius must fit in half a tile. With `draw=on` it draws the colours on every piece's band layer (clearing what was there); `draw=off` only sets the geometry. |
+| `family band <w>:<fill> ... [radius=] [inset=] [jitter=<n> [seed=]] [draw=on\|off]` | `family band 3:outside 1:foam 2:sand0 radius=3 inset=0 jitter=2 seed=6 draw=on` | **Route 1, a band profile**: the band from the terrain's edge inward, each part a width and a colour, `outside` (the outside texture carries on) or `inside`; then the inside texture. `radius` rounds the band's inner edge at outer corners (the outer contours are wider arcs about the same centre); `inset` moves the edge in from the tile's (path and bridge strips; default the scheme's). Inset, band and radius must fit in half a tile. With `draw=on` it draws the colours on every piece's band layer (clearing what was there; the face scheme's face pieces are left alone, they are drawn by hand); `draw=off` only sets the geometry. `jitter=<n>` (G13) moves every band edge in or out by up to n px, along each edge, by a seeded field that repeats every tile, so the edges are not ruler-straight and the tiles still join; the seed is written in (try several with the `seeds` tool). |
+| `family band from=<family>` | `family band from=shore 3:outside 1:foam radius=3 inset=0 detached=none frames=1 <<` rows `>>` | Copies another family's band (same scheme and tile): its geometry, its detached variants and its band layer's sheet. The line records it all, so replay reads no other asset. A texture variant with `variant of=<base> band=inherit` gets this line after every change to the base (see *Oversized assets, maps and scenes*). |
 | `family detach\|attach <variant>\|all` | `family detach ne_ne` | A detached variant's band layer is its own (drawn by hand or cut); attach builds it from the pieces again. Pieces are always drawn by hand. |
 | `family coverage [seed=] [copies=] [fill=on\|off]` | `family coverage seed=7 copies=1 fill=off` | Lays out the coverage map so every variant the scheme can produce appears `copies` times (a seeded search; refused, with what to try, when the map is too small: blob47 needs about 14x12), and draws its flat template (inside, outside and the band's colours) on a reference layer `template`. `fill=on` also paints the map with the current variants, to start from. |
 | `family cut [textures=on\|off]` | `family cut textures=off` | **Route 3, cut from a painted map**: every variant takes the medoid of the map tiles that resolve to it (the tile with the fewest differing band pixels to the others), keeping only its band (`family band … draw=off` says how wide; the textures stay the shared ones), and is detached. `textures=on` also takes the textures from the map's all-inside and all-outside tiles. |
@@ -112,7 +113,7 @@ a map:
 | Command | Normal form | Notes |
 |---|---|---|
 | `footprint <C>x<R> [at=<cx,cy>] [anchor=<x,y>] [<< flags >>]` | `footprint 2x2 at=0,0 anchor=0,1 <<` rows `>>` | The footprint is `C` x `R` cells of the art grid (the canvas in cells), starting at art cell `at` (default: the bottom-left of the art). `anchor` is the footprint cell it is placed by (default its bottom-left). The block has a row per art row, a character per art cell: `.` nothing, `b` blocks movement, `r` a roof or canopy (drawn above actors), `x` both. Footprint cells that do not block are walkable. Without a block, the footprint blocks and nothing is a roof. `footprint off` removes it (an asset without one stands on its whole art grid, by its bottom-left cell). |
-| `variant of=<asset>`, `variant off` | `variant of=lane` | This asset is a **texture variant** of another (plan §4.1): maps pick among an asset and its variants cell by cell (a hash of the cell, moved on when it would repeat both the cell to the left and the one above). Make one with `fork`, then change the inside (keep the border, or redraw a family's band and move its detail). The `variant` check compares their colour mix. |
+| `variant of=<asset> [band=inherit\|own]`, `variant off` | `variant of=lane band=inherit` | This asset is a **texture variant** of another (plan §4.1): maps pick among an asset and its variants cell by cell (a hash of the cell, moved on when it would repeat both the cell to the left and the one above). Make one with `fork`, then change the inside (keep the border, or redraw a family's band and move its detail). The `variant` check compares their colour mix. **`band=inherit`** (G13, families): the band stays the base's: the variant's band layer is locked, its own band edits (`family band`, `cut`, `detach`, `attach`) are refused, and after every batch that changes the base the server writes `family band from=<base>` on the variant's tape (one undo group, by the same author), so later fixes reach it; only its textures are its own. `band=own` makes the band its own again. |
 
 A 24x48 tree with `footprint 1x1 << r / b >>` stands on one cell; its crown overhangs the cell
 above as a canopy. The `fit` check flags an empty footprint cell and art outside the footprint
@@ -125,7 +126,8 @@ so notes and coordinates are cells), and its layers say what they hold:
 | Command | Normal form | Notes |
 |---|---|---|
 | `new map <name> <C>x<R> [tile=<T>] [palette=]` | `new map village 40x30 tile=24 palette=ruins-shore <<` rows `>>` | Starts with one tiles layer, `floor`. |
-| `layer add <name> terrain=<family> [outside=on\|off]` | `layer add sea terrain=shore outside=on above=floor` | A terrain layer: cells are the family's terrain or not; when the map is drawn the family's scheme picks every edge tile, exactly as `resolveMap` does for sample maps. With `outside=on` the cells outside the terrain show the family's outside texture (the layer fills the map); otherwise they show what is below. |
+| `layer add <name> terrain=<family> [outside=on\|off] [walkable=on\|off]` | `layer add sea terrain=shore outside=on above=floor` | A terrain layer: cells are the family's terrain or not; when the map is drawn the family's scheme picks every edge tile, exactly as `resolveMap` does for sample maps. With `outside=on` the cells outside the terrain show the family's outside texture (the layer fills the map); otherwise they show what is below (a face scheme's faces are drawn either way). **`walkable=on`** (G13): the filled ground and its edges are ground, not sea: objects may stand on them (the `footprint` check). `layer set <name> walkable=on\|off` changes it. |
+| `tiles <tiles layer> fill <tile>\|<family>.<variant> [<x,y> <W>x<H>] [replace]` | `tiles floor fill grass 0,0 40x30 cells=1x1 anchor=0,0` | (G13) A one-cell tile on every empty cell of the layer (or the box): the floor in one line. `replace` also covers one-cell tiles already there; multi-cell tiles stay. The cells are worked out when the line is written, so replay reads no other asset; the map picks among the tile's texture variants cell by cell. |
 | `layer add <name> tiles`, `layer add <name> objects` | `layer add props objects above=lanes` | Things placed by name. Objects on every objects layer are drawn in order of their footprint's bottom row (then layer, then column), above all the ground; roof cells are drawn again last. A footprint may not overlap another on any objects layer (on a tiles layer, on that layer). |
 | `layer add <name> overlay=<overlay> on=<where>` | `layer add glints overlay=glint on=sea:out` | An overlay played over the cells `on=` names: a terrain layer (its terrain), `<layer>:out` (outside it), or `all`. |
 | `terrain <layer> rect <x,y> <W>x<H> [erase]` | `terrain sea rect 0,20 40x10` | Also `ellipse <x,y> <W>x<H>`, `brush <x,y>... [size=<n>]` (a line through the points), `fill <x,y>` (4-connected), `paint <x,y> <<` rows of `#` (terrain), `-` (not) and `.` (leave) `>>`, and `clear`. |
@@ -501,15 +503,24 @@ art or an export. Images are kept as content-addressed blobs (`blobs/<sha256>.pn
   The key, the cost cap and the cost log are described in [mcp.md](mcp.md#underlays-and-the-openai-provider).
 - `underlay import <file.png> [layout=<template.png>|<layer>] [layer=underlay] [at=x,y] [size=WxH]`
   takes any PNG (relative to the project, or an absolute path).
+- The size `underlay generate` asks for follows **the placed area** (`size=`, else the canvas;
+  G13): the supported size nearest its shape (1536x1024 landscape, 1024x1536 portrait, 1024x1024
+  square), so a 16x32 placement on a 48x32 sheet asks for a portrait image. A layer layout is cut
+  to that area too.
 - Both run through the server (the MCP `run` tool, the watch view's command line, `pixelclaw run`)
   before the batch, and are written as **`underlay <layer> blob=<sha256> image=<W>x<H> at=<x,y> size=<W>x<H> [layout=<sha256>] [from="…"] [prompt="…" provider=… model=… quality=… cost=…]`**:
   the tape holds only the image's hash, where it was placed and where it came from. The layer is
   made at the bottom as a reference layer (or an empty reference layer of that name is reused).
   Each such command goes on a line of its own.
-- `snap [from=<underlay layer>] [into=draft]` reads the underlay back into pixel art on a **new
-  draft layer** (on top): it fits the image's pixel grid (the pitch and offset on each axis: the
-  edge profile's strongest period within ±15 % of the pitch the placement implies, and its phase),
-  takes each block's colour (the median of its middle), quantises it to the palette, and reports
+- `snap [from=<underlay layer>] [into=draft] [fit=placement|free]` reads the underlay back into
+  pixel art on a **new draft layer** (on top): it fits the image's pixel grid. With
+  `fit=placement` (the default since G13) the grid is the placement's: the pitch is the image's
+  size over the placed size, exactly one block per placed pixel, and only the offset is fitted
+  (the edge profile's phase at that pitch), so the draft lands on the placement pixel for pixel.
+  `fit=free` searches the pitch too (the edge profile's strongest period within ±15 % of the
+  placement's; G11's rule), which can drift to a nearby period on a draft without a crisp grid.
+  Then
+  it takes each block's colour (the median of its middle), quantises it to the palette, and reports
   **block R²** (how much of the image's colour the blocks explain) and, when the underlay has a
   layout, the **material match** (the share of blocks nearest the mean colour of their own layout
   colour's blocks). The line records the result:
@@ -753,6 +764,9 @@ inner corner turns (kept by later `family band` lines unless given again).
 
 ## Seeds
 
-Commands that use randomness (`noise`, `scatter`, `voronoi`, `bricks`, and `call` when its macro
-uses them) take `seed=<n>`. If it is left out, the normaliser picks one from the command's tape
+Commands that use randomness (`noise`, `scatter`, `voronoi`, `bricks`, `map gen`, `family
+coverage`, `family band … jitter=`, and `call` when its macro uses them) take `seed=<n>`. The MCP
+`seeds` tool (and `pixelclaw seeds`) tries one such line with several seeds as dry runs and ranks
+them by the checks; `run` with `dry=true` (`pixelclaw run --dry`) tries any batch and keeps
+nothing. If it is left out, the normaliser picks one from the command's tape
 position and writes it into the logged line, so a replay never depends on a default.

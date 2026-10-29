@@ -92,10 +92,11 @@ node cli/bin/pixelclaw.js verify my-art.pclaw
 |---|---|
 | `pixelclaw new <project> [--palette <file>]...` | Create a project folder. Palettes can be `.json`, Lospec `.json`, `.hex` or `.gpl`. |
 | `pixelclaw new <project> <kind> <name> <W>x<H> [opts]` | Create an asset (a `new` command). |
-| `pixelclaw run <project> <script.pclaw>\|-\|-e "..." [--asset <name>] [--replace] [--by <who>] [--view <mode>]` | Apply commands as one undo group. Any error applies nothing. `underlay generate`/`underlay import` lines are resolved first (an image provider or a file; the key from `OPENAI_API_KEY`). |
+| `pixelclaw run <project> <script.pclaw>\|-\|-e "..." [--asset <name>] [--replace] [--by <who>] [--view <mode>] [--dry]` | Apply commands as one undo group. Any error applies nothing. `underlay generate`/`underlay import` lines are resolved first (an image provider or a file; the key from `OPENAI_API_KEY`). `--dry` applies to a copy, prints the checks and keeps nothing. |
+| `pixelclaw seeds <project> <asset> <generator line> [--count N] [--from N] [--checks a,b] [--apply]` | Try the line with each seed as a dry run and rank the seeds by the checks; `--apply` runs the best. |
 | `pixelclaw view <project> <asset> [render\|grid\|tile3x3\|diff\|game\|recolour\|anim\|map\|family\|density\|all] [--scale N] [--region x,y,WxH] [--frame N] [--marks failing] [--theme t]` | Write views and print the text grid (or the diff's list of changes). |
 | `pixelclaw check <project> [<asset>...] [--checks a,b] [--marks]` | Run the quality checks against the style guide; exits 1 if any fails. See [docs/checks.md](docs/checks.md). |
-| `pixelclaw export <project> [<asset>...] [--profile <name>] [--out <dir>]` | Write assets through an export profile (built-in `png`, `atlas`, `tiled`, `godot`, `aseprite-json`, `aseprite`, or the project's own). See [docs/profiles.md](docs/profiles.md). |
+| `pixelclaw export <project> [<asset>...] [--profile <name>] [--out <dir>]` | Write assets through an export profile (built-in `png`, `atlas`, `tiled`, `godot`, `aseprite-json`, `aseprite`, or the project's own). Refused while a server owns the project (export through its MCP `export`). See [docs/profiles.md](docs/profiles.md). |
 | `pixelclaw export <project> <asset> --format split\|png\|strip\|bmfont [--out <dir>]` | One asset on its own: one-cell pieces, a PNG, or a font as a glyph strip or BMFont. |
 | `pixelclaw import <project> <file.png\|file.aseprite\|folder> [--profile <name>] [--as <name>] [--grid WxH] [--slice WxH] [--set s] [--palette <p>\|--build]` | Make new assets from an image (quantised; a grid of frames, or `--slice` into one asset per cell, with manifest entries and checks), a folder of images or an `.aseprite` file, or read a profile's export back and compare. |
 | `pixelclaw review <project> [<asset>...] [--set s] [--name n]` | Write a blind review bundle (images, palette, style guide, brief, rubric). |
@@ -207,6 +208,14 @@ one done, one blocked on a question, one in progress. Scenes show what each plac
 To let Claude work the queue headless (it spends money), see [docs/worker.md](docs/worker.md).
 Screenshots: [the request states](docs/screenshots/g12-states.png), [the gallery](docs/screenshots/g12-gallery.png),
 [the slice dialog](docs/screenshots/g12-import-dialog.png), [scenes](docs/screenshots/g12-scenes.png).
+The G13 demo ([examples/demo-g13.md](examples/demo-g13.md)) shows the fixes from the acceptance
+run on a small set, Fern Ledge: a **seed search** on a calm tile and a pebble tried with a **dry
+run**, a cliff family with **faces** and a **jittered** edge, a texture variant that **inherits the
+band**, a map whose floor is **filled** in one line and whose ground is **walkable**, an underlay
+**in the shape of its area** snapped on the **placement's grid**, and an export through a profile
+with a **corner order**, **path shapes** and a **per-colour output map** (five tones).
+Screenshots: [the map](docs/screenshots/g13-fern-ledge-map.png), [the fill tool](docs/screenshots/g13-map-fill.png),
+[walkable](docs/screenshots/g13-map-walkable.png), [the tones](docs/screenshots/g13-export-tones.png).
 
 ## Packages
 

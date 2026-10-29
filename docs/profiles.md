@@ -33,11 +33,12 @@ MCP: `export(profile, assets?, dest?)`, `import(path, profile?)` (see [mcp.md](m
   "include": ["sprite", "tile", "house"],
   "exclude": ["stone_floor"],
   "names": { "single": "{asset}", "frame": "{asset}_{n}", "view": "{asset}_{view}{n}", "piece": "{asset}_{cx}_{cy}", "start": 1 },
-  "autotile": { "blob47": { "names": { "o": "{asset}_lone" }, "template": "{asset}_{sides}{corners}", "sides": "nsew" }, "*": { "template": "{asset}_{variant}" } },
+  "autotile": { "blob47": { "names": { "o": "{asset}_lone" }, "template": "{asset}_{sides}{corners}", "sides": "nsew", "corners": "nw,ne,se,sw" }, "path": { "template": "{asset}_{sides}", "shapes": { "end": "{asset}_end_{sides}" } }, "*": { "template": "{asset}_{variant}" } },
   "variants": "frames",
   "mirrors": "flag",
   "oversized": "sprite",
   "roles": { "black": "#000000", "white": "#ffffff", "light": "#c8c8c8", "dark": "#707070", "darkest": "#2a2a2a" },
+  "colours": { "ink": "black", "moss2": "dark", "stone4": "#a0a0a0" },
   "density": { "levels": [1, 2, 4], "plain": 1, "suffix": "@{d}x", "reduce": true, "reducer": "ink-vote", "ink": ["ink"], "share": [1, 4] },
   "page": { "name": "bramble", "file": "{page}.png", "width": 384, "padding": 1, "trim": true, "columns": 8 },
   "records": { "format": "csv", "file": "{page}.csv", "header": true, "columns": ["sprite", "x", "y", "w", "h", "cropX", "cropY", "frameW", "frameH", "pivotX", "pivotY"] },
@@ -53,11 +54,12 @@ Only `name` and `layout` are required.
 | `layout` | `loose` (one PNG per image), `atlas` (one page per density with records), `sheet` (one sheet per asset), `tiled`, `godot`, `aseprite-json`, `aseprite` | — |
 | `include`, `exclude` | Asset names or kinds. Density copies are never exported on their own (they are their base's levels). | every asset; maps only for `tiled`; families only for `godot` |
 | `names` | Templates for an image's name (below). `start` is the first number of a numbered set. | `{asset}`, `{asset}_{n}`, `{asset}_{view}_{n}`, `{asset}_{cx}_{cy}`, 0 |
-| `autotile` | Per scheme name (or `*`): `names` maps a variant (or `inside`, `outside`) to a template; other variants use `template` when their name is side letters plus corners. `sides` orders the side letters. | `{asset}_{variant}`, `{asset}_inside`, `{asset}_outside` |
+| `autotile` | Per scheme name (or `*`): `names` maps a variant (or `inside`, `outside`) to a template; other variants use `template` when their name is side letters plus corners. `sides` orders the side letters; `corners` (G13) orders the corner suffixes, the four of `ne,se,sw,nw` comma-separated (`nw,ne,se,sw` writes `nesw_nw_ne_se_sw`; default: as the variant name has them). `shapes` (G13) gives a template per shape of a side-letter variant, by its joined sides: `lone` (none), `end` (one: a path's dead end), `straight` (two opposite), `corner` (two beside), `tee` (three), `cross` (four); a shape without one uses `template`. So a path's dead ends are named apart from its straights. | `{asset}_{variant}`, `{asset}_inside`, `{asset}_outside` |
 | `variants` | Texture variants (`variant of=`): `frames` numbers them after their base's frames (`moss_1`, `moss_2` for moss; `moss_3`, `moss_4` for moss_b); `names` exports each under its own name. | `frames` |
 | `mirrors` | Mirror views (`view W mirror=E`): `bake` writes their flipped frames; `flag` leaves them out and marks the source's images (`mirror` column, `{mirror}` in snippets) for an engine that flips at draw time. | `bake` |
 | `oversized` | Assets larger than one cell or with a footprint: `sprite` writes one image with its footprint and pivot in the records; `split` writes one-cell pieces named by `names.piece`. | `sprite` |
 | `roles` | The colour each role (`black`, `white`, `light`, `dark`, `darkest`) is written as. Import reads those colours back as the role entries. Two entries written as one colour are reported. | the entries' own colours |
+| `colours` | (G13) A per-colour output map: a palette entry (by name, or `<palette>.<entry>`) to `#rrggbb` or a role (written as `roles` gives it, which must give it). An engine that draws in tones is targeted by mapping each colour to its tone, without a script. Over `roles`. Import reads the colours back; entries written as one colour are reported and read back as the first. | none |
 | `density` | The levels written (each exactly d times the base frame). File names get `suffix` except at the `plain` level. A level with an authored copy (`density of=`) uses it; else, with `reduce`, the highest authored copy above it is reduced with `reducer`; else the base is scaled up (nearest neighbour). Notes say which. | `[1]` |
 | `page` | Atlas: the page's name and file, its width at 1x (times d per level), padding between images, and whether images are trimmed to their opaque pixels. Sheets: `columns` (a family keeps its own sheet layout). | `atlas`, `{page}.png`, 256, 1, trim on |
 | `records` | `csv` or `json` beside a page (or a sheet, or loose files), the file template and the columns. | atlas: CSV, `{page}.csv`, the columns below |
@@ -76,7 +78,8 @@ literal. An unknown placeholder is an error when the profile loads.
 
 Image names: `{asset}` (the asset, or the base of a variant set), `{n}` (the number in a numbered
 set), `{view}` (lower case, `s`), `{variant}` (a family's generic variant name, `nes_ne`),
-`{sides}` (its side letters in `sides` order, empty for `o`), `{corners}` (its corners, `_ne_se`),
+`{sides}` (its side letters in `sides` order, empty for `o`), `{corners}` (its corners, `_ne_se`,
+in `corners` order), `{shape}` (`lone`, `end`, `straight`, `corner`, `tee` or `cross`),
 `{cx}`, `{cy}` (a split piece's cell). Files: `{page}`, `{d}`, `{name}`, `{asset}`.
 
 Snippets: `{asset}`, `{name}`, `{first}` (the first image's name), `{names}` (every image, quoted,
