@@ -1,0 +1,42 @@
+{
+  "name": "waystone",
+  "kind": "object",
+  "size": [
+    48,
+    96
+  ],
+  "cell": [
+    48,
+    48
+  ],
+  "wrap": false,
+  "palette": "ember-moor",
+  "layers": [
+    {
+      "name": "main",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    }
+  ],
+  "frames": 1,
+  "paletteLocked": false,
+  "stamps": [],
+  "macros": [],
+  "tags": [],
+  "views": [],
+  "links": [],
+  "notes": [],
+  "tape": {
+    "lang": 2,
+    "commands": 9,
+    "groups": 1
+  },
+  "state": {
+    "sha256": "a4c6e29568e291b7c81d20cd4a00856291065449e2584eedb0e2852c2338564e"
+  },
+  "checkpoints": {
+    "every": 200,
+    "files": []
+  }
+}

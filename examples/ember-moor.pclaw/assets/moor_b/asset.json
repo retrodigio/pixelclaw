@@ -1,0 +1,49 @@
+{
+  "name": "moor_b",
+  "kind": "tile",
+  "size": [
+    48,
+    48
+  ],
+  "cell": [
+    48,
+    48
+  ],
+  "wrap": true,
+  "palette": "ember-moor",
+  "layers": [
+    {
+      "name": "main",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    }
+  ],
+  "frames": 1,
+  "paletteLocked": false,
+  "stamps": [],
+  "macros": [],
+  "tags": [],
+  "views": [],
+  "links": [
+    {
+      "fork": {
+        "from": "moor",
+        "at": 3
+      }
+    }
+  ],
+  "notes": [],
+  "tape": {
+    "lang": 2,
+    "commands": 8,
+    "groups": 2
+  },
+  "state": {
+    "sha256": "ed13515f216ba465fcc22f7ef2c4e18315384510a0c9628d7d2cb2c4b3ca015b"
+  },
+  "checkpoints": {
+    "every": 200,
+    "files": []
+  }
+}

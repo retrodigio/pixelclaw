@@ -1,0 +1,16 @@
+{
+  "format": "pixelclaw-project",
+  "version": 1,
+  "name": "ember-moor",
+  "tickRate": 60,
+  "defaultPalette": "ember-moor",
+  "grid": 48,
+  "style": {
+    "ground": "moor",
+    "outline": [
+      "ink"
+    ],
+    "light": "nw"
+  },
+  "profiles": []
+}

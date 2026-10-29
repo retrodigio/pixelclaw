@@ -1,0 +1,6 @@
+# The bog pool: a blob47 edge family, bog water inside, moor outside; a peat bank with a
+# jittered edge.
+new family pool 48x48 scheme=blob47
+family texture inside from=bog
+family texture outside from=moor
+family band 3:outside 2:peat0 3:peat1 2:peat2 radius=2 jitter=3 seed=1

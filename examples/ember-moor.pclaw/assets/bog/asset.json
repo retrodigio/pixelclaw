@@ -1,0 +1,42 @@
+{
+  "name": "bog",
+  "kind": "tile",
+  "size": [
+    48,
+    48
+  ],
+  "cell": [
+    48,
+    48
+  ],
+  "wrap": true,
+  "palette": "ember-moor",
+  "layers": [
+    {
+      "name": "main",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    }
+  ],
+  "frames": 1,
+  "paletteLocked": false,
+  "stamps": [],
+  "macros": [],
+  "tags": [],
+  "views": [],
+  "links": [],
+  "notes": [],
+  "tape": {
+    "lang": 2,
+    "commands": 2,
+    "groups": 1
+  },
+  "state": {
+    "sha256": "d3384fab8437b69362fc4ac065f1bd8a729f31d4c0fdccb8eea4508c48f9b44d"
+  },
+  "checkpoints": {
+    "every": 200,
+    "files": []
+  }
+}

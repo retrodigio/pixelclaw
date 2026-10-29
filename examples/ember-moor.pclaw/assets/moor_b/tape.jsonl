@@ -1,0 +1,9 @@
+{"pclaw":"tape","lang":2}
+{"seq":1,"by":"claude","at":"2026-10-29T19:38:58Z","group":"g1","cmd":"new tile moor 48x48 palette=ember-moor wrap=on cell=48x48 bg=moor2 <<\n  k ink #141018\n  0 moor0 #262b1c\n  1 moor1 #3a4228\n  2 moor2 #545f35\n  3 moor3 #747f46\n  4 moor4 #9aa25e\n  a heath0 #2e1f36\n  b heath1 #4a2c52\n  c heath2 #6a3f6c\n  d heath3 #905a87\n  f peat0 #22160e\n  g peat1 #382517\n  h peat2 #523823\n  i peat3 #705032\n  p bog0 #0f1b21\n  q bog1 #1b2f37\n  r bog2 #294751\n  s bog3 #3f6a74\n  t glint #8cb3b3\n  u stone0 #2a2a31\n  v stone1 #43444b\n  w stone2 #62646a\n  x stone3 #85888e\n  y stone4 #acafb2\n  z lichen #c4ae58\n  ramp moor moor0 moor1 moor2 moor3 moor4\n  ramp heath heath0 heath1 heath2 heath3\n  ramp peat peat0 peat1 peat2 peat3\n  ramp bog bog0 bog1 bog2 bog3 glint\n  ramp stone stone0 stone1 stone2 stone3 stone4\n>>"}
+{"seq":2,"by":"claude","at":"2026-10-29T19:38:58Z","group":"g1","cmd":"noise 0,0 48x48 ramp=moor weights=0,2,8,2,0 cluster=2..6 density=0.25 base=moor2 wrap=on seed=109"}
+{"seq":3,"by":"claude","at":"2026-10-29T19:38:58Z","group":"g1","cmd":"paint 29,9 <<\n  ..d.c..\n  .cdccd.\n  ccbcdcc\n  .cbbcc.\n  ..b.b..\n>>"}
+{"seq":4,"by":"claude","at":"2026-10-29T19:38:59Z","group":"g2","cmd":"fork moor moor_b at=3"}
+{"seq":5,"by":"claude","at":"2026-10-29T19:38:59Z","group":"g2","cmd":"variant of=moor"}
+{"seq":6,"by":"claude","at":"2026-10-29T19:38:59Z","group":"g2","cmd":"paint 29,9 <<\n  ..2.2..\n  .22222.\n  2222222\n  .22222.\n  ..2.2..\n>>"}
+{"seq":7,"by":"claude","at":"2026-10-29T19:38:59Z","group":"g2","cmd":"noise 4,4 40x40 ramp=moor weights=0,2,8,2,0 cluster=2..6 density=0.12 base=keep wrap=off seed=104"}
+{"seq":8,"by":"claude","at":"2026-10-29T19:38:59Z","group":"g2","cmd":"paint 8,30 <<\n  .c..d.\n  ccdcc.\n  cbcdcc\n  .bbcb.\n>>"}

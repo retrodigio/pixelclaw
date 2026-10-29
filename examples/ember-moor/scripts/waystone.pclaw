@@ -1,0 +1,20 @@
+# A waystone: a standing stone two cells tall, its top cell a roof (actors pass behind it).
+new object waystone 48x96 cell=48x48
+ellipse 12,6 24x86 c=stone2 fill
+ellipse 14,12 12x70 c=stone3 fill
+ellipse 16,18 4x44 c=stone4 fill
+ellipse 27,24 5x50 c=stone1 fill
+paint 18,30 <<
+  zz.
+  zzz
+  .z.
+>>
+paint 22,62 <<
+  .z
+  zz
+>>
+outline c=ink
+footprint 1x1 anchor=0,0 <<
+  r
+  b
+>>

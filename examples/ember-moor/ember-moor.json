@@ -1,0 +1,37 @@
+{
+  "name": "ember-moor",
+  "entries": [
+    {"key": "k", "name": "ink", "hex": "#141018"},
+    {"key": "0", "name": "moor0", "hex": "#262b1c"},
+    {"key": "1", "name": "moor1", "hex": "#3a4228"},
+    {"key": "2", "name": "moor2", "hex": "#545f35"},
+    {"key": "3", "name": "moor3", "hex": "#747f46"},
+    {"key": "4", "name": "moor4", "hex": "#9aa25e"},
+    {"key": "a", "name": "heath0", "hex": "#2e1f36"},
+    {"key": "b", "name": "heath1", "hex": "#4a2c52"},
+    {"key": "c", "name": "heath2", "hex": "#6a3f6c"},
+    {"key": "d", "name": "heath3", "hex": "#905a87"},
+    {"key": "f", "name": "peat0", "hex": "#22160e"},
+    {"key": "g", "name": "peat1", "hex": "#382517"},
+    {"key": "h", "name": "peat2", "hex": "#523823"},
+    {"key": "i", "name": "peat3", "hex": "#705032"},
+    {"key": "p", "name": "bog0", "hex": "#0f1b21"},
+    {"key": "q", "name": "bog1", "hex": "#1b2f37"},
+    {"key": "r", "name": "bog2", "hex": "#294751"},
+    {"key": "s", "name": "bog3", "hex": "#3f6a74"},
+    {"key": "t", "name": "glint", "hex": "#8cb3b3"},
+    {"key": "u", "name": "stone0", "hex": "#2a2a31"},
+    {"key": "v", "name": "stone1", "hex": "#43444b"},
+    {"key": "w", "name": "stone2", "hex": "#62646a"},
+    {"key": "x", "name": "stone3", "hex": "#85888e"},
+    {"key": "y", "name": "stone4", "hex": "#acafb2"},
+    {"key": "z", "name": "lichen", "hex": "#c4ae58"}
+  ],
+  "ramps": {
+    "moor": ["moor0", "moor1", "moor2", "moor3", "moor4"],
+    "heath": ["heath0", "heath1", "heath2", "heath3"],
+    "peat": ["peat0", "peat1", "peat2", "peat3"],
+    "bog": ["bog0", "bog1", "bog2", "bog3", "glint"],
+    "stone": ["stone0", "stone1", "stone2", "stone3", "stone4"]
+  }
+}

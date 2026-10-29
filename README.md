@@ -172,6 +172,13 @@ checked in:
 - the house at 2x, a density copy: [the levels and the reduction](docs/screenshots/g9-house-density.png); the walker,
   house and glints through the sample profile: [atlas page and CSV](examples/mossy-ruins.pclaw/exports/bramble/)
 
+**At 48 px** (G14): [`examples/ember-moor.pclaw`](examples/ember-moor.pclaw), an original heather
+moor with its own palette ([`examples/ember-moor/`](examples/ember-moor/): theme, palette and the
+scripts that build it), its project grid set to 48: a moor ground and two texture variants forked
+from it, bog water, a blob47 bog pool, a waystone two cells tall, and a 20x12 map whose floor is a
+`fill mix=` of the moor's looks ([the map](docs/screenshots/g14-ember-moor-map.png)). The skill's
+*Per-size defaults* table says what changes with the tile size.
+
 The G2 demo ([examples/demo-g2.md](examples/demo-g2.md)) draws the same tile through MCP while you
 watch. In the G3 demo ([examples/demo-g3.md](examples/demo-g3.md)) you fix three pixels and leave a
 note, and the agent reads them with `changes` and carries on. The G4 demo

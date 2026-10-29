@@ -1,0 +1,11 @@
+# A third look of the moor: forked (the moor's border), its heather taken out, more specks inside.
+fork moor moor_c
+variant of=moor
+paint 29,9 <<
+  ..2.2..
+  .22222.
+  2222222
+  .22222.
+  ..2.2..
+>>
+noise 4,4 40x40 ramp=moor weights=0,2,8,2,0 density=0.12 base=keep wrap=off seed=108

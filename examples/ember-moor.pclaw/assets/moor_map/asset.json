@@ -1,0 +1,65 @@
+{
+  "name": "moor_map",
+  "kind": "map",
+  "size": [
+    20,
+    12
+  ],
+  "cell": [
+    1,
+    1
+  ],
+  "wrap": false,
+  "palette": "ember-moor",
+  "layers": [
+    {
+      "name": "floor",
+      "hidden": false,
+      "locked": false,
+      "reference": false,
+      "map": {
+        "kind": "tiles"
+      }
+    },
+    {
+      "name": "bog",
+      "hidden": false,
+      "locked": false,
+      "reference": false,
+      "map": {
+        "kind": "terrain",
+        "family": "pool",
+        "outside": false
+      }
+    },
+    {
+      "name": "stones",
+      "hidden": false,
+      "locked": false,
+      "reference": false,
+      "map": {
+        "kind": "objects"
+      }
+    }
+  ],
+  "frames": 1,
+  "paletteLocked": false,
+  "stamps": [],
+  "macros": [],
+  "tags": [],
+  "views": [],
+  "links": [],
+  "notes": [],
+  "tape": {
+    "lang": 2,
+    "commands": 8,
+    "groups": 1
+  },
+  "state": {
+    "sha256": "90120e89f46baea237659d7b4cbe2bd87838c09455680df66cb0f4ea59b877c9"
+  },
+  "checkpoints": {
+    "every": 200,
+    "files": []
+  }
+}

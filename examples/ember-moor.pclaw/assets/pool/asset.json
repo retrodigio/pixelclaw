@@ -1,0 +1,48 @@
+{
+  "name": "pool",
+  "kind": "family",
+  "size": [
+    384,
+    336
+  ],
+  "cell": [
+    48,
+    48
+  ],
+  "wrap": false,
+  "palette": "ember-moor",
+  "layers": [
+    {
+      "name": "ground",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    },
+    {
+      "name": "band",
+      "hidden": false,
+      "locked": false,
+      "reference": false
+    }
+  ],
+  "frames": 1,
+  "paletteLocked": false,
+  "stamps": [],
+  "macros": [],
+  "tags": [],
+  "views": [],
+  "links": [],
+  "notes": [],
+  "tape": {
+    "lang": 2,
+    "commands": 4,
+    "groups": 1
+  },
+  "state": {
+    "sha256": "9e4079e3ba5fc4ed34d97632e6da42be968e740899bfc75234ae98c4bd58afaf"
+  },
+  "checkpoints": {
+    "every": 200,
+    "files": []
+  }
+}

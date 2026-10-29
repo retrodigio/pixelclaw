@@ -1,0 +1,11 @@
+# Moor grass, 48 px: calm olive noise (specks of 2..6 px, the default at 48 px), seed chosen
+# with `seeds`, and a tuft of heather.
+new tile moor 48x48 bg=moor2
+noise ramp=moor weights=0,2,8,2,0 density=0.25 seed=109
+paint 29,9 <<
+  ..d.c..
+  .cdccd.
+  ccbcdcc
+  .cbbcc.
+  ..b.b..
+>>

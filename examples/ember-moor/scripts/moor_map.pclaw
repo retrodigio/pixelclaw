@@ -1,0 +1,18 @@
+# The moor: 20x12 cells of 48 px (the project's grid, so no tile=). The floor is a mix of the
+# moor's three looks; a bog pool on its own layer; three waystones.
+new map moor_map 20x12
+tiles floor fill mix=moor:2,moor_b:2,moor_c:3 seed=11
+layer add bog terrain=pool outside=off above=floor
+terrain bog paint 2,2 <<
+  ..####......
+  .######.....
+  ########....
+  .#######..##
+  ..#####..###
+  ...###...###
+  .........##.
+>>
+layer add stones objects above=bog
+place waystone 12,3 layer=stones
+place waystone 15,8 layer=stones
+place waystone 3,10 layer=stones

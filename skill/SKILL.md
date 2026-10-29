@@ -57,6 +57,30 @@ If the tools are missing, the server is not connected:
 - Native grid 24 px is fully verifiable; 48 px needs regions and helpers; 96 px needs an underlay
   and region work, with a hand-made 24 px copy beside it.
 
+## Per-size defaults
+
+Set the project's grid first (`project(grid=48)`, or `pixelclaw new <dir> --grid 48`): the project
+summary's second line says what follows from it.
+
+| | 16 px | 24 px (default) | 48 px |
+|---|---|---|---|
+| `new map` without `tile=` | 16 (grid 16) | 24 | 48 |
+| camera (`style.camera` unset) | 256x144 | 384x216 | 768x432 (16x9 cells) |
+| draw scale (`style.drawScale` unset) | 2x | 2x | 1x (the game view shows the scene once) |
+| `noise` specks (no `cluster=`) | 1..3 | 1..3 | 2..6 |
+| tile `jaggies` allowance | 2 | 2 | 8 (per 24x24 px) |
+| `repetition` band widths | 1..4 lines | 1..6 | 1..12, counted in lines of 24 px |
+| map `lattice`: a mark is at least | 2 px | 5 px | 18 px, ±2 px counts as the same spot |
+| icon stroke / centre limits | 1 / 1.5 px | 1.5 / 2.25 px on 24 px icons | 3 / 4.5 px on 48 px icons |
+
+At 48 px: look with `view grid region=` (a whole 48x48 grid is long), `render` comes back at 4x
+(192 px) and `tile3x3` at 4x (576 px). Make texture variants by **forking the base and changing
+only its inside** (`fork moor moor_b`, `variant of=moor`, then `noise 4,4 40x40 … base=keep
+wrap=off` and your own marks): two independent noise tiles side by side show a seam where their
+bigger specks are cut at the border (`examples/ember-moor.pclaw` does this; its map seam is 0.35).
+Expect more `jaggies` from long curves: a big ellipse is fine alone, but where a second shape meets
+its outline the step runs go uneven; let one shape make the silhouette and shade inside it.
+
 ## Workflows
 
 ### A theme → a whole set (the project pipeline)
