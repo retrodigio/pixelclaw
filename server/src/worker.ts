@@ -9,7 +9,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { appendFileSync, chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openRequests } from '@pixelclaw/core';
 import { ProjectError, alive } from './project.ts';
@@ -168,7 +168,7 @@ export class WorkerControl {
     const s = workerSettings(dir);
     let spent = 0, sessions = 0;
     let why = '';
-    this.log([`run started by ${by}: cap ${money(s.cap)}, at most ${s.maxSessions} sessions, command ${s.command.join(' ')}`]);
+    this.log([`run started by ${by}: cap ${money(s.cap)}, at most ${s.maxSessions} sessions, command ${s.command.map((c) => basename(c)).join(' ')}`]);
     const pending = () => openRequests(readRequests(this.w.project)).filter((q) => q.state === 'open' || (q.state === 'claimed' && q.claimedBy === AGENT));
     const stamp = () => JSON.stringify([...readRequests(this.w.project).values()].map((q) => [q.id, q.state, q.events.length]));
     for (;;) {

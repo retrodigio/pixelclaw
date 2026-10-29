@@ -1025,3 +1025,94 @@ Points where the plan was unclear or silent. Each has the reading that was follo
      beside it); a thin one-colour run is shading when every other-coloured neighbour is a
      neighbouring step of its ramp (outline pixels allowed). Outlines and lines on anything else
      are judged as before. The urns' allowance is gone.
+
+## G12
+
+153. **Request records** (§21 item 1: "id, asset, kind, note, by, at, and later claim, progress,
+     done or blocked lines"). *Reading:* one JSON object a line in `requests.jsonl`, typed
+     `request` (id `r<N>`, asset, kind `draw|change|new`, note, by, at; a change also carries the
+     tape seq of its `mark`), then `claim`, `progress`, `done`, `blocked` (id, by, at, text). Two
+     record types the plan does not name are added for the person: `reply` (answers a blocked
+     request and opens it again) and `cancel` (withdraws an open, claimed or blocked one). The
+     state is a fold of the records (core `foldRequests`); `done` and `cancelled` are final; only
+     the claimer posts progress, done or blocked; a record that does not fit is refused before it
+     is written.
+
+154. **"Ask for changes" (already a `mark`) on every card.** *Reading:* on every drawn card (not
+     only reviewed ones, as in G10). It writes both: the `mark rejected "…"` on the tape by the
+     person (so `changes` and the status work as before) and a `change` request with the mark's
+     seq. A planned card gets "Draw this" instead. Duplicates (a second active draw or change
+     request for one asset) are refused.
+
+155. **"Claude is working on this" from a claim plus the latest batch author.** *Reading:* a
+     claimed request whose claimer wrote the asset's latest tape line at or after the claim. A
+     claim with no batch yet reads "claimed by claude".
+
+156. **How a worker reaches the server.** §21 says `claude -p` "with the PixelClaw MCP server";
+     a stdio server would take the project's lock, which the dashboard's server already holds.
+     *Reading:* the server also speaks MCP over HTTP at `/mcp` (the SDK's handler, both protocol
+     eras), with the watch token as a bearer, and the worker's MCP config points there. So there is
+     one writer whoever drives it. `pixelclaw work` with no server running starts one of its own
+     (watch view and `/mcp`, no stdio); with a server running it refuses and points to the
+     dashboard's button (the CLI cannot read that server's token).
+
+157. **The budget cap and the settings.** *Reading:* `project.json` `worker`: `enabled` (default
+     false), `cap` (US dollars a run, default 5), `maxSessions` (10), `command` (`["claude"]`),
+     `args`. A run is sessions of `claude -p` until the queue is empty; each session gets
+     `--max-budget-usd` set to what is left of the cap, and the run adds each session's reported
+     `total_cost_usd`; a session that reports no cost counts as spending the rest. A run also
+     stops when a session leaves the queue unchanged. Read fresh each time (no restart).
+
+158. **"Like a builder": the worker's command line.** *Reading:* `claude -p <prompt>
+     --output-format stream-json --verbose --mcp-config <tmp file> --strict-mcp-config
+     --allowedTools mcp__pixelclaw --max-budget-usd <left> --append-system-prompt <SKILL.md>`
+     plus `args`. Only the PixelClaw tools are allowed; the skill goes in as a system prompt so it
+     does not depend on what is installed. Not run with the real CLI by the builder (it spends
+     money; §21 asks for a fake): a reader should run it once and check the flags against the
+     installed Claude Code (`claude --help`), especially `--max-budget-usd`.
+
+159. **The gallery's "game scale".** *Reading:* the style guide's `drawScale` (default 2), whole
+     pixels; maps composed from their assets at that scale but shrunk to fit a card; planned
+     assets as dashed placeholders. Animated: every frame in turn at the project's tick rate.
+     "Filters by failing check": one check id, or "all pass". Compare: the picked assets side by
+     side at the same scale, ×2 and ×4 to look closer. "Maps use / used by": a map's placed
+     assets, terrain families and overlays, both ways.
+
+160. **"Manifest entries added (status drafted)".** *Reading:* statuses are worked out (G10), so
+     the entries carry no status: the import adds `{ name, kind, size, set, description:
+     "imported from <file> cell c,r" }` for each new asset the manifest does not plan, and the
+     plan shows it drafted (or checked, if every check passes). With no manifest, the assets are
+     imported unplanned (a note says so).
+
+161. **Names "from manifest entries".** *Reading:* the planned, undrawn entries of the chosen set
+     in manifest order, given to the kept cells in reading order (an error when there are fewer
+     names than cells). In the dialog: "the plan's entries"; MCP `namesFrom: "manifest"`.
+
+162. **A slice of an imported sheet as tiles.** *Reading:* as G9's import, tiles come in on a
+     plain canvas (`wrap=off`); `wrap` (the dialog's "seamless") makes them wrap documents so the
+     seam and repetition checks apply.
+
+163. **Scenes** (§21 item 5: "name, description, the assets it needs, an optional map
+     document"). *Reading:* top-level `scenes: [{ name, description, uses, map }]`; `map` must
+     be a manifest map, and the map's own `uses` count as the scene's needs. A scene's gaps:
+     missing (planned, not drawn) and unfinished (drawn, checks failing). "plan orders work by
+     scene when asked": `plan(order="scene")`, each scene's needs in order, then what no scene
+     needs. Empty manifest sets are now listed among the sets (an import can fill one).
+
+164. **`map gen` places manifest objects** (§21 item 6). *Reading:* `objects=<asset>[:<n>],…`
+     on an objects layer (`layer=`, default the map's first); without it, a map the manifest
+     plans takes the drawn objects and sprites its `uses` lists, once each. Placement: seeded,
+     larger footprints first, every footprint cell on the inner ground (village: the inner ground
+     off the lanes; island: a cell in from the shore; dungeon: a cell in from the walls), a free
+     cell between any two. The line records the objects and their footprints, so replay needs
+     neither the manifest nor the assets.
+
+165. **"Cache check results by state hash".** *Reading:* each asset's plain check run (every
+     check, every frame) in `.cache/checks/<asset>.json`, keyed by the engine stamp, the style
+     guide, the manifest, the palettes and the state keys (tape plus engine) of every asset the
+     checks read (the asset, its ground, set and peers; every asset for map checks). A changed
+     tape anywhere it reads is a new key.
+
+166. **A dropped folder.** *Reading:* the browser reads a dropped folder's PNG and `.aseprite`
+     files (nested folders too, by name), and they are imported as a folder: one asset per file,
+     named by the file (or the pattern), unless a single sheet is sliced.

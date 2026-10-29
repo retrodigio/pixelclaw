@@ -88,7 +88,7 @@ function RequestLine({ q, store }: { q: WorkRequest; store: Store }) {
           <button type="submit" disabled={!reply.trim() || busy} data-testid="reply-send">Answer</button>
         </form>
       )}
-      {(q.state === 'open' || q.state === 'blocked') && (
+      {ACTIVE.includes(q.state) && (
         <button className="link" disabled={busy} onClick={() => void send({ action: 'cancel', id: q.id })} data-testid="cancel" title="Withdraw this request">withdraw</button>
       )}
     </div>

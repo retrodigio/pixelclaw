@@ -125,7 +125,7 @@ try {
   await page.getByTestId('g-shards_3').waitFor();
   await page.getByTestId('g-set').selectOption('clutter');
   await page.waitForTimeout(400);
-  await shot(page, 'gallery-clutter');
+  await shot(page, 'gallery-clutter', { clip: { x: 0, y: 0, width: 1440, height: 260 } });
   await page.getByTestId('g-set').selectOption('all');
 
   console.log('\n3. The person asks: Draw this on urn_blue and goat, Ask for changes on jar_icon');

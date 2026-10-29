@@ -182,6 +182,17 @@ Status of plan features touched so far. Steps refer to the build plan (§10).
 | Fonts in profiles (`fonts.format strip\|bmfont\|both\|sheet`, `separator`, `maxLine`) and `export --format strip\|bmfont` | §4.6, §7.4, G11 | done | `g11.test.ts` (core and server) | docs/profiles.md. |
 | UI: underlays drawn faded under the art; a font's sheet on a dark checkerboard and its text preview | §8.3, G11 | done | screenshots `docs/screenshots/g11-*.png`; the Playwright suite unchanged and green | `/api/blob/<sha>.png` (token). |
 | Demo: an offline mockup underlay for a 6x4-tile scene, snapped and cleaned into tiles; a 5x7 font as a strip and BMFont; an icon set checked | G11 | done | `kiln-hollow.test.ts` (verify; rebuild the G11 work from the scripts and the mockup; 3 exported, 8 checked, 15 planned of 26; every check passes) | `examples/demo-g11.md`, `examples/demo-g11-agent.ts`, `examples/kiln-hollow/make-yard-mockup.ts`; how to run a live underlay is in the demo. |
+| Requests: `requests.jsonl` records and their state machine (open, claimed, blocked, done, cancelled) | §21 (1), G12 | done | `g12.test.ts` (core: every transition, refused records, a bad line skipped, ids, queue order) | Core `foldRequests`/`requestProblem`; server `requests.ts`. `reply` and `cancel` are the person's (question 153). |
+| Dashboard requests: Draw this, Ask for changes (with its `mark`), Add an asset (a validated manifest entry); each request's state live on its card | §21 (1), G12 | done | `g12.spec.ts` (the buttons' records fold to the states the cards show; Claude is working on this; done; blocked, answered, open again; withdraw), `g12.test.ts` (server: through a page's socket; refusals) | WebSocket `request` messages; every page hears `requests`. "Claude is working on this": the claimer wrote the asset's latest line after the claim (question 155). |
+| MCP `work` (claim the next or a named request, progress, done, blocked, list); `plan` lists requests first | §21 (2), G12 | done | `g12.test.ts` (server, over the HTTP endpoint) | One claimed request at a time per agent. The skill's routine: `plan` at the start and after each asset; requests before planned work. |
+| MCP over HTTP at `/mcp` (bearer: the watch token) | §21 (2), G12 | done | `g12.test.ts` (every MCP call there goes over it) | The worker's connection to the running server (question 156). |
+| `pixelclaw work` and Start Claude: a headless `claude -p` worker with the MCP server and the skill; a budget cap; one per project; a log on the dashboard; only when `worker.enabled` | §21 (2), G12 | done | `g12.test.ts` (a fake claude: disabled from the button and the CLI, enabled to an empty queue, the cap, one at a time, stop, a blocked request), `g12.spec.ts` (the button only when enabled; its log) | `server/src/worker.ts`, `server/test/fake-claude.ts`; docs/worker.md. Not run with the real CLI (question 158). |
+| The gallery: game scale, animated, filters (set, kind, status, failing check), sort, compare, one click to the editor; maps use assets, assets used by maps | §21 (3), G12 | done | `g12.spec.ts` (scale, frames, filters, related, compare) | `/api/strip/<asset>.png` (frames side by side; maps composed). Screenshots `docs/screenshots/g12-gallery*.png`. |
+| Import into the gallery: a sheet sliced into assets, a folder, `.aseprite`; the slice dialog (cell, offset, gap, names by pattern or from the plan, palette or adopt); manifest entries; every check run | §21 (4), G12 | done | `g12.test.ts` (server: a sheet with an empty cell and an off-palette pixel into five assets, entries, checks, tapes; names from the manifest; a clash makes nothing), `g12.spec.ts` (the dialog), `kiln-hollow.test.ts` | Same import from MCP (`slice`, `names`, `namesFrom`, `set`), the CLI (`--slice`, `--set`) and `POST /api/import`. Core `sliceCells`, `sliceNames`. |
+| Scenes in the manifest; their gaps on the dashboard; `plan(order="scene")` | §21 (5), G12 | done | `g12.test.ts` (core: validation, gaps with the map's uses; server: the report and the text) | Question 163. |
+| `map gen` places manifest objects | §21 (6), G10 notes, G12 | done | `g12.test.ts` (core: on the inner ground, off the lanes, apart, replayed byte for byte; the manifest's objects written into the line; refusals; server: through MCP) | `objects=`, `layer=`, `fp=` in the line (question 164). |
+| `plan` faster: check results cached by state hash | §21 (6), G11 notes, G12 | done | `g12.test.ts` (server: the cached plan equals a plan with no cache, and is faster; a changed tape runs its checks again) | `.cache/checks/<asset>.json` (question 165). A CLI `plan` on mossy-ruins: 3.8 s with no check cache, 0.8 s with it; Kiln Hollow 1.0 s and 0.7 s (most of what is left is Node starting). |
+| Demo: a person imports a sheet into the gallery, asks for two planned assets and a change; the agent takes them through `plan` and `work`: one done, one blocked, one in progress | G12 | done | `kiln-hollow.test.ts` (verify; rebuild of the G12 work; the requests fold to done, blocked, claimed; 3 exported, 9 checked, 3 drafted, 14 planned of 29) | `examples/demo-g12.md`, `examples/demo-g12-agent.ts` (run by hand); screenshots `docs/screenshots/g12-*.png` and `scripts/screenshots-g12.ts` (the worker with the fake). |
 
 ## Notes for G8
 
@@ -307,3 +318,27 @@ What the acceptance project (§10 A1) will need, from G11's side:
   1536x1024 image takes about 1-2 s. `plan` still runs every check on every drawn asset.
 - **Cost of this step**: not measured.
 
+
+## Notes for the next step (after G12)
+
+- **Run the worker once for real.** The builder has no reason to spend money and used a fake
+  `claude` that takes the same arguments. A reader should enable `worker` on a scratch copy of
+  Kiln Hollow with a small `cap` (1), ask for one planned prop, press Start Claude, and check: the
+  flags are accepted by the installed Claude Code (`--max-budget-usd`, `--allowedTools
+  mcp__pixelclaw`, `--append-system-prompt`, `--strict-mcp-config`), the HTTP MCP connection
+  works (Claude Code's `"type": "http"` with a bearer header), the reported `total_cost_usd` lands
+  in the log and the panel, and the session asks with `blocked` rather than in chat.
+- **The open requests in the example.** Kiln Hollow keeps r2 (the goat, blocked on horns and
+  colour) and r3 (the jar's wider mouth, claimed by claude, a note pinned) on purpose, to show the
+  states. Answer r2 and finish r3 when the example is next carried on; the shards need their
+  jaggies fixed (drafted).
+- **Imports and set consistency.** Importing into an existing set changes its medians: the shards
+  in `props` would have failed the urn's consistency (ramp steps). The import result lists each new
+  asset's checks but not what the import did to the set's other assets; a line for those would
+  help.
+- **Gallery at scale.** The gallery loads every asset's strip at once and the page replays every
+  tape on connect; fine for Kiln Hollow (30 assets), worth paging or lazy loading past a few
+  hundred. Maps are composed by the server per request (not cached by state).
+- **Worker log retention.** `logs/worker.log` grows without bound (the dashboard shows the last
+  200 lines); rotate it if runs become routine.
+- **Cost of this step**: not measured.
