@@ -10,12 +10,13 @@ import {
 import type { Editor } from './editor.ts';
 import type { Store } from './store.ts';
 
-export type MapTool = 'brush' | 'rect' | 'erase' | 'place' | 'move' | 'remove' | 'camera';
+export type MapTool = 'brush' | 'rect' | 'erase' | 'fill' | 'place' | 'move' | 'remove' | 'camera';
 
 const TOOLS: { id: MapTool; label: string; tip: string }[] = [
   { id: 'brush', label: '✎ paint', tip: 'Paint the terrain layer cell by cell (terrain <layer> brush …)' },
   { id: 'rect', label: '▭ rect', tip: 'Paint a rectangle of terrain; hold Shift to erase it (terrain <layer> rect …)' },
   { id: 'erase', label: '⌫ erase', tip: 'Erase the terrain layer cell by cell (terrain <layer> brush … erase)' },
+  { id: 'fill', label: '▦ fill', tip: 'Lay the chosen one-cell tile on every empty cell of the tiles layer; drag to fill a box (tiles <layer> fill <asset>)' },
   { id: 'place', label: '⊕ place', tip: 'Place the chosen asset by its anchor cell (place <asset> x,y)' },
   { id: 'move', label: '✣ move', tip: 'Drag something placed to another cell (move x,y x,y)' },
   { id: 'remove', label: '✕ remove', tip: 'Take away what is placed on a cell (remove x,y)' },
@@ -40,9 +41,15 @@ export function MapEditor({ doc, store, ed, editable }: { doc: Doc; store: Store
   const terrains = doc.layers.filter((l) => l.map?.kind === 'terrain').map((l) => l.name);
   const holders = doc.layers.filter((l) => l.map?.kind === 'objects' || l.map?.kind === 'tiles').map((l) => l.name);
   const placeable = assets.filter((a) => !a.doc.family && !a.doc.overlay && !a.doc.map && a.doc.cellW === t);
+  const tilesLayers = doc.layers.filter((l) => l.map?.kind === 'tiles').map((l) => l.name);
+  const fillable = placeable.filter((a) => { const fp = footprintOf(a.doc); return fp.cols === 1 && fp.rows === 1 && a.doc.kind === 'tile'; });
+  const fillLayer = layer && tilesLayers.includes(layer) ? layer : tilesLayers[0] ?? null;
+  const fillTile = asset && fillable.some((a) => a.name === asset) ? asset : fillable[0]?.name ?? null;
   const terrainLayer = layer && terrains.includes(layer) ? layer : terrains[0] ?? null;
   const placeLayer = layer && holders.includes(layer) ? layer : holders.find((n) => doc.layers.find((l) => l.name === n)!.map!.kind === 'objects') ?? holders[0] ?? null;
   const chosen = asset && placeable.some((a) => a.name === asset) ? asset : placeable.find((a) => a.doc.kind === 'object')?.name ?? placeable[0]?.name ?? null;
+  const terrainInfo = doc.layers.find((l) => l.name === terrainLayer)?.map;
+  const walkable = terrainInfo?.kind === 'terrain' && !!terrainInfo.walkable;
   const screen = cameraOf(store.style);
   const cam = camera && showCam ? cameraRegion(composed, camera[0], camera[1], screen[0], screen[1]) : null;
   const region = cam ? { x: cam.x, y: cam.y, w: cam.w, h: cam.h } : { x: 0, y: 0, w: doc.width, h: doc.height };
@@ -66,7 +73,7 @@ export function MapEditor({ doc, store, ed, editable }: { doc: Doc; store: Store
       g.strokeRect(X + 1, Y + 1, w * t * k - 2, h * t * k - 2);
     };
     if (drag && (tool === 'brush' || tool === 'erase')) for (const [x, y] of drag.cells) box(x, y, 1, 1, 'transparent', tool === 'erase' ? 'rgba(255,80,80,0.35)' : 'rgba(80,220,255,0.35)');
-    if (drag && tool === 'rect') {
+    if (drag && (tool === 'rect' || tool === 'fill')) {
       const r = norm(drag.from, drag.to);
       box(r.x, r.y, r.w, r.h, drag.shift ? '#ff5050' : '#50dcff', drag.shift ? 'rgba(255,80,80,0.2)' : 'rgba(80,220,255,0.2)');
     }
@@ -137,6 +144,10 @@ export function MapEditor({ doc, store, ed, editable }: { doc: Doc; store: Store
     } else if (tool === 'rect' && terrainLayer) {
       const r = norm(d.from, d.to);
       send(`terrain ${terrainLayer} rect ${r.x},${r.y} ${r.w}x${r.h}${d.shift ? ' erase' : ''}`);
+    } else if (tool === 'fill' && fillLayer && fillTile) {
+      // A click fills the whole layer's empty cells; a drag fills a box.
+      const r = norm(d.from, d.to);
+      send(`tiles ${fillLayer} fill ${fillTile}${r.w > 1 || r.h > 1 ? ` ${r.x},${r.y} ${r.w}x${r.h}` : ''}`);
     } else if (tool === 'move') {
       const li = doc.layers.findIndex((l) => l.name === placeLayer);
       const p = placedAt(doc, li, d.from[0], d.from[1]) ?? doc.layers.map((_, i) => placedAt(doc, i, d.from[0], d.from[1])).find(Boolean) ?? null;
@@ -158,6 +169,21 @@ export function MapEditor({ doc, store, ed, editable }: { doc: Doc; store: Store
           <select value={terrainLayer ?? ''} onChange={(e) => setLayer(e.target.value)} data-testid="map-terrain" title="The terrain layer you paint (its family's scheme picks the edge tiles)">
             {terrains.map((n) => <option key={n}>{n}</option>)}
           </select>
+        )}
+        {(tool === 'brush' || tool === 'rect' || tool === 'erase') && terrainLayer && (
+          <label className="chk" title="Objects may stand on this terrain layer's filled ground and edges (layer set <layer> walkable=on|off): ground, not sea">
+            <input type="checkbox" checked={walkable} disabled={!editable} data-testid="map-walkable" onChange={(e) => send(`layer set ${terrainLayer} walkable=${e.target.checked ? 'on' : 'off'}`)} /> walkable
+          </label>
+        )}
+        {tool === 'fill' && (
+          <>
+            <select value={fillLayer ?? ''} onChange={(e) => setLayer(e.target.value)} data-testid="map-fill-layer" title="The tiles layer you fill">
+              {tilesLayers.map((n) => <option key={n}>{n}</option>)}
+            </select>
+            <select value={fillTile ?? ''} onChange={(e) => setAsset(e.target.value)} data-testid="map-fill-tile" title="The one-cell tile laid on every empty cell (the map picks among its texture variants)">
+              {fillable.map((a) => <option key={a.name} value={a.name}>{a.name}</option>)}
+            </select>
+          </>
         )}
         {(tool === 'place' || tool === 'move') && (
           <select value={placeLayer ?? ''} onChange={(e) => setLayer(e.target.value)} data-testid="map-layer" title="The tiles or objects layer you place on">
@@ -209,5 +235,5 @@ function describe(doc: Doc, c: ReturnType<typeof composeMapDoc>, [x, y]: Pt): st
   });
   const cel = doc.cels.map((fr) => fr[0]![y * doc.width + x]);
   void cel; void TRANSPARENT;
-  return `${x},${y}: ${g ? `${g.asset}${g.variant ? `.${g.variant}` : ''}` : 'nothing'}${things.length ? ` · ${[...new Set(things)].join(', ')}` : ''}`;
+  return `${x},${y}: ${g ? `${g.asset}${g.variant ? `.${g.variant}` : ''}${g.walkable ? ' (walkable)' : ''}` : 'nothing'}${things.length ? ` · ${[...new Set(things)].join(', ')}` : ''}`;
 }

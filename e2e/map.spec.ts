@@ -19,6 +19,7 @@ const SETUP: [string, string][] = [
   ].join('\n')],
   ['hut', [`new object hut 16x16 cell=${T}x${T}`, 'rect 0,0 16x8 c=soil2 fill', 'rect 2,8 12x8 c=stone3 fill', 'footprint 2x1 anchor=0,0 <<\n  rr\n  bb\n>>'].join('\n')],
   ['bush', [`new object bush ${T}x${T}`, 'ellipse 1,1 6x6 c=moss3 fill'].join('\n')],
+  ['turf', [`new tile turf ${T}x${T}`, `rect 0,0 ${T}x${T} c=moss1 fill`, 'px 2,3 5,6 c=moss2'].join('\n')],
   ['isle', ['new map isle 12x9 tile=8', 'layer add sea terrain=land outside=on above=floor', 'layer add props objects above=sea', 'terrain sea rect 2,2 8x5'].join('\n')],
 ];
 
@@ -114,4 +115,21 @@ test('every map control logs a command that replays to the map on the canvas', a
   await page.getByTestId('map-marks').uncheck();
   await page.getByTestId('map-zoom-1').click();
   expect(await tapeLength()).toBe(before);
+});
+
+test('G13: the fill tool lays a tile on every empty cell of a tiles layer; walkable marks a terrain\'s ground', async ({ page }) => {
+  const at = await open(page);
+  await page.locator('[data-tool="fill"]').click();
+  await expect(page.getByTestId('map-fill-layer')).toHaveValue('floor');
+  await expect(page.getByTestId('map-fill-tile')).toHaveValue('turf');
+  // A drag fills a box; a click the rest of the layer.
+  await act(page, async () => {
+    await page.mouse.move(...await at(0, 0)); await page.mouse.down(); await page.mouse.move(...await at(1, 1), { steps: 2 }); await page.mouse.up();
+  }, ['tiles floor fill turf 0,0 2x2 cells=1x1 anchor=0,0']);
+  await act(page, async () => { await page.mouse.click(...await at(6, 4)); }, ['tiles floor fill turf 0,0 12x9 cells=1x1 anchor=0,0']);
+  await page.locator('[data-tool="brush"]').click();
+  await act(page, () => page.getByTestId('map-walkable').check(), ['layer set sea walkable=on']);
+  await page.mouse.move(...await at(0, 0));
+  await expect(page.getByTestId('map-status')).toContainText('(walkable)');
+  await act(page, () => page.getByTestId('map-walkable').uncheck(), ['layer set sea walkable=off']);
 });
