@@ -71,7 +71,7 @@ export interface Footprint {
 
 /** What a map layer holds (plan §4.11). Terrain layers hold 1 where their family's terrain is. */
 export type MapLayerInfo =
-  | { kind: 'terrain'; family: string; outside: boolean }
+  | { kind: 'terrain'; family: string; outside: boolean; walkable?: boolean }
   | { kind: 'tiles' }
   | { kind: 'objects' }
   | { kind: 'overlay'; overlay: string; on: string };
@@ -613,14 +613,14 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
 
 function mapLayerJson(m: MapLayerInfo): string[] {
   switch (m.kind) {
-    case 'terrain': return ['terrain', m.family, m.outside ? 'outside' : ''];
+    case 'terrain': return ['terrain', m.family, m.outside ? 'outside' : '', ...(m.walkable ? ['walkable'] : [])];
     case 'overlay': return ['overlay', m.overlay, m.on];
     default: return [m.kind];
   }
 }
 
 function mapLayerFromJson(a: string[]): MapLayerInfo {
-  if (a[0] === 'terrain') return { kind: 'terrain', family: a[1]!, outside: a[2] === 'outside' };
+  if (a[0] === 'terrain') return { kind: 'terrain', family: a[1]!, outside: a[2] === 'outside', ...(a[3] === 'walkable' ? { walkable: true } : {}) };
   if (a[0] === 'overlay') return { kind: 'overlay', overlay: a[1]!, on: a[2]! };
   return { kind: a[0] as 'tiles' | 'objects' };
 }

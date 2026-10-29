@@ -160,6 +160,8 @@ export interface CellTile {
   edge: boolean;
   /** Drawn by a terrain layer that fills the map with its outside ground (the land against the sea). */
   base?: boolean;
+  /** Drawn by a terrain layer whose ground is walkable (walkable=on): footprints may stand on it. */
+  walkable?: boolean;
 }
 
 export interface PlacedObject extends Placed {
@@ -315,7 +317,7 @@ export function composeMapDoc(d: Doc, world: MapWorld, o: ComposeOptions = {}): 
             if (c !== TRANSPARENT) px[(y * t + yy) * W + x * t + xx] = c;
           }
         } else blit(flat(f), f.width, cx * t, cy * t, t, t, x * t, y * t);
-        top[i] = { asset: f.name, variant: v === null ? 'outside' : s.variants[v]!.name, edge: v !== null && !fullInside(s, v), ...(info.outside ? { base: true } : {}) };
+        top[i] = { asset: f.name, variant: v === null ? 'outside' : s.variants[v]!.name, edge: v !== null && !fullInside(s, v), ...(info.outside ? { base: true } : {}), ...(info.walkable ? { walkable: true } : {}) };
         variants[i] = v;
       });
       return;
@@ -547,7 +549,7 @@ export function mapDocText(d: Doc, world: MapWorld, c: ComposedMap = composeMapD
     if (info.kind === 'terrain') {
       const n = cel.reduce((a, v) => a + (v === 1 ? 1 : 0), 0);
       const fam = world.family(info.family);
-      lines.push(`layer ${l.name}: terrain of ${info.family}${fam.length > 1 ? ` (+ variants ${fam.slice(1).map((x) => x.name).join(', ')})` : ''}, ${n} cells${info.outside ? '; its outside ground fills the rest' : ''}${hid}`);
+      lines.push(`layer ${l.name}: terrain of ${info.family}${fam.length > 1 ? ` (+ variants ${fam.slice(1).map((x) => x.name).join(', ')})` : ''}, ${n} cells${info.outside ? '; its outside ground fills the rest' : ''}${info.walkable ? ' (walkable: objects may stand on it)' : ''}${hid}`);
     } else if (info.kind === 'overlay') {
       lines.push(`layer ${l.name}: overlay ${info.overlay} on ${info.on}${hid}`);
     } else {
@@ -790,7 +792,7 @@ export function mapChecks(d: Doc, world: MapWorld, limits: Partial<typeof MAP_LI
       const g = c.top[i];
       // Only the ground a map is filled with stops an object: its outside (the sea) and its edge tiles.
       if (!g) bad.push([x, y]);
-      else if (g.variant === 'outside' || (g.edge && g.base)) bad.push([x, y]);
+      else if (!g.walkable && (g.variant === 'outside' || (g.edge && g.base))) bad.push([x, y]);
     }
     if (clash.length) fpGroups.push({ label: `${at}: overlaps ${c.objects[objCells.get(clash[0]![1] * cols + clash[0]![0])!]!.name}`, cells: clash });
     if (bad.length) {

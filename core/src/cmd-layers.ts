@@ -53,12 +53,12 @@ function flagOpts(a: Args): { hidden?: boolean; locked?: boolean; reference?: bo
 
 const layerCmd: CommandSpec = {
   name: 'layer',
-  summary: 'layer <name> | layer add <name> [above=|below=<layer>] [reference] | (maps) layer add <name> terrain=<family> [outside=on|off] | tiles | objects | overlay=<overlay> on=<layer>|<layer>:out|all | layer set <name> [hidden=] [locked=] [reference=] | layer rename <name> <new> | layer move <name> above=|below=<layer> | layer merge <name> | layer remove <name>',
+  summary: 'layer <name> | layer add <name> [above=|below=<layer>] [reference] | (maps) layer add <name> terrain=<family> [outside=on|off] [walkable=on|off] | tiles | objects | overlay=<overlay> on=<layer>|<layer>:out|all | layer set <name> [hidden=] [locked=] [reference=] [walkable=] | layer rename <name> <new> | layer move <name> above=|below=<layer> | layer merge <name> | layer remove <name>',
   normalise(cmd, ctx) {
     const doc = needDoc(cmd, ctx);
     const first = cmd.args[0];
     const mapAdd = !!doc.map && first?.t === 'word' && first.v === 'add';
-    const a = new Args(cmd, ['above', 'below', 'hidden', 'locked', 'reference', 'terrain', 'outside', 'overlay', 'on'], mapAdd ? ['reference', 'tiles', 'objects'] : ['reference']);
+    const a = new Args(cmd, ['above', 'below', 'hidden', 'locked', 'reference', 'terrain', 'outside', 'walkable', 'overlay', 'on'], mapAdd ? ['reference', 'tiles', 'objects'] : ['reference']);
     const how = a.take('word', 'a layer name, or add, set, rename, move, merge or remove');
     const noOpts = (except: string[] = []) => {
       for (const o of a.opts.values()) if (!except.includes(o.key)) throw new DiagError(o.line, o.col, `layer ${how.v} takes no ${o.key}=`);
@@ -81,7 +81,7 @@ const layerCmd: CommandSpec = {
       if (doc.map) {
         info = mapLayerInfo(a, doc);
         what = mapLayerText(info);
-        noOpts(['above', 'below', 'flag', 'terrain', 'outside', 'overlay', 'on']);
+        noOpts(['above', 'below', 'flag', 'terrain', 'outside', 'walkable', 'overlay', 'on']);
       } else {
         noOpts(['above', 'below', 'flag']);
       }
@@ -103,6 +103,18 @@ const layerCmd: CommandSpec = {
     const i = layerIndex(doc, target);
     if (how.v === 'set') {
       a.done();
+      const wk = a.opts.get('walkable');
+      if (wk) {
+        // A terrain layer's filled ground (its outside and edges) is walkable: footprints may stand on it.
+        const info = doc.layers[i]!.map;
+        if (info?.kind !== 'terrain') throw new DiagError(wk.line, wk.col, `walkable= goes with a terrain layer`);
+        noOpts(['walkable']);
+        const on = a.choice('walkable', ['on', 'off'], 'off') === 'on';
+        return { text: `layer set ${target.v} walkable=${on ? 'on' : 'off'}`, op: fn((d) => {
+          const m = d.layers[i]!.map as Extract<MapLayerInfo, { kind: 'terrain' }>;
+          d.layers[i]!.map = on ? { ...m, walkable: true } : { kind: 'terrain', family: m.family, outside: m.outside };
+        }) };
+      }
       noOpts(['hidden', 'locked', 'reference']);
       const f = flagOpts(a);
       if (!Object.keys(f).length) throw new DiagError(cmd.line, cmd.col, `layer set: give hidden=, locked= or reference= (on or off)`);
@@ -176,11 +188,14 @@ function mapLayerInfo(a: Args, doc: Doc): MapLayerInfo {
     if (!/^[a-z][a-z0-9_-]*$/.test(v)) throw new DiagError(o.line, o.vcol, `'${v}' is not an asset name`);
     return v;
   };
-  for (const k of ['outside', 'on']) {
+  for (const k of ['outside', 'walkable', 'on']) {
     const o = a.opts.get(k);
-    if (o && !((k === 'outside' && ter) || (k === 'on' && ov))) throw new DiagError(o.line, o.col, `${k}= goes with ${k === 'outside' ? 'terrain=' : 'overlay='}`);
+    if (o && !((k !== 'on' && ter) || (k === 'on' && ov))) throw new DiagError(o.line, o.col, `${k}= goes with ${k !== 'on' ? 'terrain=' : 'overlay='}`);
   }
-  if (ter) return { kind: 'terrain', family: name(ter.value, ter), outside: a.choice('outside', ['on', 'off'], 'off') === 'on' };
+  if (ter) {
+    const walkable = a.choice('walkable', ['on', 'off'], 'off') === 'on';
+    return { kind: 'terrain', family: name(ter.value, ter), outside: a.choice('outside', ['on', 'off'], 'off') === 'on', ...(walkable ? { walkable } : {}) };
+  }
   if (ov) {
     const on = a.opts.get('on');
     const where = on?.value ?? 'all';
@@ -194,7 +209,7 @@ function mapLayerInfo(a: Args, doc: Doc): MapLayerInfo {
 }
 
 function mapLayerText(m: MapLayerInfo): string {
-  if (m.kind === 'terrain') return ` terrain=${m.family} outside=${m.outside ? 'on' : 'off'}`;
+  if (m.kind === 'terrain') return ` terrain=${m.family} outside=${m.outside ? 'on' : 'off'}${m.walkable ? ' walkable=on' : ''}`;
   if (m.kind === 'overlay') return ` overlay=${m.overlay} on=${m.on}`;
   return ` ${m.kind}`;
 }

@@ -1,6 +1,6 @@
 // G13 (plan §23): fixes from the acceptance run, in core. Each test failed before its fix.
 import { describe, expect, it } from 'vitest';
-import { TRANSPARENT, composeMapDoc, layoutOf, mapWorld, runBatch, type AssetState, type Doc } from '../src/index.ts';
+import { TRANSPARENT, composeMapDoc, deserializeDoc, layoutOf, mapChecks, mapWorld, replay, runBatch, serializeDoc, type AssetState, type Doc } from '../src/index.ts';
 import { EMPTY, palettes, run } from './helpers.ts';
 
 const T = 8;
@@ -47,4 +47,52 @@ terrain top rect 1,1 4x2`, docs);
       void TRANSPARENT; void layoutOf;
     });
   }
+});
+
+describe('item 5: a fill for tiles layers; walkable ground', () => {
+  const grass = run(EMPTY, `new tile grass ${T}x${T}\nrect 0,0 ${T}x${T} c=leaf fill`).doc!;
+  const flag = run(EMPTY, `new tile flag ${T}x${T}\nrect 0,0 ${T}x${T} c=stone fill`).doc!;
+  const hut = run(EMPTY, `new object hut ${T * 2}x${T} cell=${T}x${T}\nrect 0,0 ${T * 2}x${T} c=rust fill\nfootprint 2x1`).doc!;
+  // A path family: the terrain is the path, its outside (the filled ground) grass.
+  const path = run(EMPTY, `new family lane ${T}x${T} scheme=blob47
+rect @cell(inside) 0,0 ${T}x${T} c=stone fill
+rect @cell(outside) 0,0 ${T}x${T} c=leaf fill
+family band 1:outside 1:moss`).doc!;
+  const docs = { grass, flag, hut, lane: path };
+
+  it('tiles <layer> fill lays a tile on every empty cell (or a box), leaving what is placed', () => {
+    const st = runMap(EMPTY, `new map m 6x4 tile=${T}
+place flag 2,1 layer=floor
+tiles floor fill grass
+tiles floor fill flag 4,2 2x2`, docs);
+    const line = st.entries.find((e) => e.cmd.startsWith('tiles floor fill grass'))!.cmd;
+    expect(line).toBe('tiles floor fill grass 0,0 6x4 cells=1x1 anchor=0,0');
+    const c = composeMapDoc(st.doc!, world(docs));
+    const names = c.top.map((x) => x?.asset ?? '-');
+    expect(names.join(' ')).toBe(['grass grass grass grass grass grass', 'grass grass flag grass grass grass', 'grass grass grass grass grass grass', 'grass grass grass grass grass grass'].join(' '));
+    // The box only fills empty cells; replace covers one-cell tiles too.
+    const st2 = runMap(st, 'tiles floor fill flag 4,2 2x2 replace', docs);
+    expect(composeMapDoc(st2.doc!, world(docs)).top.filter((x) => x?.asset === 'flag').length).toBe(5);
+    // Replays byte for byte without the assets.
+    const r = replay(st2.entries, palettes);
+    expect(serializeDoc(r.doc!)).toEqual(serializeDoc(st2.doc!));
+    expect(() => runMap(st, 'tiles floor fill hut', docs)).toThrow(/one-cell tiles/);
+  });
+
+  it('walkable=on: objects may stand on a terrain layer\'s filled ground', () => {
+    const map = (walk: string) => runMap(EMPTY, `new map m 8x6 tile=${T}
+layer add ground terrain=lane outside=on${walk}
+terrain ground rect 0,2 8x1
+layer add props objects
+place hut 1,4 layer=props`, docs);
+    const fp = (st: AssetState) => mapChecks(st.doc!, world(docs)).find((x) => x.id === 'footprint')!;
+    expect(fp(map('')).pass).toBe(false);
+    const st = map(' walkable=on');
+    expect(st.entries[1]!.cmd).toBe('layer add ground terrain=lane outside=on walkable=on above=floor');
+    expect(fp(st).pass).toBe(true);
+    expect(deserializeDoc(serializeDoc(st.doc!)).layers.find((l) => l.name === 'ground')!.map).toEqual({ kind: 'terrain', family: 'lane', outside: true, walkable: true });
+    // layer set turns it on and off.
+    expect(fp(runMap(map(''), 'layer set ground walkable=on', docs)).pass).toBe(true);
+    expect(fp(runMap(st, 'layer set ground walkable=off', docs)).pass).toBe(false);
+  });
 });

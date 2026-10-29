@@ -279,6 +279,52 @@ const removeCmd: CommandSpec = {
   },
 };
 
+// --- tiles fill
+
+const tilesCmd: CommandSpec = {
+  name: 'tiles',
+  summary: 'tiles <tiles layer> fill <asset>|<family>.<variant> [<x,y> <W>x<H>] [replace]   (lays a one-cell tile on every empty cell of the layer, or of the box; replace also covers one-cell tiles already there; the map picks among the tile\'s texture variants)',
+  normalise(cmd, ctx) {
+    const doc = mapOf(cmd, ctx);
+    const a = new Args(cmd, ['cells', 'anchor'], ['replace']);
+    const lt = a.take('word', 'a tiles layer');
+    const li = layerNamed(doc, lt, ['tiles']);
+    const how = a.take('word', 'fill');
+    if (how.v !== 'fill') throw new DiagError(how.line, how.col, `tiles: expected fill`);
+    const what = a.take('word', 'an asset name');
+    const thing = thingName(what);
+    let box = { x: 0, y: 0, w: doc.width, h: doc.height };
+    if (a.peek()?.t === 'point') {
+      const p = a.take('point', 'a corner x,y');
+      const sz = a.take('size', 'a size WxH');
+      if (sz.w < 1 || sz.h < 1) throw new DiagError(sz.line, sz.col, `tiles fill: the box must be at least 1x1`);
+      box = { x: p.x, y: p.y, w: sz.w, h: sz.h };
+    }
+    a.done();
+    const replace = a.flags.some((f) => f.v === 'replace');
+    const fp = footprintFor(a, ctx, thing.name, thing.variant, what, 'tiles');
+    if (fp.cols !== 1 || fp.rows !== 1) throw new DiagError(what.line, what.col, `tiles fill lays one-cell tiles; '${thing.name}' is ${fp.cols}x${fp.rows} cells (place it instead)`);
+    const e: MapEntry = { name: thing.name, variant: thing.variant, ...fp };
+    // The cells to fill, worked out now so the line replays without the asset.
+    const { grid, placed } = occupancy(doc, li);
+    const cells: number[] = [];
+    for (let y = Math.max(0, box.y); y < Math.min(doc.height, box.y + box.h); y++) for (let x = Math.max(0, box.x); x < Math.min(doc.width, box.x + box.w); x++) {
+      const k = grid[y * doc.width + x]!;
+      if (k < 0) { cells.push(y * doc.width + x); continue; }
+      const q = placed[k]!, o = doc.map!.entries[q.entry]!;
+      if (replace && o.cols === 1 && o.rows === 1 && q.x === x && q.y === y) cells.push(y * doc.width + x);
+    }
+    return {
+      text: `tiles ${lt.v} fill ${what.v} ${box.x},${box.y} ${box.w}x${box.h} ${entryText(fp)}${replace ? ' replace' : ''}`,
+      op: fn((d) => {
+        const v = entryIndex(d, e);
+        const cel = d.cels[li]![0]!;
+        for (const i of cells) cel[i] = v;
+      }),
+    };
+  },
+};
+
 // --- road
 
 /** A route through points, along x then y between each pair (4-connected, so path schemes join it up). */
@@ -691,7 +737,7 @@ const variantCmd: CommandSpec = {
   },
 };
 
-for (const c of [terrainCmd, placeCmd, moveCmd, removeCmd, roadCmd, mapCmd, footprintCmd, variantCmd]) registerCommand(c);
+for (const c of [terrainCmd, tilesCmd, placeCmd, moveCmd, removeCmd, roadCmd, mapCmd, footprintCmd, variantCmd]) registerCommand(c);
 
 // `scatter` on a map places assets; elsewhere it is the stamp generator.
 const pixelScatter = COMMANDS.get('scatter')!;
