@@ -602,6 +602,46 @@ export function mapAscii(d: Doc, c?: ComposedMap): string {
   return [`cells (${[...legend, ...[...names].map(([n, ch]) => `${ch} ${n}`), '+ under an object, . nothing'].join(', ')}):`, tens, ones, ...rows].join('\n');
 }
 
+/**
+ * The cells of a map as a reviewer sees them (G13, the review bundle's cells.txt): a lower-case
+ * letter for the ground each cell shows (a terrain, its outside ground, a tile), a capital where
+ * an object stands (its anchor cell), '+' under the rest of an object, '.' nothing.
+ */
+export function mapCellsText(d: Doc, c: ComposedMap): string {
+  const W = d.width, H = d.height;
+  const g = Array.from({ length: W * H }, () => '.');
+  const taken = new Set(['.', '+']);
+  const letters = new Map<string, string>();
+  const letter = (key: string, name: string, upper: boolean): string => {
+    const had = letters.get(key);
+    if (had) return had;
+    const cands = [...name.replace(/[^a-z]/gi, ''), ...'abcdefghijklmnopqrstuvwxyz'].map((x) => (upper ? x.toUpperCase() : x.toLowerCase()));
+    const ch = cands.find((x) => !taken.has(x)) ?? '?';
+    taken.add(ch);
+    letters.set(key, ch);
+    return ch;
+  };
+  for (let i = 0; i < W * H; i++) {
+    const t = c.top[i];
+    if (!t) continue;
+    g[i] = t.variant === 'outside' ? letter(`${t.asset} outside`, t.asset, false) : letter(t.asset, t.asset, false);
+  }
+  const names = new Map<string, string>();
+  for (const p of placements(d)) {
+    if (d.layers[p.layer]!.map?.kind !== 'objects' || d.layers[p.layer]!.hidden) continue;
+    const e = d.map!.entries[p.entry]!;
+    names.set(e.name, letter(`object ${e.name}`, e.name, true));
+    const b = entryBox(e, p.x, p.y);
+    for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) if (x >= 0 && y >= 0 && x < W && y < H) g[y * W + x] = '+';
+    if (p.x >= 0 && p.y >= 0 && p.x < W && p.y < H) g[p.y * W + p.x] = names.get(e.name)!;
+  }
+  const legend = [...letters].map(([k, ch]) => `${ch} ${k.startsWith('object ') ? k.slice(7) : k.endsWith(' outside') ? `${k.slice(0, -8)}'s outside ground` : k}`);
+  const tens = '     ' + Array.from({ length: W }, (_, x) => (x % 10 === 0 ? String(Math.floor(x / 10) % 10) : ' ')).join('');
+  const ones = '     ' + Array.from({ length: W }, (_, x) => String(x % 10)).join('');
+  const rows = Array.from({ length: H }, (_, y) => `${String(y).padStart(3)}  ${g.slice(y * W, y * W + W).join('')}`);
+  return [`cells (columns across, rows down; ${[...legend, '+ under an object, . nothing'].join(', ')}):`, tens, ones, ...rows].join('\n');
+}
+
 /** The tile at each cell, as rows of short labels (the topmost ground tile; objects' anchors marked). */
 export function mapTilesText(c: ComposedMap): string {
   const labels = new Map<string, string>();

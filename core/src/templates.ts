@@ -58,6 +58,12 @@ function paintTerrain(img: Rgba, s: Scheme, terrain: Terrain, t: number, g: Geom
   const maps = bandMaps(s, t, g);
   variants.forEach((v, i) => {
     const mx = (i % terrain.cols) * t + ox, my = Math.floor(i / terrain.cols) * t + oy;
+    if (v !== null && s.variants[v]!.on === 'face') {
+      // A face below the terrain (G13): its upper half in the face colour, on the outside.
+      if (c.outside) fillRect(img, mx, my, t, t, c.outside);
+      fillRect(img, mx, my, t, Math.max(1, t / 2), darker(c.band));
+      return;
+    }
     for (let y = 0; y < t; y++) for (let x = 0; x < t; x++) {
       const b = v === null ? -1 : maps[v]![y * t + x]!;
       const fill = b >= 0 && b < g.bands.length ? g.bands[b]!.fill : null;

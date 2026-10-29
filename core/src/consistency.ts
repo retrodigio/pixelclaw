@@ -251,11 +251,13 @@ export function consistencyOf(d: Doc, peers: { name: string; doc: Doc }[], o: Co
     const mine = get(me);
     const vals = theirs.filter((t) => !sameMaterial || (t.m.material !== null && t.m.material === me.material)).map((t) => get(t.m)).filter((x): x is number => x !== null);
     if (mine === null || vals.length < 2) return;
-    const med = median(vals);
+    // The median of the whole set, this asset included (G13): every member is held to one centre,
+    // so on a small set one odd asset is the outlier, not the two that disagree with it.
+    const med = median([...vals, mine]);
     const off = ratio ? (med > 0 ? Math.max(mine / med, med / mine) : 1) : Math.abs(mine - med);
     parts.push({
       name, value: mine, limit: ratio ? `× ${limit} of the set's ${fmt(med)}` : `± ${fmt(limit)} of the set's ${fmt(med)}`, pass: off <= limit,
-      detail: `${fmt(mine)} against the set's median ${fmt(med)} (${vals.length} others${sameMaterial ? ` mostly in ${me.material}` : ''})`,
+      detail: `${fmt(mine)} against the set's median ${fmt(med)} (with ${vals.length} others${sameMaterial ? ` mostly in ${me.material}` : ''})`,
     });
     void key;
   };

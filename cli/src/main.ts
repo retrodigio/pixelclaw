@@ -149,7 +149,7 @@ function loadState(proj: Project, name: string): AssetState {
 /** A running server is the single writer for its project; the CLI does not write behind its back. */
 function assertNoServer(proj: Project): void {
   const held = lockHolder(proj.dir);
-  if (held) throw new ProjectError(`a pixelclaw server (pid ${held.pid}) owns ${proj.dir}; send commands through it (MCP), or stop it first`);
+  if (held) throw new ProjectError(`a pixelclaw server (pid ${held.pid}) owns ${proj.dir}; send commands through it (MCP: run, export, import), or stop it first`);
 }
 
 function apply(io: Io, proj: Project, text: string, source: string, o: { asset?: string; replace: boolean; by: string; dry?: boolean }): { code: number; doc?: Doc } {
@@ -431,6 +431,7 @@ function cmdExport(io: Io, p: Parsed): number {
   const format = one(p, 'format') as ExportFormat;
   if (!(EXPORT_FORMATS as readonly string[]).includes(format)) throw new UsageError(`--format must be one of ${EXPORT_FORMATS.join(', ')}`);
   const proj = loadProject(dir);
+  assertNoServer(proj);
   const w = new Writer(proj);
   const files = exportAsset(w.doc(name), w.assetDocs(), format, one(p, 'out') ?? join(proj.dir, 'exports', format));
   io.out(`${format}: wrote ${files.length} files\n${files.map((f) => `  ${f}\n`).join('')}`);
@@ -441,6 +442,7 @@ function cmdExportProfile(io: Io, p: Parsed): number {
   const [dir, ...names] = p.pos;
   if (!dir) throw new UsageError('export: give a project folder');
   const proj = loadProject(dir);
+  assertNoServer(proj);
   const w = new Writer(proj);
   const profile = one(p, 'profile') ?? 'png';
   const r = exportWithProfile(proj, w.assetDocs(), profile, { names: names.length ? names : undefined, dest: one(p, 'out'), at: io.now() });

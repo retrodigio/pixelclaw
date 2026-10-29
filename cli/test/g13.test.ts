@@ -1,6 +1,6 @@
 // G13 (plan §23) from the command line: `run --dry` and `seeds`, and an export refused while a
 // server owns the project.
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -43,5 +43,20 @@ describe('run --dry and seeds', () => {
     const a = cli(['seeds', proj, 'turf', 'noise', 'ramp=moss', 'density=0.2', '--count', '4', '--apply']);
     expect(a.out).toContain('turf: applied 1 command as group');
     expect(readFileSync(join(proj, 'assets', 'turf', 'tape.jsonl'), 'utf8')).toContain(best.replace(/^noise /, ''));
+  });
+});
+
+describe('item 10: export while a server owns the project', () => {
+  it('is refused, and nothing is written', () => {
+    // A live process (this test's parent) holds the lock, as a running pixelclaw serve would.
+    writeFileSync(join(proj, '.pixelclaw.lock'), JSON.stringify({ pid: process.ppid, url: 'http://127.0.0.1:7417/' }) + '\n');
+    const r = cli(['export', proj, '--profile', 'png']);
+    expect(r.code).toBe(1);
+    expect(r.err).toMatch(/a pixelclaw server \(pid \d+\) owns .*send commands through it \(MCP: run, export, import\)/);
+    expect(existsSync(join(proj, 'exports'))).toBe(false);
+    const f = cli(['export', proj, 'turf', '--format', 'png']);
+    expect(f.code).toBe(1);
+    rmSync(join(proj, '.pixelclaw.lock'));
+    expect(cli(['export', proj, '--profile', 'png']).code).toBe(0);
   });
 });

@@ -7,7 +7,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  animGifFrames, cameraOf, cameraRegion, composeMap, composeMapDoc, mapAscii, mapWorld, paintComposed, drawScaleOf, encodeGif, encodePng, flatten, groundOf, islandTerrain, mapGifFrames, renderAnimSheet, renderFamilyView, renderGame, renderMap,
+  animGifFrames, cameraOf, cameraRegion, composeMap, composeMapDoc, mapCellsText, mapWorld, paintComposed, drawScaleOf, encodeGif, encodePng, flatten, groundOf, islandTerrain, mapGifFrames, renderAnimSheet, renderFamilyView, renderGame, renderMap,
   renderScaled, renderTile3x3, schemeOf, setName, setOf, type AssetDoc, type Doc,
 } from '@pixelclaw/core';
 import { ProjectError } from './project.ts';
@@ -38,7 +38,7 @@ You are reviewing pixel art for a game, with fresh eyes. Judge only what you see
 - \`scenes/<map>.png\`: each scene (a place built from the tiles and objects) whole, at 1x;
   \`scenes/<map>.screen<n>.png\`: screens of it at the game's draw scale (${o.scale}x), what a player
   sees, \`scenes/<map>.screens.txt\` says which cells each shows; \`scenes/<map>.cells.txt\` maps every cell (a letter per
-  ground, a capital where an object stands).
+  ground it shows, a capital where an object stands).
 - \`palette.md\`: the colours the art uses.${o.style ? '\n- `style.md`: the style guide.' : ''}${o.brief ? '\n- `brief.md`: the game\'s theme and what each piece is meant to be.' : ''}
 
 Tiles:
@@ -180,7 +180,7 @@ export function writeReview(w: Writer, o: { assets?: string[]; set?: string; nam
     const world = mapWorld(all);
     const c = composeMapDoc(a.doc, world);
     save(`scenes/${a.name}.png`, encodePng(paintComposed(c, { scale: 1 })));
-    save(`scenes/${a.name}.cells.txt`, `The cells of scenes/${a.name}.png (${c.t} px each at 1x).\n\n${mapAscii(a.doc)}\n`);
+    save(`scenes/${a.name}.cells.txt`, `The cells of scenes/${a.name}.png (${c.t} px each at 1x).\n\n${mapCellsText(a.doc, c)}\n`);
     const [sw, sh] = cameraOf(style);
     const used = c.top.map((t, i) => (t && t.variant !== 'outside' ? i : -1)).filter((i) => i >= 0);
     const xs = used.map((i) => i % c.cols), ys = used.map((i) => Math.floor(i / c.cols));

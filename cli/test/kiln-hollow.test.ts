@@ -86,7 +86,14 @@ describe('examples/kiln-hollow.pclaw', () => {
       run('yard', script('yard.pclaw'));
       const u = await w.runAsync({ asset: 'yard', commands: `underlay import ${join(SRC, 'yard-mockup.png')} layout=${join(SRC, 'yard-layout.png')}`, by: 'claude' });
       expect(u.ok).toBe(true);
-      run('yard', 'snap');
+      // The yard was snapped in G11, before snap fitted the placement's grid by default (G13):
+      // the default gives the same rows (only the recorded pitch and offset round differently).
+      // So the recorded G11 line is run as it is, after checking the default gives its rows.
+      const placed = w.dry({ asset: 'yard', commands: 'snap', by: 'claude' });
+      const recorded = tape(PROJECT, 'yard').find((e) => e.cmd.startsWith('snap '))!.cmd;
+      const rows = (c: string) => c.split('\n').slice(1).join('\n');
+      expect(placed.ok && rows(placed.added[0]!.cmd)).toBe(rows(recorded));
+      run('yard', recorded);
       for (const t of ['sage', 'yard_clay', 'shallows']) { run(t, script(`${t}.pclaw`)); run(t, script(`${t}_clean.pclaw`)); }
       run('yard', 'layer set draft reference=on');
       run('hollow_type', script('hollow_type.pclaw'));
