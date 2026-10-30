@@ -74,12 +74,14 @@ Fonts and icons:
   new font <name> <W>x<H> chars="ABC…"|32-126 [cols=16] [baseline=<row>] [line=<px>] [spacing=1]   a glyph sheet: one W x H cell per character
   glyph A [advance=<n>|auto] <<  rows  >>    (letters and digits as themselves; other characters as U+0021 or "!")   font set baseline= line= spacing=
   icon mode=tone|full|channel   how an icon is exported (tone: roles recoloured by the game; full: as drawn; channel: pure-RGB masks)
-Autotile families (a sheet of every variant of a scheme: blob47, wang16-corner, path, bridge8, single, face):
+Autotile families (a sheet of every variant of a scheme: blob47, blob47-round, wang16-corner, path, bridge8, single, face, lane):
   new family <name> <T>x<T> scheme=<scheme> [map=<C>x<R>]   layers ground (the textures, laid by the band) and band (the band's art)
   family texture inside|outside from=<tile asset> [frame=<n>]    copy a seamless tile into the inside or outside texture
   family band <w>:<colour|outside|inside>... [radius=<r>] [inset=<n>] [jitter=<n> [seed=]] [draw=on|off]   the band from the edge in (3:outside 1:foam 2:sand1); draws it on the pieces; jitter: edges wobble up to n px (try seeds with the seeds tool)
   family band from=<family>   copy another family's band (variant of=<base> band=inherit does this after every change to the base: a texture variant that follows later fixes)
   layer band ; paint @cell(o) 0,0 << ... >>   hand-detail a piece (cells by name: @cell(inside), @cell(nesw)); every other variant is built from the pieces' quadrants, live
+  face scheme (cliffs): south faces below the terrain (face_o, face_ew, face_ie_iw: ends, middle, inner corners), side faces beside it (side_e, side_e_ns, side_w, side_w_ns), corner_ew; draw them on the band layer; face_ew_b/_c, side_*_ns_b are other looks of the middles (family detach face_ew_b, then draw it)
+  lane scheme: a path that fills where it is wide (a plain middle) and turns diagonally (a cell joined across a corner draws a strip to it)
   family detach|attach <variant>|all   draw a variant by hand instead   |   family coverage [seed=] [copies=] [fill=on] (a coverage map to paint)   |   family cut [textures=on]
   new overlay <name> <W>x<H> ; overlay set mode=cycle|pingpong|wave|sparkle on=outside|inside|all [anchor=x,y] [spread=4x2] [every=3]   sub-tile sprites over a map (view map with=)
 Oversized tiles and objects (48x48, 24x48, …; cell= the grid): new object house 48x48 cell=24x24 ; footprint 2x1 [at=<cx,cy>] [anchor=<x,y>] << a row per art cell row: . b (blocks) r (roof, drawn above actors) x (both) >>

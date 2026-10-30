@@ -1,6 +1,6 @@
 {
   "name": "face",
-  "description": "blob47 plus a south face: a cell below the terrain (and not in it) gets a face piece, joined east and west to the faces beside it: 47 + 4 variants",
+  "description": "blob47 and a cliff's faces in the cells around it: south faces below the terrain (ends, joins, inner corners), side faces beside its east and west edges, corners where they meet, and alternate looks of the long middles: 47 + 28 variants",
   "neighbours": "8",
   "cornerRule": true,
   "columns": 8,
@@ -11,12 +11,25 @@
     "ns",
     "nesw_ne_se_sw_nw",
     "face_o",
-    "face_ew"
+    "face_ew",
+    "face_ie_iw",
+    "side_e",
+    "side_e_ns",
+    "side_w",
+    "side_w_ns",
+    "corner_ew"
   ],
   "faces": true,
+  "sides": true,
   "kinds": {
     "faceend": "out",
-    "facemid": "out"
+    "facemid": "out",
+    "faceinner": "out",
+    "sidetop": "out",
+    "sidemid": "out",
+    "sidebot": "out",
+    "cornere": "out",
+    "cornerw": "out"
   },
   "variants": [
     {"name":"o","key":0,"quads":["outer","outer","outer","outer"]},
@@ -69,6 +82,30 @@
     {"name":"face_o","key":0,"quads":["faceend","faceend","faceend","faceend"],"on":"face"},
     {"name":"face_e","key":4,"quads":["faceend","facemid","faceend","facemid"],"on":"face"},
     {"name":"face_ew","key":68,"quads":["facemid","facemid","facemid","facemid"],"on":"face"},
-    {"name":"face_w","key":64,"quads":["facemid","faceend","facemid","faceend"],"on":"face"}
+    {"name":"face_w","key":64,"quads":["facemid","faceend","facemid","faceend"],"on":"face"},
+    {"name":"face_ie","key":8,"quads":["faceend","faceinner","faceend","faceinner"],"on":"face"},
+    {"name":"face_iw","key":32,"quads":["faceinner","faceend","faceinner","faceend"],"on":"face"},
+    {"name":"face_e_iw","key":36,"quads":["faceinner","facemid","faceinner","facemid"],"on":"face"},
+    {"name":"face_ie_iw","key":40,"quads":["faceinner","faceinner","faceinner","faceinner"],"on":"face"},
+    {"name":"face_ie_w","key":72,"quads":["facemid","faceinner","facemid","faceinner"],"on":"face"},
+    {"name":"side_e","key":64,"quads":["sidetop@nw","out","sidebot@sw","out"],"on":"side"},
+    {"name":"side_e_n","key":65,"quads":["sidemid@nw","out","sidebot@sw","out"],"on":"side"},
+    {"name":"side_e_s","key":80,"quads":["sidetop@nw","out","sidemid@sw","out"],"on":"side"},
+    {"name":"side_e_ns","key":81,"quads":["sidemid@nw","out","sidemid@sw","out"],"on":"side"},
+    {"name":"side_w","key":4,"quads":["out","sidetop@ne","out","sidebot@se"],"on":"side"},
+    {"name":"side_w_n","key":5,"quads":["out","sidemid@ne","out","sidebot@se"],"on":"side"},
+    {"name":"side_w_s","key":20,"quads":["out","sidetop@ne","out","sidemid@se"],"on":"side"},
+    {"name":"side_w_ns","key":21,"quads":["out","sidemid@ne","out","sidemid@se"],"on":"side"},
+    {"name":"side_ew","key":68,"quads":["sidetop@nw","sidetop@ne","sidebot@sw","sidebot@se"],"on":"side"},
+    {"name":"side_ew_n","key":69,"quads":["sidemid@nw","sidemid@ne","sidebot@sw","sidebot@se"],"on":"side"},
+    {"name":"side_ew_s","key":84,"quads":["sidetop@nw","sidetop@ne","sidemid@sw","sidemid@se"],"on":"side"},
+    {"name":"side_ew_ns","key":85,"quads":["sidemid@nw","sidemid@ne","sidemid@sw","sidemid@se"],"on":"side"},
+    {"name":"corner_e","key":128,"quads":["cornere","out","out","out"],"on":"corner"},
+    {"name":"corner_w","key":2,"quads":["out","cornerw","out","out"],"on":"corner"},
+    {"name":"corner_ew","key":130,"quads":["cornere","cornerw","out","out"],"on":"corner"},
+    {"name":"face_ew_b","key":null,"quads":["facemid","facemid","facemid","facemid"],"on":"face","alt":"face_ew"},
+    {"name":"face_ew_c","key":null,"quads":["facemid","facemid","facemid","facemid"],"on":"face","alt":"face_ew"},
+    {"name":"side_e_ns_b","key":null,"quads":["sidemid@nw","out","sidemid@sw","out"],"on":"side","alt":"side_e_ns"},
+    {"name":"side_w_ns_b","key":null,"quads":["out","sidemid@ne","out","sidemid@se"],"on":"side","alt":"side_w_ns"}
   ]
 }

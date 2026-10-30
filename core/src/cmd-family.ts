@@ -9,7 +9,7 @@ import {
   BAND_LAYER, GROUND_LAYER, bandMaps, composeMap, coverageTerrain, cutFamily, familyCell, layoutOf, schemeOf, variantCounts,
 } from './family.ts';
 import { DiagError, parse, type ParsedCommand } from './parser.ts';
-import { reachable, type Band, type BandFill } from './schemes.ts';
+import { isFace, reachable, type Band, type BandFill } from './schemes.ts';
 
 function familyOf(cmd: ParsedCommand, ctx: NormaliseContext): { doc: Doc; f: FamilyState } {
   const doc = needDoc(cmd, ctx);
@@ -244,8 +244,8 @@ function bandCmd(a: Args, doc: Doc, f: FamilyState, ctx: NormaliseContext): { te
       const t = fam.tile;
       const L = layoutOf(fam);
       const maps = bandMaps(s, t, geometry);
-      // Face pieces are the face's own art, drawn by hand outside the terrain: the band leaves them (G13).
-      const pieces = s.pieces.map((p) => s.byName.get(p)!).filter((v) => s.variants[v]!.on !== 'face');
+      // Face pieces (south, side, corner) are the face's own art, drawn by hand outside the terrain: the band leaves them (G13, G16).
+      const pieces = s.pieces.map((p) => s.byName.get(p)!).filter((v) => !isFace(s.variants[v]!.on));
       const seen = new Set<Uint16Array>();
       for (const cel of d.cels[bl]!) {
         if (seen.has(cel)) continue;

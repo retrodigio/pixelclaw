@@ -112,7 +112,7 @@ describe('underlay generate through the OpenAI provider (a fake client)', () => 
     expect(JSON.parse(sent[1]!.body)).toEqual({ model: 'gpt-image-1', prompt: 'again', size: '1536x1024', quality: 'low', n: 1 });
     expect(readCostLog(p)[1]).toMatchObject({ ok: true, actual: (40 * 5 + 360 * 10 + 1056 * 40) / 1e6 });
     expect(leaks(p.dir)).toEqual([]);
-  });
+  }, 60_000); // two 1536x1024 images through the pure-JS PNG coder: slow when the whole suite runs at once
 
   it('errors that echo the key are scrubbed, in the message and the log', async () => {
     const p = project();

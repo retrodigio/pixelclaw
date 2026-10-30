@@ -169,7 +169,14 @@ ruler-straight; pick its seed with `seeds`), then hand-detail the pieces on the 
 @cell(o) …`); every variant follows. Judge on `view map` (seam ≤ 1, ideally ≤ 0.5) and `view
 family`. The family follows the tiles its textures came `from=`: fix the tile, and the family is
 copied again. Rounder corners: `scheme=blob47-round` (built in; fillets). Cliffs: `scheme=face`, paint
-`@cell(face_o)` and `@cell(face_ew)`. A texture variant that should follow later band fixes:
+the faces on the band layer: south faces `@cell(face_o)` (ends), `@cell(face_ew)` (the middle),
+`@cell(face_ie_iw)` (inner corners, where the face meets the terrain beside it); side faces
+`@cell(side_e)`/`@cell(side_e_ns)` on the cell's west half (the terrain's east side) and
+`side_w`/`side_w_ns` on its east half; `@cell(corner_ew)` where a side meets the south face's end.
+Give a long cliff other looks: `family detach face_ew_b` (and `face_ew_c`, `side_e_ns_b`,
+`side_w_ns_b`) and draw them; a map spreads them by cell. Roads and rivers that widen or step
+diagonally: `scheme=lane` (a wide lane has a plain middle; a diagonal step draws a strip to the
+corner). A texture variant that should follow later band fixes:
 `fork <f> <f>_b`, `variant of=<f> band=inherit`, then change only its textures. After a `family
 cut`, heed the seam warning.
 

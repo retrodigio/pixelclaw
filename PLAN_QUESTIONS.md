@@ -1466,3 +1466,27 @@ Points where the plan was unclear or silent. Each has the reading that was follo
      a one-step darker shadow side facing away from the light and a one-step lighter lit pixel
      (a pair on small stones, two on big ones); tufts colour their blades by side. Both take
      `seed=`, so `seeds` ranks them as any generator (its messages now list them).
+
+218. **"Side faces (east, west), inner corners"** (item 2). *Reading:* as the south face is art drawn
+     into the cell below the terrain, side faces are art drawn into the cell beside its east or west
+     edge (on the half of the cell next to the terrain), joining the side face above and below, and
+     a corner piece goes in the cell diagonally below where a side face meets the south face's end.
+     "Inner corners" are the faces' own: a south face whose cell has terrain beside it (the face
+     meets the terrain's side) takes an inner-corner half instead of an end (`face_ie`, `face_iw`).
+     The south face wins over a side face in a cell that could be both. A cell that was `face_o`
+     beside terrain in G13 is now `face_ie`; a project scheme copied into a tape before G16 (no
+     inner variants) still resolves as it did.
+
+219. **"Face variants"** (item 2). *Reading:* other looks of the long middles (the south face's
+     `face_ew`, the side faces' `side_e_ns`, `side_w_ns`), placed instead of the middle on some cells
+     by a hash of the cell, so a long cliff is not one tile repeated. Each starts as a copy of its
+     middle (built from the same pieces) and becomes its own with `family detach` and drawing; the
+     family's texture variants (`variant of=`) still work as before.
+
+220. **"A filled path family with a plain centre (no island per tile); a path that turns
+     diagonally"** (item 2). *Reading:* a new built-in scheme `lane`: eight neighbours, inset like
+     `path`, a corner counting when both sides beside it are the lane (so a wide lane is filled:
+     `path`, with four neighbours, shows the outside at every inside corner, an island per tile) or
+     when neither is (a diagonal step draws a strip to that corner; the cells beside the step carry
+     its edge, like fillets). The diagonal strips are measured across a row (W·√2 wide as 99/70) so
+     their bands step cleanly at 45°. `path` itself is unchanged (existing tapes replay as they were).

@@ -9,7 +9,7 @@
 import { coverageTerrain, bandMaps, islandTerrain, variantCounts } from './family.ts';
 import { createRgba, type Rgba } from './png.ts';
 import { drawLabel } from './render.ts';
-import { reachable, resolveMap, type Band, type Geometry, type Scheme, type Terrain } from './schemes.ts';
+import { isFace, reachable, resolveMap, type Band, type Geometry, type Scheme, type Terrain } from './schemes.ts';
 import { parseSize, setName, type Manifest, type ManifestAsset } from './manifest.ts';
 import { Pcg32 } from './pcg.ts';
 
@@ -58,10 +58,13 @@ function paintTerrain(img: Rgba, s: Scheme, terrain: Terrain, t: number, g: Geom
   const maps = bandMaps(s, t, g);
   variants.forEach((v, i) => {
     const mx = (i % terrain.cols) * t + ox, my = Math.floor(i / terrain.cols) * t + oy;
-    if (v !== null && s.variants[v]!.on === 'face') {
-      // A face below the terrain (G13): its upper half in the face colour, on the outside.
+    if (v !== null && isFace(s.variants[v]!.on)) {
+      // A face (G13): a south face's upper half in the face colour, on the outside; a side face's or
+      // a corner's quadrants that carry it (G16).
       if (c.outside) fillRect(img, mx, my, t, t, c.outside);
-      fillRect(img, mx, my, t, Math.max(1, t / 2), darker(c.band));
+      const x = s.variants[v]!;
+      if (x.on === 'face') fillRect(img, mx, my, t, Math.max(1, t / 2), darker(c.band));
+      else x.quads.forEach((k, q) => { if (k !== 'out') fillRect(img, mx + (q & 1 ? t / 2 : 0), my + (q & 2 ? t / 2 : 0), t / 2, t / 2, darker(c.band)); });
       return;
     }
     for (let y = 0; y < t; y++) for (let x = 0; x < t; x++) {

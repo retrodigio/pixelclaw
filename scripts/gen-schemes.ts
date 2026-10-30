@@ -15,10 +15,10 @@ const N = 1, NE = 2, E = 4, SE = 8, S = 16, SW = 32, W = 64, NW = 128;
 const SIDES: [number, string][] = [[N, 'n'], [E, 'e'], [S, 's'], [W, 'w']];
 const DIAGS: [number, string][] = [[NE, 'ne'], [SE, 'se'], [SW, 'sw'], [NW, 'nw']];
 
-interface Variant { name: string; key: number | null; quads: string[]; on?: 'face' | 'fillet' }
+interface Variant { name: string; key: number | null; quads: string[]; on?: 'face' | 'side' | 'corner' | 'fillet'; alt?: string }
 interface Scheme {
-  name: string; description: string; neighbours: '8' | '4' | 'axis' | 'corners' | 'none'; cornerRule?: boolean | 'either';
-  inset?: [number, number]; kinds?: Record<string, string>; faces?: boolean; fillets?: boolean; columns: number; pieces: string[]; variants: Variant[];
+  name: string; description: string; neighbours: '8' | '4' | 'axis' | 'corners' | 'none'; cornerRule?: boolean | 'either' | 'diagonal';
+  inset?: [number, number]; kinds?: Record<string, string>; faces?: boolean; sides?: boolean; fillets?: boolean; columns: number; pieces: string[]; variants: Variant[];
 }
 
 const sideName = (k: number) => SIDES.filter(([b]) => k & b).map(([, s]) => s).join('') || 'o';
@@ -108,18 +108,117 @@ function wang16(): Scheme {
   };
 }
 
+/**
+ * blob47 and the faces of a cliff drawn into the cells around it (G13, G16): a south face in the
+ * cell below the terrain, side faces in the cells beside its east and west edges, and a corner
+ * where a side face meets the end of the south face. Faces are art in cells outside the terrain;
+ * the band leaves them alone and the pieces' art (the band layer) is copied by quadrant.
+ *
+ * - South faces (a cell below the terrain): each half is an end, joins the face beside it (that
+ *   cell is below the terrain too: bit E or W), or meets the terrain beside it, an inner corner
+ *   (bit SE or SW). 9 variants: face_o, face_e, face_w, face_ew (G13), face_ie, face_iw, face_e_iw,
+ *   face_ie_w, face_ie_iw.
+ * - Side faces (a cell beside the terrain, not below it): on its west half when the terrain is to
+ *   the west (bit W: the terrain's east side), its east half when to the east (bit E); each joins
+ *   the face above (bit N: the terrain goes on above, diagonally) and below (bit S: the cell below
+ *   is not terrain), else it ends. side_e…, side_w…, side_ew…: 12 variants.
+ * - Corners (beside neither, the terrain diagonally above): corner_e (terrain to the north-west:
+ *   below the terrain's east side face, past the south face's east end), corner_w, corner_ew.
+ * - Alternates (G16 "face variants"): face_ew_b, face_ew_c, side_e_ns_b, side_w_ns_b are looks of
+ *   the long middles, placed by a hash of the cell; each is a copy of its middle until detached
+ *   (`family detach face_ew_b`) and drawn.
+ */
 function face(): Scheme {
   const b = blob47();
-  const faces: Variant[] = [
-    { name: 'face_o', key: 0, quads: ['faceend', 'faceend', 'faceend', 'faceend'], on: 'face' },
-    { name: 'face_e', key: E, quads: ['faceend', 'facemid', 'faceend', 'facemid'], on: 'face' },
-    { name: 'face_ew', key: E | W, quads: ['facemid', 'facemid', 'facemid', 'facemid'], on: 'face' },
-    { name: 'face_w', key: W, quads: ['facemid', 'faceend', 'facemid', 'faceend'], on: 'face' },
+  const end = (st: 'end' | 'join' | 'inner') => (st === 'end' ? 'faceend' : st === 'join' ? 'facemid' : 'faceinner');
+  const faces: Variant[] = [];
+  for (const w of ['end', 'join', 'inner'] as const) for (const e of ['end', 'join', 'inner'] as const) {
+    const key = (e === 'join' ? E : e === 'inner' ? SE : 0) | (w === 'join' ? W : w === 'inner' ? SW : 0);
+    const part = (st: string, j: string, i: string) => (st === 'join' ? j : st === 'inner' ? i : '');
+    const name = key === 0 ? 'face_o' : key === (E | W) ? 'face_ew' : `face_${[part(e, 'e', 'ie'), part(w, 'w', 'iw')].filter(Boolean).join(e === 'join' && w === 'join' ? '' : '_')}`;
+    faces.push({ name, key, quads: [end(w), end(e), end(w), end(e)], on: 'face' });
+  }
+  faces.sort((p, q) => p.key! - q.key!);
+  const sides: Variant[] = [];
+  for (const side of [W, E, W | E]) for (const ns of [0, N, S, N | S]) {
+    const tag = side === W ? 'e' : side === E ? 'w' : 'ew';
+    const top = ns & N ? 'sidemid' : 'sidetop', bot = ns & S ? 'sidemid' : 'sidebot';
+    // Quadrants NW NE SW SE: the strip on the side the terrain is on.
+    const quads = [side & W ? `${top}@nw` : 'out', side & E ? `${top}@ne` : 'out', side & W ? `${bot}@sw` : 'out', side & E ? `${bot}@se` : 'out'];
+    sides.push({ name: `side_${tag}${ns ? `_${ns & N ? 'n' : ''}${ns & S ? 's' : ''}` : ''}`, key: side | ns, quads, on: 'side' });
+  }
+  const corners: Variant[] = [
+    { name: 'corner_e', key: NW, quads: ['cornere', 'out', 'out', 'out'], on: 'corner' },
+    { name: 'corner_w', key: NE, quads: ['out', 'cornerw', 'out', 'out'], on: 'corner' },
+    { name: 'corner_ew', key: NW | NE, quads: ['cornere', 'cornerw', 'out', 'out'], on: 'corner' },
   ];
+  const alts: Variant[] = [
+    { name: 'face_ew_b', key: null, quads: ['facemid', 'facemid', 'facemid', 'facemid'], on: 'face', alt: 'face_ew' },
+    { name: 'face_ew_c', key: null, quads: ['facemid', 'facemid', 'facemid', 'facemid'], on: 'face', alt: 'face_ew' },
+    { name: 'side_e_ns_b', key: null, quads: ['sidemid@nw', 'out', 'sidemid@sw', 'out'], on: 'side', alt: 'side_e_ns' },
+    { name: 'side_w_ns_b', key: null, quads: ['out', 'sidemid@ne', 'out', 'sidemid@se'], on: 'side', alt: 'side_w_ns' },
+  ];
+  // The G13 faces keep their places (the first four after blob47's); the rest follow.
+  const g13 = ['face_o', 'face_e', 'face_ew', 'face_w'];
+  const ordered = [...g13.map((n) => faces.find((f) => f.name === n)!), ...faces.filter((f) => !g13.includes(f.name))];
   return {
     ...b, name: 'face',
-    description: 'blob47 plus a south face: a cell below the terrain (and not in it) gets a face piece, joined east and west to the faces beside it: 47 + 4 variants',
-    faces: true, kinds: { faceend: 'out', facemid: 'out' }, pieces: [...b.pieces, 'face_o', 'face_ew'], variants: [...b.variants, ...faces],
+    description: 'blob47 and a cliff\'s faces in the cells around it: south faces below the terrain (ends, joins, inner corners), side faces beside its east and west edges, corners where they meet, and alternate looks of the long middles: 47 + 28 variants',
+    faces: true, sides: true, kinds: { faceend: 'out', facemid: 'out', faceinner: 'out', sidetop: 'out', sidemid: 'out', sidebot: 'out', cornere: 'out', cornerw: 'out' },
+    pieces: [...b.pieces, 'face_o', 'face_ew', 'face_ie_iw', 'side_e', 'side_e_ns', 'side_w', 'side_w_ns', 'corner_ew'],
+    variants: [...b.variants, ...ordered, ...sides, ...corners, ...alts],
+  };
+}
+
+/**
+ * A lane (G16): a path that fills where it is wide and turns diagonally. Eight neighbours: a
+ * diagonal counts when both sides next to it are the lane (the corner is filled, as blob47's, so a
+ * lane two or more cells wide has a plain middle) and when neither is (a strip runs to that corner:
+ * a diagonal turn); with one side it does not. The strip is inset from the tile's edges like the
+ * path scheme's. Beside a diagonal strip through the middle, an empty corner carries its flank
+ * (diagside, outerdiag); a cell that joins only diagonally has a round middle (diagcap) instead of
+ * the square end of a straight strip; a cell outside the lane where a diagonal strip passes its
+ * corner (the lane on both sides next to that corner, not on the diagonal) gets that strip's edge
+ * (d_…).
+ */
+function lane(): Scheme {
+  const keys = new Set<number>();
+  for (let raw = 0; raw < 256; raw++) {
+    let k = raw & (N | E | S | W);
+    for (const [v, h, d] of CORNERS) if ((raw & d) && !!(raw & v) === !!(raw & h)) k |= d;
+    keys.add(k);
+  }
+  // The diagonals beside each corner (the other diagonal: NW's are NE and SW).
+  const beside: Record<number, number> = { [NW]: NE | SW, [NE]: NW | SE, [SW]: NW | SE, [SE]: NE | SW };
+  const ql = (k: number, v: boolean, h: boolean, d: number) => {
+    if (v && h) return k & d ? 'in' : 'inner';
+    if (v || h) return v ? 'vert' : 'horiz';
+    if (k & d) return 'diag';
+    // A corner with nothing: beside a diagonal strip through the middle, its flank; else a straight
+    // strip's end, or the round middle where the cell joins only diagonally.
+    const sides = k & (N | E | S | W), diags = k & (NE | SE | SW | NW);
+    if (k & beside[d]!) return sides ? 'outerdiag' : 'diagside';
+    return sides || !diags ? 'outer' : 'diagcap';
+  };
+  const variants: Variant[] = [...keys].sort((a, c) => a - c).map((k) => ({ name: blobName(k), key: k, quads: CORNERS.map(([v, h, d]) => ql(k, !!(k & v), !!(k & h), d)) }));
+  for (let m = 1; m < 16; m++) {
+    const k = (m & 1 ? NE : 0) | (m & 2 ? SE : 0) | (m & 4 ? SW : 0) | (m & 8 ? NW : 0);
+    const corners = DIAGS.filter(([bit]) => k & bit).map(([, n]) => n);
+    variants.push({ name: `d_${corners.join('_')}`, key: k, quads: [NW, NE, SW, SE].map((bit) => (k & bit ? 'diagfill' : 'out')), on: 'fillet' });
+  }
+  const pieces = ['o', 'nesw', 'ew', 'ns', 'nesw_ne_se_sw_nw'];
+  const have = (n: string) => variants.find((v) => v.name === n)!.quads.map((q, i) => `${q}@${i}`);
+  const need = new Set<string>();
+  for (const v of variants) v.quads.forEach((q, i) => { if (q !== 'out') need.add(`${q}@${i}`); });
+  for (const p of pieces) for (const q of have(p)) need.delete(q);
+  while (need.size) {
+    const best = variants.reduce((a, c) => (c.quads.filter((q, i) => need.has(`${q}@${i}`)).length > a.quads.filter((q, i) => need.has(`${q}@${i}`)).length ? c : a));
+    pieces.push(best.name);
+    best.quads.forEach((q, i) => need.delete(`${q}@${i}`));
+  }
+  return {
+    name: 'lane', description: `a path that fills where it is wide (a diagonal counts when both sides next to it are the lane) and turns diagonally (a lone diagonal draws a strip to that corner, and the cells beside it the strip's edge): ${variants.length - 15} variants + 15`,
+    neighbours: '8', cornerRule: 'diagonal', inset: [1, 4], columns: 8, pieces, variants,
   };
 }
 
@@ -186,6 +285,6 @@ mkdirSync(EXAMPLE, { recursive: true });
 // blob47-round is built in since G15 (plan §26 item 4); the example project keeps its own copy (its
 // tapes name it with def=, as a project scheme).
 write(EXAMPLE, blob47Round());
-for (const s of [blob47(), blob47Round(), wang16(), path(), bridge8(), single(), face()]) {
+for (const s of [blob47(), blob47Round(), wang16(), path(), bridge8(), single(), face(), lane()]) {
   write(OUT, s);
 }

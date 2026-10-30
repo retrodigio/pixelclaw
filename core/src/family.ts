@@ -290,7 +290,7 @@ export function islandTerrain(s: Scheme, cols: number, rows: number, seed: numbe
 /** How many times each variant appears on a map. */
 export function variantCounts(s: Scheme, terrain: Terrain): number[] {
   const n = new Array<number>(s.variants.length).fill(0);
-  for (const v of resolveMap(s, terrain)) if (v !== null) n[v]!++;
+  for (const v of resolveMap(s, terrain, 'not', false)) if (v !== null) n[v]!++;
   return n;
 }
 
@@ -309,13 +309,31 @@ export function neighbourhoodOf(s: Scheme, v: number): Terrain | null {
   }
   const cells = new Uint8Array(9);
   if (x.on === 'fillet') {
-    for (const [b, around] of [[2, [1, 2, 5]], [8, [5, 8, 7]], [32, [7, 6, 3]], [128, [3, 0, 1]]] as [number, number[]][]) if (x.key & b) for (const i of around) cells[i] = 1;
+    // Rounder inner corners: both sides and the diagonal; a lane's diagonal strip: both sides only.
+    const lane = s.cornerRule === 'diagonal';
+    for (const [b, around] of [[2, [1, 2, 5]], [8, [5, 8, 7]], [32, [7, 6, 3]], [128, [3, 0, 1]]] as [number, number[]][]) if (x.key & b) for (const i of around) if (!lane || i !== around[1]) cells[i] = 1;
     return { cols: 3, rows: 3, cells };
   }
   if (x.on === 'face') {
+    // Below the terrain; each side joins (the terrain above the cell beside it) or is an inner corner (the terrain beside it).
     cells[1] = 1;
     if (x.key & 4) cells[2] = 1;
     if (x.key & 64) cells[0] = 1;
+    if (x.key & 8) cells[2] = cells[5] = 1;
+    if (x.key & 32) cells[0] = cells[3] = 1;
+    return { cols: 3, rows: 3, cells };
+  }
+  if (x.on === 'side') {
+    // Beside the terrain (west: the terrain's east side); joining up when it goes on above, down unless it is below.
+    if (x.key & 64) cells[3] = 1;
+    if (x.key & 4) cells[5] = 1;
+    if (x.key & 1) { if (x.key & 64) cells[0] = 1; if (x.key & 4) cells[2] = 1; }
+    if (!(x.key & 16)) { cells[7] = 1; if (x.key & 64) cells[6] = 1; if (x.key & 4) cells[8] = 1; }
+    return { cols: 3, rows: 3, cells };
+  }
+  if (x.on === 'corner') {
+    if (x.key & 128) cells[0] = 1;
+    if (x.key & 2) cells[2] = 1;
     return { cols: 3, rows: 3, cells };
   }
   cells[4] = 1;

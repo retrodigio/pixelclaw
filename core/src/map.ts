@@ -13,7 +13,7 @@ import { GROUND_LAYER, bandMaps, drawOverlayAt, hash32, layoutOf, mapSeam, overl
 import { lab, luma601, lstar } from './checks.ts';
 import type { Rgba } from './png.ts';
 import type { Pt } from './raster.ts';
-import { resolveMap, type Scheme, type Terrain } from './schemes.ts';
+import { isFace, resolveMap, type Scheme, type Terrain } from './schemes.ts';
 
 // --- The assets a map reads
 
@@ -352,7 +352,7 @@ export function composeMapDoc(d: Doc, world: MapWorld, o: ComposeOptions = {}): 
         const f = pick(fam, x, y, li);
         const L = layoutOf(f.family!);
         const [cx, cy] = v === null ? L.outside : L.cells[v]!;
-        if (v !== null && s.variants[v]!.on === 'face' && !info.outside) {
+        if (v !== null && isFace(s.variants[v]!.on) && !info.outside) {
           // A face is art in a cell outside the terrain: all of it is drawn, whatever the layer's
           // fill (G13); only the outside texture laid under it is left to the layers below.
           blit(faceArt(f), f.width, cx * t, cy * t, t, t, x * t, y * t);

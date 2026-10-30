@@ -66,10 +66,35 @@ reduced neighbourhood it answers to, and how it is built from four 12x12 (half-t
 | `path` | 4; a strip through the middle (inset a quarter of the tile) | 16 | `o`, `nesw`, `ew`, `ns` |
 | `bridge8` | along one axis, east-west first | 8 (`v`, the north-south single, is placed by name) | `h`, `h_ew`, `v`, `v_ns` |
 | `single` | none | 1 | `o` |
-| `face` | blob47, plus a south face in the cell below the terrain, joined east and west | 47 + 4 | blob47's and `face_o`, `face_ew` |
+| `face` | blob47, plus a cliff's faces in the cells around the terrain (G13, G16): south faces below it, side faces beside its east and west edges, corners where they meet, alternate looks of the long middles | 47 + 28 | blob47's and `face_o`, `face_ew`, `face_ie_iw`, `side_e`, `side_e_ns`, `side_w`, `side_w_ns`, `corner_ew` |
+| `lane` | 8; a path that fills where it is wide (a corner counts when both sides beside it are the lane) and turns diagonally (a lone diagonal draws a strip to that corner); inset a quarter of the tile (G16) | 82 + 15 | `o`, `nesw`, `ew`, `ns`, `nesw_ne_se_sw_nw` and 9 for the diagonals (see the file) |
 
 Variant names are the joined sides (`n e s w`, `o` for none), then each counted corner:
 `ne_ne` is joined north and east with the corner between them, `nesw_ne_se_sw_nw` the interior.
+
+**Faces (G16).** The face scheme's faces are art in cells outside the terrain, drawn by hand on the
+pieces' band layer (the band leaves them alone) and copied by quadrant to the rest:
+
+- *South faces*, in the cell below the terrain. Each half ends, joins the face beside it (`e`, `w`:
+  that cell is below the terrain too) or meets the terrain beside it, an inner corner (`ie`, `iw`):
+  `face_o`, `face_e`, `face_w`, `face_ew`, `face_ie`, `face_iw`, `face_e_iw`, `face_ie_w`, `face_ie_iw`.
+  Pieces: `face_o` (both ends), `face_ew` (the middle), `face_ie_iw` (both inner corners).
+- *Side faces*, in the cell beside the terrain and not below it: `side_e…` on the cell's west half
+  (the terrain's east side), `side_w…` on its east half, `side_ew…` both; `_n` joins the face above
+  (the terrain goes on above), `_s` the one below (the cell below is not terrain), else the strip
+  ends there. Pieces: `side_e` (both ends), `side_e_ns` (the middle), `side_w`, `side_w_ns`.
+- *Corners*, where the terrain is only diagonally above: `corner_e` (below its east side, past the
+  south face's end), `corner_w`, `corner_ew`. Piece: `corner_ew`.
+- *Alternate looks* of the long middles: `face_ew_b`, `face_ew_c`, `side_e_ns_b`, `side_w_ns_b`. A
+  map (and the sample island) puts one of the looks on each such cell by a hash of the cell. Each is
+  a copy of its middle until you `family detach face_ew_b` and draw it, so a long cliff need not
+  repeat one tile.
+
+**Lanes (G16).** `lane` is for roads and rivers that are sometimes wide: a block of lane cells has
+a plain middle (the `path` scheme, four neighbours, shows the outside at every inside corner of a
+wide area), and a lane can step diagonally: a cell joined only across a corner draws a strip to it
+(`o_se`), the cells beside the step carry the strip's edge (`d_…`, drawn in a cell outside the lane
+like a fillet), and the strip is measured across each row so its edges step cleanly at 45°.
 
 **How the variants are made.** A family has two layers. `ground` holds the textures; on every
 variant it is laid again after every command: each pixel shows the inside or the outside texture

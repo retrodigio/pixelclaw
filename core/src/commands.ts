@@ -257,9 +257,10 @@ export function canonicalScheme(s: SchemeJson): SchemeJson {
   return {
     name: s.name, description: s.description, neighbours: s.neighbours,
     ...(s.cornerRule !== undefined ? { cornerRule: s.cornerRule } : {}), ...(s.inset ? { inset: s.inset } : {}),
-    ...(s.kinds ? { kinds: s.kinds } : {}), ...(s.faces !== undefined ? { faces: s.faces } : {}), ...(s.fillets !== undefined ? { fillets: s.fillets } : {}),
+    ...(s.kinds ? { kinds: s.kinds } : {}), ...(s.faces !== undefined ? { faces: s.faces } : {}), ...(s.sides !== undefined ? { sides: s.sides } : {}),
+    ...(s.fillets !== undefined ? { fillets: s.fillets } : {}),
     columns: s.columns, pieces: s.pieces,
-    variants: s.variants.map((v) => ({ name: v.name, key: v.key, quads: v.quads, ...(v.on ? { on: v.on } : {}) })),
+    variants: s.variants.map((v) => ({ name: v.name, key: v.key, quads: v.quads, ...(v.on ? { on: v.on } : {}), ...(v.alt ? { alt: v.alt } : {}) })),
   };
 }
 

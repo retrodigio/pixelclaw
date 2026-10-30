@@ -8,6 +8,7 @@ import blob47 from '../schemes/blob47.json' with { type: 'json' };
 import blob47Round from '../schemes/blob47-round.json' with { type: 'json' };
 import bridge8 from '../schemes/bridge8.json' with { type: 'json' };
 import face from '../schemes/face.json' with { type: 'json' };
+import lane from '../schemes/lane.json' with { type: 'json' };
 import path from '../schemes/path.json' with { type: 'json' };
 import single from '../schemes/single.json' with { type: 'json' };
 import wang16 from '../schemes/wang16-corner.json' with { type: 'json' };
@@ -20,8 +21,9 @@ export const NB_DIRS: [number, number, number][] = [[1, 0, -1], [2, 1, -1], [4, 
 
 export type Neighbours = '8' | '4' | 'axis' | 'corners' | 'none';
 /** The geometry a quadrant kind is drawn with. */
-export type BaseKind = 'in' | 'out' | 'outer' | 'inner' | 'horiz' | 'vert' | 'vround' | 'hround' | 'fillet';
-const BASE: readonly string[] = ['in', 'out', 'outer', 'inner', 'horiz', 'vert', 'vround', 'hround', 'fillet'];
+export type BaseKind = 'in' | 'out' | 'outer' | 'inner' | 'horiz' | 'vert' | 'vround' | 'hround' | 'fillet' | 'diag' | 'diagcap' | 'diagside' | 'outerdiag' | 'diagfill';
+const BASE: readonly string[] = ['in', 'out', 'outer', 'inner', 'horiz', 'vert', 'vround', 'hround', 'fillet', 'diag', 'diagcap', 'diagside', 'outerdiag', 'diagfill'];
+const DIAG: readonly string[] = ['diag', 'diagcap', 'diagside', 'outerdiag', 'diagfill'];
 /** A quadrant (or the corner a kind faces): 0 NW, 1 NE, 2 SW, 3 SE. */
 export type Quad = 0 | 1 | 2 | 3;
 const QUAD_NAMES = ['nw', 'ne', 'sw', 'se'];
@@ -33,23 +35,35 @@ export interface SchemeVariant {
   /** Kinds of the quadrants NW, NE, SW, SE, as written ("outer", "vert@se"). */
   quads: string[];
   /**
-   * Drawn in a cell outside the terrain: 'face' below it (the face scheme's south faces), 'fillet'
-   * where the terrain turns an inner corner around it (the key is those corners: NE, SE, SW, NW bits).
+   * Drawn in a cell outside the terrain: 'face' below it (the face scheme's south faces), 'side'
+   * beside it and 'corner' diagonally below it (G16), 'fillet' where the terrain turns an inner
+   * corner around it (the key is those corners: NE, SE, SW, NW bits).
    */
-  on?: 'face' | 'fillet';
+  on?: 'face' | 'side' | 'corner' | 'fillet';
+  /** Another look of this variant (G16): placed instead of it on some cells, by a hash of the cell. */
+  alt?: string;
 }
+
+/** Faces of a cliff (south, side and corner pieces): art in a cell outside the terrain, drawn whatever a map layer's fill. */
+export const isFace = (on: SchemeVariant['on']): boolean => on === 'face' || on === 'side' || on === 'corner';
 
 export interface SchemeJson {
   name: string;
   description: string;
   neighbours: Neighbours;
-  /** true: a diagonal counts when both sides next to it are the terrain; 'either': when either is (rounder inner corners need to see them). */
-  cornerRule?: boolean | 'either';
+  /**
+   * true: a diagonal counts when both sides next to it are the terrain; 'either': when either is
+   * (rounder inner corners need to see them); 'diagonal': when both are or neither is (a lane's
+   * diagonal turn, G16).
+   */
+  cornerRule?: boolean | 'either' | 'diagonal';
   /** The strip's inset from the tile's edges as a fraction of the tile (path, bridge8). */
   inset?: [number, number];
   /** Extra kinds and the geometry each is drawn with. */
   kinds?: Record<string, string>;
   faces?: boolean;
+  /** Side faces beside the terrain's east and west edges, and corners below them (G16). */
+  sides?: boolean;
   /** Rounder inner corners: outside cells get a fillet in each corner the terrain turns around (fillet variants). */
   fillets?: boolean;
   columns: number;
@@ -72,7 +86,11 @@ export interface Scheme extends SchemeJson {
   byName: Map<string, number>;
   byKey: Map<number, number>;
   faceByKey: Map<number, number>;
+  sideByKey: Map<number, number>;
+  cornerByKey: Map<number, number>;
   filletByKey: Map<number, number>;
+  /** A variant with other looks: it and its alternates (G16). */
+  alts: Map<number, number[]>;
 }
 
 export class SchemeError extends Error {}
@@ -91,6 +109,8 @@ export function loadScheme(s: SchemeJson): Scheme {
   const byName = new Map<string, number>();
   const byKey = new Map<number, number>();
   const faceByKey = new Map<number, number>();
+  const sideByKey = new Map<number, number>();
+  const cornerByKey = new Map<number, number>();
   const filletByKey = new Map<number, number>();
   s.variants.forEach((v, i) => {
     if (!/^[a-z][a-z0-9_]*$/.test(v.name)) throw new SchemeError(`scheme ${s.name}: '${v.name}' is not a usable variant name`);
@@ -98,7 +118,7 @@ export function loadScheme(s: SchemeJson): Scheme {
     if (v.quads.length !== 4) throw new SchemeError(`scheme ${s.name}: variant '${v.name}' needs 4 quads`);
     byName.set(v.name, i);
     if (v.key === null) return;
-    const m = v.on === 'face' ? faceByKey : v.on === 'fillet' ? filletByKey : byKey;
+    const m = v.on === 'face' ? faceByKey : v.on === 'side' ? sideByKey : v.on === 'corner' ? cornerByKey : v.on === 'fillet' ? filletByKey : byKey;
     if (m.has(v.key)) throw new SchemeError(`scheme ${s.name}: key ${v.key} is both ${s.variants[m.get(v.key)!]!.name} and ${v.name}`);
     m.set(v.key, i);
   });
@@ -120,11 +140,18 @@ export function loadScheme(s: SchemeJson): Scheme {
       throw new SchemeError(`scheme ${s.name}: no piece has the ${spec.kind}@${QUAD_NAMES[spec.face]} quadrant variant '${v.name}' needs`);
     });
   });
-  return { ...s, quadSpecs, sources, byName, byKey, faceByKey, filletByKey };
+  const alts = new Map<number, number[]>();
+  s.variants.forEach((v, i) => {
+    if (!v.alt) return;
+    const of = byName.get(v.alt);
+    if (of === undefined) throw new SchemeError(`scheme ${s.name}: '${v.name}' is a look of '${v.alt}', which it does not have`);
+    alts.set(of, [...(alts.get(of) ?? [of]), i]);
+  });
+  return { ...s, quadSpecs, sources, byName, byKey, faceByKey, sideByKey, cornerByKey, filletByKey, alts };
 }
 
 export const BUILTIN_SCHEMES: ReadonlyMap<string, Scheme> = new Map(
-  ([blob47, blob47Round, wang16, path, bridge8, single, face] as SchemeJson[]).map((s) => [s.name, loadScheme(s)]),
+  ([blob47, blob47Round, wang16, path, bridge8, single, face, lane] as SchemeJson[]).map((s) => [s.name, loadScheme(s)]),
 );
 
 export function schemeNamed(name: string): Scheme | undefined {
@@ -142,6 +169,10 @@ export function reduceKey(s: SchemeJson, bits: number): number {
     case '8': {
       let k = bits & (N | E | S | W);
       if (!s.cornerRule) return bits & 255;
+      if (s.cornerRule === 'diagonal') {
+        for (const [d, a, b] of [[NE, N, E], [SE, S, E], [SW, S, W], [NW, N, W]] as const) if ((bits & d) && !!(bits & a) === !!(bits & b)) k |= d;
+        return k;
+      }
       if (s.cornerRule === 'either') {
         for (const [d, a, b] of [[NE, N, E], [SE, S, E], [SW, S, W], [NW, N, W]] as const) if ((bits & d) && (bits & (a | b))) k |= d;
         return k;
@@ -170,10 +201,49 @@ export function resolveVariant(s: Scheme, here: boolean, bits: number): number |
       | ((bits & (S | W | SW)) === (S | W | SW) ? SW : 0) | ((bits & (N | W | NW)) === (N | W | NW) ? NW : 0);
     return k ? s.filletByKey.get(k) ?? null : null;
   }
-  if (!s.faces || !(bits & NB.N)) return null;
-  // A face joins the faces beside it: a neighbour out of the terrain with terrain above it.
-  const k = ((bits & NB.E) === 0 && (bits & NB.NE) ? NB.E : 0) | ((bits & NB.W) === 0 && (bits & NB.NW) ? NB.W : 0);
-  return s.faceByKey.get(k) ?? null;
+  if (s.cornerRule === 'diagonal') {
+    // A lane's diagonal turn passing this cell's corner: the lane on both sides next to it, not on the diagonal.
+    const { N, NE, E, SE, S, SW, W, NW } = NB;
+    const k = ((bits & (N | E)) === (N | E) && !(bits & NE) ? NE : 0) | ((bits & (S | E)) === (S | E) && !(bits & SE) ? SE : 0)
+      | ((bits & (S | W)) === (S | W) && !(bits & SW) ? SW : 0) | ((bits & (N | W)) === (N | W) && !(bits & NW) ? NW : 0);
+    return k ? s.filletByKey.get(k) ?? null : null;
+  }
+  if (!s.faces) return null;
+  const { N, NE, E, SE, S, SW, W, NW } = NB;
+  if (bits & N) {
+    // A south face. Each side joins the face beside it (out of the terrain, the terrain above it),
+    // meets the terrain beside it (an inner corner), or ends.
+    const k = (bits & E ? SE : bits & NE ? E : 0) | (bits & W ? SW : bits & NW ? W : 0);
+    // A scheme without inner corners (a tape's copy from before G16): there the face ends.
+    return s.faceByKey.get(k) ?? s.faceByKey.get(k & (E | W)) ?? null;
+  }
+  if (!s.sides) return null;
+  if (bits & (E | W)) {
+    // A side face: on the side the terrain is on; it joins the face above when the terrain goes on
+    // above, and the one below unless the terrain is below.
+    const k = (bits & (E | W)) | ((bits & W && bits & NW) || (bits & E && bits & NE) ? N : 0) | (bits & S ? 0 : S);
+    return s.sideByKey.get(k) ?? null;
+  }
+  return s.cornerByKey.get(bits & (NE | NW)) ?? null;
+}
+
+/** A small integer hash of a few numbers (an alternate look's cell). */
+function mix32(...ns: number[]): number {
+  let h = 0x2545f491;
+  for (const n of ns) {
+    h = Math.imul(h ^ (n | 0), 0x9e3779b1) >>> 0;
+    h = (h ^ (h >>> 15)) >>> 0;
+    h = Math.imul(h, 0x85ebca77) >>> 0;
+    h = (h ^ (h >>> 13)) >>> 0;
+  }
+  return h;
+}
+
+/** A variant on the map cell x,y: itself or one of its alternate looks, by a hash of the cell. */
+export function lookAt(s: Scheme, v: number | null, x: number, y: number): number | null {
+  if (v === null) return null;
+  const a = s.alts.get(v);
+  return a ? a[mix32(x, y, 0xface) % a.length]! : v;
 }
 
 /** The variants a map can produce, in the scheme's order (the north-south single bridge cannot). */
@@ -197,9 +267,10 @@ export const terrainWidth = (s: SchemeJson, t: Terrain): number => (s.neighbours
  * Every tile of a map: its variant (index) or null for plain outside. Past the map's edge a cell is
  * outside (`border` not, the default here: a family's sample island), terrain (`terrain`), or the
  * edge cell's own value (`same`: maps since G15, so terrain running off the map has no edge band
- * along the border). Corner schemes read the terrain's own corner grid (`layerTerrain`).
+ * along the border). Corner schemes read the terrain's own corner grid (`layerTerrain`). With
+ * `looks`, a variant that has alternate looks takes one of them by a hash of the cell (G16).
  */
-export function resolveMap(s: Scheme, t: Terrain, border: 'same' | 'terrain' | 'not' = 'not'): (number | null)[] {
+export function resolveMap(s: Scheme, t: Terrain, border: 'same' | 'terrain' | 'not' = 'not', looks = true): (number | null)[] {
   const tw = terrainWidth(s, t);
   const th = t.cells.length / tw;
   const at = (x: number, y: number): boolean => {
@@ -216,7 +287,8 @@ export function resolveMap(s: Scheme, t: Terrain, border: 'same' | 'terrain' | '
     }
     let bits = 0;
     for (const [b, dx, dy] of NB_DIRS) if (at(x + dx, y + dy)) bits |= b;
-    out.push(resolveVariant(s, at(x, y), bits));
+    const v = resolveVariant(s, at(x, y), bits);
+    out.push(looks ? lookAt(s, v, x, y) : v);
   }
   return out;
 }
@@ -272,12 +344,16 @@ const isq = (n: number): number => n * n;
  * edge has `radius` and its outer contours are wider.
  */
 function below(base: BaseKind, U: number, V: number, K: number, C: number): boolean {
+  return below0(base, U, V, K, C);
+}
+
+function below0(base: BaseKind, U: number, V: number, K: number, C: number): boolean {
   switch (base) {
     case 'in': return false;
     case 'out': return true;
     case 'horiz': case 'hround': return V < K;
     case 'vert': case 'vround': return U < K;
-    case 'fillet': return true;
+    case 'fillet': case 'diag': case 'diagcap': case 'diagside': case 'outerdiag': case 'diagfill': return true;
     case 'outer': {
       if (U >= C || V >= C) return Math.min(U, V) < K;
       // d = C - sqrt((C-U)^2 + (C-V)^2) < K  <=>  sqrt(..) > C - K
@@ -289,6 +365,31 @@ function below(base: BaseKind, U: number, V: number, K: number, C: number): bool
       if (V > 0) return V < K;
       return true;
     }
+  }
+}
+
+/**
+ * A lane's diagonal turn (G16), in doubled pixels from the corner the quadrant faces (P, Q: across
+ * and up or down from its edges); W is a straight strip's half-width (doubled: the tile less both
+ * insets) and t the tile. The diagonal strips are measured across a row, so every band is the same
+ * number of pixels in each row (clean 45° steps), and are as wide across as a straight strip
+ * (W·√2, as 99/70):
+ * - 'diag': the strip from the tile's middle to the corner (along P = Q);
+ * - 'diagside': beside a strip through the middle (along P + Q = 2t, the other diagonal), its flank;
+ *   'outerdiag': the same beside a straight strip's end (with 'outer', in bandAt);
+ * - 'diagcap': where a strip that ends in the middle stops: square across it (both diagonals' bands);
+ * - 'diagfill': in a cell outside the lane, the edge of a strip passing its corner (across P + Q = 0).
+ * Depth into the lane below K? Integer maths.
+ */
+function diagBelow(base: BaseKind, P: number, Q: number, K: number, W: number, t: number): boolean {
+  const M = Math.floor((W * 99 + 35) / 70) - K;
+  if (M <= 0) return true;
+  const along = Math.abs(P - Q) >= M, across = Math.abs(P + Q - 2 * t) >= M;
+  switch (base) {
+    case 'diag': return along;
+    case 'diagfill': return P + Q >= M;
+    case 'diagcap': return along || across;
+    default: return across; // diagside, outerdiag
   }
 }
 
@@ -317,6 +418,17 @@ export function bandAt(spec: QuadSpec, t: number, q: Quad, x: number, y: number,
   const [U0, V0] = uv(t, q, spec.face, x, y, g.inset);
   // The jitter moves the pixel deeper or shallower: every band edge moves with it, in order.
   const U = U0 - Ju, V = V0 - Jv;
+  if (DIAG.includes(spec.base)) {
+    const C = 2 * (bandWidth(g) + g.radius);
+    const below = (K: number) => diagBelow(spec.base, U + 2 * g.inset, V + 2 * g.inset, K, t - 2 * g.inset, t) && (spec.base !== 'outerdiag' || below0('outer', U, V, K, C));
+    if (below(0)) return -1;
+    let k = 0;
+    for (let i = 0; i < g.bands.length; i++) {
+      k += 2 * g.bands[i]!.w;
+      if (below(k)) return i;
+    }
+    return g.bands.length;
+  }
   const F = 2 * (g.fillet ?? 0);
   if (F > 0 || spec.base === 'vround' || spec.base === 'hround' || spec.base === 'fillet') {
     if (spec.base !== 'outer' && spec.base !== 'in' && spec.base !== 'out' && spec.base !== 'vert' && spec.base !== 'horiz') {
