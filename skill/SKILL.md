@@ -40,6 +40,10 @@ If the tools are missing, the server is not connected:
   primitives, `mirror … live` for symmetric shapes. Count and quote coordinates.
 - **Texture by generators, not by hand:** `noise` (clustered, on a ramp), `scatter`, `voronoi`,
   `bricks`; tiles are `wrap=on` so they tile by construction. Another seed is another variant.
+- **Structure by generators too:** `pebbles ramp=<stone ramp>` (stones with a shadow side and a lit
+  pixel) and `tufts ramp=<grass ramp>` (blades) are lit from the style guide's light, never
+  overlap, and keep the tile's rows and columns even, so they pass `repetition`, `seam` and
+  `jaggies` at 16, 24 and 48 px with their defaults. Lay them over a calm `noise` ground.
 - **Choose seeds by the checks, not by hand:** `seeds(asset, line, count=8)` tries a generator
   line with N seeds as dry runs and ranks them (fewest failing, least over, most room);
   `apply=true` keeps the best. **Try before you keep:** `run(…, dry=true)` applies to a copy,
@@ -143,6 +147,12 @@ is run; fix what fails by coordinates like any drafted asset.
 `view tile3x3` → fix stripes and repeated marks (`check` repetition, seam; one mark on a calm
 tile is fine: the limit rises with the band's spread) → a variant or two by `seeds` from another
 `from=` (`new tile <name>_b …`, `variant of=<name>`) so maps do not weave.
+
+A structured ground (shingle, grass with tufts): the calm ground, then `pebbles`/`tufts` (its line
+says `edges=<n>`); each look is a fork of it (`fork shingle shingle_b`, `variant of=shingle`), the
+ground laid again and the same generator with **the same `edges=` and another seed** (rank it with
+`seeds`): every look then has the same stones across its edges and its own inside, so a map can
+`fill mix=` them in any order with no seam and no lattice.
 
 ### A sprite or prop
 

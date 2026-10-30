@@ -197,6 +197,8 @@ text; `export` writes a map for Tiled (the `tiled` profile) and splits an oversi
 | `scatter [<x,y> <W>x<H>] stamp=\|c= count= ...` | `scatter 0,0 24x24 stamp=tuft count=3 minDist=10 flip=on wrap=on seed=3` | |
 | `voronoi [<x,y> <W>x<H>] cells= ramp= ...` | `voronoi 0,0 24x24 cells=7 ramp=stone weights=1,1,1,1,1,1 gap=ink relax=1 wrap=on seed=5` | |
 | `bricks [<x,y> <W>x<H>] size=<W>x<H> ramp= ...` | `bricks 0,0 24x24 size=8x4 ramp=stone weights=1,1,1,1,1,1 gap=ink offset=4 seed=4` | |
+| `pebbles [<x,y> <W>x<H>] ramp= ...` | `pebbles 0,0 24x24 ramp=stone weights=1,1,1,1 size=3..5 density=0.3 light=nw cast=none gap=1 wrap=on edges=3 seed=3` | Stones lit from the style's light (G16). See *Generators*. |
+| `tufts [<x,y> <W>x<H>] ramp= ...` | `tufts 0,0 48x48 ramp=moss size=8..12 blades=3..5 density=0.2 light=nw foot=moss0 gap=1 wrap=on edges=3 seed=3` | Grass tufts lit from the style's light (G16). |
 | `stamp save <name> <x,y> <W>x<H>`, `stamp save <name> <<` rows `>>` | `stamp save tuft 4,4 3x3` | See *Stamps and brushes*. |
 | `stamp <name> <x,y> [flip=none\|h\|v\|hv]` | `stamp tuft 10,12 flip=none` | Placed by its top-left corner. |
 | `stamp remove <name>` | | |
@@ -433,6 +435,39 @@ so a texture fills a tile seamlessly by construction.
 - `bricks size=<W>x<H> ramp=<ramp> weights=… gap=<colour>|none offset=<n>`: courses of bricks
   W by H with 1-px joints (included in the size), every other course shifted by `offset` (default
   half a brick). A box a whole number of bricks wide repeats seamlessly.
+- `pebbles ramp=<ramp> weights=… size=a..b density=<share> gap=<n> light=<dir> cast=<colour>|none`
+  (G16): stones. Each is an ellipse a..b px wide (default from the cell: 3..4 at 16 px, 3..5 at
+  24, 5..11 at 48) in a body tone of the ramp (by `weights`, one per entry that has a darker and a
+  lighter neighbour), its shadow side one step darker on the edges facing away from the light, and a
+  lit pixel one step lighter toward it (a pair on small stones, two on stones 8 px wide or more).
+  `light=` defaults to the style guide's (`style.light`), else `nw`. Stones never overlap: `gap`
+  (default 1) is kept clear between them. `cast=<colour>` also lays a cast shadow on the ground,
+  away from the light.
+- `tufts ramp=<ramp> size=a..b blades=a..b density=<share> gap=<n> light=<dir> foot=<colour>|none`
+  (G16): grass. Each tuft is a few blades from a row of roots (default 2..3 blades at 16 px, 3..4
+  at 24, 3..5 from 32), the middle one tallest, the outer ones leaning out; blades on the light's
+  side take the ramp's lightest colour, those on the far side a darker step, and `foot` (default
+  the ramp's darkest) a row under the roots.
+
+Both place their shapes so the rows and columns come out even (the measure `repetition` and
+`seam` use: each shape tries a few spots and the places around it and keeps the evenest, and may
+take another of its tones or heights), over whatever is in the box already; ground of a shape's own
+colour right beside it (a speck of noise) takes the box's commonest colour so it does not join the
+shape. With `wrap=on` the shapes that cross the box's edge come from `edges=<seed>` (default the
+seed itself) and the rest from `seed=`: looks of one ground drawn with the same `edges=` and other
+seeds share everything across their edges, so they join each other any way round. That is the way
+to make texture variants of a structured ground:
+
+```
+new tile shingle 24x24 bg=soil1
+pebbles ramp=stone seed=4                  # writes edges=4
+fork shingle shingle_b
+variant of=shingle
+rect 0,0 24x24 c=soil1 fill
+pebbles ramp=stone edges=4 seed=9          # the same stones across the edges, others inside
+```
+
+`wrap=off` keeps every shape whole inside the box (for a box inside a tile).
 
 ### Stamps and brushes
 
@@ -771,8 +806,8 @@ inner corner turns (kept by later `family band` lines unless given again).
 
 ## Seeds
 
-Commands that use randomness (`noise`, `scatter`, `voronoi`, `bricks`, `map gen`, `family
-coverage`, `family band … jitter=`, and `call` when its macro uses them) take `seed=<n>`. The MCP
+Commands that use randomness (`noise`, `scatter`, `voronoi`, `bricks`, `pebbles`, `tufts`,
+`map gen`, `family coverage`, `family band … jitter=`, and `call` when its macro uses them) take `seed=<n>`. The MCP
 `seeds` tool (and `pixelclaw seeds`) tries one such line with several seeds as dry runs and ranks
 them by the checks; `run` with `dry=true` (`pixelclaw run --dry`) tries any batch and keeps
 nothing. If it is left out, the normaliser picks one from the command's tape

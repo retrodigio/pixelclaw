@@ -444,11 +444,11 @@ export class Writer {
       const text = `${line} seed=${seed}`;
       const d = this.dry({ asset: req.asset, commands: req.before ? `${req.before}\n${text}` : text, by: req.by }, { checks: req.checks });
       if (!d.ok) {
-        if (d.errors.some((e) => /no option 'seed'/.test(e.message))) throw new ProjectError(`seeds: '${parsed.commands[0]!.name}' takes no seed (only generators do: noise, scatter, voronoi, bricks, map gen, family coverage, …)`);
+        if (d.errors.some((e) => /no option 'seed'/.test(e.message))) throw new ProjectError(`seeds: '${parsed.commands[0]!.name}' takes no seed (only generators do: noise, scatter, voronoi, bricks, pebbles, tufts, map gen, family coverage, …)`);
         return d;
       }
       const written = d.added.at(-1)?.cmd ?? '';
-      if (!new RegExp(`\\bseed=${seed}\\b`).test(written)) throw new ProjectError(`seeds: '${parsed.commands[0]!.name}' takes no seed (only generators do: noise, scatter, voronoi, bricks, map gen, family coverage, …)`);
+      if (!new RegExp(`\\bseed=${seed}\\b`).test(written)) throw new ProjectError(`seeds: '${parsed.commands[0]!.name}' takes no seed (only generators do: noise, scatter, voronoi, bricks, pebbles, tufts, map gen, family coverage, …)`);
       const live = d.results.filter((x) => x.status !== 'skip');
       const failing = live.filter((x) => x.status === 'fail');
       const ratio = (x: CheckResult) => overLimit(x) ?? (x.status === 'fail' ? 2 : 0);

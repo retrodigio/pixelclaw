@@ -1439,3 +1439,30 @@ Points where the plan was unclear or silent. Each has the reading that was follo
      which fail `jaggies` as they have since G12 (PROGRESS's G12 notes: "the shards need their
      jaggies fixed (drafted)"); G15 changes neither their tapes nor that check, so they are left as
      the G12 example's drafted state.
+
+## G16 (plan §26: art help)
+
+215. **"`pebbles` … `tufts` … pass jaggies, repetition and lattice on a mixed floor without
+     hand-tuning"** (item 1). *Reading:* with every option at its default (sizes and densities
+     scale with the cell), four looks of one ground (a base and three texture variants) filled as a
+     `mix=` on a map pass, on each tile, jaggies, orphans, repetition and seam, and on the map,
+     lattice, repetition and seam, at 16, 24 and 48 px, for more than one seed. Random placement
+     alone failed `repetition` on most tiles (a row with no stone is a stripe), so each shape is
+     placed and then moved, re-toned or resized to keep every band of rows and columns within the
+     repetition limit and the tile's edge lines within the seam check's, over what is in the box
+     already. A ground that fails `repetition` by itself (much `noise` at the defaults does) is
+     usually brought back by the stones; the test lays them on a plain ground.
+
+216. **"Wrap-safe"** (item 1). *Reading:* with `wrap=on` a shape that crosses an edge is drawn whole
+     across it, so the tile tiles with itself; and looks of one ground must join each other too,
+     which independent seeds cannot (a stone cut at every border between two looks). So the shapes
+     that cross the edges come from `edges=<seed>` (by default the seed, written into the line) and
+     the rest from `seed=`: looks with the same `edges=` share everything across their edges and
+     differ inside, and the `seeds` tool varies `seed=` only. `wrap=off` keeps every shape inside the
+     box.
+
+217. **"Lit from the style's light"; "ranked by `seeds`"** (item 1). *Reading:* `light=` defaults
+     to `style.light` (else `nw`), written into the line like `shade`'s; pebbles take a body tone,
+     a one-step darker shadow side facing away from the light and a one-step lighter lit pixel
+     (a pair on small stones, two on big ones); tufts colour their blades by side. Both take
+     `seed=`, so `seeds` ranks them as any generator (its messages now list them).

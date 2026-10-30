@@ -55,6 +55,9 @@ Commands (one per line, or ';' between them; '#' comments). Full reference: docs
   noise [<x,y> <W>x<H>] ramp=<r> [weights=6,2,1] [cluster=1..3] [density=0.15] [base=<c>|keep] [seed=n]
   scatter [box] stamp=<s>[,<s>]|c=<colour> count=<n> [minDist=<n>] [flip=on] [seed=n]
   voronoi [box] cells=<n> ramp=<r> [gap=<colour>] [relax=1] [seed=n]     bricks [box] size=8x4 ramp=<r> [gap=<colour>] [seed=n]
+  pebbles [box] ramp=<r> [size=a..b] [density=0.3] [cast=<colour>] [edges=<seed>] [seed=n]   stones: a shadow side and a lit pixel from the style's light, none overlapping, rows and columns kept even
+  tufts [box] ramp=<r> [size=a..b] [blades=a..b] [density=0.2] [foot=<colour>|none] [edges=<seed>] [seed=n]   grass tufts lit from the style's light
+      looks of one ground: the same edges= and other seeds share what crosses the tile's edges, so they join any way round (variant of=, then fill mix=)
   stamp save <name> <x,y> <W>x<H> (or a << block >>) | stamp <name> <x,y> [flip=h|v|hv]    brush square|circle <n> | brush stamp <name> | brush off
   def tuft(x,y) { px $x,$y $x+1,$y-1 c=moss2 }   call tuft 5,18
   palette set <entry> hex=#rrggbb [role=<r>|none] | palette add [<name>] hex=#rrggbb|role=<r> [key=<k>]   this asset's palette; roles black|white|light|dark|darkest for recolourable art
@@ -340,7 +343,7 @@ export function createMcpServer(host: McpHost, version: string, mo: McpOptions =
 
   server.registerTool('seeds', {
     title: 'Try seeds',
-    description: 'Try a generator line (noise, scatter, voronoi, bricks, map gen, family coverage, …) with several seeds, each as a dry run on the asset, and rank them by the checks: ' +
+    description: 'Try a generator line (noise, scatter, voronoi, bricks, pebbles, tufts, map gen, family coverage, …) with several seeds, each as a dry run on the asset, and rank them by the checks: ' +
       'fewest failing first, then the least over their limits, then the most room on the rest. Nothing is kept unless apply is true (then the best seed is run as one undo group).',
     inputSchema: z.object({
       asset: z.string(),

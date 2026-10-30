@@ -7,6 +7,7 @@ import './cmd-transform.ts';
 import './cmd-shapes.ts';
 import './cmd-art.ts';
 import './cmd-gen.ts';
+import './cmd-structure.ts';
 import './cmd-stamps.ts';
 import './cmd-macros.ts';
 import './cmd-anim.ts';

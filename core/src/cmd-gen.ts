@@ -10,12 +10,12 @@ import { DiagError, type ParsedCommand } from './parser.ts';
 import { Pcg32 } from './pcg.ts';
 import { fraction, intOpt, isqrt, rampOpt, rangeOpt, weightsOpt, type Ramp } from './values.ts';
 
-const mod = (a: number, n: number): number => ((a % n) + n) % n;
+export const mod = (a: number, n: number): number => ((a % n) + n) % n;
 
-interface Box { x: number; y: number; w: number; h: number; text: string }
+export interface Box { x: number; y: number; w: number; h: number; text: string }
 
 /** An optional box (default: the whole canvas), offset by @cell. */
-function optBox(a: Args, doc: Doc, cmdName: string): Box {
+export function optBox(a: Args, doc: Doc, cmdName: string): Box {
   const cell = a.cellOrigin(doc);
   if (a.peek()?.t !== 'point') {
     if (a.cell) return { x: cell.dx, y: cell.dy, w: doc.cellW, h: doc.cellH, text: `${cell.text} 0,0 ${doc.cellW}x${doc.cellH}` };
@@ -27,17 +27,17 @@ function optBox(a: Args, doc: Doc, cmdName: string): Box {
   return { x: p.x + cell.dx, y: p.y + cell.dy, w: s.w, h: s.h, text: `${cell.text} ${p.x},${p.y} ${s.w}x${s.h}` };
 }
 
-function seedOf(a: Args, ctx: NormaliseContext): number {
+export function seedOf(a: Args, ctx: NormaliseContext): number {
   const o = a.opts.get('seed');
   return o ? intOpt(o, 0, 0x7fffffff) : ctx.newSeed();
 }
 
-function wrapOpt(a: Args, doc: Doc): boolean {
+export function wrapOpt(a: Args, doc: Doc): boolean {
   return a.choice('wrap', ['on', 'off'], doc.wrap ? 'on' : 'off') === 'on';
 }
 
 /** Pick an index by weight. */
-function pick(rng: Pcg32, weights: number[]): number {
+export function pick(rng: Pcg32, weights: number[]): number {
   const total = weights.reduce((s, w) => s + w, 0);
   let r = rng.nextInt(total);
   for (let i = 0; i < weights.length; i++) {
@@ -47,7 +47,7 @@ function pick(rng: Pcg32, weights: number[]): number {
   return weights.length - 1;
 }
 
-function rampAndWeights(a: Args, doc: Doc, cmd: ParsedCommand): { ramp: Ramp; weights: number[] } {
+export function rampAndWeights(a: Args, doc: Doc, cmd: ParsedCommand): { ramp: Ramp; weights: number[] } {
   const ro = a.opts.get('ramp');
   if (!ro) throw new DiagError(cmd.line, cmd.col, `${cmd.name}: missing ramp=<ramp> (a palette ramp, or entries a,b,c)`);
   const ramp = rampOpt(ro, doc.palette);
@@ -57,7 +57,7 @@ function rampAndWeights(a: Args, doc: Doc, cmd: ParsedCommand): { ramp: Ramp; we
 }
 
 /** A place in the box: wrapped around it (as a torus) or null when it falls outside. */
-function placer(b: Box, wrap: boolean) {
+export function placer(b: Box, wrap: boolean) {
   return (u: number, v: number): [number, number] | null => {
     if (wrap) return [b.x + mod(u, b.w), b.y + mod(v, b.h)];
     return u < 0 || v < 0 || u >= b.w || v >= b.h ? null : [b.x + u, b.y + v];
