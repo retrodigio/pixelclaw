@@ -1490,3 +1490,20 @@ Points where the plan was unclear or silent. Each has the reading that was follo
      when neither is (a diagonal step draws a strip to that corner; the cells beside the step carry
      its edge, like fillets). The diagonal strips are measured across a row (W·√2 wide as 99/70) so
      their bands step cleanly at 45°. `path` itself is unchanged (existing tapes replay as they were).
+
+221. **"A `shadow` helper for sprites and objects (the style guide's direction and colour)"** (item
+     3). *Reading:* `style.shadow` in project.json is `{ "c": <entry or darker>, "dir": <direction> }`
+     (Q56: settings in project.json, words in style.md); `dir` defaults to away from `style.light`.
+     The shadow is a flat ellipse on the ground (as wide as the art's bottom third plus two pixels,
+     a third as tall, on its lowest row, moved a sixth of its width toward `dir`), drawn only on empty
+     pixels so it sits behind. A cast silhouette was considered and left out: in a 3/4 view the
+     flattened silhouette of a tall object reads as a second object, and an ellipse never makes
+     jaggies. On a sprite `darker` has no ground to darken, so the helper asks for `c=`.
+
+222. **"Maps drawing placed objects' shadows"** (item 3). *Reading:* per objects layer
+     (`shadow=darker|<colour>|off shadowdir=`), defaulting to the style guide's shadow when the layer
+     is added (written into the line; no style shadow, no shadows, so every existing map draws as
+     before). Shadows go on the ground after every ground layer and before any object, so objects
+     never shadow each other. `darker` is a step down the ramp of the palette the ground pixel came
+     from (else the nearest entry at least 6 L* darker). The map checks (seam, lattice, …) read the
+     ground without shadows.

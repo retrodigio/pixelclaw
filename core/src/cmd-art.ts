@@ -4,7 +4,8 @@
 // layer, inside their selection, and reads neighbours across the edges of wrap documents.
 
 import { Args, drawable, fn, registerCommand, resolveColour, synthOpt, type CommandSpec } from './commands.ts';
-import { TRANSPARENT, ctxOf, type Doc } from './doc.ts';
+import { TRANSPARENT, ctxOf, flatten, type Doc } from './doc.ts';
+import { SHADOW_DIRS, shadowBox, shadowDirOf, shadowPixels } from './shadow.ts';
 import { targetOf } from './draw.ts';
 import { DiagError } from './parser.ts';
 import { indexOf, type Target } from './raster.ts';
@@ -189,6 +190,53 @@ function cleanOrphans(d: Doc, t: Target, size: number, keepTexture: boolean): vo
   }
 }
 
+/**
+ * A shadow under a sprite or an object (G16): a flat ellipse on the ground, pushed away from the
+ * light, in the style guide's shadow colour and direction unless given; drawn on your layer only
+ * where the art is empty, so it sits behind. The line records the box it was drawn in.
+ */
+const shadowCmd: CommandSpec = {
+  name: 'shadow',
+  summary: 'shadow [<x,y> <W>x<H>] [c=<colour>] [dir=n|ne|e|se|s|sw|w|nw]   (an ellipse on the ground under the art, away from the light; the style guide\'s colour and direction)',
+  normalise(cmd, ctx) {
+    const doc = drawable(cmd, ctx);
+    const a = new Args(cmd, ['c', 'dir']);
+    const cell = a.cellOrigin(doc);
+    let box: { x: number; y: number; w: number; h: number } | null = null;
+    if (a.peek()?.t === 'point') {
+      const p = a.take('point', 'a corner x,y');
+      const sz = a.take('size', 'a size WxH');
+      box = { x: p.x + cell.dx, y: p.y + cell.dy, w: sz.w, h: sz.h };
+    }
+    a.done();
+    const st = ctx.defaults?.shadow;
+    const dir = a.choice('dir', SHADOW_DIRS, st?.dir && SHADOW_DIRS.includes(st.dir) ? st.dir : shadowDirOf(ctx.defaults?.light));
+    const co = a.opts.get('c') ?? (st?.c && st.c !== 'darker' ? synthOpt('c', st.c, cmd) : undefined);
+    if (!co) throw new DiagError(cmd.line, cmd.col, `shadow: give c=<colour>${st?.c === 'darker' ? ' (the style guide\'s shadow is darker, a step down the ramps of the ground under it: maps draw that; a sprite has no ground)' : ' (or a shadow colour in the style guide: style.shadow.c)'}`);
+    const c = resolveColour(co.value, doc.palette, co.line, co.vcol);
+    if (!box) {
+      const f = ctxOf(doc, ctx.by).frame;
+      box = shadowBox(flatten(doc, f), doc.width, doc.height, dir);
+      if (!box) throw new DiagError(cmd.line, cmd.col, `shadow: nothing is drawn yet to cast one (or give its box x,y WxH)`);
+    }
+    const b = box;
+    return {
+      text: `shadow ${b.x},${b.y} ${b.w}x${b.h} c=${c.name} dir=${dir}`,
+      op: fn((d, by) => {
+        const t = targetOf(d, by);
+        const flat = flatten(d, ctxOf(d, by).frame);
+        for (const [x, y] of shadowPixels(b)) {
+          if (x < 0 || y < 0 || x >= d.width || y >= d.height) continue;
+          const i = y * d.width + x;
+          if (flat[i] !== TRANSPARENT || (t.mask && !t.mask[i])) continue;
+          t.pixels[i] = c.index;
+        }
+      }),
+    };
+  },
+};
+
 registerCommand(outlineCmd);
+registerCommand(shadowCmd);
 registerCommand(shadeCmd);
 registerCommand(cleanCmd);

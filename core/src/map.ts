@@ -14,6 +14,7 @@ import { lab, luma601, lstar } from './checks.ts';
 import type { Rgba } from './png.ts';
 import type { Pt } from './raster.ts';
 import { isFace, resolveMap, type Scheme, type Terrain } from './schemes.ts';
+import { darkerMap, shadowBox, shadowPixels } from './shadow.ts';
 
 // --- The assets a map reads
 
@@ -256,7 +257,9 @@ export function composeMapDoc(d: Doc, world: MapWorld, o: ComposeOptions = {}): 
   const variants: (number | null)[] = Array.from({ length: cols * rows }, () => null);
   const problems: string[] = [];
   const flats = new Map<Doc, Map<number, Uint16Array>>();
+  const drawn = new Set<Doc>();
   const flat = (x: Doc) => {
+    drawn.add(x);
     const f = frameOf(x, tick);
     let byF = flats.get(x);
     if (!byF) flats.set(x, (byF = new Map()));
@@ -431,6 +434,24 @@ export function composeMapDoc(d: Doc, world: MapWorld, o: ComposeOptions = {}): 
       if (doc && doc.cellW !== t) problems.push(`${e.name}: its cells are ${doc.cellW} px, the map's ${t}`);
     }
     objects.sort((a, b) => a.base - b.base || a.layer - b.layer || a.x - b.x || a.y - b.y);
+  }
+  // Shadows (G16): under each object on a layer that casts them, on the ground, before any object.
+  const shadowed = objects.filter((ob) => ob.doc && (d.layers[ob.layer]!.map as Extract<MapLayerInfo, { kind: 'objects' }>).shadow);
+  if (shadowed.length) {
+    const dark = darkerMap(pal.entries, [...drawn].map((x) => ({ palette: x.palette, map: pal.of(x) })));
+    for (const ob of shadowed) {
+      const sh = (d.layers[ob.layer]!.map as Extract<MapLayerInfo, { kind: 'objects' }>).shadow!;
+      const box = shadowBox(flat(ob.doc!), ob.doc!.width, ob.doc!.height, sh.dir);
+      if (!box) continue;
+      const c = sh.c === 'darker' ? -1 : pal.entries.findIndex((e) => e.name === sh.c);
+      if (sh.c !== 'darker' && c < 0) { problems.push(`layer ${d.layers[ob.layer]!.name}: no colour '${sh.c}' for shadows`); continue; }
+      for (const [x, y] of shadowPixels(box)) {
+        const X = ob.px + x, Y = ob.py + y;
+        if (X < 0 || Y < 0 || X >= W || Y >= H) continue;
+        const v = px[Y * W + X]!;
+        if (v !== TRANSPARENT) px[Y * W + X] = c < 0 ? dark[v]! : c;
+      }
+    }
   }
   const artOwner = new Int32Array(W * H).fill(-1);
   const roofOwner = new Int32Array(W * H).fill(-1);

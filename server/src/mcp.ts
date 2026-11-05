@@ -51,7 +51,7 @@ Commands (one per line, or ';' between them; '#' comments). Full reference: docs
   dither <x,y> <W>x<H> a= b= [pattern=checker|bayer2|bayer4|bayer8|hlines|vlines] [level=0.25]
   gradient <x,y> <W>x<H> ramp=<ramp> [dir=down|up|right|left|radial] [steps=n] [pattern=none|checker|bayer4..]
   ramp <name> = <darkest> ... <lightest>   |   palette lock|unlock   |   palette save as=<new palette>
-  outline c=<colour> [mode=outer|inner] [corners=on|off] [from=<layer>]    shade light=nw [ramp=<r>|all] [edge=1]    clean orphans [size=1] [keep=texture]
+  outline c=<colour> [mode=outer|inner] [corners=on|off] [from=<layer>]    shade light=nw [ramp=<r>|all] [edge=1]    shadow [c=<colour>] [dir=se] (an ellipse under the art, away from the light)    clean orphans [size=1] [keep=texture]
   noise [<x,y> <W>x<H>] ramp=<r> [weights=6,2,1] [cluster=1..3] [density=0.15] [base=<c>|keep] [seed=n]
   scatter [box] stamp=<s>[,<s>]|c=<colour> count=<n> [minDist=<n>] [flip=on] [seed=n]
   voronoi [box] cells=<n> ramp=<r> [gap=<colour>] [relax=1] [seed=n]     bricks [box] size=8x4 ramp=<r> [gap=<colour>] [seed=n]
@@ -87,7 +87,7 @@ Autotile families (a sheet of every variant of a scheme: blob47, blob47-round, w
 Oversized tiles and objects (48x48, 24x48, …; cell= the grid): new object house 48x48 cell=24x24 ; footprint 2x1 [at=<cx,cy>] [anchor=<x,y>] << a row per art cell row: . b (blocks) r (roof, drawn above actors) x (both) >>
   variant of=<asset> [band=inherit]   this asset is a texture variant of another (fork it, change the inside, keep the border): maps pick among them cell by cell; band=inherit (families): the band stays the base's, now and after later fixes
 Maps (plan §4.11: cells of tile px holding names; a map redraws itself when a tile changes):
-  new map <name> <C>x<R> tile=24   layer add <name> terrain=<family> [outside=on] [walkable=on] | tiles | objects | overlay=<overlay> on=<terrain layer>[:out]|all   (walkable: objects may stand on its filled ground; layer set <layer> walkable=on|off)
+  new map <name> <C>x<R> tile=24   layer add <name> terrain=<family> [outside=on] [walkable=on] | tiles | objects [shadow=darker|<colour>|off] (objects cast shadows on the ground; default the style guide's style.shadow) | overlay=<overlay> on=<terrain layer>[:out]|all   (walkable: objects may stand on its filled ground; layer set <layer> walkable=on|off)
   tiles <tiles layer> fill <tile> [<x,y> <W>x<H>] [replace]   a one-cell tile on every empty cell (the floor in one line)
   tiles <tiles layer> fill mix=<tile>:<weight>,... [box] [variants=named]   a seeded scatter of several tiles by weight, no two equal neighbours where it can help it (two tiles: no 2x2 block of one; a tile's weight is shared with its variants the mix does not name)
   terrain <layer> rect <x,y> <W>x<H> | ellipse … | brush <x,y>... [size=n] | fill <x,y> | paint <x,y> << # terrain, - not, . leave >> | clear   [erase]   the scheme picks the edge tiles

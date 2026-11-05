@@ -84,6 +84,7 @@ export function styleDefaults(p: Project, m: Manifest | null): StyleDefaults {
       };
     },
     ...(style.light ? { light: style.light } : {}),
+    ...(style.shadow ? { shadow: style.shadow } : {}),
     ...(style.outline ? { outline: style.outline } : {}),
     grid,
     mapObjects: (map) => {

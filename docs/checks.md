@@ -85,6 +85,7 @@ in the test palette; a tile half moss, half leaf scores `jump = (1 - 1/7) / (sqr
   "camera": "384x216",
   "sizes": { "tile": "24x24", "sprite": "24x24" },
   "light": "nw",
+  "shadow": { "c": "darker", "dir": "se" },
   "sets": { "props": { "checks": { "orphans": { "max": 1.5 } } } },
   "checks": { "orphans": { "max": 1.5, "tile": { "max": 3 } }, "jaggies": { "off": true } },
   "assets": { "stone_floor": { "checks": { "repetition": { "off": true } }, "ground": "...", "set": ["..."] } }
@@ -95,7 +96,10 @@ in the test palette; a tile half moss, half leaf scores `jump = (1 - 1/7) / (sqr
 Each check's parameters merge in this order: the defaults for every kind, the defaults for the
 asset's kind, `style.checks.<check>`, `style.checks.<check>.<kind>`, the asset's manifest set's
 `style.sets.<set>.checks.<check>` (G10), then `style.assets.<asset>.checks.<check>`. `light` is
-the light direction `consistency` holds the art to and `shade` uses when it is not given; see
+the light direction `consistency` holds the art to and `shade`, `pebbles` and `tufts` use when it is
+not given; `shadow` (G16) is the `shadow` helper's colour (an entry) and maps' objects layers'
+shadows (an entry, or `darker`: a step down the ramps of the ground under it), `dir` where they fall
+(default: away from `light`); see
 [pipeline.md](pipeline.md#style-guide-defaults-and-thresholds). The parameter names are the ones in the table (`max`,
 `min`), plus `off`, and for some checks more: `orphans.texture` (allow one-step strays),
 `banding.minEdges`, `readability.delta`, `readability.maxIou`, `readability.minSpread`. The server

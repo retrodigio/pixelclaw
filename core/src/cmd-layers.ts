@@ -4,7 +4,8 @@
 // tags and views (cmd-anim.ts) follow frames as they are added, removed and moved.
 
 import { insertFrames, moveFrame, moveMap, removeFrame, viewOf } from './anim.ts';
-import { Args, fn, needDoc, registerCommand, type CommandSpec, type NormaliseContext } from './commands.ts';
+import { Args, fn, needDoc, registerCommand, resolveColour, type CommandSpec, type NormaliseContext } from './commands.ts';
+import { SHADOW_DIRS, shadowDirOf } from './shadow.ts';
 import { mixSeed, parseMix, spreadMix } from './mix.ts';
 import { TRANSPARENT, ctxOf, newLayer, remapCtx, setCtx, type Doc, type MapLayerInfo } from './doc.ts';
 import { DiagError, type ParsedCommand, type Token } from './parser.ts';
@@ -54,12 +55,12 @@ function flagOpts(a: Args): { hidden?: boolean; locked?: boolean; reference?: bo
 
 const layerCmd: CommandSpec = {
   name: 'layer',
-  summary: 'layer <name> | layer add <name> [above=|below=<layer>] [reference] | (maps) layer add <name> terrain=<family> [outside=on|off] [walkable=on|off] [border=same|terrain|not] [mix=<tile>:<weight>,... [variants=spread|named] [seed=]] | tiles | objects | overlay=<overlay> on=<layer>|<layer>:out|all | layer set <name> [hidden=] [locked=] [reference=] [walkable=] [border=] [mix=…|none] | layer rename <name> <new> | layer move <name> above=|below=<layer> | layer merge <name> | layer remove <name>   (border: past the map\'s edge a cell counts as its own (same, the default), as terrain, or not; mix: the terrain\'s inside cells drawn as a seeded scatter of one-cell tiles by weight)',
+  summary: 'layer <name> | layer add <name> [above=|below=<layer>] [reference] | (maps) layer add <name> terrain=<family> [outside=on|off] [walkable=on|off] [border=same|terrain|not] [mix=<tile>:<weight>,... [variants=spread|named] [seed=]] | tiles | objects [shadow=darker|<colour>|off] [shadowdir=<dir>] | overlay=<overlay> on=<layer>|<layer>:out|all | layer set <name> [hidden=] [locked=] [reference=] [walkable=] [border=] [mix=…|none] [shadow=darker|<colour>|off [shadowdir=]] | layer rename <name> <new> | layer move <name> above=|below=<layer> | layer merge <name> | layer remove <name>   (border: past the map\'s edge a cell counts as its own (same, the default), as terrain, or not; mix: the terrain\'s inside cells drawn as a seeded scatter of one-cell tiles by weight)',
   normalise(cmd, ctx) {
     const doc = needDoc(cmd, ctx);
     const first = cmd.args[0];
     const mapAdd = !!doc.map && first?.t === 'word' && first.v === 'add';
-    const a = new Args(cmd, ['above', 'below', 'hidden', 'locked', 'reference', 'terrain', 'outside', 'walkable', 'overlay', 'on', 'border', 'mix', 'seed', 'variants'], mapAdd ? ['reference', 'tiles', 'objects'] : ['reference']);
+    const a = new Args(cmd, ['above', 'below', 'hidden', 'locked', 'reference', 'terrain', 'outside', 'walkable', 'overlay', 'on', 'border', 'mix', 'seed', 'variants', 'shadow', 'shadowdir'], mapAdd ? ['reference', 'tiles', 'objects'] : ['reference']);
     const how = a.take('word', 'a layer name, or add, set, rename, move, merge or remove');
     const noOpts = (except: string[] = []) => {
       for (const o of a.opts.values()) if (!except.includes(o.key)) throw new DiagError(o.line, o.col, `layer ${how.v} takes no ${o.key}=`);
@@ -82,7 +83,7 @@ const layerCmd: CommandSpec = {
       if (doc.map) {
         info = mapLayerInfo(a, doc, ctx);
         what = mapLayerText(info);
-        noOpts(['above', 'below', 'flag', 'terrain', 'outside', 'walkable', 'overlay', 'on', 'border', 'mix', 'seed', 'variants']);
+        noOpts(['above', 'below', 'flag', 'terrain', 'outside', 'walkable', 'overlay', 'on', 'border', 'mix', 'seed', 'variants', 'shadow', 'shadowdir']);
       } else {
         noOpts(['above', 'below', 'flag']);
       }
@@ -104,6 +105,15 @@ const layerCmd: CommandSpec = {
     const i = layerIndex(doc, target);
     if (how.v === 'set') {
       a.done();
+      if (a.opts.get('shadow') || a.opts.get('shadowdir')) {
+        // Objects' shadows (G16).
+        const first = (a.opts.get('shadow') ?? a.opts.get('shadowdir'))!;
+        if (doc.layers[i]!.map?.kind !== 'objects') throw new DiagError(first.line, first.col, `${first.key}= goes with an objects layer`);
+        noOpts(['shadow', 'shadowdir']);
+        const cur = (doc.layers[i]!.map as Extract<MapLayerInfo, { kind: 'objects' }>).shadow;
+        const sh = shadowOpt(a, doc, ctx, cur);
+        return { text: `layer set ${target.v} ${sh ? `shadow=${sh.c} shadowdir=${sh.dir}` : 'shadow=off'}`, op: fn((d) => { d.layers[i]!.map = sh ? { kind: 'objects', shadow: sh } : { kind: 'objects' }; }) };
+      }
       const wk = a.opts.get('walkable'), bo = a.opts.get('border'), mo = a.opts.get('mix');
       if (wk || bo || mo) {
         // Terrain settings: walkable ground (footprints may stand on its outside and edges), the
@@ -192,6 +202,24 @@ const layerCmd: CommandSpec = {
   },
 };
 
+/**
+ * shadow=darker|<colour>|off [shadowdir=<dir>] on an objects layer (G16): left out, the style
+ * guide's shadow (or the layer's own, on layer set); the direction defaults to the style guide's,
+ * else away from its light.
+ */
+function shadowOpt(a: Args, doc: Doc, ctx: NormaliseContext, cur?: { c: string; dir: string }): { c: string; dir: string } | undefined {
+  const o = a.opts.get('shadow');
+  const st = ctx.defaults?.shadow;
+  const c = o ? o.value : cur?.c ?? st?.c;
+  if (!c || c === 'off') {
+    if (a.opts.get('shadowdir') && c === 'off') throw new DiagError(a.opts.get('shadowdir')!.line, a.opts.get('shadowdir')!.col, `shadowdir= goes with a shadow`);
+    return undefined;
+  }
+  const name = c === 'darker' ? c : resolveColour(c, doc.palette, o?.line ?? a.cmd.line, o?.vcol ?? a.cmd.col).name;
+  const dir = a.choice('shadowdir', SHADOW_DIRS, cur?.dir ?? (st?.dir && SHADOW_DIRS.includes(st.dir) ? st.dir : shadowDirOf(ctx.defaults?.light)));
+  return { c: name, dir };
+}
+
 /** border=same|terrain|not (same: undefined, the default). */
 function borderOpt(a: Args): 'terrain' | 'not' | undefined {
   const b = a.choice('border', ['same', 'terrain', 'not'], 'same');
@@ -225,6 +253,10 @@ function mapLayerInfo(a: Args, doc: Doc, ctx: NormaliseContext): MapLayerInfo {
     if (!/^[a-z][a-z0-9_-]*$/.test(v)) throw new DiagError(o.line, o.vcol, `'${v}' is not an asset name`);
     return v;
   };
+  for (const k of ['shadow', 'shadowdir']) {
+    const o = a.opts.get(k);
+    if (o && !a.flags.some((f) => f.v === 'objects')) throw new DiagError(o.line, o.col, `${k}= goes with objects`);
+  }
   for (const k of ['outside', 'walkable', 'on', 'border', 'mix']) {
     const o = a.opts.get(k);
     if (o && !((k !== 'on' && ter) || (k === 'on' && ov))) throw new DiagError(o.line, o.col, `${k}= goes with ${k !== 'on' ? 'terrain=' : 'overlay='}`);
@@ -248,7 +280,11 @@ function mapLayerInfo(a: Args, doc: Doc, ctx: NormaliseContext): MapLayerInfo {
     }
     return { kind: 'overlay', overlay: name(ov.value, ov), on: where };
   }
-  return { kind: kinds[0] as 'tiles' | 'objects' };
+  if (kinds[0] === 'objects') {
+    const sh = shadowOpt(a, doc, ctx);
+    return sh ? { kind: 'objects', shadow: sh } : { kind: 'objects' };
+  }
+  return { kind: 'tiles' };
 }
 
 function mapLayerText(m: MapLayerInfo): string {
@@ -257,6 +293,7 @@ function mapLayerText(m: MapLayerInfo): string {
       (m.mix ? ` mix=${m.mix.map((x) => `${x.name}:${x.weight}`).join(',')} variants=named seed=${m.seed}` : '');
   }
   if (m.kind === 'overlay') return ` overlay=${m.overlay} on=${m.on}`;
+  if (m.kind === 'objects' && m.shadow) return ` objects shadow=${m.shadow.c} shadowdir=${m.shadow.dir}`;
   return ` ${m.kind}`;
 }
 

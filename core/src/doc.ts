@@ -77,7 +77,8 @@ export interface Footprint {
 export type MapLayerInfo =
   | { kind: 'terrain'; family: string; outside: boolean; walkable?: boolean; border?: 'terrain' | 'not'; mix?: { name: string; weight: number }[]; seed?: number }
   | { kind: 'tiles' }
-  | { kind: 'objects' }
+  /** shadow (G16): every object placed on the layer casts one on the ground (c: an entry of the map's palette, or darker). */
+  | { kind: 'objects'; shadow?: { c: string; dir: string } }
   | { kind: 'overlay'; overlay: string; on: string };
 
 /** A thing a map places by name: a tile, a family's variant, an object; with the footprint it was placed with. */
@@ -627,6 +628,7 @@ function mapLayerJson(m: MapLayerInfo): string[] {
     case 'terrain': return ['terrain', m.family, m.outside ? 'outside' : '', ...(m.walkable ? ['walkable'] : []), ...(m.border ? [`border=${m.border}`] : []),
       ...(m.mix ? [`mix=${m.mix.map((x) => `${x.name}:${x.weight}`).join(',')}`, `seed=${m.seed ?? 1}`] : [])];
     case 'overlay': return ['overlay', m.overlay, m.on];
+    case 'objects': return m.shadow ? ['objects', `shadow=${m.shadow.c}`, `dir=${m.shadow.dir}`] : ['objects'];
     default: return [m.kind];
   }
 }
@@ -643,6 +645,7 @@ function mapLayerFromJson(a: string[]): MapLayerInfo {
     };
   }
   if (a[0] === 'overlay') return { kind: 'overlay', overlay: a[1]!, on: a[2]! };
+  if (a[0] === 'objects' && a[1]?.startsWith('shadow=')) return { kind: 'objects', shadow: { c: a[1].slice(7), dir: (a[2] ?? 'dir=se').slice(4) } };
   return { kind: a[0] as 'tiles' | 'objects' };
 }
 

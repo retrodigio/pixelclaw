@@ -49,7 +49,10 @@ If the tools are missing, the server is not connected:
   `apply=true` keeps the best. **Try before you keep:** `run(…, dry=true)` applies to a copy,
   checks it, and keeps nothing (a pebble, a walkable flag, a `family cut`).
 - **Helpers apply the style guide exactly:** `outline` (the style guide's ink when you leave out
-  `c=`), `shade` (its light when you leave out `light=`), `clean orphans`, pixel-perfect lines.
+  `c=`), `shade` (its light when you leave out `light=`), `clean orphans`, pixel-perfect lines,
+  `shadow` (an ellipse under a sprite, away from the light, in `style.shadow.c`). On maps, set
+  `style.shadow` (`{"c": "darker"}`) and every objects layer casts shadows on the ground (`layer add
+  props objects` writes `shadow=darker shadowdir=se`); do not also bake a shadow into those objects.
 - **Keep the checks green, but do not stop at green.** Look at the 3x3 or the game view and judge
   it as a player would. Fix by coordinates from `check`, not by redrawing.
 - **One light, one outline rule, one level of detail across a set.** The `consistency` check

@@ -65,6 +65,8 @@ export interface StyleDefaults {
   asset?(kind: string, name: string): { size?: [number, number]; palette?: string; scheme?: string; cell?: [number, number]; chars?: string } | undefined;
   /** `shade` with no light=: the style guide's light direction. */
   light?: string;
+  /** `shadow` and a map's objects layers (G16): the style guide's shadow colour (an entry, or darker) and direction. */
+  shadow?: { c?: string; dir?: string };
   /** `outline` with no c=: the style guide's outline colours (the first the palette has). */
   outline?: string[];
   /** `map gen` with no objects=: the assets the manifest says this map uses (objects are stood on it). */

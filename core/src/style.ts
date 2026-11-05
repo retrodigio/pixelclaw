@@ -8,7 +8,8 @@
 //     "drawScale": 2,                               the engine's draw scale (game view)
 //     "sizes": { "sprite": "24x24" },               required sizes per kind (coverage)
 //     "checks": { "orphans": { "max": 1.5, "tile": { "max": 3 } } },
-//     "assets": { "stone_floor": { "checks": { "repetition": { "off": true } }, "ground": "...", "set": ["..."] } }
+//     "assets": { "stone_floor": { "checks": { "repetition": { "off": true } }, "ground": "...", "set": ["..."] } },
+//     "shadow": { "c": "darker", "dir": "se" }      the shadow helper's and maps' object shadows (G16)
 //   },
 //   "themes": { "rust": { "light": "#e0a070", "dark": "#a05030", "darkest": "#301008" } }
 
@@ -32,6 +33,8 @@ export interface StyleJson {
   assets?: Record<string, { checks?: Record<string, unknown>; ground?: string; set?: string[] }>;
   /** The light direction (n, ne, … nw): `shade`'s default and what `consistency` holds the art to. */
   light?: string;
+  /** Shadows (G16): `c` an entry or `darker` (a step down the ground's ramps, on maps), `dir` where they fall (default: away from the light). */
+  shadow?: { c?: string; dir?: string };
   /** Per manifest set: check thresholds (`{ "props": { "checks": { "orphans": { "max": 2 } } } }`). */
   sets?: Record<string, { checks?: Record<string, unknown> }>;
 }
