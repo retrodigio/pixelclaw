@@ -33,6 +33,8 @@ export interface StyleJson {
   assets?: Record<string, { checks?: Record<string, unknown>; ground?: string; set?: string[] }>;
   /** The light direction (n, ne, … nw): `shade`'s default and what `consistency` holds the art to. */
   light?: string;
+  /** Colours reserved for some assets (G16): entry name → the assets that may use it (the palette check flags the rest). */
+  reserved?: Record<string, string[]>;
   /** Shadows (G16): `c` an entry or `darker` (a step down the ground's ramps, on maps), `dir` where they fall (default: away from the light). */
   shadow?: { c?: string; dir?: string };
   /** Per manifest set: check thresholds (`{ "props": { "checks": { "orphans": { "max": 2 } } } }`). */
@@ -52,7 +54,7 @@ export function checkStyleOf(json: StyleJson | undefined, palette: (name: string
     style: {
       ...(palettes.length ? { palettes } : {}), ...(s.outline ? { outline: s.outline } : {}), ...(s.sizes ? { sizes: s.sizes } : {}),
       ...(s.checks ? { checks: s.checks } : {}), ...(s.assets ? { assets: s.assets } : {}),
-      ...(s.density ? { density: s.density } : {}), ...(s.light ? { light: s.light } : {}),
+      ...(s.density ? { density: s.density } : {}), ...(s.light ? { light: s.light } : {}), ...(s.reserved ? { reserved: s.reserved } : {}),
     },
     problems,
   };

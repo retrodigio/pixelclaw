@@ -32,7 +32,7 @@ describe('pixelclaw check', () => {
   it('prints the table with coordinates and exits 1 when a check fails', () => {
     const r = cli(['check', proj, 'chest']);
     expect(r.code).toBe(1);
-    expect(r.out).toContain('chest: 1 of 7 checks failing');
+    expect(r.out).toContain('chest: 1 of 9 checks failing'); // margin and pieces since G16
     expect(r.out).toContain('✗  orphans     2.4%   ≤ 1%    9 stray px in 374 (9 lone, 0 near-orphans)');
     expect(r.out).toContain('lone pixel (no neighbour shares its colour): 7,4 17,4 6,14 17,14 6,18 17,18 6,19 6,20 16,20');
     expect(r.out).toMatch(/✓ {2}readability 1 +≥ 0.8 +edge contrast: 66 of 66 edge px differ from 'grass'/);

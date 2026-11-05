@@ -122,6 +122,7 @@ export function measure(d: Doc, ink: string[]): Measures {
   let n = 0, lsum = 0, edge = 0, edgeInk = 0, gx = 0, gy = 0, gw = 0, clusters = 0, clustered = 0;
   let x0 = W, y0 = H, x1 = -1, y1 = -1;
   const rampUse = new Map<string, Set<number>>();
+  const entryCount = new Map<number, number>();
   const rampCount = new Map<string, number>();
   const rampOf = new Map<number, string>();
   for (const [r, names] of Object.entries(pal.ramps)) for (const nm of names) {
@@ -138,7 +139,7 @@ export function measure(d: Doc, ink: string[]): Measures {
       n++; lsum += L[v]!;
       if (f === frames[0]) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
       const r = rampOf.get(v);
-      if (r) { (rampUse.get(r) ?? rampUse.set(r, new Set()).get(r)!).add(v); rampCount.set(r, (rampCount.get(r) ?? 0) + 1); }
+      if (r) { (rampUse.get(r) ?? rampUse.set(r, new Set()).get(r)!).add(v); rampCount.set(r, (rampCount.get(r) ?? 0) + 1); entryCount.set(v, (entryCount.get(v) ?? 0) + 1); }
       if (!d.wrap && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => at(x + dx!, y + dy!) === TRANSPARENT)) { edge++; if (inkSet.has(v)) edgeInk++; }
       // The shading gradient: between neighbours of one material, which way it gets lighter.
       if (r) for (const [dx, dy] of [[1, 0], [0, 1]] as const) {
@@ -173,7 +174,10 @@ export function measure(d: Doc, ink: string[]): Measures {
   if (!n) return { box: null, lightness: null, outline: null, light: null, cluster: null, steps: null, material: null, stroke: null, fill: null, centre: null };
   const mag = Math.hypot(gx, gy);
   const strength = gw > 0 ? mag / gw : 0;
-  const uses = [...rampUse.values()].map((s) => s.size);
+  // Ramp steps (G16): an entry drawn on only a few pixels (a lone accent: a glint, a gem) is not a
+  // step of its material; a ramp with no other entries is not a material of the art.
+  const accent = Math.max(3, Math.floor(n / 100));
+  const uses = [...rampUse.values()].map((s) => [...s].filter((v) => (entryCount.get(v) ?? 0) >= accent).length).filter((k) => k > 0);
   const material = [...rampCount].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0]?.[0] ?? null;
   return {
     box: x1 >= 0 ? { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 } : null,
@@ -192,6 +196,13 @@ export function measure(d: Doc, ink: string[]): Measures {
 export const LIGHT_DIRS: Record<string, [number, number]> = {
   n: [0, -1], ne: [1, -1], e: [1, 0], se: [1, 1], s: [0, 1], sw: [-1, 1], w: [-1, 0], nw: [-1, -1],
 };
+
+/** The first and third quartiles (linear between ranks). */
+function quartiles(xs: number[]): [number, number] {
+  const s = [...xs].sort((a, b) => a - b);
+  const q = (f: number) => { const r = f * (s.length - 1), i = Math.floor(r); return i + 1 < s.length ? s[i]! + (s[i + 1]! - s[i]!) * (r - i) : s[i]!; };
+  return [q(0.25), q(0.75)];
+}
 
 function median(xs: number[]): number {
   const s = [...xs].sort((a, b) => a - b);
@@ -247,13 +258,25 @@ export function consistencyOf(d: Doc, peers: { name: string; doc: Doc }[], o: Co
     const off = me.box.h - o.height;
     parts.push({ name: 'height', value: me.box.h, limit: `${o.height} ± ${o.heightTol}`, pass: Math.abs(off) <= o.heightTol, detail: `the drawn shape is ${me.box.h} px tall (rows ${me.box.y}..${me.box.y + me.box.h - 1}); the manifest plans ${o.height}` });
   }
-  const vs = <K extends keyof Measures>(key: K, name: string, get: (m: Measures) => number | null, limit: number, fmt: (x: number) => string, ratio = false, sameMaterial = false) => {
+  const vs = <K extends keyof Measures>(key: K, name: string, get: (m: Measures) => number | null, limit: number, fmt: (x: number) => string, ratio = false, sameMaterial = false, band = false) => {
     const mine = get(me);
     const vals = theirs.filter((t) => !sameMaterial || (t.m.material !== null && t.m.material === me.material)).map((t) => get(t.m)).filter((x): x is number => x !== null);
     if (mine === null || vals.length < 2) return;
     // The median of the whole set, this asset included (G13): every member is held to one centre,
     // so on a small set one odd asset is the outlier, not the two that disagree with it.
     const med = median([...vals, mine]);
+    if (band) {
+      // Held to the set's middle half (G16): the distance outside its quartiles, so one more member
+      // (an import, a new prop) moves the band a little and does not flip an asset that was inside it.
+      const [q1, q3] = quartiles([...vals, mine]);
+      const off = mine < q1 ? q1 - mine : mine > q3 ? mine - q3 : 0;
+      const mid = q1 === q3 ? fmt(q1) : `${fmt(q1)}..${fmt(q3)}`;
+      parts.push({
+        name, value: mine, limit: `± ${fmt(limit)} of the set's ${mid}`, pass: off <= limit,
+        detail: `${fmt(mine)} against the set's middle half ${mid} (with ${vals.length} others)`,
+      });
+      return;
+    }
     const off = ratio ? (med > 0 ? Math.max(mine / med, med / mine) : 1) : Math.abs(mine - med);
     parts.push({
       name, value: mine, limit: ratio ? `× ${limit} of the set's ${fmt(med)}` : `± ${fmt(limit)} of the set's ${fmt(med)}`, pass: off <= limit,
@@ -265,7 +288,7 @@ export function consistencyOf(d: Doc, peers: { name: string; doc: Doc }[], o: Co
   vs('lightness', 'lightness', (m) => m.lightness, o.maxL, (x) => String(r1(x)), false, true);
   vs('outline', 'outline share', (m) => m.outline, o.maxOutline, (x) => String(r2(x)));
   vs('cluster', 'cluster size', (m) => m.cluster, o.maxCluster, (x) => String(r2(x)), true);
-  vs('steps', 'ramp steps', (m) => m.steps, o.maxSteps, (x) => String(r1(x)));
+  vs('steps', 'ramp steps', (m) => m.steps, o.maxSteps, (x) => String(r1(x)), false, false, true);
   if (o.icon) {
     // The icon set (plan §4.5): one stroke weight, boxes that fill the canvas alike, each icon optically centred.
     vs('stroke', 'stroke weight', (m) => m.stroke, o.icon.maxStroke, (x) => String(r1(x)));

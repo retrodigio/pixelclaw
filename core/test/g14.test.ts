@@ -172,10 +172,10 @@ describe('item 4: the 48 px audit in core', () => {
     expect(band(48, 2)).toBeCloseTo(band(24, 1), 1);
   });
 
-  it('jaggies: a texture\'s allowance is per 24x24 px of cell (8 at 48 px), a sprite\'s stays 0', () => {
+  it('jaggies: a texture\'s allowance is per 24x24 px of cell (8 at 48 px); a sprite\'s 2 at 48 px since G16 (0 before)', () => {
     expect(runChecks(run(EMPTY, 'new tile a 24x24 bg=moss2').doc!, ['jaggies'])[0]!.limit).toBe('≤ 2');
     expect(runChecks(run(EMPTY, 'new tile a 48x48 bg=moss2').doc!, ['jaggies'])[0]!.limit).toBe('≤ 8');
-    expect(runChecks(run(EMPTY, 'new sprite s 48x48\nrect 4,4 20x20 c=ink').doc!, ['jaggies'])[0]!.limit).toBe('≤ 0');
+    expect(runChecks(run(EMPTY, 'new sprite s 48x48\nrect 4,4 20x20 c=ink').doc!, ['jaggies'])[0]!.limit).toBe('≤ 2');
   });
 
   it('icon consistency: stroke and centre limits in px grow with the icon (set for 16 px)', () => {

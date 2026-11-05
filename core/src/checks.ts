@@ -16,7 +16,7 @@ import { densityDiff, type ReducerOptions } from './density.ts';
 import { consistencyOf, isRecolour } from './consistency.ts';
 import { placements } from './map.ts';
 
-export const CHECK_IDS = ['palette', 'orphans', 'jaggies', 'banding', 'outline', 'seam', 'coverage', 'readability', 'revert', 'repetition', 'lattice', 'anim', 'views', 'fit', 'variant', 'footprint', 'draworder', 'density', 'consistency', 'font'] as const;
+export const CHECK_IDS = ['palette', 'orphans', 'jaggies', 'banding', 'outline', 'seam', 'coverage', 'readability', 'revert', 'repetition', 'lattice', 'anim', 'views', 'fit', 'variant', 'footprint', 'draworder', 'density', 'consistency', 'font', 'margin', 'pieces'] as const;
 export type CheckId = (typeof CHECK_IDS)[number];
 
 export function isCheckId(s: string): s is CheckId {
@@ -89,6 +89,8 @@ export interface CheckStyle {
   density?: { reducer?: string } & ReducerOptions;
   /** consistency: the light direction (n, ne, … nw). */
   light?: string;
+  /** palette (G16): colours reserved for some assets: entry name → the assets that may use it. */
+  reserved?: Record<string, string[]>;
 }
 
 export interface CheckContext {
@@ -126,7 +128,8 @@ const DEFAULTS: Record<CheckId, { all: Params } & Partial<Record<string, Params>
   // An overlay is flecks and sparkles: its lone pixels are its art.
   orphans: { all: { max: 1, texture: false }, tile: { max: 2, texture: true }, family: { max: 2, texture: true }, overlay: { off: true }, font: { off: true } },
   // A glyph sheet's single pixels and diagonals are its letters: it has the font check instead.
-  jaggies: { all: { max: 0 }, tile: { max: 2 }, family: { max: 2 }, font: { off: true } },
+  // Sprites and objects (G16): one more allowed per `area` px of art (none at 24x24, 2 at 48x48).
+  jaggies: { all: { max: 0, area: 1152 }, tile: { max: 2 }, family: { max: 2 }, font: { off: true } },
   // The pillow share: 1 when ramp steps follow the outline on every side alike.
   banding: { all: { max: 0.5, minEdges: 8 }, font: { off: true } },
   outline: { all: { min: 0.85 }, font: { off: true } },
@@ -163,6 +166,12 @@ const DEFAULTS: Record<CheckId, { all: Params } & Partial<Record<string, Params>
     icon: { maxStroke: 1, maxFill: 0.2, maxCentre: 1.5 } },
   // Glyph sheets: problems with cap height, x-height, the baseline, advances and the line height (maxLine: the profile's limit, 0 none).
   font: { all: { max: 0, maxLine: 0 } },
+  // Sprites and icons (G16): art touching an edge of its cell (the bottom is where a sprite stands:
+  // allowed unless bottom is false). Objects fill their map cells by design: off unless turned on.
+  margin: { all: { max: 0, bottom: true }, object: { off: true }, tile: { off: true }, family: { off: true }, map: { off: true }, font: { off: true }, overlay: { off: true }, sheet: { off: true } },
+  // Sprites and objects (G16): parts of the art that do not touch the rest (8-connected), of at
+  // least `min` px (smaller specks are orphans' business).
+  pieces: { all: { max: 0, min: 4 }, tile: { off: true }, family: { off: true }, map: { off: true }, font: { off: true }, overlay: { off: true }, icon: { off: true }, sheet: { off: true } },
 };
 
 /** A check's thresholds for a document kind: defaults, then the style guide's. */
@@ -271,6 +280,8 @@ function checkPalette(img: Img, p: Params, ctx: CheckContext): CheckResult {
   const roleArt = hasRoles(pal) || mode === 'tone';
   const pure = (hex: string) => rgbOf(hex).every((c) => c === 0 || c === 255);
   const allowed = ctx.style?.palettes?.length ? new Set(ctx.style.palettes.flatMap((x) => x.entries.map((e) => e.hex))) : null;
+  // Colours reserved for some assets (G16): any other asset that uses one is flagged.
+  const reserved = new Map(Object.entries(ctx.style?.reserved ?? {}).filter(([, who]) => !who.includes(img.doc.name)));
   const by = new Map<string, Pt[]>();
   const add = (label: string, i: number) => { if (!by.has(label)) by.set(label, []); by.get(label)!.push(ptOf(img, i)); };
   let opaque = 0;
@@ -284,6 +295,7 @@ function checkPalette(img: Img, p: Params, ctx: CheckContext): CheckResult {
     else if (mode === 'full' && e.role) add(`${e.name} is a role in a full-colour icon (drawn as is)`, i);
     else if (roleArt && mode !== 'channel' && mode !== 'full' && !e.role) add(`${e.name} is a fixed colour in ${mode === 'tone' ? 'a tone icon (recoloured through roles)' : 'role art'}`, i);
     else if (allowed && !e.role && !allowed.has(e.hex)) add(`${e.name} ${e.hex} is not in the style palettes`, i);
+    else if (reserved.has(e.name)) add(`${e.name} is reserved for ${reserved.get(e.name)!.join(', ')} (style.reserved)`, i);
   }
   const groups = [...by].map(([label, pts]) => ({ label, pts }));
   const n = groups.reduce((s, g) => s + g.pts.length, 0);
@@ -607,7 +619,11 @@ function checkJaggies(img: Img, p: Params, ctx: CheckContext = {}): CheckResult 
   // A texture's allowance is per 24x24 px of cell (G14): a 48 px tile has four times the room of a 24 px one.
   const d = img.doc;
   const per = Number(p.max) > 0 && (d.wrap || d.family) ? Math.max(1, Math.floor((d.cellW * d.cellH) / 576)) : 1;
-  const max = Number(p.max) * per;
+  // A sprite's or an object's allowance grows with its art (G16): at 48 px a long curve meeting a
+  // second shape has a few uneven steps however it is drawn. An object is one piece of art over its cells.
+  const art = d.kind === 'object' ? d.width * d.height : d.cellW * d.cellH;
+  const grow = !d.wrap && !d.family && Number(p.area) > 0 ? Math.floor(art / Number(p.area)) : 0;
+  const max = Number(p.max) * per + grow;
   return result('jaggies', {
     status: n <= max ? 'pass' : 'fail', score: n, shown: String(n), limit: `≤ ${max}`, groups,
     detail: (n === 0 ? 'lines and outlines step evenly' : `${corners} doubled L-corners, ${runs} irregular step runs, ${spikes.length} spikes, ${notches.length} notches`) +
@@ -1408,11 +1424,87 @@ function checkFont(img: Img, p: Params): CheckResult {
   });
 }
 
+/** The cells a sprite's art is judged in: an object is one piece of art over its cells; a sprite sheet is its cells. */
+function artCells(d: Doc): { x: number; y: number; w: number; h: number }[] {
+  if (d.kind === 'object') return [{ x: 0, y: 0, w: d.width, h: d.height }];
+  const out: { x: number; y: number; w: number; h: number }[] = [];
+  for (let y = 0; y + d.cellH <= d.height; y += d.cellH) for (let x = 0; x + d.cellW <= d.width; x += d.cellW) out.push({ x, y, w: d.cellW, h: d.cellH });
+  return out;
+}
+
+/** Art touching an edge of its cell (G16): a sprite cut by its canvas, or with no room for its outline. */
+function checkMargin(img: Img, p: Params): CheckResult {
+  const d = img.doc;
+  if (d.wrap || d.family || d.map) return skip('margin', 'tiles and families join their neighbours');
+  const sides = Number(p.max) >= 0 && p.bottom === false ? ['top', 'left', 'right', 'bottom'] : ['top', 'left', 'right'];
+  const by = new Map<string, Pt[]>();
+  const add = (side: string, x: number, y: number) => { if (!by.has(side)) by.set(side, []); by.get(side)!.push([x, y]); };
+  for (const c of artCells(d)) {
+    for (let x = c.x; x < c.x + c.w; x++) {
+      if (img.get(x, c.y) !== TRANSPARENT) add('top', x, c.y);
+      if (sides.includes('bottom') && img.get(x, c.y + c.h - 1) !== TRANSPARENT) add('bottom', x, c.y + c.h - 1);
+    }
+    for (let y = c.y; y < c.y + c.h; y++) {
+      if (img.get(c.x, y) !== TRANSPARENT) add('left', c.x, y);
+      if (img.get(c.x + c.w - 1, y) !== TRANSPARENT) add('right', c.x + c.w - 1, y);
+    }
+  }
+  const groups = sides.filter((x) => by.has(x)).map((x) => ({ label: `art on the ${x} edge of its ${d.kind === 'object' ? 'canvas' : 'cell'}`, pts: by.get(x)! }));
+  const n = groups.reduce((a, g) => a + g.pts.length, 0);
+  const max = Number(p.max);
+  return result('margin', {
+    status: n <= max ? 'pass' : 'fail', score: n, shown: String(n), limit: `≤ ${max}`, groups,
+    detail: n === 0 ? `a clear pixel all round${sides.includes('bottom') ? '' : ' but the bottom (where it stands)'}` : `${n} px on the edge (${groups.map((g) => `${g.label.replace(/^art on the | edge.*$/g, '')} ${g.pts.length}`).join(', ')}): move it in, or make the canvas bigger`,
+  });
+}
+
+/** A sprite in disconnected parts (G16): a floating lamp room, a hat beside its head. */
+function checkPieces(img: Img, p: Params): CheckResult {
+  const d = img.doc;
+  if (d.wrap || d.family || d.map) return skip('pieces', 'tiles and families are texture');
+  const min = Number(p.min);
+  const groups: FlagGroup[] = [];
+  let extra = 0;
+  for (const c of artCells(d)) {
+    const seen = new Uint8Array(c.w * c.h);
+    const parts: Pt[][] = [];
+    for (let y = 0; y < c.h; y++) for (let x = 0; x < c.w; x++) {
+      if (seen[y * c.w + x] || img.get(c.x + x, c.y + y) === TRANSPARENT) continue;
+      const part: Pt[] = [];
+      const stack: Pt[] = [[x, y]];
+      seen[y * c.w + x] = 1;
+      while (stack.length) {
+        const [u, v] = stack.pop()!;
+        part.push([c.x + u, c.y + v]);
+        for (const [dx, dy] of N8) {
+          const X = u + dx, Y = v + dy;
+          if (X < 0 || Y < 0 || X >= c.w || Y >= c.h || seen[Y * c.w + X] || img.get(c.x + X, c.y + Y) === TRANSPARENT) continue;
+          seen[Y * c.w + X] = 1;
+          stack.push([X, Y]);
+        }
+      }
+      parts.push(part);
+    }
+    parts.sort((a, b) => b.length - a.length);
+    for (const part of parts.slice(1)) {
+      if (part.length < min) continue;
+      extra++;
+      const xs = part.map((q) => q[0]), ys = part.map((q) => q[1]);
+      groups.push({ label: `a part apart from the rest: ${part.length} px at ${Math.min(...xs)},${Math.min(...ys)} ${Math.max(...xs) - Math.min(...xs) + 1}x${Math.max(...ys) - Math.min(...ys) + 1}`, pts: part });
+    }
+  }
+  const max = Number(p.max);
+  return result('pieces', {
+    status: extra <= max ? 'pass' : 'fail', score: extra, shown: String(extra), limit: `≤ ${max}`, groups,
+    detail: extra === 0 ? 'one piece' : `${extra} part${extra > 1 ? 's' : ''} not touching the rest (${groups.map((g) => g.label.replace(/^a part apart from the rest: /, '')).join('; ')}): join it, or turn pieces off for this asset if it is meant to float`,
+  });
+}
+
 const RUNNERS: Record<CheckId, (img: Img, p: Params, ctx: CheckContext) => CheckResult> = {
   palette: checkPalette, orphans: checkOrphans, jaggies: checkJaggies, banding: checkBanding, outline: checkOutline,
   seam: checkSeam, coverage: checkCoverage, readability: checkReadability, revert: checkRevert, repetition: checkRepetition,
   anim: checkAnim, views: checkViews, fit: checkFit, variant: checkVariant, footprint: notMap('footprint'), lattice: notMap('lattice'), draworder: notMap('draworder'), density: checkDensity,
-  consistency: checkConsistency, font: checkFont,
+  consistency: checkConsistency, font: checkFont, margin: checkMargin, pieces: checkPieces,
 };
 
 /** Checks of the whole document (every frame at once); the others read one frame's image. */

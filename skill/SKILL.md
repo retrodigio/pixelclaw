@@ -55,6 +55,10 @@ If the tools are missing, the server is not connected:
   props objects` writes `shadow=darker shadowdir=se`); do not also bake a shadow into those objects.
 - **Keep the checks green, but do not stop at green.** Look at the 3x3 or the game view and judge
   it as a player would. Fix by coordinates from `check`, not by redrawing.
+- **Keep art inside its cell and in one piece:** `margin` fails a sprite touching the top or sides
+  of its cell (it stands on the bottom), `pieces` a part floating apart (a lamp room above its
+  tower: join it). Colours meant for one thing only (a lantern's glow, a gem) go in
+  `style.reserved` (`{"glow": ["lantern"]}`); `palette` then flags them anywhere else.
 - **One light, one outline rule, one level of detail across a set.** The `consistency` check
   compares each asset with its set; a recolour (palette swap) is recognised and not compared with
   its source.

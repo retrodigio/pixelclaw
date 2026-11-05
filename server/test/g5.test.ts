@@ -32,13 +32,13 @@ describe('checks through MCP', () => {
   it('every run result ends with a check summary', async () => {
     const r = await call('run', { asset: 'box', commands: 'new sprite box 12x12\nrect 2,2 8x8 c=stone3 fill\nrect 2,2 8x8 c=ink\npx 5,5 c=lichen' });
     const t = texts(r.content);
-    expect(t).toMatch(/checks: palette 0 ✓ · orphans [\d.]+% ✗ · jaggies 0 ✓ · banding 0 ✓ · outline 1 ✓ · coverage 0 ✓ · readability 1 ✓ {2}\(1 failing: `check` gives coordinates\)/);
+    expect(t).toMatch(/checks: palette 0 ✓ · orphans [\d.]+% ✗ · jaggies 0 ✓ · banding 0 ✓ · outline 1 ✓ · coverage 0 ✓ · readability 1 ✓ · margin 0 ✓ · pieces 0 ✓ {2}\(1 failing: `check` gives coordinates\)/);
   });
 
   it('check gives the table with coordinates and circles the flagged pixels', async () => {
     const r = await call('check', { asset: 'box' });
     const t = texts(r.content);
-    expect(t).toContain('box: 1 of 7 checks failing');
+    expect(t).toContain('box: 1 of 9 checks failing'); // margin and pieces since G16
     expect(t).toContain('✗  orphans');
     expect(t).toContain('lone pixel (no neighbour shares its colour): 5,5');
     expect(t).toContain('–  seam        skipped: not a wrap (tile) document');
@@ -47,10 +47,10 @@ describe('checks through MCP', () => {
     expect(t).toMatch(/render: \d+x\d+ px, saved .*box\.render\.png/);
     // Fixed by coordinates: the summary goes green.
     const fix = texts((await call('run', { asset: 'box', commands: 'px 5,5 c=stone3' })).content);
-    expect(fix).toMatch(/checks: .* readability 1 ✓$/m);
+    expect(fix).toMatch(/checks: .* readability 1 ✓ · margin 0 ✓ · pieces 0 ✓$/m);
     expect(fix).not.toContain('failing');
     const ok = await call('check', { asset: 'box' });
-    expect(texts(ok.content)).toContain('box: all 7 checks pass');
+    expect(texts(ok.content)).toContain('box: all 9 checks pass');
     expect(image(ok.content)).toBeUndefined();
   });
 

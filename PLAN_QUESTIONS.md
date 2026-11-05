@@ -1507,3 +1507,27 @@ Points where the plan was unclear or silent. Each has the reading that was follo
      never shadow each other. `darker` is a step down the ramp of the palette the ground pixel came
      from (else the nearest entry at least 6 L* darker). The map checks (seam, lattice, …) read the
      ground without shadows.
+
+223. **"Sprite `jaggies` allowance scaled with size (not 0 at 48 px)"** (item 4). *Reading:* one
+     more defect per 1152 px of art (`jaggies.area`): none at 24x24 (fully verifiable, as before),
+     2 at 48x48, 8 at 96x96; an object's art is all its cells (4 on a 48x96 waystone). Tiles keep
+     G14's 2 per 24x24 px.
+
+224. **"Consistency's ramp-steps ignores lone accent pixels and does not flip when the set grows"**
+     (item 4). *Reading:* an entry counts as a step only when it covers at least 3 px and 1% of the
+     art; a ramp with no such entry is not one of the art's materials. The asset is held to the set's
+     middle half (first to third quartile, itself included) instead of the median: a new member
+     moves the band a little, where it could move a median across the limit. Only ramp steps change;
+     the other measures keep the median.
+
+225. **"New `margin` (art touching the canvas edge)"** (item 4). *Reading:* per cell (an object's
+     canvas), the top, left and right edges; the bottom is where a sprite stands and is allowed
+     (`margin.bottom: false` to hold it too). Objects are off by default: buildings and walls fill
+     their map cells by design (every example house and tree touches its canvas), and a person can
+     turn it on. **`pieces`** counts 8-connected parts other than the biggest, of at least 4 px (a
+     smaller speck is an orphan); icons are off (letters and symbols are often in parts).
+
+226. **"Palette reservations (a colour allowed only on listed assets, from style.md)"** (item 4).
+     *Reading:* the settings live in project.json `style.reserved` (`{ entry: [assets] }`), as every
+     check setting does (Q56: style.md holds the words); the style guide's text should say why.
+     The `palette` check flags a reserved colour in any asset not listed, by entry name.
