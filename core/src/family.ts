@@ -8,7 +8,7 @@ import { TRANSPARENT, flatten, type Doc, type FamilyState, type OverlayState } f
 import { luma601, seamAxis } from './checks.ts';
 import { Pcg32 } from './pcg.ts';
 import {
-  bandMap, bandWidth, loadScheme, reachable, resolveMap, schemeNamed, terrainWidth, type Geometry, type Scheme, type Terrain,
+  bandMap, bandWidth, isFace, loadScheme, reachable, resolveMap, schemeNamed, terrainWidth, type Geometry, type Scheme, type Terrain,
 } from './schemes.ts';
 
 import type { Pt } from './raster.ts';
@@ -422,6 +422,25 @@ export function coverageTerrain(s: Scheme, cols: number, rows: number, seed: num
 
 // --- The seam score over a map (plan §13's metric on a composed image instead of a 3x3 tiling)
 
+
+/**
+ * A cliff's faces (G16: south, side and corner pieces) meet the terrain at the cell's edge by
+ * design: for the seam over a family's sample map, their cells show the outside ground under them
+ * (in place), so the seam is the band's and the textures'. Returns how many cells that was.
+ */
+export function groundUnderFaces(img: MapImage, d: Doc, frame = 0): number {
+  const f = d.family;
+  if (!f) return 0;
+  const s = schemeOf(f), t = img.t, cols = img.w / t;
+  const faces = img.variants.flatMap((v, i) => (v !== null && isFace(s.variants[v]!.on) ? [i] : []));
+  if (!faces.length) return 0;
+  const [ox, oy] = layoutOf(f).outside, flat = flatten(d, frame);
+  for (const i of faces) {
+    const mx = (i % cols) * t, my = Math.floor(i / cols) * t;
+    for (let y = 0; y < t; y++) for (let x = 0; x < t; x++) img.px[(my + y) * img.w + mx + x] = flat[(oy * t + y) * d.width + ox * t + x]!;
+  }
+  return faces.length;
+}
 
 export function mapSeam(img: MapImage, d: Doc): { score: number; jx: number; jy: number; lx: number; ly: number } {
   const { w: W, h: H, t } = img;

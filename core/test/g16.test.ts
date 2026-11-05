@@ -208,6 +208,14 @@ describe('item 2: faces of a cliff, and lanes', () => {
     expect(after.size).toBe(2);
   });
 
+  it('a face family\'s seam is the band\'s and the textures\': face cells are measured as the outside under them', () => {
+    // The same family with and without its faces drawn: the same seam.
+    const bare = run(EMPTY, cliffLines.slice(0, 5).join('\n')).doc!;
+    const r = runChecks(cliff, ['seam'])[0]!;
+    expect(r.detail).toMatch(/its \d+ face cells as the outside under them/);
+    expect(r.score).toBe(runChecks(bare, ['seam'])[0]!.score);
+  });
+
   it('the coverage template draws side faces and corners', () => {
     const t = coverageTemplate(face, { tile: 8, inside: [120, 160, 80], outside: [60, 90, 160] })!;
     const cells = t.variants.flatMap((v, i) => (v !== null && (face.variants[v]!.on === 'side' || face.variants[v]!.on === 'corner') ? [i] : []));

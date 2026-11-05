@@ -240,6 +240,15 @@ map's border** and its **inside a mix** of tiles. Screenshots: [before](docs/scr
 and [after](docs/screenshots/g15-hollow-after.png), [the terrain tools](docs/screenshots/g15-map-terrain-tools.png),
 [the worker's log](docs/screenshots/g15-worker-log.png).
 
+The G16 demo ([examples/demo-g16.md](examples/demo-g16.md)): art help on a 48 px heath. A shingle and
+a grass floor from the new **`pebbles`** and **`tufts`** generators (each a base and two looks
+sharing `edges=`, seeds ranked by the checks), a **cliff plateau with side faces, corners and inner
+corners**, a **lane** that widens with a plain middle and **turns diagonally**, standing stones that
+**cast shadows**, and the new checks catching a **floating part** (`pieces`), **art on the canvas
+edge** (`margin`) and a **reserved colour** misused. Screenshots: [the heath](docs/screenshots/g16-heath.png),
+[the map editor](docs/screenshots/g16-map-editor.png), [the cliff](docs/screenshots/g16-cliff-map.png),
+[pieces](docs/screenshots/g16-check-pieces.png).
+
 ## Packages
 
 - `core`: the document (layers, frames, each author's context), palettes, command parser and

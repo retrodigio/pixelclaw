@@ -9,7 +9,7 @@ import { charText, glyphs } from './font.ts';
 import { rgbOf, type Palette } from './palette.ts';
 import type { Pt } from './raster.ts';
 import { hasRoles } from './themes.ts';
-import { DEFAULT_MAP, composeMap, islandTerrain, layoutOf, mapSeam, schemeOf } from './family.ts';
+import { DEFAULT_MAP, composeMap, groundUnderFaces, islandTerrain, layoutOf, mapSeam, schemeOf } from './family.ts';
 import { artGrid, cellFlag, composeMapDoc, inFootprint, mapChecks, variantMatch, type MapWorld } from './map.ts';
 import { rampsOf } from './values.ts';
 import { densityDiff, type ReducerOptions } from './density.ts';
@@ -832,11 +832,12 @@ function checkSeam(img: Img, p: Params, ctx: CheckContext): CheckResult {
     const d = img.doc;
     const { cols, rows, seed } = DEFAULT_MAP;
     const m = composeMap(d, islandTerrain(schemeOf(d.family!), cols, rows, seed), ctx.frame ?? 0);
+    const faces = groundUnderFaces(m, d, ctx.frame ?? 0);
     const s = mapSeam(m, d);
     const max = Number(p.max);
     return result('seam', {
       status: s.score <= max ? 'pass' : 'fail', score: s.score, shown: fmt(s.score), limit: `≤ ${max}`,
-      detail: `over a ${cols}x${rows} island (seed ${seed}): jump x ${fmt(s.jx)} y ${fmt(s.jy)}; line x ${fmt(s.lx)} y ${fmt(s.ly)} (view map shows it)`,
+      detail: `over a ${cols}x${rows} island (seed ${seed}${faces ? `; its ${faces} face cells as the outside under them` : ''}): jump x ${fmt(s.jx)} y ${fmt(s.jy)}; line x ${fmt(s.lx)} y ${fmt(s.ly)} (view map shows it)`,
     });
   }
   if (!img.wrap) return skip('seam', 'not a wrap (tile) document');

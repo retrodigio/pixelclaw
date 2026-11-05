@@ -9,7 +9,7 @@ import { createRgba, type Rgba } from './png.ts';
 import { indexOf, type Pt } from './raster.ts';
 import { themedPalette, type Theme } from './themes.ts';
 import {
-  DEFAULT_MAP, composeMap, drawOverlays, familyFrameAt, islandTerrain, layoutOf, mapPeriod, mapSeam, neighbourhoodOf, overlayOnPalette, schemeOf, tileMap, type MapImage,
+  DEFAULT_MAP, composeMap, drawOverlays, familyFrameAt, groundUnderFaces, islandTerrain, layoutOf, mapPeriod, mapSeam, neighbourhoodOf, overlayOnPalette, schemeOf, tileMap, type MapImage,
 } from './family.ts';
 import type { Terrain } from './schemes.ts';
 
@@ -791,7 +791,10 @@ export function renderMap(doc: Doc, o: MapViewOptions = {}): Rgba {
 export function mapText(doc: Doc, o: MapViewOptions = {}): string {
   const sc = mapScene(doc, o, o.tick ?? 0);
   const { img, base } = sc;
-  const seam = mapSeam(img, base);
+  // The seam as the check measures it: a cliff's faces as the ground under them (G16).
+  const ground = { ...img, px: img.px.slice() };
+  if (base.family && !o.terrain) groundUnderFaces(ground, base, 0);
+  const seam = mapSeam(ground, base);
   const f2 = (n: number) => String(Number(n.toFixed(2)));
   const lines = [`${img.w / img.t}x${img.h / img.t} tiles of ${img.t} px${base.family && !o.terrain ? `, a random island (seed ${o.seed ?? DEFAULT_MAP.seed})` : ''}` +
     `; seam ${f2(seam.score)} (jump x ${f2(seam.jx)} y ${f2(seam.jy)}, line x ${f2(seam.lx)} y ${f2(seam.ly)}; about 1 or less reads as no seam)`];

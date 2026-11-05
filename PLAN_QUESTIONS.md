@@ -1531,3 +1531,20 @@ Points where the plan was unclear or silent. Each has the reading that was follo
      *Reading:* the settings live in project.json `style.reserved` (`{ entry: [assets] }`), as every
      check setting does (Q56: style.md holds the words); the style guide's text should say why.
      The `palette` check flags a reserved colour in any asset not listed, by entry name.
+
+227. **A face family's seam** (items 2 and 4). *Reading:* found while building the demo: a cliff whose
+     faces meet the terrain at the cell's edge scored 1.3 over its sample island although its band
+     and textures join cleanly (the seam metric sees the faces' edges on the tile grid). The
+     family's `seam` check and `view map`'s figure now measure face cells as the outside ground under
+     them; the faces are judged by eye. Maps' seams are unchanged.
+
+228. **"Ember Moor's floor should use the new generators where they help"**. *Reading:* the moor's
+     three looks are now the same noise ground with `tufts` sharing `edges=2` and their own seeds (the
+     heather clump kept on two looks): the map's lattice goes from 26% to 12% and its seam from 0.35 to
+     0.17. Calm bog water is then an outlier in cluster size against the tufted moor (its set is the
+     project's ground tiles, there being no manifest): its `consistency.maxCluster` is raised to 5 in
+     the style guide rather than drawing structure into still water.
+
+229. **The demo's "stand-in"**. *Reading:* as in G14, a script that drives `pixelclaw serve` over MCP
+     the way Claude would (no model); it builds a new 48 px project from Ember Moor's palette.
+

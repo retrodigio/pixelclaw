@@ -226,6 +226,9 @@ Status of plan features touched so far. Steps refer to the build plan (§10).
 | Face scheme: side faces, inner corners, alternate looks; the `lane` scheme (a filled path, diagonal turns) | §26 G16 (2) | done | `core/test/g16.test.ts` (item 2: the face scheme resolves 9 south faces, 12 side faces and 3 corners; side faces and corners drawn beside the terrain with outside on and off; alternates placed by cell, a copy of the middle until detached and drawn; the coverage template draws them; a three-wide lane has a plain middle where `path` shows grass at every inside corner; a diagonal lane is one connected strip whose rows all cross the same run, clean 45° steps), `core/test/schemes.test.ts` (updated: 75 face variants; a face beside terrain is now `face_ie`, not `face_o`) | `scripts/gen-schemes.ts` writes `core/schemes/face.json` (47 + 28) and `lane.json` (82 + 15). Faces (`on: face\|side\|corner`) are drawn on maps whatever the layer's fill; lane strips are measured across a row. Plan questions 218-220. |
 | Shadows: the `shadow` helper; maps' objects cast shadows | §26 G16 (3) | done | `core/test/g16.test.ts` (item 3: the helper's box from the art's foot, away from the light, only on empty pixels, the style's colour and direction, a darker style refused on a sprite; a map's objects layer takes `shadow=darker shadowdir=se` from the style, darkens each ground pixel one ramp step south-east of the object's foot, leaves the checks' ground alone, `layer set … shadow=off\|<colour>`, kept by save and load) | `core/src/shadow.ts`; `style.shadow` `{c, dir}` (dir default: away from `style.light`). Plan questions 221-222. |
 | Checks: sprite jaggies by size; ramp steps without accents, by the set's middle half; `margin`; `pieces`; palette reservations | §26 G16 (4) | done | `core/test/g16.test.ts` (item 4: the same three corners allowed 0, 2 and 8 at 24, 48 and 96 px, 4 on a 48x96 object; a one-pixel accent no longer a step and a growing set not flipping a verdict; margin on a sprite's edges, the bottom allowed, objects and tiles skipped; a floating part failed, a speck left to orphans; a reserved colour failed outside its assets) | Every example asset passes the new checks; Kiln Hollow's `shards_*` still fail jaggies as before (sprites at 24 px keep an allowance of 0). Plan questions 223-226. |
+| A face family's seam without its faces | §26 G16 (2), (4) | done | `core/test/g16.test.ts` (item 2: the same family with and without its faces drawn scores the same seam) | Faces meet the terrain at the cell's edge by design; the family's island seam and `view map`'s figure measure their cells as the outside ground under them. Plan question 227. |
+| Ember Moor's floor with the generators | §26 G16 | done | `cli/test/ember-moor.test.ts` (scripts rebuild every asset; every check passes) | The moor's three looks: the same noise ground and `tufts` sharing `edges=2`, each with its own seed. Map lattice 26% → 12%, seam 0.35 → 0.17. The pool follows its outside tile (G15). The bog's `consistency.maxCluster` raised to 5 (calm water against tufted grass). Plan question 228. |
+| Demo: a 48 px heath with generator floors, a cliff plateau, a lane, shadows, planted faults | §26, G16 | done | `examples/demo-g16-agent.ts` (run by hand), `examples/demo-g16.md` | Screenshots `docs/screenshots/g16-*.png` (`scripts/screenshots-g16.ts`). Plan question 229. |
 
 ## Notes for G8
 
@@ -442,3 +445,30 @@ What the acceptance project (§10 A1) will need, from G11's side:
   as it did.
 - **Kiln Hollow's `shards_*`** still fail `jaggies` (imported drafts since G12).
 - **Cost of this step**: not measured.
+
+
+## Notes for the next step (after G16)
+
+- **The structure generators optimise for the checks.** `pebbles` and `tufts` move, re-tone and
+  resize their shapes until every band of rows and columns is within the repetition limit and the
+  edge lines within the seam check's; that makes their layouts even by construction, which a reader
+  should look at: an even layout can read as orderly at 16 px, where a tile holds few shapes. A 48 px
+  tile takes about half a second to normalise (each replay too).
+- **Two generators on one tile do not know about each other**: a second `pebbles` or `tufts` line can
+  draw over the first's shapes. Use one structure generator per look, or a box (`pebbles 4,4 40x40 …
+  wrap=off`) for a second one.
+- **Many `noise` grounds fail `repetition` on their own** at the defaults; the generators usually even
+  them out, but rank the noise with `seeds` first.
+- **Face art is hand work.** Nine pieces (three south, four side, a corner, plus the alternates) are
+  drawn by hand; a helper that draws a rock face from a ramp (strata, cracks, a lit top) would make
+  cliffs cheap. The faces are excluded from the family's seam; they are judged by eye.
+- **Lanes**: the `lane` scheme's diagonal steps are one cell wide; a lane two cells wide that steps
+  diagonally has not been tried (a corner with one side in the lane does not count, by the rule).
+- **Shadows** are ellipses from the art's bottom third; tall thin objects get small shadows. A cast
+  (sheared silhouette) option was left out (plan question 221).
+- **`margin` is off for objects** (buildings fill their cells); a tree whose canopy is cut by its
+  canvas (Mossy Ruins' `tree` touches both sides) is not flagged. A reader may want it on for some
+  objects (`style.assets.<name>.checks.margin.off: false`).
+- **Kiln Hollow's `shards_*`** still fail `jaggies` (24 px sprites keep an allowance of 0).
+- **Cost of this step**: not measured.
+
