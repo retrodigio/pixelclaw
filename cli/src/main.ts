@@ -71,7 +71,7 @@ export const USAGE = `pixelclaw: a pixel art editor driven by commands
       Ask for work as the dashboard does: draw a planned asset, change a drawn one (also writes
       mark rejected "<note>" on its tape), or add a new asset (its manifest entry, validated first).
       Without a kind, lists the requests still open, claimed or blocked. Refused while a server
-      owns the project (use its dashboard or MCP request).
+      owns the project it is sent to that server (see "While a server runs").
   pixelclaw reply <project> <id> "<answer>" [--by <author>]      answer a blocked request (it opens again)
   pixelclaw cancel <project> <id> ["<why>"] [--by <author>]       withdraw a request
   pixelclaw work <project> [--port N]
@@ -105,9 +105,22 @@ export const USAGE = `pixelclaw: a pixel art editor driven by commands
       line. Each is replayed before and after; it is written only if the pixels are the same.
   pixelclaw verify <project> [<asset>...]
       Replay every tape and compare with asset.json, preview.png and checkpoints.
+  pixelclaw await <project-folder | watch-url> [--timeout <seconds>, default 600] [--since <cursor>] [--as <name>] [--json]
+      Wait on the running server for what people ask in the dashboard (a request, a reply, a
+      withdrawn request, or an approval, rejection or review mark), print the events with their
+      next step (work claims a request; changes reads a change) and a cursor, then EXIT. Run it in
+      the background and restart it with --since <cursor> after each exit: its exit is what wakes
+      an agent. Exit 0 with events, 3 on timeout, 1 if no server can be reached. Requests handed
+      over are recorded as seen by --as (default claude). Works with serve --no-mcp.
   pixelclaw serve --project <project> [--port 7417] [--no-mcp]
       Own the project: MCP on stdin/stdout for the agent, and the live watch view on
       http://127.0.0.1:<port>/?token=... (printed to stderr). Creates the project if needed.
+
+While a server runs (pixelclaw serve): commands that write (new, run, seeds --apply, export,
+import, review, plan --manifest/--templates, request, reply, cancel) are sent to it over HTTP,
+found through the project's lock and a token file only you can read, so they go through its
+writer and a connected dashboard updates live. Read-only commands read the files. If the server
+cannot be reached the command runs directly. upgrade still needs the server stopped.
 
 Command reference: docs/commands.md
 `;
@@ -166,7 +179,7 @@ function loadState(proj: Project, name: string): AssetState {
 /** A running server is the single writer for its project; the CLI does not write behind its back. */
 function assertNoServer(proj: Project): void {
   const held = lockHolder(proj.dir);
-  if (held) throw new ProjectError(`a pixelclaw server (pid ${held.pid}) owns ${proj.dir} but its token file is not readable by this user, so the command could not be sent to it; send it through MCP or the dashboard, or stop the server first`);
+  if (held) throw new ProjectError(`a pixelclaw server (pid ${held.pid}) owns ${proj.dir} and the command could not be sent to it (its token file must be readable by you); send commands through it (MCP: run, export, import, request; or its dashboard), or stop it first`);
 }
 
 function apply(io: Io, proj: Project, text: string, source: string, o: { asset?: string; replace: boolean; by: string; dry?: boolean }): { code: number; doc?: Doc } {

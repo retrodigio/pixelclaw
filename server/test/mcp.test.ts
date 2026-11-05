@@ -30,7 +30,7 @@ afterAll(async () => {
 describe('MCP over stdio', () => {
   it('lists the tools and gives instructions', async () => {
     const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(['changes', 'check', 'export', 'history', 'import', 'plan', 'project', 'request', 'review', 'run', 'seeds', 'view', 'work']);
+    expect(tools.map((t) => t.name).sort()).toEqual(['await_requests', 'changes', 'check', 'export', 'history', 'import', 'plan', 'project', 'request', 'review', 'run', 'seeds', 'view', 'work']);
     expect(client.getInstructions()).toContain('watch link');
   });
 
@@ -103,14 +103,9 @@ describe('MCP over stdio', () => {
     expect(execFileSync(process.execPath, [BIN, 'verify', proj], { encoding: 'utf8' })).toContain('ok   slab');
   });
 
-  it('the CLI refuses to write while the server owns the project', () => {
-    let err = '';
-    try {
-      execFileSync(process.execPath, [BIN, 'run', proj, '--asset', 'slab', '-e', 'px 0,0 c=ink'], { encoding: 'utf8', stdio: 'pipe' });
-    } catch (e) {
-      err = String((e as { stderr: string }).stderr);
-    }
-    expect(err).toContain('a pixelclaw server');
+  it('the CLI sends a write to the server that owns the project (one undo group, the page sees it)', () => {
+    const out = execFileSync(process.execPath, [BIN, 'run', proj, '--asset', 'slab', '-e', 'px 0,0 c=ink'], { encoding: 'utf8', stdio: 'pipe' });
+    expect(out).toContain('slab: applied 1 command as group g5');
   });
 });
 
@@ -140,7 +135,7 @@ describe('the watch view', () => {
     expect(a.messages).toEqual(b.messages);
     const [hello, batch, eye] = a.messages as { type: string; [k: string]: unknown }[];
     expect(hello!.type).toBe('hello');
-    expect(batch).toMatchObject({ type: 'batch', asset: 'slab', by: 'claude', group: 'g5', changed: 2, reset: false });
+    expect(batch).toMatchObject({ type: 'batch', asset: 'slab', by: 'claude', group: 'g6', changed: 2, reset: false });
     expect((batch!.entries as { cmd: string }[]).map((e) => e.cmd)).toEqual(['px 2,2 c=moss2', 'px 3,3 c=moss3']);
     expect(eye).toMatchObject({ type: 'eye', eye: { asset: 'slab', mode: 'render' } });
     a.ws.close();

@@ -226,6 +226,16 @@ Check results are kept in `.cache/checks/` by the state hashes of everything the
 fresh process (a CLI call, a new server) does not run every check on every asset again. See
 [pipeline.md](pipeline.md).
 
+### `await_requests`
+
+Wait until a person files, answers or withdraws a request, or approves, rejects or reviews an
+asset in the dashboard. `timeout` is seconds (default 30, at most 120); `cursor` is the cursor the
+last call returned. Returns the events (each with the request id or asset, the note, who, and the
+next step: `work` or `changes`) and the next cursor, or `no new events`. The requests it hands over
+are recorded as seen, and the dashboard shows an agent is listening while it waits. Not offered on
+the worker's connection. For long waits between tasks prefer `pixelclaw await <project>` in the
+background: its exit wakes the model ([pipeline.md](pipeline.md#hearing-about-requests-await)).
+
 ### `work`
 
 The request queue. With no
@@ -570,8 +580,17 @@ tile and anything placed on it.
   without it the page explains where to find the link. The page's scripts and styles
   (`/assets/…`) are public: they hold no art.
 - While running, the server writes `<project>/.pixelclaw.lock` (its pid and URL, without the
-  token). CLI commands that write (`new`, `run`) refuse to touch a project a live server owns;
-  `view` and `verify` still work. Add `.pixelclaw.lock` to a project's `.gitignore`.
+  token). CLI commands that write (`new`, `run`, `seeds --apply`, `export`, `import`, `review`,
+  `plan --manifest`, `request`, `reply`, `cancel`) find a live server through that lock and a
+  token file, and send the command to it (`POST /api/cli`, a bearer token) so it goes through the
+  writer queue; `upgrade` still refuses. `view`, `check`, `verify` and the other readers read the
+  files. Add `.pixelclaw.lock` to a project's `.gitignore`.
+- The token file sits outside the project folder (`$XDG_RUNTIME_DIR/pixelclaw`, else
+  `~/.pixelclaw/run`, or `PIXELCLAW_STATE_DIR`), is mode 0600 in a 0700 folder, is named by a hash
+  of the project path, and is removed when the server stops. No PixelClaw tool or view reads it, and
+  the worker's connection (its own token) cannot use `/api/cli` or `/api/await`.
+- `GET /api/await?since=&timeout=&as=` (long poll; bearer token) returns
+  `{ events, cursor, timedOut }`; `GET /api/presence` says who is listening.
 
 ### The stream
 

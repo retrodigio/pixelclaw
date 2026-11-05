@@ -166,13 +166,16 @@ into the tape as an `import` command that carries the pixels, so the tape still 
 
 `pixelclaw serve --project <dir>` owns one project folder. It is the **single writer**: every
 command, from the agent or a browser, goes through one queue in arrival order, is written to the
-tape with its author, and is streamed to every open page. A lock file stops the CLI from writing
-to a project a server owns.
+tape with its author, and is streamed to every open page. A lock file says a server owns the
+project; a CLI command that writes finds that server through the lock and a token file only the
+user can read (outside the project folder), and sends the command to it over HTTP, so it joins the
+same queue and the open pages update live. If the server cannot be reached the command runs
+directly, as with no server.
 
 The agent connects over **MCP** (stdio, or HTTP for the worker). The tools are `project` (open a
 folder, add palettes, get the watch link), `run`, `view`, `check`, `seeds`, `history`, `changes`
 (what others changed since the agent last looked, with their notes and a diff image), `plan`,
-`request`, `work`, `review`, `export` and `import`.
+`request`, `work`, `await_requests`, `review`, `export` and `import`.
 
 The **watch view** is a local web page: the canvas in the middle, the tape scrolling beside it,
 layers, frames and a timeline, check chips that circle flagged pixels, and editing tools whose
@@ -201,6 +204,22 @@ CLI or over MCP. Requests are records in `requests.jsonl` with a small state mac
 claimed (with progress notes), blocked on a question (open again once answered), done and
 cancelled. An agent takes them with
 the `work` tool, and `plan` lists open requests first.
+
+A request in a file reaches no one by itself, and a model is not woken by a notification, so the
+server tells agents in the one way that works: **`pixelclaw await`** (or the MCP tool
+`await_requests`) is a long poll on the server that returns as soon as a person files, answers or
+withdraws a request or writes an approval, rejection or review mark, and the CLI form then
+*exits*. An agent runs it in the background; the process ending is what returns control to the
+model, which reads the events, takes the requests with `work`, and starts the wait again from the
+cursor it printed. Events are numbered in the server's memory (`<run>:<n>`), so a restarted wait
+loses and repeats nothing; with no cursor, requests still open and unseen are the events.
+
+The server knows who is listening: waiting `await` calls, MCP sessions that called `work`, `plan`
+or `await_requests` in the last five minutes, and the running worker. Handing an open request to
+an agent writes a `seen` record, and the cards read **sent**, **seen by claude**, **working**,
+**done**. With nobody listening, or a request unseen for two minutes, the card says so and offers
+a prompt to paste into Claude Code (and *Start the worker* when the project allows it), rather
+than looking as if Claude had it.
 
 When no agent session is open, the optional **worker** works the queue: a headless Claude Code
 session connected to the project's server with only PixelClaw's tools. It is **off by default**

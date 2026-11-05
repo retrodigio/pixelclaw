@@ -918,7 +918,7 @@ export class Writer {
       assets,
       live: this.live,
       eye: this.lastEye,
-      worker: this.workerStatus(),
+      worker: this.workerStatus(), presence: this.hub.presence(),
     };
   }
 }

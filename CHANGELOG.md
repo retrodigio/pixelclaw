@@ -4,7 +4,37 @@ All notable changes to PixelClaw are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [Unreleased] (0.2.0)
+
+### Feedback from the dashboard reaches an agent
+- `pixelclaw await <project-folder | watch-url> [--timeout <s>] [--since <cursor>]` waits on the
+  running server and **exits** with what people did: a request, a reply, a withdrawn request, or
+  an approval, rejection or review mark written in the dashboard. It prints each event with its
+  next step (`work` claims a request, `changes` reads a change) and a cursor for the next call.
+  Exit 0 with events, 3 on timeout, 1 if the server cannot be reached. An agent runs it in the
+  background; its exit is what wakes the model. It works with `serve --no-mcp`.
+- The MCP tool `await_requests` is the same wait (timeout capped at 2 minutes) for agents that
+  prefer to stay in a tool call.
+- The server finds clients by the project's lock plus a token file only the user can read (mode
+  0600, in a 0700 folder outside the project, removed when the server stops).
+- Requests have a `seen` record: when `await`, `plan` or `work` hands an open request to an agent
+  it is written to `requests.jsonl` (once per agent). Files without it read as before.
+- Cards say what is true: **sent**, **seen by <agent>**, **Claude is working on this**, **done**.
+  With no agent listening, or a request unseen for two minutes, the card and the header say so,
+  with *Copy prompt for Claude* and, when the project allows the worker, *Start the worker*.
+  Filing a request with nobody listening says so at once.
+- The dashboard header shows whether an agent is listening (a waiting `await`, an MCP session that
+  called `work`, `plan` or `await` in the last five minutes, or the running worker).
+- `plan` (CLI and MCP) says when open requests have no listener.
+
+### The CLI writes through a running server
+- `new`, `run`, `seeds --apply`, `export`, `import`, `review`, `plan --manifest/--templates`,
+  `request`, `reply` and `cancel` used to refuse while `pixelclaw serve` held the project. They
+  now send the command to the server (found through its lock and the token file), so it goes
+  through the same writer queue, undo groups and checks as MCP `run`, and a connected dashboard
+  updates live instead of dropping to "reconnecting". Output and exit codes match the direct
+  path; a refused command applies nothing. If the server cannot be reached (a stale lock, a dead
+  process) the command runs directly as before. Read-only commands still read the files.
 
 ## [0.1.0]
 

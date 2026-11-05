@@ -315,6 +315,7 @@ export class Store {
     this.styleVersion++;
     this.eye = s.eye;
     this.worker = s.worker ?? null;
+    this.presence = s.presence ?? null;
     this.queue = [];
     this.travel = null;
     this.assets = new Map();

@@ -38,6 +38,8 @@ export interface Snapshot {
   eye: Eye | null;
   /** The headless worker (\`pixelclaw work\`): whether it may run, and whether it is running. */
   worker: WorkerStatus;
+  /** Who is listening for requests; later changes arrive as `presence` messages. */
+  presence?: Presence;
 }
 
 /** What a person can ask from the dashboard. */

@@ -71,7 +71,7 @@ async function page(): Promise<{ msgs: { type: string; [k: string]: unknown }[];
     if (m.type === 'answer' && m.id !== undefined) waiting.get(m.id)?.({ ok: !!m.ok, error: m.error });
   };
   await new Promise<void>((r, j) => { ws.onopen = () => r(); ws.onerror = () => j(new Error('ws')); });
-  await until(() => msgs.some((m) => m.type === 'presence'), 'the first presence message');
+  await until(() => msgs.some((m) => m.type === 'hello'), 'the hello message');
   return {
     msgs,
     send: (body) => new Promise((resolve) => {
@@ -129,7 +129,7 @@ describe('pixelclaw await against a real server', () => {
     waiter.stdout.on('data', (d: Buffer) => { out += d; });
     const exited = new Promise<number | null>((r) => waiter.on('close', r));
     await until(async () => ((await api('/api/presence')) as { waiters: unknown[] }).waiters.length === 1, 'the waiter to show in presence');
-    expect(p.msgs.filter((m) => m.type === 'presence').at(-1)).toMatchObject({ presence: { listening: true } });
+    await until(() => (p.msgs.filter((m) => m.type === 'presence').at(-1) as { presence?: { listening: boolean } } | undefined)?.presence?.listening === true, 'the page to hear a listener');
     expect(out).toBe('');
     // A person asks for the urn to be drawn.
     const sent = await p.send({ action: 'request', kind: 'draw', asset: 'urn', note: 'squat' });

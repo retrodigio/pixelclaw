@@ -23,6 +23,13 @@ If the tools are missing, the server is not connected:
    dealt with: `note done <id>`.
 3. `plan` at the start of the session and again after each finished asset: it lists the
    **requests** people made in the dashboard first, then what is left and what is failing.
+   If you are driving a project served with `pixelclaw serve` and a person may be watching, start
+   a background wait right away and keep one running between tasks:
+   `pixelclaw await <project folder>` (run it in the background; it blocks, prints what people asked
+   for and a cursor, then exits). When it exits, handle what it printed (`work` for a request,
+   `changes` for an approval or rejection), then **start it again with `--since <cursor>`**. Exit
+   code 3 means nothing happened; restart it the same way. Without it, nobody knows you are there
+   and a request the person filed just sits. `plan` tells you when open requests have no listener.
 4. **Requests before planned work.** `work` claims the next open request and says what is asked
    (draw a planned asset, change a drawn one, or a new asset the person added to the manifest).
    Do it, then `work(action="done", text=<what changed>)`. If you cannot go on without the person
@@ -126,7 +133,10 @@ asset back down, and `plan` says why.
 
 People ask for work without talking to you: "Draw this" on a planned card, "Ask for changes" on
 a drawn one (also a `mark rejected "…"` on its tape), "Add an asset" (a new manifest entry). They
-wait in `requests.jsonl`; `plan` lists them first and `work` hands them out one at a time.
+wait in `requests.jsonl`; `plan` lists them first and `work` hands them out one at a time. The
+person's card reads *sent* until something hands it to you, then *seen by claude*: keep a background
+`pixelclaw await <project>` running (restart it after each exit, `--since` the cursor it printed) so
+that happens as soon as they press the button, and the card never claims more than is true.
 
 1. `work` → read what is asked, the asset's plan entry and status, and any answer to an earlier
    question.

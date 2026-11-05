@@ -412,7 +412,6 @@ export async function startWatchServer(o: WatchOptions): Promise<WatchServer> {
       }
     };
     ws.send(JSON.stringify({ type: 'hello', snapshot: o.writer.snapshot() } satisfies ServerMessage));
-    ws.send(JSON.stringify({ type: 'presence', presence: o.writer.hub.presence() } satisfies ServerMessage));
   });
 
   const tries = o.port === 0 ? 1 : Math.max(1, o.tries ?? 20);

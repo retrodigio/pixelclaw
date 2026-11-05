@@ -188,11 +188,58 @@ not fit is refused before it is written:
 | blocked | `blocked` with a question (claimed, by the claimer) | the agent |
 | cancelled | `cancel` (open, claimed or blocked) | a person |
 
-The cards show each request live: who asked and what; **Claude is working on this** (with its
-latest progress note) while the claimer's batches arrive on the asset; Claude's question with an
-answer box when blocked; ✓ done with what changed. The agent hears through `plan` (requests
-first) and takes them with the MCP `work` tool; the skill's routine takes requests before
-planned work and calls `plan` after each finished asset.
+The cards show each request live, in the order it really happens: **sent** (written to the
+project, no agent has it); **seen by claude** (an agent was handed it by `await`, `plan` or
+`work`: a `{"type":"seen","id":"r1","by":"claude","at":"…"}` record, once per agent; an answer
+to a blocked request clears it, since the answer has not been seen yet); **Claude is working on
+this** (with its latest progress note) while the claimer's batches arrive on the asset; Claude's
+question with an answer box when blocked; ✓ done with what changed. Files with no `seen` records
+read as before.
+
+**Nobody listening.** A server knows an agent is listening when an `await` is waiting, an MCP
+session called `work`, `plan` or `await_requests` in the last five minutes, or the worker is
+running. With none, or when a request is still unseen after two minutes, its card and the header
+say so plainly, with *Copy prompt for Claude* (a ready prompt that tells a Claude Code session to
+run `pixelclaw await <this project>` in the background and work each request as it arrives) and,
+when `project.json` enables the worker, *Start the worker*. Filing a request with nobody
+listening says so at once.
+
+![A request nobody has: the card says no agent is listening](screenshots/request-nobody-listening.png)
+
+### Hearing about requests: `await`
+
+```
+pixelclaw await <project-folder | watch-url> [--timeout <seconds>, default 600] [--since <cursor>] [--as <name>] [--json]
+```
+
+Blocks on the running server until a person files a request, answers a blocked one, withdraws one,
+or writes an approval, rejection or review mark in the dashboard; then prints and **exits**:
+
+```
+2 events:
+  request r4 (urn) from human:ana at 2026-11-05T12:00:00Z: "make it taller"
+    next: work (claim it: work id=r4)
+  approved turf from human:ana at 2026-11-05T12:01:10Z: "good"
+    next: changes (read what the person did to turf)
+next cursor: 3fa91c:7
+```
+
+Exit 0 with events, **3** on timeout (`no new events` and the cursor), 1 if no server can be
+reached. The exit is the design: an agent (Claude Code) runs it as a background command, and the
+process ending is what returns control to the model; a notification over MCP does not wake a
+model. Run it again with `--since <cursor>` after every exit, so nothing is missed or repeated;
+with no cursor, requests that are still open and unseen are the events, so a freshly started
+listener picks up what is waiting. The agent's own `claim`, `progress` and `done` are not events.
+`next: work` means claim the request with the MCP `work` tool; `next: changes` means read what the
+person did (the `changes` tool). `--as` names the listener (default `claude`); the requests it is
+handed are recorded as seen by that name.
+
+It works while `serve` holds the project (also with `--no-mcp`): the target is the project folder
+(found through the lock file and a token file that only the user can read: mode 0600 in a 0700
+folder outside the project, removed when the server stops) or the watch URL with its token. The
+MCP tool `await_requests` (`timeout` seconds, at most 120; `cursor`) is the same wait for an agent
+that stays in a tool call. `plan`, on the CLI and over MCP, says when there are open requests and
+nothing is waiting for them.
 
 ![Each state: urn_blue done, the goat blocked on a question, Claude working on the jar](screenshots/queue-states.png)
 

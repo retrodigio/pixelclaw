@@ -88,9 +88,10 @@ describe('export, import and densities through MCP', () => {
     expect(h2).toMatch(/tag add blink 1-3 loop=pingpong/);
   }, 30000);
 
-  it('the CLI refuses to export while the server owns the project; MCP exports; every tape verifies', async () => {
+  it('the CLI exports through the server that owns the project; MCP exports; every tape verifies', async () => {
     const out = join(s.root, 'atlas-out');
-    expect(() => execFileSync(process.execPath, [BIN, 'export', s.proj, 'imp', '--profile', 'atlas', '--out', out], { encoding: 'utf8', stdio: 'pipe' })).toThrow(/a pixelclaw server \(pid \d+\) owns/);
+    // The CLI's export is sent to the server that owns the project.
+    expect(execFileSync(process.execPath, [BIN, 'export', s.proj, 'imp', '--profile', 'atlas', '--out', out], { encoding: 'utf8', stdio: 'pipe' })).toMatch(/atlas: 1 images/);
     expect(texts((await call('export', { profile: 'atlas', assets: ['imp'], dest: out })).content)).toMatch(/atlas: 1 images/);
     expect(JSON.parse(readFileSync(join(out, 'atlas.json'), 'utf8')).sprites.map((x: { sprite: string }) => x.sprite)).toEqual(['imp']);
     expect(execFileSync(process.execPath, [BIN, 'verify', s.proj], { encoding: 'utf8' })).toMatch(/7 assets verified/);

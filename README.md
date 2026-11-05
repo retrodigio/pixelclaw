@@ -72,7 +72,23 @@ pixelclaw skill install          # the Claude Code skill: workflows, house rules
 (From a source checkout without the global install: `claude mcp add pixelclaw -- node
 /path/to/pixelclaw/cli/dist/pixelclaw.js serve --project …`.) Start `claude` and ask it to draw.
 Its tools are `project`, `run`, `view`, `check`, `seeds`, `changes`, `history`, `plan`,
-`request`, `work`, `review`, `export` and `import` ([docs/mcp.md](docs/mcp.md)).
+`request`, `work`, `await_requests`, `review`, `export` and `import` ([docs/mcp.md](docs/mcp.md)).
+
+### Feedback from the dashboard
+
+A request made in the dashboard (*Draw this*, *Ask for changes*, *Add an asset*) is a note in the
+project until an agent hears of it. An agent that works the project keeps a wait running in the
+background and restarts it each time it exits:
+
+```sh
+pixelclaw await ~/art/my-game.pclaw          # blocks; prints what was asked and a cursor; exits
+pixelclaw await ~/art/my-game.pclaw --since <cursor>
+```
+
+(or the MCP tool `await_requests`). The cards say **sent**, **seen by claude**, **working**, **done**,
+and when nobody is listening they say that, with a prompt to paste into Claude Code. While a
+server runs, `pixelclaw run` and the other writing commands are sent to it, so the dashboard keeps
+updating live.
 
 ### Watch, edit and approve in the browser
 
@@ -152,6 +168,7 @@ The example projects are checked in: [`examples/mossy-ruins.pclaw`](examples/mos
 | `pixelclaw skill install [--dest <dir> \| --project <dir>]` | Install the Claude Code skill (default `~/.claude/skills/pixelclaw`). |
 | `pixelclaw verify <project> [<asset>...]` | Replay every tape and compare it with the saved state, the preview, the checkpoints and the state cache. |
 | `pixelclaw upgrade <project> [<asset>...]` | Rewrite tapes from tape language 1 in language 2 (the palette in the `new` line); written only if the replay gives the same pixels, then verified. |
+| `pixelclaw await <project \| watch-url> [--timeout s] [--since cursor]` | Wait for requests and feedback from the dashboard, print them, exit (3 on timeout). |
 | `pixelclaw serve --project <project> [--port 7417] [--no-mcp]` | Own the project: MCP on stdin/stdout and the live watch view on localhost (the link, with its token, is printed to stderr). See [docs/mcp.md](docs/mcp.md). |
 
 The command language is described in [docs/commands.md](docs/commands.md).
@@ -174,7 +191,7 @@ my-art.pclaw/
   views/                    renders written by 'pixelclaw view' and the MCP 'view' and 'changes' tools
   reviews/<date>-<set>/     blind review bundles (and the findings brought back)
   reads.json                how far each agent has read each tape (for 'changes')
-  .pixelclaw.lock           present while a server owns the project (not for git)
+  .pixelclaw.lock           present while a server owns the project (not for git; no token in it)
   .cache/state/<asset>.gwc  each asset's state after its tape, keyed by the tape (never committed)
 ```
 

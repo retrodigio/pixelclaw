@@ -71,6 +71,8 @@ export async function forwardToServer(argv: string[], io: Pick<Io, 'out' | 'err'
   }
   let j: { code?: number; stdout?: string; stderr?: string; error?: string };
   try { j = JSON.parse(r.body); } catch { return null; }
+  // A server that cannot run CLI commands (501): the command takes the direct path, which says why it is refused.
+  if (r.status === 501) return null;
   if (r.status !== 200) {
     io.err(`error: the server refused it: ${j.error ?? r.status}\n`);
     return 1;
