@@ -7,7 +7,7 @@ import {
   BUILTIN_THEMES, CHECK_IDS, TapeCursor, Timeline, activeGroups, checkContextFor, runChecks, type AssetDoc, type CheckId, type CheckResult, type Diag,
   type Doc, type Palette, type PaletteSource, type StyleJson, type TapeEntry, type Theme, type WorkRequest,
 } from '@pixelclaw/core';
-import { HUMAN_RE, type Eye, type PersonRequest, type ServerMessage, type Snapshot, type WorkerStatus } from '@pixelclaw/server/protocol';
+import { HUMAN_RE, type Eye, type PersonRequest, type Presence, type ServerMessage, type Snapshot, type WorkerStatus } from '@pixelclaw/server/protocol';
 
 export type Tab = 'editor' | 'dashboard' | 'gallery';
 const TABS: Tab[] = ['editor', 'dashboard', 'gallery'];
@@ -103,6 +103,8 @@ export class Store {
   requests: WorkRequest[] = [];
   /** The headless worker, and its log as far as this page has seen it. */
   worker: WorkerStatus | null = null;
+  /** Who is listening for requests (the server pushes it). */
+  presence: Presence | null = null;
   workerLog: string[] = [];
   /** Bumped when the plan may have changed (a batch, an export, a new manifest): the dashboard reloads it. */
   planVersion = 0;
@@ -282,6 +284,7 @@ export class Store {
       done?.({ ok: m.ok, ...(m.error ? { error: m.error } : {}), ...(m.request ? { request: m.request } : {}) });
     } else if (m.type === 'requests') this.requests = m.requests;
     else if (m.type === 'worker') this.worker = m.status;
+    else if (m.type === 'presence') this.presence = m.presence;
     else if (m.type === 'workerLog') this.workerLog = [...this.workerLog, ...m.lines].slice(-500);
     else if (m.type === 'batch') {
       this.planVersion++;

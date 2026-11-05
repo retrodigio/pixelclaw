@@ -606,7 +606,10 @@ export function createMcpServer(host: McpHost, version: string, mo: McpOptions =
     try {
       const action = a.action ?? 'next';
       if (action === 'list') {
+        if (!mo.confined) w.hub.touch(AGENT);
         const active = openRequests(readRequests(w.project));
+        // Listing hands the open requests over: they are now seen.
+        if (!mo.confined) markSeen(w, active.filter((x) => x.state === 'open').map((x) => x.id), AGENT);
         return { content: [text(active.length ? active.map((q) => requestLine(q)).join('\n') : 'no open requests')] };
       }
       const r = action === 'next' ? agentWork(w, AGENT, { action, id: a.id }) : agentWork(w, AGENT, { action, id: a.id, text: a.text ?? '' });

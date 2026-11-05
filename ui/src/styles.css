@@ -423,3 +423,10 @@ button.ask-claude { border-color: #7a5a34; color: var(--claude); }
 .compare canvas { image-rendering: pixelated; display: block; }
 .compare figcaption { background: rgba(16, 17, 20, 0.85); padding: 2px 6px; border-radius: 4px; }
 .compare-tools { margin-bottom: 10px; }
+
+.no-listener { margin-top: 4px; padding: 4px 6px; border-radius: 4px; background: #3a2a14; color: #f0c98a; font-size: 12px; }
+.no-listener .card-actions { margin-top: 4px; }
+.prompt-text { white-space: pre-wrap; margin: 4px 0 0; padding: 4px; background: #1d1a14; color: var(--text, #d8dbe0); user-select: all; font-size: 11px; }
+.req-chip.unattended { color: #f0c98a; border-color: #b9873a; }
+.listener-chip.on { color: #8fd18b; }
+.listener-chip.off { color: var(--dim); }

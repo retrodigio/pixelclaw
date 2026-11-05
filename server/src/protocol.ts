@@ -2,6 +2,8 @@
 // import them without pulling in any Node code.
 
 import type { Presence } from './await.ts';
+
+export type { Presence };
 import type { Diag, ManifestAsset, ManifestError, Palette, Status, StyleJson, TapeEntry, Theme, WorkRequest } from '@pixelclaw/core';
 
 export interface AssetTape {

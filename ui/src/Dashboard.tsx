@@ -11,6 +11,7 @@ import { DOC_KINDS, STATUSES, type Status, type WorkRequest } from '@pixelclaw/c
 import type { PlanAsset, PlanReport } from '@pixelclaw/server/protocol';
 import type { Store } from './store.ts';
 import { ImportButton, ImportDrop } from './Import.tsx';
+import { ListenerChip, NoListener, unattended, useNow } from './Listening.tsx';
 
 export const STATUS_TEXT: Record<Status, string> = {
   planned: 'not drawn yet', drafted: 'drawn; checks failing', checked: 'every check passes', reviewed: 'blind review done',
@@ -55,6 +56,7 @@ const KIND_WORD: Record<WorkRequest['kind'], string> = { draw: 'Claude to draw i
 
 /** A request's state on its card: open, Claude working, blocked with the question and a reply box, done. */
 function RequestLine({ q, store }: { q: WorkRequest; store: Store }) {
+  const now = useNow();
   const [reply, setReply] = useState('');
   const [busy, setBusy] = useState(false);
   const last = store.lastWrite(q.asset);
@@ -70,11 +72,18 @@ function RequestLine({ q, store }: { q: WorkRequest; store: Store }) {
     store.changed();
     return r.ok;
   };
+  const seen = q.seen ?? [];
+  const nobody = unattended(store, q, now);
+  // sent → seen by <agent> → working → done (blocked and withdrawn as they are)
+  const stage = q.state === 'open' ? (seen.length ? 'seen' : 'sent') : q.state === 'claimed' ? 'working' : q.state;
   return (
-    <div className={`req req-${q.state}${working ? ' working' : ''}`} data-testid={`request-${q.id}`} data-state={q.state} title={`${q.id}: ${q.kind} asked by ${q.by} at ${q.at}`}>
+    <div className={`req req-${q.state}${working ? ' working' : ''}${nobody ? ' unattended' : ''}`} data-testid={`request-${q.id}`} data-state={q.state} data-stage={stage} title={`${q.id}: ${q.kind} asked by ${q.by} at ${q.at}`}>
       <div className="req-head">
         <span className="req-id mono">{q.id}</span>
-        {q.state === 'open' && <span>{who(q.by)} asked {KIND_WORD[q.kind]}{q.note ? <>: <i>“{q.note}”</i></> : ''}{q.events.some((e) => e.type === 'reply') ? ' (answered; waiting for Claude)' : ''}</span>}
+        {q.state === 'open' && <span>
+          <b data-testid="stage">{seen.length ? `seen by ${seen.map((x) => x.by).join(', ')}` : 'sent'}</b>
+          {' · '}{who(q.by)} asked {KIND_WORD[q.kind]}{q.note ? <>: <i>“{q.note}”</i></> : ''}{q.events.some((e) => e.type === 'reply') ? ' (answered; waiting for an agent)' : ''}
+        </span>}
         {q.state === 'claimed' && (working
           ? <span className="claude-working" data-testid="working"><span className="pulse" />Claude is working on this{q.latest ? <>: <i>{q.latest}</i></> : ''}</span>
           : <span>claimed by {q.claimedBy}{q.latest ? <>: <i>{q.latest}</i></> : ''}</span>)}
@@ -82,6 +91,7 @@ function RequestLine({ q, store }: { q: WorkRequest; store: Store }) {
         {q.state === 'done' && <span>✓ done: {q.latest}</span>}
         {q.state === 'cancelled' && <span className="dim">withdrawn</span>}
       </div>
+      {nobody && <NoListener store={store} why={store.presence?.listening ? 'Nobody has picked this up for a couple of minutes. It is only a note in the project until an agent takes it.' : 'No agent is listening. Nobody has this request yet; it waits in the project until an agent is started.'} />}
       {q.state === 'blocked' && (
         <form className="card-actions ask" onSubmit={(e) => { e.preventDefault(); if (reply.trim()) void send({ action: 'reply', id: q.id, text: reply.trim() }).then((ok) => { if (ok) setReply(''); }); }}>
           <input value={reply} onChange={(e) => setReply(e.target.value)} placeholder="your answer" aria-label="your answer" data-testid="reply-text" />
@@ -240,6 +250,7 @@ export function Dashboard({ store }: { store: Store }) {
   const [statusFilter, setStatusFilter] = useState<Status | null>(null);
   const [adding, setAdding] = useState(false);
   const requests = store.requests;
+  const now = useNow();
   const active = useMemo(() => requests.filter((q) => ACTIVE.includes(q.state)), [requests]);
   if (!plan) return <div className="dashboard" data-testid="dashboard"><div className="dim pad">{error ?? 'Loading the plan…'}</div></div>;
   const planned = plan.assets.filter((a) => a.planned);
@@ -254,6 +265,7 @@ export function Dashboard({ store }: { store: Store }) {
               {plan.theme ? <span className="dim"> · {plan.theme}</span> : <span className="dim"> · no manifest yet: the agent writes the plan (manifest.json) with its plan tool.</span>}
             </div>
             <span className="spacer" />
+            <ListenerChip store={store} />
             <WorkerPanel store={store} />
           </div>
           {plan.manifest.errors.length > 0 && (
@@ -277,8 +289,9 @@ export function Dashboard({ store }: { store: Store }) {
             <span className="spacer" />
             {active.length > 0 && (() => {
               const forClaude = active.filter((q) => q.state !== 'blocked').length, waiting = active.length - forClaude;
-              return <span className="chip req-chip" data-testid="requests-count" title={active.map((q) => `${q.id} ${q.kind} ${q.asset}: ${q.state}`).join('\n')}>
-                {[forClaude ? `${forClaude} request${forClaude === 1 ? '' : 's'} for Claude` : '', waiting ? `${waiting} waiting for your answer` : ''].filter(Boolean).join(' · ')}
+              const nobody = active.filter((q) => unattended(store, q, now)).length;
+              return <span className={`chip req-chip${nobody ? ' unattended' : ''}`} data-testid="requests-count" title={active.map((q) => `${q.id} ${q.kind} ${q.asset}: ${q.state}`).join('\n')}>
+                {[forClaude ? `${forClaude} request${forClaude === 1 ? '' : 's'} sent` : '', waiting ? `${waiting} waiting for your answer` : '', nobody ? (store.presence?.listening ? `${nobody} unseen for 2 minutes` : 'no agent is listening') : ''].filter(Boolean).join(' · ')}
               </span>;
             })()}
             {plan.manifest.exists && !plan.manifest.errors.length && <button onClick={() => setAdding(true)} data-testid="add-asset-open" title="Add an asset to the plan and ask Claude to draw it">+ Add an asset</button>}
