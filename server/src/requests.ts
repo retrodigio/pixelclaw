@@ -192,7 +192,6 @@ export function agentWork(w: Writer, agent: string, q: AgentWork): { request: Wo
     if (held) return { request: held, message: `you already have ${held.id}; finish it (done or blocked) before taking another` };
     const target = q.id ? reqs.get(q.id) : openRequests(reqs).find((x) => x.state === 'open');
     if (!target) return { request: null, message: q.id ? `no request ${q.id}` : 'no open requests' };
-    if (target.state === 'open' && !target.seen.some((x) => x.by === agent)) appendRequest(p, { type: 'seen', id: target.id, by: agent, at });
     return { request: appendRequest(p, { type: 'claim', id: target.id, by: agent, at }), message: `claimed ${target.id}` };
   }
   const id = q.id ?? mine(reqs, agent)?.id;
