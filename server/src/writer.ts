@@ -4,6 +4,7 @@
 // `changes`, and a timeline per asset so any earlier state is quick to rebuild.
 
 import { readFileSync, statSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import {
   CHECK_IDS, SNAP_MIN_MATERIAL, SNAP_MIN_R2, ReplayCache, composeUnderlay, TapeCursor, Timeline, serializeDoc, tapeLang, tapeToJsonl, activeGroups, checkContextFor, ctxOf, drawScaleOf, groundOf, paletteToJson, parse, projectThemes, replay, runBatch,
@@ -910,7 +911,7 @@ export class Writer {
     this.freshStyle();
     const assets = this.assets().map((name) => ({ name, entries: this.states.get(name)?.entries ?? readTape(this.project, name) }));
     return {
-      project: { name: this.project.json.name, dir: this.project.dir, tickRate: this.project.json.tickRate ?? 60, grid: this.project.json.grid ?? 24 },
+      project: { name: this.project.json.name, dir: this.project.dir, home: homedir(), tickRate: this.project.json.tickRate ?? 60, grid: this.project.json.grid ?? 24 },
       palettes: [...this.project.palettes.values()],
       defaultPalette: this.project.json.defaultPalette,
       style: this.project.json.style ?? {},

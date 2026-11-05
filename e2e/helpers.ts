@@ -23,13 +23,18 @@ export interface Agent {
   close(): Promise<void>;
 }
 
-/** A server on a new project with the demo palette, or on a copy of an existing project folder. */
-export async function startAgent(o: { copy?: string } = {}): Promise<Agent> {
+/**
+ * A server on a new project with the demo palette, or on a copy of an existing project folder.
+ * `home`: the server runs with the temporary folder as its home and the project at ~/art/ruins.pclaw,
+ * so what the page shows of the path reads as a person's (and screenshots show no machine path).
+ */
+export async function startAgent(o: { copy?: string; home?: boolean } = {}): Promise<Agent> {
   const root = mkdtempSync(join(tmpdir(), 'pixelclaw-e2e-'));
-  const dir = join(root, 'ruins.pclaw');
+  const dir = o.home ? join(root, 'art', 'ruins.pclaw') : join(root, 'ruins.pclaw');
   if (o.copy) cpSync(o.copy, dir, { recursive: true });
   else execFileSync(process.execPath, [BIN, 'new', dir, '--palette', PALETTE_FILE]);
-  const transport = new StdioClientTransport({ command: process.execPath, args: [BIN, 'serve', '--project', dir, '--port', '0'], stderr: 'pipe' });
+  const env = o.home ? { ...(process.env as Record<string, string>), HOME: root, PIXELCLAW_STATE_DIR: join(root, 'state') } : undefined;
+  const transport = new StdioClientTransport({ command: process.execPath, args: [BIN, 'serve', '--project', dir, '--port', '0'], stderr: 'pipe', env });
   let stderr = '';
   (transport.stderr as PassThrough).on('data', (d: Buffer) => { stderr += d.toString(); });
   const client = new Client({ name: 'pixelclaw-e2e', version: '1.0.0' });

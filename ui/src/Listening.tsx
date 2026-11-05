@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react';
 import type { WorkRequest } from '@pixelclaw/core';
 import type { Store } from './store.ts';
+import { promptFor, shownDir } from './prompt.ts';
 
 /** How long an open request may go unseen before the card says so (the server uses the same figure). */
 export const UNSEEN_MS = 2 * 60 * 1000;
@@ -34,16 +35,6 @@ export function unattended(store: Store, q: WorkRequest, now: number): boolean {
   return !p.listening || now - askedAt(q) > UNSEEN_MS;
 }
 
-export function shellQuote(s: string): string {
-  return /^[A-Za-z0-9_./:@%+=,-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`;
-}
-
-/** The prompt to give a Claude Code session so it works this project's requests as they arrive. */
-export function promptFor(dir: string): string {
-  const cmd = `pixelclaw await ${shellQuote(dir)}`;
-  return `People ask for changes in the PixelClaw dashboard for the project at ${dir}. Run \`${cmd}\` in the background (it waits, prints what was asked and a cursor, then exits). Each time it exits, read what it printed, take each request with the PixelClaw work tool (claim it, draw or change the art, post progress, finish it with done or ask one question with blocked), and then start \`${cmd} --since <the cursor it printed>\` in the background again. Keep doing this until I say stop.`;
-}
-
 async function copy(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
@@ -57,7 +48,7 @@ async function copy(text: string): Promise<boolean> {
 export function NoListener({ store, why }: { store: Store; why: string }) {
   const [copied, setCopied] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
-  const dir = store.project?.dir ?? '<project folder>';
+  const dir = store.project?.dir ? shownDir(store.project.dir, store.project.home) : '<project folder>';
   const prompt = promptFor(dir);
   const w = store.worker;
   return (

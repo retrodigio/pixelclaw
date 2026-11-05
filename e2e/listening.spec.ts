@@ -3,6 +3,7 @@
 // with a prompt to hand to Claude Code.
 
 import { appendFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 import { REPO, startAgent, type Agent } from './helpers.ts';
@@ -25,7 +26,7 @@ const shot = async (page: import('@playwright/test').Page, name: string) => {
 };
 
 test('with nobody listening the card says so, offers the prompt, and clears once an agent is there', async ({ page, context }) => {
-  agent = await startAgent();
+  agent = await startAgent({ home: true });
   // The manifest is written to the folder directly: no agent tool has been called, so nobody is listening.
   writeFileSync(join(agent.dir, 'manifest.json'), JSON.stringify(MANIFEST));
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
@@ -50,8 +51,16 @@ test('with nobody listening the card says so, offers the prompt, and clears once
   await req.getByTestId('copy-prompt').click();
   await expect(req.getByTestId('prompt-copied')).toContainText('Copied');
   const prompt = await req.getByTestId('prompt-text').innerText();
-  expect(prompt).toContain(`pixelclaw await ${agent.dir}`);
+  // The folder as the person would type it, and the steps for a session with MCP and one without.
+  expect(prompt).toContain('the project at ~/art/ruins.pclaw.');
+  expect(prompt).toContain('`pixelclaw await ~/art/ruins.pclaw`');
   expect(prompt).toContain('--since');
+  expect(prompt).toContain("If you have PixelClaw's MCP tools, use the work tool");
+  for (const step of ['claim', 'progress "<note>"', 'done "<what changed>"', 'block "<one clear question>"']) {
+    expect(prompt).toContain(`\`pixelclaw work ~/art/ruins.pclaw ${step}`);
+  }
+  expect(prompt).not.toContain('/var/');
+  expect(prompt).not.toContain(tmpdir());
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(prompt);
   await shot(page, 'request-nobody-listening');
 
