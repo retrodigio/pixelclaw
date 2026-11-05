@@ -93,8 +93,8 @@ describe('requests and the work tool', () => {
 
   it('plan lists requests first; work claims, posts progress, finishes, blocks', async () => {
     const plan = texts((await b.call('plan')).content);
-    expect(plan.split('\n')[0]).toBe('Requests from people (3): take these before planned work, with `work` (it claims the next open one):');
-    expect(plan).toContain('r1 draw urn: "squat, with a lip" (from human:ana; open)');
+    expect(plan.split('\n')[0]).toBe('Requests from people (3): take these before planned work, with `work` (it claims the next open one; without MCP, `pixelclaw work <project> claim`):');
+    expect(plan).toContain('r1 draw urn: "squat, with a lip" (from human:ana; seen by claude)');
     const w1 = texts((await b.call('work')).content);
     expect(w1).toMatch(/^claimed r1\nr1 draw urn/);
     expect(w1).toContain('plan: urn is a sprite 16x16 in set props: a squat stone urn (drawn height 12 px)');

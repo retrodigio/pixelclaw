@@ -10,7 +10,7 @@ import {
   foldRequests, nextRequestId, openRequests, quote, requestProblem, validateManifest, type ManifestAsset, type RequestKind, type RequestRecord, type WorkRequest,
 } from '@pixelclaw/core';
 import { ProjectError, assetExists, type Project } from './project.ts';
-import { MANIFEST_FILE, knownFor, manifestEntry, readManifest, writeManifest } from './plan.ts';
+import { MANIFEST_FILE, knownFor, manifestEntry, planReport, readManifest, writeManifest } from './plan.ts';
 import type { PersonRequest } from './protocol.ts';
 import { unseenOpen, type AgentEvent } from './await.ts';
 import type { Writer } from './writer.ts';
@@ -97,10 +97,12 @@ export function personRequest(w: Writer, by: string, q: PersonRequest): WorkRequ
   return appendRequest(p, { ...rec, mark: r.added.at(-1)?.seq });
 }
 
-/** A request as one line: `r3 change urn: "taller" (from human:ana at …; claimed by claude)`. */
+/** A request as one line: `r3 change urn: "taller" (from human:ana at …; claimed by claude)`; open ones say `open` or `seen by <agent>`. */
 export function requestLine(q: WorkRequest): string {
   const what = q.kind === 'draw' ? `draw ${q.asset}` : q.kind === 'change' ? `change ${q.asset}` : `new asset ${q.asset}`;
-  const state = q.state === 'claimed' ? `claimed by ${q.claimedBy}` : q.state === 'blocked' ? `blocked: "${q.question}"` : q.state;
+  // An open request an agent was handed reads as the dashboard's card does: "seen by claude".
+  const state = q.state === 'claimed' ? `claimed by ${q.claimedBy}` : q.state === 'blocked' ? `blocked: "${q.question}"`
+    : q.state === 'open' && q.seen.length ? `seen by ${q.seen.map((x) => x.by).join(', ')}` : q.state;
   return `${q.id} ${what}${q.note ? `: "${q.note}"` : ''} (from ${q.by} at ${q.at}; ${state})`;
 }
 
@@ -178,7 +180,7 @@ function mine(reqs: Map<string, WorkRequest>, agent: string): WorkRequest | unde
   return [...reqs.values()].filter((q) => q.state === 'claimed' && q.claimedBy === agent).at(-1);
 }
 
-export function agentWork(w: Writer, agent: string, q: AgentWork): { request: WorkRequest | null; message: string } {
+export function agentWork(w: Writer, agent: string, q: AgentWork, steps: WorkSteps = MCP_STEPS): { request: WorkRequest | null; message: string } {
   const p = w.project;
   const reqs = readRequests(p);
   const at = w.stamp();
@@ -199,14 +201,56 @@ export function agentWork(w: Writer, agent: string, q: AgentWork): { request: Wo
   const target = reqs.get(id);
   if (q.action === 'done' && target && target.state === 'claimed' && target.claimedBy === agent) {
     // Done means the asset passes its checks; blocked stays open for anything else.
-    if (!assetExists(p, target.asset)) throw new ProjectError(`${id} is not done: ${target.asset} is not drawn yet. Draw it, or work(action="blocked", text=<one clear question>) if you cannot`);
+    if (!assetExists(p, target.asset)) throw new ProjectError(`${id} is not done: ${target.asset} is not drawn yet. Draw it, or ${steps.blocked(id)} if you cannot`);
     const failing = w.checks(target.asset).results.filter((r) => r.status === 'fail');
     if (failing.length) {
       throw new ProjectError(`${id} is not done: ${target.asset} fails ${failing.length} check${failing.length === 1 ? '' : 's'}:\n` +
         failing.map((r) => `  ${r.id}${r.score !== null ? ` ${r.shown}` : ''}${r.limit ? ` (limit ${r.limit})` : ''}${r.detail ? `: ${r.detail}` : ''}`).join('\n') +
-        `\nFix ${failing.length === 1 ? 'it' : 'them'} (check shows the pixels) and finish again, or work(action="blocked", text=<one clear question>) if you cannot.`);
+        `\nFix ${failing.length === 1 ? 'it' : 'them'} (check shows the pixels) and finish again, or ${steps.blocked(id)} if you cannot.`);
     }
   }
   const r = appendRequest(p, { type: q.action, id, by: agent, at, text: q.text });
   return { request: r, message: `${id}: ${q.action}` };
+}
+
+/** How an agent takes the next step on a request: the MCP `work` tool, or the CLI's `pixelclaw work`. */
+export interface WorkSteps {
+  done(id: string, what: string): string;
+  blocked(id: string): string;
+  next: string;
+}
+
+export const MCP_STEPS: WorkSteps = {
+  done: (_id, what) => `work(action="done", text=<${what}>)`,
+  blocked: () => 'work(action="blocked", text=<one clear question>)',
+  next: 'call work for the next',
+};
+
+/** A word for a shell command line, quoted when it needs to be. */
+export function shellArg(s: string): string {
+  return /^[A-Za-z0-9_./:@%+=,~-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`;
+}
+
+/** The steps as `pixelclaw work` commands, for an agent with no MCP; `dir` is the project as the agent named it. */
+export function cliSteps(dir: string): WorkSteps {
+  const d = shellArg(dir);
+  return {
+    done: (id, what) => `\`pixelclaw work ${d} done ${id} "<${what}>"\``,
+    blocked: (id) => `\`pixelclaw work ${d} block ${id} "<one clear question>"\``,
+    next: `run \`pixelclaw work ${d} claim\` for the next`,
+  };
+}
+
+/** What a claimed request asks, with what the project knows about its asset and the next steps. */
+export function requestBrief(w: Writer, q: WorkRequest, steps: WorkSteps = MCP_STEPS): string {
+  const out = [requestLine(q)];
+  const e = manifestEntry(readManifest(w.project).manifest, q.asset);
+  if (e) out.push(`plan: ${q.asset} is a ${e.kind} ${e.size}${e.set ? ` in set ${e.set}` : ''}${e.description ? `: ${e.description}` : ''}${e.height ? ` (drawn height ${e.height} px)` : ''}`);
+  const a = planReport(w).assets.find((x) => x.name === q.asset);
+  if (a) out.push(`status: ${a.status} → ${a.next}${a.failing.length ? `; failing: ${a.failing.join(', ')}` : ''}${a.flags.length ? `; ${a.flags.join('; ')}` : ''}`);
+  if (q.kind === 'draw' || q.kind === 'new') out.push(`Draw it: run with \`new ${e?.kind ?? 'sprite'} ${q.asset}\` (the manifest fills in its size and palette), look, check, fix; then ${steps.done(q.id, 'what you drew')}.`);
+  else out.push(`Change it as asked (the request is also a \`mark rejected\` on its tape${q.mark ? ` at #${q.mark}` : ''}; \`changes\` shows the person's edits and notes); then ${steps.done(q.id, 'what changed')}.`);
+  if (q.events.some((x) => x.type === 'reply')) out.push(`The person answered: "${q.events.filter((x) => x.type === 'reply').at(-1)!.text}"`);
+  out.push(`If you cannot go on without the person, ${steps.blocked(q.id)}.`);
+  return out.join('\n');
 }

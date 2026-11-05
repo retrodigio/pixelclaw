@@ -209,14 +209,15 @@ export function unseenOpen(reqs: ReadonlyMap<string, WorkRequest>): AgentEvent[]
 }
 
 /** Events as text, for the CLI and the MCP tool. */
-export function formatEvents(events: AgentEvent[], cursor: string): string {
+export function formatEvents(events: AgentEvent[], cursor: string, o: { cli?: string } = {}): string {
   if (!events.length) return `no new events\nnext cursor: ${cursor}`;
   const out: string[] = [`${events.length} event${events.length === 1 ? '' : 's'}:`];
   for (const e of events) {
     const what = e.id ? `${e.kind} ${e.id} (${e.asset})` : `${e.kind} ${e.asset}`;
     out.push(`  ${what} from ${e.by} at ${e.at}${e.note ? `: "${e.note}"` : ''}`);
     out.push(e.next === 'work'
-      ? `    next: work${e.kind === 'cancel' ? ' (action "list"; stop if you hold it)' : e.id ? ` (claim it: work id=${e.id})` : ''}`
+      ? `    next: work${e.kind === 'cancel' ? ' (action "list"; stop if you hold it)' : e.id ? ` (claim it: work id=${e.id})` : ''}` +
+        (o.cli && e.kind !== 'cancel' && e.id ? `; without MCP: pixelclaw work ${o.cli} claim ${e.id}` : '')
       : `    next: changes (read what the person did to ${e.asset})`);
   }
   out.push(`next cursor: ${cursor}`);

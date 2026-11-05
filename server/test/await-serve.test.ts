@@ -192,6 +192,66 @@ describe('pixelclaw await against a real server', () => {
   });
 });
 
+describe('an agent with no MCP works requests with the CLI', () => {
+  it('serve --no-mcp: the card goes sent → seen → working → done, driven only by the CLI', async () => {
+    await startServe();
+    const p = await page();
+    const states: string[] = [];
+    const label = (): string => {
+      const last = [...p.msgs].reverse().find((m) => m.type === 'requests') as { requests: { id: string; state: string; seen: unknown[] }[] } | undefined;
+      const q = last?.requests.find((x) => x.id === 'r1');
+      return !q ? 'none' : q.state === 'open' ? (q.seen.length ? 'seen' : 'sent') : q.state === 'claimed' ? 'working' : q.state;
+    };
+    const note = (): void => { const l = label(); if (states.at(-1) !== l) states.push(l); };
+    const presence = async () => (await api('/api/presence')) as { listening: boolean; agents: { by: string }[] };
+    expect((await presence()).listening).toBe(false);
+    // A person asks for the urn in the dashboard.
+    expect((await p.send({ action: 'request', kind: 'draw', asset: 'urn', note: 'squat' })).ok).toBe(true);
+    await until(() => (note(), label() === 'sent'), 'sent');
+    // The agent hears of it, then lists the requests (which hands r1 over).
+    const heard = await cli(['await', dir, '--timeout', '10']);
+    expect(heard.code).toBe(0);
+    expect(heard.out).toContain(`without MCP: pixelclaw work ${dir} claim r1`);
+    await until(() => (note(), label() === 'seen'), 'seen');
+    const list = await cli(['work', dir, 'list']);
+    expect(list.out).toContain('r1 draw urn: "squat" (from human:ana');
+    expect(list.out).toContain('seen by claude)');
+    // The other lists say what the card says.
+    expect((await cli(['request', dir])).out).toContain('; seen by claude)');
+    expect((await cli(['plan', dir])).out).toContain('(from human:ana; seen by claude)');
+    // claim: working, and the agent shows as listening.
+    const claim = await cli(['work', dir, 'claim']);
+    expect(claim.err).toBe('');
+    expect(claim.out).toContain('claimed r1');
+    await until(() => (note(), label() === 'working'), 'working');
+    expect((await presence()).agents.map((a) => a.by)).toContain('claude');
+    expect((await presence()).listening).toBe(true);
+    const progress = await cli(['work', dir, 'progress', 'blocking in the body']);
+    expect(progress.code).toBe(0);
+    await until(() => p.msgs.some((m) => m.type === 'requests' && (m.requests as { latest: string | null }[])[0]?.latest === 'blocking in the body'), 'the progress note on the page');
+    // A first try that fails its checks: done is refused and the card stays working.
+    expect((await cli(['run', dir, '-e', 'new sprite urn\npx 3,3 c=stone2'])).code).toBe(0);
+    const before = readFileSync(join(dir, 'requests.jsonl'), 'utf8');
+    const refused = await cli(['work', dir, 'done', 'drew the urn']);
+    expect(refused.code).toBe(1);
+    expect(refused.err).toMatch(/r1 is not done: urn fails \d+ checks?/);
+    expect(readFileSync(join(dir, 'requests.jsonl'), 'utf8')).toBe(before);
+    expect(label()).toBe('working');
+    // Fixed, then done.
+    expect((await cli(['run', dir, '--asset', 'urn', '-e', 'clear\nrect 4,4 8x10 c=stone2 fill\noutline c=ink'])).code).toBe(0);
+    const done = await cli(['work', dir, 'done', 'drew the urn']);
+    expect(done.err).toBe('');
+    expect(done.out).toMatch(/^r1: done\n/);
+    await until(() => (note(), label() === 'done'), 'done');
+    expect(states).toEqual(['sent', 'seen', 'working', 'done']);
+    // Written by the server's writer, with the agent as author.
+    const recs = readFileSync(join(dir, 'requests.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l) as { type: string; by: string });
+    expect(recs.map((x) => x.type)).toEqual(['request', 'seen', 'claim', 'progress', 'done']);
+    expect(recs.slice(1).every((x) => x.by === 'claude')).toBe(true);
+    p.close();
+  }, 90_000); // a dozen CLI processes, each a Node start-up, under a full parallel run
+});
+
 describe('CLI writes go through a running server', () => {
   it('run from another process reaches a connected page without a reconnect', async () => {
     await startServe();

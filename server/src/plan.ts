@@ -195,10 +195,11 @@ export function planText(r: PlanReport, o: { order?: 'set' | 'scene' } = {}): st
   const lines: string[] = [];
   const active = openRequests(new Map(r.requests.map((q) => [q.id, q])));
   if (active.length) {
-    lines.push(`Requests from people (${active.length}): take these before planned work, with \`work\` (it claims the next open one):`);
+    lines.push(`Requests from people (${active.length}): take these before planned work, with \`work\` (it claims the next open one; without MCP, \`pixelclaw work <project> claim\`):`);
     for (const q of active) {
       const what = q.kind === 'draw' ? `draw ${q.asset}` : q.kind === 'change' ? `change ${q.asset}` : `new asset ${q.asset}`;
-      const state = q.state === 'claimed' ? `claimed by ${q.claimedBy}` : q.state === 'blocked' ? `blocked, waiting for ${q.by}: "${q.question}"` : 'open';
+      const state = q.state === 'claimed' ? `claimed by ${q.claimedBy}` : q.state === 'blocked' ? `blocked, waiting for ${q.by}: "${q.question}"`
+        : q.seen.length ? `seen by ${q.seen.map((x) => x.by).join(', ')}` : 'open';
       lines.push(`  ${q.id} ${what}${q.note ? `: "${q.note}"` : ''} (from ${q.by}; ${state})`);
     }
     lines.push('');

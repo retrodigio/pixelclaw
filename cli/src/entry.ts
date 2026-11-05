@@ -4,7 +4,7 @@
 import { DEFAULT_PORT, serve } from '@pixelclaw/server/serve';
 import { ProjectError, lockHolder, workerLockHolder, workerSettings } from '@pixelclaw/server';
 import { resolve } from 'node:path';
-import { USAGE, UsageError, main, one, parseArgs, resolveRunArgv, type Io } from './main.ts';
+import { USAGE, UsageError, main, one, parseArgs, resolveRunArgv, startsWorker, type Io } from './main.ts';
 import { awaitMain, forwardToServer, listenerLine, runForwarded } from './forward.ts';
 
 const out: Pick<Io, 'out' | 'err'> = { out: (s) => process.stdout.write(s), err: (s) => process.stderr.write(s) };
@@ -34,12 +34,14 @@ async function serveMain(argv: string[]): Promise<number> {
   }
 }
 
-/** `pixelclaw work`: a server of its own (watch view and MCP over HTTP), then the worker until it stops. */
+/** `pixelclaw work <project> start`: a server of its own (watch view and MCP over HTTP), then the worker until it stops. */
 export async function workMain(argv: string[]): Promise<number> {
   try {
     const p = parseArgs(argv, ['port'], []);
-    const [project] = p.pos;
-    if (!project || p.pos.length > 1) throw new UsageError('work: give one project folder');
+    // `work <project> start`, or the older `work <project>`.
+    const pos = p.pos[1] === 'start' ? [p.pos[0], ...p.pos.slice(2)] : p.pos;
+    const [project] = pos;
+    if (!project || pos.length > 1) throw new UsageError('work start: give one project folder');
     const dir = resolve(project);
     const s = workerSettings(dir);
     if (!s.enabled) throw new ProjectError(`the worker is off for ${dir}: set "worker": { "enabled": true } in its project.json first (it runs Claude Code headless and spends money, up to "cap" US dollars a run, default ${s.cap}; see docs/worker.md)`);
@@ -79,7 +81,8 @@ export async function cli(argv: string[]): Promise<number> {
     if (e.code === 'EPIPE') process.exit(0);
     throw e;
   });
-  if (argv[0] === 'work') process.exit(await workMain(argv.slice(1)));
+  // `work <project> start` (or the older `work <project>`) runs the worker; the other work actions write requests.
+  if (startsWorker(argv)) process.exit(await workMain(argv.slice(1)));
   if (argv[0] === 'serve') {
     const code = await serveMain(argv.slice(1));
     // Nothing else should keep the process alive once the server has stopped.

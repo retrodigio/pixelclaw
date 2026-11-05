@@ -98,6 +98,70 @@ describe('requests from the CLI', () => {
     expect(cli(['request', proj]).out).toBe('no open requests\n');
   });
 
+  it('an agent without MCP: list (seen), claim, progress, block, done refused while checks fail, done', () => {
+    expect(cli(['request', proj, 'draw', 'urn', '--note', 'squat', '--by', 'human:ana']).code).toBe(0);
+    // list hands the open request over: a seen record, and the request list and plan say so.
+    let r = cli(['work', proj, 'list']);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain('r1 draw urn: "squat" (from human:ana at 2026-10-29T12:00:00Z; seen by claude)');
+    expect(records().at(-1)).toMatchObject({ type: 'seen', id: 'r1', by: 'claude' });
+    expect(cli(['request', proj]).out).toContain('; seen by claude)');
+    expect(cli(['plan', proj]).out).toContain('r1 draw urn: "squat" (from human:ana; seen by claude)');
+    // claim prints what is asked, with the next steps as CLI commands.
+    r = cli(['work', proj, 'claim']);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain('claimed r1');
+    expect(r.out).toContain('plan: urn is a sprite 16x16 in set props');
+    expect(r.out).toContain(`then \`pixelclaw work ${proj} done r1 "<what you drew>"\``);
+    expect(r.out).toContain(`\`pixelclaw work ${proj} block r1 "<one clear question>"\``);
+    expect(cli(['work', proj, 'claim']).out).toMatch(/you already have r1/);
+    r = cli(['work', proj, 'progress', 'blocking in the body', '--by', 'claude']);
+    expect(r).toMatchObject({ code: 0, out: expect.stringMatching(/^r1: progress\nr1 draw urn.*claimed by claude\)\n$/) });
+    expect(records().at(-1)).toMatchObject({ type: 'progress', id: 'r1', by: 'claude', text: 'blocking in the body' });
+    // done is refused while the asset is not drawn, or fails its checks; nothing is written.
+    const n = records().length;
+    r = cli(['work', proj, 'done', 'drew it']);
+    expect(r.code).toBe(1);
+    expect(r.err).toMatch(/r1 is not done: urn is not drawn yet/);
+    expect(cli(['run', proj, '-e', 'new sprite urn\npx 3,3 c=stone2']).code).toBe(0);
+    r = cli(['work', proj, 'done', 'r1', 'drew it']);
+    expect(r.code).toBe(1);
+    expect(r.err).toMatch(/r1 is not done: urn fails \d+ checks?:\n  orphans/);
+    expect(r.err).toContain(`\`pixelclaw work ${proj} block r1 "<one clear question>"\``);
+    expect(records().length).toBe(n);
+    // block asks the person; their reply opens it again; claim it again and finish.
+    r = cli(['work', proj, 'block', 'Glazed or bare?']);
+    expect(r.out).toMatch(/r1: blocked\nr1 draw urn.*blocked: "Glazed or bare\?"/);
+    expect(cli(['reply', proj, 'r1', 'Bare.', '--by', 'human:ana']).code).toBe(0);
+    expect(cli(['work', proj, 'claim', 'r1']).out).toContain('The person answered: "Bare."');
+    expect(cli(['run', proj, '--asset', 'urn', '-e', 'clear\nrect 4,4 8x10 c=stone2 fill\noutline c=ink']).code).toBe(0);
+    r = cli(['work', proj, 'done', 'drew the urn, bare stone']);
+    expect(r).toMatchObject({ code: 0, out: expect.stringMatching(/^r1: done\n.*; done\)\nNo open requests left\.\n$/) });
+    expect(records().at(-1)).toMatchObject({ type: 'done', id: 'r1', by: 'claude', text: 'drew the urn, bare stone' });
+    expect(cli(['work', proj, 'claim']).out).toBe('no open requests\n');
+  });
+
+  it('work actions: usage errors write nothing', () => {
+    expect(cli(['request', proj, 'draw', 'urn']).code).toBe(0);
+    const n = records().length;
+    for (const [args, msg] of [
+      [['frob'], /the action is list, claim, progress, block, done or start/],
+      [['done'], /work done: say what changed/],
+      [['block', 'r1'], /the one question/],
+      [['progress', 'a', 'b'], /put the text in quotes/],
+      [['claim', 'urn'], /give a request id like r3/],
+      [['list', 'r1'], /takes no id or text/],
+      [['claim', '--port', '9'], /--port is for work start/],
+    ] as [string[], RegExp][]) {
+      const r = cli(['work', proj, ...args]);
+      expect(r.code, args.join(' ')).toBe(2);
+      expect(r.err).toMatch(msg);
+    }
+    expect(cli(['work', proj, 'done', 'r1', 'x']).err).toMatch(/r1 is open|claim/);
+    expect(cli(['work', proj, 'progress', 'nothing held']).err).toMatch(/no claimed request to post progress on/);
+    expect(records().length).toBe(n);
+  });
+
   it('refused while a server owns the project', () => {
     writeFileSync(join(proj, '.pixelclaw.lock'), JSON.stringify({ pid: process.ppid, url: 'http://127.0.0.1:1/' }));
     const r = cli(['request', proj, 'draw', 'urn']);

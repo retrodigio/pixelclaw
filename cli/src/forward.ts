@@ -7,9 +7,9 @@ import { request } from 'node:http';
 import { realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
-  findServer, formatEvents, loadProject, readRequests, serverFromUrl, type AgentEvent, type ServerRef, type Writer,
+  findServer, formatEvents, loadProject, readRequests, serverFromUrl, shellArg, type AgentEvent, type ServerRef, type Writer,
 } from '@pixelclaw/server';
-import { UsageError, WRITE_OPTS, main, one, parseArgs, type Io } from './main.ts';
+import { UsageError, WORK_ACTIONS, WRITE_OPTS, main, one, parseArgs, type Io } from './main.ts';
 
 /** `await` exits with this when the timeout passed with nothing to report. */
 export const EXIT_TIMEOUT = 3;
@@ -44,6 +44,7 @@ function writes(cmd: string, p: ReturnType<typeof parseArgs>): boolean {
     case 'run': return !p.flags.has('dry');
     case 'seeds': return p.flags.has('apply');
     case 'plan': return p.flags.has('manifest') || p.flags.has('templates');
+    case 'work': return WORK_ACTIONS.includes(p.pos[1] ?? '');
     default: return true;
   }
 }
@@ -161,7 +162,7 @@ export async function awaitMain(argv: string[], io: Pick<Io, 'out' | 'err'>): Pr
     io.err(`error: ${j.error ?? `the server answered ${r.status}`}\n`);
     return 1;
   }
-  io.out(p.flags.has('json') ? JSON.stringify({ events: j.events, cursor: j.cursor, timedOut: j.timedOut }) + '\n' : formatEvents(j.events, j.cursor) + '\n');
+  io.out(p.flags.has('json') ? JSON.stringify({ events: j.events, cursor: j.cursor, timedOut: j.timedOut }) + '\n' : formatEvents(j.events, j.cursor, { cli: /^https?:\/\//.test(p.pos[0]!) ? '<project>' : shellArg(p.pos[0]!) }) + '\n');
   return j.events.length ? 0 : EXIT_TIMEOUT;
 }
 
@@ -180,5 +181,5 @@ export async function listenerLine(dir: string): Promise<string> {
   } catch {
     return '';
   }
-  return `${many} and no agent is listening for them. Keep \`pixelclaw await ${dir}\` running in the background (its exit wakes you), and take them with the MCP work tool.\n`;
+  return `${many} and no agent is listening for them. Keep \`pixelclaw await ${dir}\` running in the background (its exit wakes you), and take them with the MCP work tool (without MCP: \`pixelclaw work ${shellArg(dir)} claim\`).\n`;
 }

@@ -157,7 +157,7 @@ export interface WatchOptions {
 }
 
 /** Commands the CLI may send to the server (the ones that write). */
-export const FORWARDED_COMMANDS = ['new', 'run', 'seeds', 'export', 'import', 'review', 'plan', 'request', 'reply', 'cancel'];
+export const FORWARDED_COMMANDS = ['new', 'run', 'seeds', 'export', 'import', 'review', 'plan', 'request', 'reply', 'cancel', 'work'];
 
 export async function startWatchServer(o: WatchOptions): Promise<WatchServer> {
   const host = o.host ?? '127.0.0.1';

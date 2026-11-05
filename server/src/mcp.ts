@@ -9,10 +9,10 @@ import { formatChecks, formatSeeds } from './report.ts';
 import { writeReview } from './review.ts';
 import { EXPORT_FORMATS, exportAsset } from './export.ts';
 import { exportWithProfile, importIntoProject, importSummary, planImport, projectProfiles, projectSchemes } from './io.ts';
-import { agentWork, awaitRequests, listenerNote, markSeen, personRequest, readRequests, requestLine, toPersonRequest } from './requests.ts';
+import { MCP_STEPS, agentWork, awaitRequests, listenerNote, markSeen, personRequest, requestBrief, readRequests, requestLine, toPersonRequest } from './requests.ts';
 import { formatEvents } from './await.ts';
-import { openRequests, type WorkRequest } from '@pixelclaw/core';
-import { manifestEntry, planReport, planText, readManifest, writeManifest, writeTemplates } from './plan.ts';
+import { openRequests } from '@pixelclaw/core';
+import { planReport, planText, writeManifest, writeTemplates } from './plan.ts';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { VIEW_MODES, makeView, parseRegion, type View, type ViewMode } from './views.ts';
@@ -620,7 +620,7 @@ export function createMcpServer(host: McpHost, version: string, mo: McpOptions =
         const left = openRequests(readRequests(w.project)).filter((x) => x.state === 'open').length;
         return { content: [text(`${r.message}${action === 'progress' ? '' : `. ${left ? `${left} open request${left === 1 ? '' : 's'} left: call work for the next.` : 'No open requests left.'}`}`)] };
       }
-      return { content: [text(`${r.message}\n${requestBrief(w, q)}`)] };
+      return { content: [text(`${r.message}\n${requestBrief(w, q, MCP_STEPS)}`)] };
     } catch (e) {
       return errorResult(e);
     }
@@ -713,20 +713,6 @@ export function createMcpServer(host: McpHost, version: string, mo: McpOptions =
   }));
 
   return server;
-}
-
-/** What a claimed request asks, with what the project knows about its asset. */
-function requestBrief(w: Writer, q: WorkRequest): string {
-  const out = [requestLine(q)];
-  const e = manifestEntry(readManifest(w.project).manifest, q.asset);
-  if (e) out.push(`plan: ${q.asset} is a ${e.kind} ${e.size}${e.set ? ` in set ${e.set}` : ''}${e.description ? `: ${e.description}` : ''}${e.height ? ` (drawn height ${e.height} px)` : ''}`);
-  const a = planReport(w).assets.find((x) => x.name === q.asset);
-  if (a) out.push(`status: ${a.status} → ${a.next}${a.failing.length ? `; failing: ${a.failing.join(', ')}` : ''}${a.flags.length ? `; ${a.flags.join('; ')}` : ''}`);
-  if (q.kind === 'draw' || q.kind === 'new') out.push(`Draw it: run with \`new ${e?.kind ?? 'sprite'} ${q.asset}\` (the manifest fills in its size and palette), look, check, fix; then work(action="done", text=<what you drew>).`);
-  else out.push(`Change it as asked (the request is also a \`mark rejected\` on its tape${q.mark ? ` at #${q.mark}` : ''}; \`changes\` shows the person's edits and notes); then work(action="done", text=<what changed>).`);
-  if (q.events.some((x) => x.type === 'reply')) out.push(`The person answered: "${q.events.filter((x) => x.type === 'reply').at(-1)!.text}"`);
-  out.push('If you cannot go on without the person, work(action="blocked", text=<one clear question>).');
-  return out.join('\n');
 }
 
 /** "failing" or a comma list of check names; undefined for none, null when something is not a check. */

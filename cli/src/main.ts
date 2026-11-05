@@ -1,4 +1,4 @@
-// pixelclaw: new | run | view | check | review | plan | request | reply | cancel | export | import | verify | upgrade | skill (work and serve: entry.ts). A thin layer over @pixelclaw/core and the project folder.
+// pixelclaw: new | run | view | check | review | plan | request | reply | cancel | work (its actions) | export | import | verify | upgrade | skill (work start and serve: entry.ts). A thin layer over @pixelclaw/core and the project folder.
 
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -11,7 +11,7 @@ import {
 import {
   AssetExistsError, NoAssetError, ProjectError, VIEW_MODES, Writer, assetDir, checkpointNames, createProject, formatChecks, isViewMode, listAssets,
   findServer, loadProject, lockHolder, paletteSource, parseRegion, prefixHash, previewPng, readAssetJson, readCheckpoints, readPaletteFile,
-  needsUnderlay, resolveUnderlays, formatSeeds, readTape, readTapeFile, readStateCacheRaw, stateKey, saveAsset, sha256, writeReview, planReport, planText, writeManifest, writeTemplates, SUMMARY_BUDGET, EXPORT_FORMATS, exportAsset, exportWithProfile, importIntoProject, importSummary, planImport, personRequest, readRequests, requestLine, toPersonRequest, type ExportFormat, type Project, type ViewMode,
+  needsUnderlay, resolveUnderlays, formatSeeds, readTape, readTapeFile, readStateCacheRaw, stateKey, saveAsset, sha256, writeReview, planReport, planText, writeManifest, writeTemplates, SUMMARY_BUDGET, EXPORT_FORMATS, exportAsset, exportWithProfile, importIntoProject, importSummary, planImport, personRequest, readRequests, requestLine, toPersonRequest, agentWork, cliSteps, requestBrief, shellArg, type ExportFormat, type Project, type ViewMode,
 } from '@pixelclaw/server';
 
 export interface Io {
@@ -70,11 +70,19 @@ export const USAGE = `pixelclaw: a pixel art editor driven by commands
   pixelclaw request <project> [draw <asset> | change <asset> --note "<what>" | add <name> --kind <k> --size WxH [--set <s>] [--description "…"] [--height N]] [--note "…"] [--by <author>]
       Ask for work as the dashboard does: draw a planned asset, change a drawn one (also writes
       mark rejected "<note>" on its tape), or add a new asset (its manifest entry, validated first).
-      Without a kind, lists the requests still open, claimed or blocked. Refused while a server
-      owns the project it is sent to that server (see "While a server runs").
+      Without a kind, lists the requests still open, claimed or blocked (open ones say seen by
+      <agent> once an agent has been handed them). While a server runs it is sent to that server.
   pixelclaw reply <project> <id> "<answer>" [--by <author>]      answer a blocked request (it opens again)
   pixelclaw cancel <project> <id> ["<why>"] [--by <author>]       withdraw a request
-  pixelclaw work <project> [--port N]
+  pixelclaw work <project> list | claim [<id>] | progress [<id>] "<note>" | block [<id>] "<question>" | done [<id>] "<what changed>" [--by <agent>]
+      An agent's side of the request queue, for a session without PixelClaw's MCP tools (the MCP
+      work tool does the same): list hands over the open requests (the cards say seen by
+      <agent>), claim takes the next open one or <id> and prints what is asked, progress posts a
+      note the person sees, block stops it with one clear question, done finishes it with what
+      changed (only when the asset passes its checks). After claim the id may be left out. Any
+      error applies nothing. --by names the agent (default claude). With a server running these
+      go through it, so the dashboard's cards move live and the agent shows as listening.
+  pixelclaw work <project> start [--port N]      (also: pixelclaw work <project> [--port N])
       Work the request queue with a headless Claude Code session (claude -p with the PixelClaw MCP
       server and the skill) until it is empty or the budget cap is reached. Runs only when
       project.json has "worker": { "enabled": true } (it spends money; cap, command and args are
@@ -117,7 +125,7 @@ export const USAGE = `pixelclaw: a pixel art editor driven by commands
       http://127.0.0.1:<port>/?token=... (printed to stderr). Creates the project if needed.
 
 While a server runs (pixelclaw serve): commands that write (new, run, seeds --apply, export,
-import, review, plan --manifest/--templates, request, reply, cancel) are sent to it over HTTP,
+import, review, plan --manifest/--templates, request, reply, cancel, work) are sent to it over HTTP,
 found through the project's lock and a token file only you can read, so they go through its
 writer and a connected dashboard updates live. Read-only commands read the files. If the server
 cannot be reached the command runs directly. upgrade still needs the server stopped.
@@ -284,7 +292,19 @@ export const WRITE_OPTS: Record<string, [string[], string[]]> = {
   request: [['note', 'by', 'kind', 'size', 'set', 'description', 'height'], []],
   reply: [['by'], []],
   cancel: [['by'], []],
+  work: [['by', 'port'], []],
 };
+
+/** `pixelclaw work <project> <action>`: the MCP work tool's actions, for an agent with no MCP. */
+export const WORK_ACTIONS = ['list', 'claim', 'progress', 'block', 'done'];
+
+/** Whether a `work` command line starts the headless worker (`work <project> start`, or the older `work <project>`). */
+export function startsWorker(argv: string[]): boolean {
+  if (argv[0] !== 'work') return false;
+  let p: Parsed;
+  try { p = parseArgs(argv.slice(1), ...WRITE_OPTS.work!); } catch { return true; }
+  return p.pos[1] === undefined || p.pos[1] === 'start';
+}
 
 const RUN_OPTS = WRITE_OPTS.run![0];
 
@@ -447,6 +467,55 @@ function cmdAnswer(io: Io, action: string, p: Parsed): number {
   io.out(`${requestLine(q)}\n`);
   return 0;
 }
+
+/**
+ * `work`: an agent's side of a request, as the MCP work tool does it: list hands the open requests
+ * over (seen), claim takes one, progress posts a note, block asks one question, done finishes it
+ * (only when the asset passes its checks). The id may be left out after claim: it is the one you
+ * hold. Errors apply nothing.
+ */
+function cmdWork(io: Io, p: Parsed): number {
+  const [dir, action, ...rest] = p.pos;
+  if (!dir || !action) throw new UsageError(`work: ${WORK_USAGE}`);
+  if (action === 'start') throw new UsageError('work start: run it from the pixelclaw command, not through a server');
+  if (!WORK_ACTIONS.includes(action)) throw new UsageError(`work: the action is ${WORK_ACTIONS.join(', ')} or start (not '${action}')`);
+  if (one(p, 'port') !== undefined) throw new UsageError('work: --port is for work start');
+  const id = rest[0] && /^r\d+$/.test(rest[0]) ? rest.shift() : undefined;
+  const [text, ...extra] = rest;
+  if (extra.length) throw new UsageError(`work ${action}: put the text in quotes (unexpected '${extra[0]}')`);
+  if (action === 'list' && (id || text !== undefined)) throw new UsageError('work list takes no id or text');
+  if (action === 'claim' && text !== undefined) throw new UsageError(`work claim: unexpected '${text}' (give a request id like r3, or none for the next open one)`);
+  if (['progress', 'block', 'done'].includes(action) && !text?.trim()) {
+    throw new UsageError(`work ${action}: say ${action === 'progress' ? 'what you are doing' : action === 'block' ? 'the one question for the person' : 'what changed'} (in quotes)`);
+  }
+  const proj = loadProject(dir);
+  assertNoServer(proj);
+  const w = wr(io, proj);
+  const by = one(p, 'by') ?? 'claude';
+  const steps = cliSteps(dir);
+  if (action === 'list') {
+    agentWork(w, by, { action: 'list' });
+    const active = openRequests(readRequests(proj));
+    io.out(active.length ? active.map((q) => requestLine(q) + '\n').join('') + `Take one: \`pixelclaw work ${shellArg(dir)} claim [<id>]\`\n` : 'no open requests\n');
+    return 0;
+  }
+  const r = action === 'claim' ? agentWork(w, by, { action: 'next', id }, steps)
+    : agentWork(w, by, { action: action === 'block' ? 'blocked' : action as 'progress' | 'done', id, text: text! }, steps);
+  w.requestsChanged();
+  if (!r.request) {
+    io.out(`${r.message}\n`);
+    return 0;
+  }
+  if (action === 'claim') {
+    io.out(`${r.message}\n${requestBrief(w, r.request, steps)}\n`);
+    return 0;
+  }
+  const left = openRequests(readRequests(proj)).filter((x) => x.state === 'open').length;
+  io.out(`${r.message}\n${requestLine(r.request)}\n${action === 'progress' ? '' : left ? `${left} open request${left === 1 ? '' : 's'} left: ${steps.next}.\n` : 'No open requests left.\n'}`);
+  return 0;
+}
+
+export const WORK_USAGE = 'work <project> (list | claim [<id>] | progress [<id>] "<note>" | block [<id>] "<question>" | done [<id>] "<what changed>") [--by <agent>], or work <project> start [--port N]';
 
 function cmdPlan(io: Io, p: Parsed): number {
   const [dir] = p.pos;
@@ -715,6 +784,8 @@ export function main(argv: string[], io: Io = nodeIo): number {
         return cmdRequest(io, parseArgs(rest, ...WRITE_OPTS.request!));
       case 'reply': case 'cancel':
         return cmdAnswer(io, cmd, parseArgs(rest, ...WRITE_OPTS.reply!));
+      case 'work':
+        return cmdWork(io, parseArgs(rest, ...WRITE_OPTS.work!));
       case 'skill':
         return cmdSkill(io, parseArgs(rest, ['dest', 'project'], []));
       case 'verify':
