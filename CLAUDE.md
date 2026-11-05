@@ -1,33 +1,55 @@
-# pixelclaw
+# PixelClaw: notes for agents working on the code
 
-PixelClaw: a pixel art editor built for an AI agent to drive by command (an MCP server and a CLI),
-with a live browser view where people watch and edit. Indexed colour only. TypeScript, pnpm
-workspaces (`core`, `server`, `ui`, `cli`, `skill/`).
+PixelClaw is a pixel art editor built for an AI agent to drive by command (an MCP server and a
+CLI), with a live browser view where people watch and edit. Indexed colour only. TypeScript, pnpm
+workspaces: `core`, `server`, `ui`, `cli`, plus `skill/` (the Claude Code skill). Start with
+[README.md](README.md), [docs/design.md](docs/design.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## The plan
+## Layout
 
-The design plan is `PIXELTOOL.md`; its local path is in `CLAUDE.local.md` (not committed). It is read-only; never edit it. Section 12 holds
-the owner's decisions and overrides anything earlier. Build plan steps are §10 (G1..G11). If the
-plan is unclear, write the question into `PLAN_QUESTIONS.md` with your reading, follow the reading,
-and say so in your report.
+- `core/`: the document model, command language, replay, checks, renders, schemes, families,
+  maps, profiles, PNG/GIF. Pure TypeScript, no DOM or Node APIs. Data: `core/schemes/*.json`
+  (autotile schemes), `core/profiles/*.json` (export profiles).
+- `server/`: the project folder, the single writer, views, MCP (stdio and HTTP), the HTTP +
+  WebSocket server for the watch view, the worker.
+- `ui/`: the watch view, editor and dashboard (Vite + React + canvas 2D); it replays tapes with
+  `core`.
+- `cli/`: the `pixelclaw` command; `pnpm build` bundles everything into `cli/dist`.
+- `docs/`: reference docs. `examples/`: example projects, walkthroughs and the stand-in agents
+  that drive them. `scripts/`: the build, scheme generation and screenshot scripts.
 
-## Keep the repo publishable
+## Conventions
 
-This repo will be made public with its full history, so every commit must be safe to publish:
-- No names, art, palettes or text from any existing game, and none of the plan's project-specific
-  names (the game the plan was written for, its test packs, local folders under `~/projects/`).
-  Examples, fixtures and docs use invented content (an original demo theme, e.g. "mossy ruins").
-- Game-specific knowledge is data (autotile schemes, export profiles); ship only generic ones.
-- Do not read anything outside this repo except the plan file above. Dependencies must have
-  permissive licences (MIT, BSD, Apache-2.0, ISC) and be few.
+- **Core is deterministic.** Integer maths, the seeded PCG generator (`core/src/pcg.ts`), no
+  `Date`, `Math.random`, DOM or Node APIs in `core`. Replaying a tape must be byte-identical on
+  every machine; golden tests and `pixelclaw verify` depend on it.
+- **Every edit is a command.** New features are commands on the tape (with a normal form, so the
+  tape replays exactly), not side channels. A person's action in the UI writes a command too.
+- **Game-specific knowledge is data.** Schemes and export profiles are JSON; ship only generic
+  ones. Examples, fixtures and docs use invented content (an original demo theme such as "mossy
+  ruins"), never names, art or palettes from an existing game.
+- **Few, permissive dependencies** (MIT, BSD, Apache-2.0, ISC). `test/licences.test.ts` checks
+  every installed package.
+- Comments explain the code; docs describe the tool. Name tests, examples and screenshots by the
+  feature they cover.
 
-## Working conventions
+## Running things
 
-- Core is deterministic: integer maths, a seeded PCG generator, no `Date`, `Math.random` or DOM/Node
-  APIs in `core`. Replay of a tape is byte-identical.
-- Tests: vitest (and Playwright from G2). `pnpm test` must pass before every commit.
-- Track status in `PROGRESS.md`: one row per plan feature you touch (done, partial, deferred), the
-  test that validates it, and a short note.
-- Commit at the end of each coherent piece of work, with a clear message ending in the attribution
-  lines the task gives you.
-- Never open GUI windows or leave servers running when you finish.
+Node 22.18 or later (TypeScript runs directly through Node's type stripping) and pnpm 10.
+
+```sh
+pnpm install
+pnpm build                 # the UI (vite) and the bundled CLI in cli/dist
+pnpm typecheck             # tsc over core, server, cli, ui and e2e
+pnpm test:unit             # vitest
+pnpm test:e2e              # Playwright (needs pnpm build, and `npx playwright install chromium` once)
+pnpm test                  # build + vitest + Playwright: must pass before every commit
+node cli/bin/pixelclaw.js --help
+```
+
+- Golden images: `UPDATE_GOLDEN=1 pnpm test:unit` rewrites them; look at every changed PNG before
+  committing. A golden change means the pixels changed, so it needs a reason.
+- The stand-in agents (`examples/*-agent.ts`) drive `pixelclaw serve` over MCP the way Claude
+  Code would; they write into `out/` (ignored).
+- Never open GUI windows or leave servers running when you finish; Playwright specs and tests
+  start their own servers on temporary projects and stop them.
