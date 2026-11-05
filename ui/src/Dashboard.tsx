@@ -291,7 +291,7 @@ export function Dashboard({ store }: { store: Store }) {
               const forClaude = active.filter((q) => q.state !== 'blocked').length, waiting = active.length - forClaude;
               const nobody = active.filter((q) => unattended(store, q, now)).length;
               return <span className={`chip req-chip${nobody ? ' unattended' : ''}`} data-testid="requests-count" title={active.map((q) => `${q.id} ${q.kind} ${q.asset}: ${q.state}`).join('\n')}>
-                {[forClaude ? `${forClaude} request${forClaude === 1 ? '' : 's'} sent` : '', waiting ? `${waiting} waiting for your answer` : '', nobody ? (store.presence?.listening ? `${nobody} unseen for 2 minutes` : 'no agent is listening') : ''].filter(Boolean).join(' · ')}
+                {[forClaude ? `${forClaude} request${forClaude === 1 ? '' : 's'} for Claude` : '', waiting ? `${waiting} waiting for your answer` : '', nobody ? (store.presence?.listening ? `${nobody} unseen for 2 minutes` : 'no agent is listening') : ''].filter(Boolean).join(' · ')}
               </span>;
             })()}
             {plan.manifest.exists && !plan.manifest.errors.length && <button onClick={() => setAdding(true)} data-testid="add-asset-open" title="Add an asset to the plan and ask Claude to draw it">+ Add an asset</button>}

@@ -27,7 +27,7 @@ export type RequestRecord =
   | { type: 'claim' | 'progress' | 'done' | 'blocked' | 'reply' | 'cancel' | 'seen'; id: string; by: string; at: string; text?: string };
 
 export interface RequestEvent {
-  type: Exclude<RequestRecord['type'], 'request'>;
+  type: Exclude<RequestRecord['type'], 'request' | 'seen'>;
   by: string;
   at: string;
   text?: string;
@@ -104,6 +104,11 @@ export function applyRequest(reqs: Map<string, WorkRequest>, r: RequestRecord): 
     return;
   }
   const q = reqs.get(r.id)!;
+  if (r.type === 'seen') {
+    // Who has seen it is kept on its own, not among the events (the timeline of what happened to it).
+    q.seen.push({ by: r.by, at: r.at });
+    return;
+  }
   q.events.push({ type: r.type, by: r.by, at: r.at, ...(r.text !== undefined ? { text: r.text } : {}) });
   switch (r.type) {
     case 'claim': q.state = 'claimed'; q.claimedBy = r.by; break;
@@ -111,7 +116,6 @@ export function applyRequest(reqs: Map<string, WorkRequest>, r: RequestRecord): 
     case 'done': q.state = 'done'; q.latest = r.text ?? null; q.question = null; break;
     case 'blocked': q.state = 'blocked'; q.latest = r.text ?? null; q.question = r.text ?? null; break;
     case 'reply': q.state = 'open'; q.claimedBy = null; q.question = null; q.latest = r.text ?? null; q.seen = []; break;
-    case 'seen': q.seen.push({ by: r.by, at: r.at }); break;
     case 'cancel': q.state = 'cancelled'; break;
   }
 }
