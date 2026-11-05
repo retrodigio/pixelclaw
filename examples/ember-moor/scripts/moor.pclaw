@@ -1,7 +1,9 @@
 # Moor grass, 48 px: calm olive noise (specks of 2..6 px, the default at 48 px), seed chosen
-# with `seeds`, and a tuft of heather.
+# with `seeds`; grass tufts lit from the style's light (G16: `tufts`, its seed ranked by `seeds`;
+# edges=2 is shared by every look of the moor); and a tuft of heather.
 new tile moor 48x48 bg=moor2
 noise ramp=moor weights=0,2,8,2,0 density=0.25 seed=109
+tufts ramp=moor0,moor1,moor3,moor4 edges=2 seed=2
 paint 29,9 <<
   ..d.c..
   .cdccd.

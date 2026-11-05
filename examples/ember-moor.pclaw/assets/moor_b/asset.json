@@ -29,18 +29,18 @@
     {
       "fork": {
         "from": "moor",
-        "at": 3
+        "at": 4
       }
     }
   ],
   "notes": [],
   "tape": {
     "lang": 2,
-    "commands": 8,
+    "commands": 9,
     "groups": 2
   },
   "state": {
-    "sha256": "ed13515f216ba465fcc22f7ef2c4e18315384510a0c9628d7d2cb2c4b3ca015b"
+    "sha256": "5374734ad61c17c037e788987c14b72591e49f668c507e05f6f8c25ad7b46f34"
   },
   "checkpoints": {
     "every": 200,

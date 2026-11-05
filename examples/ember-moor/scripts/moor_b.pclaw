@@ -1,15 +1,10 @@
-# A second look of the moor (a texture variant): forked from it so its border is the moor's
-# (where the two meet there is no seam); inside, more specks and the heather elsewhere.
+# A second look of the moor (a texture variant): forked from it; the same ground laid again, the
+# tufts with the moor's edges=2 (so the tufts across its edges are the moor's, and the looks join)
+# and their own seed inside; the heather elsewhere.
 fork moor moor_b
 variant of=moor
-paint 29,9 <<
-  ..2.2..
-  .22222.
-  2222222
-  .22222.
-  ..2.2..
->>
-noise 4,4 40x40 ramp=moor weights=0,2,8,2,0 density=0.12 base=keep wrap=off seed=104
+noise ramp=moor weights=0,2,8,2,0 density=0.25 seed=109
+tufts ramp=moor0,moor1,moor3,moor4 edges=2 seed=5
 paint 8,30 <<
   .c..d.
   ccdcc.

@@ -10,7 +10,16 @@
     "outline": [
       "ink"
     ],
-    "light": "nw"
+    "light": "nw",
+    "assets": {
+      "bog": {
+        "checks": {
+          "consistency": {
+            "maxCluster": 5
+          }
+        }
+      }
+    }
   },
   "profiles": []
 }

@@ -88,7 +88,9 @@ At 48 px: look with `view grid region=` (a whole 48x48 grid is long), `render` c
 (192 px) and `tile3x3` at 4x (576 px). Make texture variants by **forking the base and changing
 only its inside** (`fork moor moor_b`, `variant of=moor`, then `noise 4,4 40x40 … base=keep
 wrap=off` and your own marks): two independent noise tiles side by side show a seam where their
-bigger specks are cut at the border (`examples/ember-moor.pclaw` does this; its map seam is 0.35).
+bigger specks are cut at the border. With the structure generators the fork can lay the same
+ground again and only change the generator's seed, keeping its `edges=` (`examples/ember-moor.pclaw`
+since G16: three looks of noise and `tufts edges=2`, map seam 0.17, lattice 12%).
 Expect more `jaggies` from long curves: a big ellipse is fine alone, but where a second shape meets
 its outline the step runs go uneven; let one shape make the silhouette and shade inside it.
 
