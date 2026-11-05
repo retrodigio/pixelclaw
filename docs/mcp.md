@@ -61,7 +61,7 @@ size, wrap, palette, commands and groups) and the watch link.
 | `grid` | integer 4..256, optional | The project's grid: its tile size in px (project.json `grid`, default 24). New maps without `tile=`, the camera (16x9 cells) and the draw scale (2 below 48 px, 1 from 48) follow it. The summary's second line says what they are. |
 
 ```
-project 'mossy-ruins' at /Users/me/art/mossy-ruins.pclaw
+project 'mossy-ruins' at ~/art/mossy-ruins.pclaw
 watch live: http://127.0.0.1:7417/?token=3f9c…  (give this link to the person watching)
 
 palette mossy-ruins (default): 16 colours

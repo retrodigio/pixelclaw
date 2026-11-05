@@ -68,11 +68,10 @@ try {
   await page.waitForTimeout(200);
   await page.screenshot({ path: out('animation-narrow') });
 
-  // What the agent sees: the anim contact sheets and GIFs, the game view with every direction, the floor's 3x3.
+  // What the agent sees: the anim contact sheets, the game view with every direction, the floor's 3x3.
   for (const [asset, mode] of [['walker', 'anim'], ['water', 'anim'], ['walker', 'game'], ['stone_floor', 'tile3x3']] as const) {
     await agent.call('view', { asset, mode, frame: 1 });
     copyFileSync(join(agent.dir, 'views', `${asset}.${mode}.png`), out(`animation-${asset}-${mode}`));
-    if (mode === 'anim') copyFileSync(join(agent.dir, 'views', `${asset}.anim.gif`), out(`animation-${asset}`, 'gif'));
   }
 } finally {
   await browser.close();
