@@ -1,4 +1,4 @@
-// The G14 example (examples/ember-moor.pclaw): a small original set at 48 px, its grid 48: the
+// The ember-moor example (examples/ember-moor.pclaw): a small original set at 48 px, its grid 48: the
 // moor ground and two texture variants, the bog water, a blob47 pool family, a waystone, and a
 // 20x12 map whose floor is a mix of the moor's looks. Every tape replays; running the scripts
 // again gives the same tape commands, state and previews; every check passes.

@@ -1,4 +1,4 @@
-// G7 families: derivation from a band profile, from quadrant pieces and
+// Families: derivation from a band profile, from quadrant pieces and
 // cut from a painted map, with the textures re-projected; checked pixel by pixel against the
 // picture a map of cells makes, and as goldens; the map preview, its seam score and overlays;
 // coverage; and replay.
@@ -108,14 +108,14 @@ describe('family derivation', () => {
 
   it('derivation goldens: blob47 from a band profile, path and wang16 from pieces, the family view', () => {
     const blob = docOf(`${BASE('blob47')}\nfamily band 2:outside 1:ink 1:rust radius=1\nlayer band\npx @cell(o) 3,3 4,3 c=stone`);
-    golden('g7/blob47.png', encodePng(renderScaled(blob, { scale: 4 })));
-    golden('g7/blob47.family.png', encodePng(renderFamilyView(blob, { scale: 2 })));
+    golden('family/blob47.png', encodePng(renderScaled(blob, { scale: 4 })));
+    golden('family/blob47.family.png', encodePng(renderFamilyView(blob, { scale: 2 })));
     const path = docOf(`${BASE('path')}\nfamily band 1:ink 1:stone`);
-    golden('g7/path.png', encodePng(renderScaled(path, { scale: 4 })));
+    golden('family/path.png', encodePng(renderScaled(path, { scale: 4 })));
     const wang = docOf(`${BASE('wang16-corner')}\nfamily band 1:outside 1:ink radius=1`);
-    golden('g7/wang16.png', encodePng(renderScaled(wang, { scale: 4 })));
+    golden('family/wang16.png', encodePng(renderScaled(wang, { scale: 4 })));
     const bridge = docOf(`${BASE('bridge8')}\nfamily band 1:ink\nlayer band\npx @cell(h) 0,2 0,5 7,2 7,5 c=rust`);
-    golden('g7/bridge8.png', encodePng(renderScaled(bridge, { scale: 4 })));
+    golden('family/bridge8.png', encodePng(renderScaled(bridge, { scale: 4 })));
   });
 
   it('cuts a family from its painted coverage map: medoids, only the band kept, detached', () => {
@@ -141,7 +141,7 @@ describe('family derivation', () => {
       }
     }
     void pieces;
-    golden('g7/cut.png', encodePng(renderScaled(cut, { scale: 2 })));
+    golden('family/cut.png', encodePng(renderScaled(cut, { scale: 2 })));
     // No map, no band: refused with what to do.
     expect(() => run(state(BASE('blob47')), 'family cut')).toThrow(/lay out the coverage map first/);
     expect(() => run(state(BASE('blob47', ' map=6x6')), 'family coverage seed=1')).toThrow(/no 6x6 layout with every variant/);
@@ -196,7 +196,7 @@ describe('family derivation', () => {
 describe('maps and overlays', () => {
   it('composes a random island (golden), with its text', () => {
     const d = docOf(`${BASE('blob47')}\nfamily band 2:outside 1:ink 1:rust radius=1`);
-    golden('g7/island.png', encodePng(renderMap(d, { cols: 10, rows: 8, seed: 5, scale: 2 })));
+    golden('family/island.png', encodePng(renderMap(d, { cols: 10, rows: 8, seed: 5, scale: 2 })));
     const s = BUILTIN_SCHEMES.get('blob47')!;
     const t = islandTerrain(s, 10, 8, 5);
     expect(islandTerrain(s, 10, 8, 5).cells).toEqual(t.cells);
@@ -214,7 +214,7 @@ describe('maps and overlays', () => {
       expect(o.overlay!.mode).toBe(mode);
       const frames = mapGifFrames(fam, { cols: 6, rows: 5, seed: 2, overlays: [o], scale: 1 });
       expect(frames.length, mode).toBeGreaterThan(1);
-      if (mode === 'wave') golden('g7/overlay-wave.gif', encodeGif(frames, { delta: true }));
+      if (mode === 'wave') golden('family/overlay-wave.gif', encodeGif(frames, { delta: true }));
       // Overlays draw only on outside tiles here.
       const m = composeMap(fam, islandTerrain(BUILTIN_SCHEMES.get('blob47')!, 6, 5, 2), 0);
       const shown = renderMap(fam, { cols: 6, rows: 5, seed: 2, overlays: [o], scale: 1 });

@@ -1,9 +1,9 @@
-// The checked-in demos: the stone floor tile, the G4 grass tile with two variants and
-// the chest sprite, and G5's test sprite, with G5's fixes and review round on all of them; G6's
-// walking figure and water tile, and the stone floor redrawn as flagstones; G7's sand tile, the
-// shore family built from it and the water, and the glint overlay; G8's house, tree and well, the
+// The mossy-ruins example: the stone floor tile, the grass tile with two variants and the chest
+// sprite, the glowcap test sprite, with the check fixes and review round on all of them; the
+// walking figure and water tile, and the stone floor redrawn as flagstones; the sand tile, the
+// shore family built from it and the water, and the glint overlay; the house, tree and well, the
 // meadow and lane families, the village map, the variants that fixed its repetition, and the
-// person's move of the well; G9's waters, sands and shores for the open sea and the beach, the
+// person's move of the well; the waters, sands and shores for the open sea and the beach, the
 // house at 2x, the shore and meadow on the project's own scheme blob47-round, and the village's
 // notes closed. Every
 // tape must replay to the committed state and preview, running the scripts from scratch must give
@@ -40,7 +40,7 @@ describe('examples/mossy-ruins.pclaw', () => {
     expect(r.code).toBe(0);
   });
 
-  it("the scripts rebuild every asset: G4's art, G5's test sprite, the fixes and the review round", () => {
+  it("the scripts rebuild every asset: the first art, the test sprite, the fixes and the review round", () => {
     const tmp = mkdtempSync(join(tmpdir(), 'pixelclaw-example-'));
     try {
       const copy = join(tmp, 'mossy-ruins.pclaw');
@@ -51,7 +51,7 @@ describe('examples/mossy-ruins.pclaw', () => {
         expect(r.err).toBe('');
         for (const step of ['fix', 'well', 'review', 'redraw', 'g6review', 'g9']) {
           const f = join(ROOT, 'scripts', `${name}_${step}.pclaw`);
-          // The well was moved by a person in the watch view (the G8 demo).
+          // The well was moved by a person in the watch view (the maps walkthrough).
           if (existsSync(f)) expect(cli(['run', copy, f, '--asset', name, ...(step === 'well' ? ['--by', 'human:chris'] : [])]).err).toBe('');
         }
         const asset = (p: string, f: string) => readFileSync(join(p, 'assets', name, f));

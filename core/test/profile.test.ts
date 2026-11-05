@@ -1,4 +1,4 @@
-// G9 export, import and densities: round-trip identity (export, then
+// Export, import and densities: round-trip identity (export, then
 // import, gives the same indices) through every built-in profile and the sample profile; the CSV
 // page layout docs/profiles.md defines; the reducer against hand-made fixtures; `.aseprite` round
 // trip; the PNG reader; project schemes and fillets; `scale` and `density`.

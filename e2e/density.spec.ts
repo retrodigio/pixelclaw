@@ -1,4 +1,4 @@
-// Plan §10 G9 in the browser: an asset with a higher-density copy gets a density tab in the
+// Densities and import in the browser: an asset with a higher-density copy gets a density tab in the
 // preview panel (the copies side by side and the highest one reduced, its differences marked);
 // looking logs nothing. An imported asset's tape starts with its import commands.
 

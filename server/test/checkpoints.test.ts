@@ -1,4 +1,4 @@
-// G4 on the server: checkpoint files every 200 commands (written as a tape grows, removed when it
+// Checkpoints on the server: checkpoint files every 200 commands (written as a tape grows, removed when it
 // starts again, the fast way in when an asset is loaded, and checked by `pixelclaw verify`), and
 // `palette save` writing a document's palette back to the project.
 
@@ -74,7 +74,7 @@ describe('checkpoints', () => {
     const aj = join(ex, 'assets', 'stone_floor', 'asset.json');
     const j = JSON.parse(readFileSync(aj, 'utf8'));
     proj = loadProject(ex);
-    // The hash this tile had before G4 (PCLAWDOC 1) is still accepted; another one is not.
+    // The hash in the first state format (PCLAWDOC 1) is still accepted; another one is not.
     j.state.sha256 = sha256(serializeDocV1(new Writer(proj).doc('stone_floor'))!);
     writeFileSync(aj, JSON.stringify(j));
     const v = verify();

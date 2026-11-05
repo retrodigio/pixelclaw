@@ -1,4 +1,4 @@
-// G8 maps and oversized assets: terrain painting resolves the same
+// Maps and oversized assets: terrain painting resolves the same
 // variants as the scheme reference; footprints block overlapping placement; split then reassembly
 // is identity; map replay is byte-identical; draw order, roofs and the map checks; texture
 // variants; Tiled export; map gen.

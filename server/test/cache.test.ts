@@ -1,4 +1,4 @@
-// G10: the state cache. A fresh writer reads each asset's state from
+// The state cache. A fresh writer reads each asset's state from
 // .cache/state/<asset>.gwc when its key matches the tape, and that state is byte-identical to a
 // full replay; a changed tape, a changed palette (language 1) or a broken file falls back to the
 // replay; `pixelclaw verify` compares the cache with the replay.

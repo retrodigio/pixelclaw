@@ -1,4 +1,4 @@
-// Plan §10 G8 in the browser: every map control (paint, rectangle, erase, place, move, remove)
+// Maps in the browser: every map control (paint, rectangle, erase, place, move, remove)
 // logs a command written by the person, and core's replay of the server's tape, composed from the
 // assets it names, equals the map on the canvas; the camera, the zoom and the hot spots log nothing.
 
@@ -118,7 +118,7 @@ test('every map control logs a command that replays to the map on the canvas', a
   expect(await tapeLength()).toBe(before);
 });
 
-test('G13: the fill tool lays a tile on every empty cell of a tiles layer; walkable marks a terrain\'s ground', async ({ page }) => {
+test('the fill tool lays a tile on every empty cell of a tiles layer; walkable marks a terrain\'s ground', async ({ page }) => {
   const at = await open(page);
   await page.locator('[data-tool="fill"]').click();
   await expect(page.getByTestId('map-fill-layer')).toHaveValue('floor');
@@ -135,7 +135,7 @@ test('G13: the fill tool lays a tile on every empty cell of a tiles layer; walka
   await act(page, () => page.getByTestId('map-walkable').uncheck(), ['layer set sea walkable=off']);
 });
 
-test('G14: the fill tool lays a mix of tiles by weight (tiles <layer> fill mix=)', async ({ page }) => {
+test('the fill tool lays a mix of tiles by weight (tiles <layer> fill mix=)', async ({ page }) => {
   const at = await open(page);
   await page.locator('[data-tool="fill"]').click();
   await page.getByTestId('map-fill-tile').selectOption('(mix)');

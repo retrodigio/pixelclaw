@@ -1,4 +1,4 @@
-// Plan §10 G3 in the browser: every UI action replays from its logged command to the same pixels
+// Editing in the browser: every UI action replays from its logged command to the same pixels
 // (Playwright drives each tool, then core replays the server's tape and the canvas must match);
 // two browsers stay in sync while both edit; undo and redo by author; "branch here" makes a fork
 // that replays; a person's fixes and note come back to the agent through `changes`; a tape of

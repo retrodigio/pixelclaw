@@ -1,4 +1,4 @@
-// The G10 and G11 demo project (examples/kiln-hollow.pclaw): a manifest of 20 assets from a
+// The kiln-hollow example project (examples/kiln-hollow.pclaw): a manifest of 20 assets from a
 // one-paragraph theme, three of them taken end to end; then a HUD set and two tiles more,
 // the yard's mockup underlay snapped into a draft, three tiles cut from it and cleaned, a 5x7 font
 // and four icons; scenes, a sheet of pot shards imported into the gallery, and three
@@ -18,8 +18,8 @@ const ROOT = join(import.meta.dirname, '..', '..', 'examples');
 const PROJECT = join(ROOT, 'kiln-hollow.pclaw');
 const SRC = join(ROOT, 'kiln-hollow');
 const ASSETS = ['clay', 'urn', 'kiln'];
-const G11 = ['yard', 'sage', 'yard_clay', 'shallows', 'hollow_type', 'jar_icon', 'hearth_icon', 'drop_icon', 'bowl_icon'];
-const G12 = ['urn_blue', 'shards_1', 'shards_2', 'shards_3'];
+const YARD_FONT_ICONS = ['yard', 'sage', 'yard_clay', 'shallows', 'hollow_type', 'jar_icon', 'hearth_icon', 'drop_icon', 'bowl_icon'];
+const GALLERY_REQUESTS = ['urn_blue', 'shards_1', 'shards_2', 'shards_3'];
 const SHARDS = ['shards_1', 'shards_2', 'shards_3'];
 const FINDINGS = { clay: 5, urn: 7, kiln: 5 } as Record<string, number>;
 
@@ -35,10 +35,10 @@ const tape = (dir: string, a: string) => readFileSync(join(dir, 'assets', a, 'ta
 describe('examples/kiln-hollow.pclaw', () => {
   it('verifies, and every check passes on the drawn assets', () => {
     const v = cli(['verify', PROJECT]);
-    for (const a of [...ASSETS, ...G11, ...G12]) expect(v.out).toContain(`ok   ${a}`);
+    for (const a of [...ASSETS, ...YARD_FONT_ICONS, ...GALLERY_REQUESTS]) expect(v.out).toContain(`ok   ${a}`);
     expect(v.code).toBe(0);
     const c = cli(['check', PROJECT]);
-    for (const a of [...ASSETS, ...G11, 'urn_blue']) expect(c.out).toMatch(new RegExp(`^${a}: all \\d+ checks pass$`, 'm'));
+    for (const a of [...ASSETS, ...YARD_FONT_ICONS, 'urn_blue']) expect(c.out).toMatch(new RegExp(`^${a}: all \\d+ checks pass$`, 'm'));
     // The imported shards are as the sheet drew them: drafted, with jaggies to fix.
     for (const a of SHARDS) expect(c.out).toMatch(new RegExp(`^${a}: 1 of \\d+ checks failing`, 'm'));
   });
@@ -82,13 +82,13 @@ describe('examples/kiln-hollow.pclaw', () => {
         run(a, `mark reviewed "blind review g10: ${FINDINGS[a]} findings fixed by coordinates"`);
       }
       for (const a of ASSETS) run(a, 'mark approved', 'human:chris');
-      // G11: the yard's underlay from the checked-in mockup, snapped; tiles cut and cleaned; the font; the icons and their fixes.
+      // The yard's underlay from the checked-in mockup, snapped; tiles cut and cleaned; the font; the icons and their fixes.
       run('yard', script('yard.pclaw'));
       const u = await w.runAsync({ asset: 'yard', commands: `underlay import ${join(SRC, 'yard-mockup.png')} layout=${join(SRC, 'yard-layout.png')}`, by: 'claude' });
       expect(u.ok).toBe(true);
-      // The yard was snapped in G11, before snap fitted the placement's grid by default:
+      // The yard was snapped by an older version, before snap fitted the placement's grid by default:
       // the default gives the same rows (only the recorded pitch and offset round differently).
-      // So the recorded G11 line is run as it is, after checking the default gives its rows.
+      // So the recorded line is run as it is, after checking the default gives its rows.
       const placed = w.dry({ asset: 'yard', commands: 'snap', by: 'claude' });
       const recorded = tape(PROJECT, 'yard').find((e) => e.cmd.startsWith('snap '))!.cmd;
       const rows = (c: string) => c.split('\n').slice(1).join('\n');
@@ -99,12 +99,12 @@ describe('examples/kiln-hollow.pclaw', () => {
       run('hollow_type', script('hollow_type.pclaw'));
       for (const i of ['jar_icon', 'hearth_icon', 'drop_icon', 'bowl_icon']) run(i, script(`${i}.pclaw`));
       for (const i of ['jar_icon', 'drop_icon', 'bowl_icon']) run(i, script(`${i}_fix.pclaw`));
-      // G12: the person's import of the shards and their change request (its mark); the agent's urn_blue and its start on the jar.
+      // The person's import of the shards and their change request (its mark); the agent's urn_blue and its start on the jar.
       importIntoProject(w, { path: join(SRC, 'shards.png'), slice: { cell: [24, 24] }, pattern: 'shards_{n}', kind: 'sprite', set: 'clutter', palette: 'kiln-hollow' }, 'human:chris');
       run('jar_icon', 'mark rejected "a wider mouth, so it reads as a jar at 1x"', 'human:chris');
       run('urn_blue', script('urn_blue.pclaw'));
       run('jar_icon', script('jar_icon_g12.pclaw'));
-      for (const a of [...ASSETS, ...G11, ...G12]) {
+      for (const a of [...ASSETS, ...YARD_FONT_ICONS, ...GALLERY_REQUESTS]) {
         expect(tape(dir, a).map((e) => [e.by, e.cmd]), a).toEqual(tape(PROJECT, a).map((e) => [e.by, e.cmd]));
         const state = (d: string) => JSON.parse(readFileSync(join(d, 'assets', a, 'asset.json'), 'utf8')).state.sha256;
         expect(state(dir), a).toBe(state(PROJECT));

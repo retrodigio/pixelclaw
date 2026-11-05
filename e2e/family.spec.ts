@@ -1,4 +1,4 @@
-// Plan §10 G7 in the browser: every new family control (detach, attach, the coverage map, cutting
+// Families in the browser: every new family control (detach, attach, the coverage map, cutting
 // from it) logs a command that core replays to the pixels on the canvas; a stroke on a piece
 // reaches every variant built from it; the variants and map views, the map's size and seed, and
 // folding timeline rows log nothing.

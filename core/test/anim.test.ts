@@ -1,4 +1,4 @@
-// G6 in core: frame durations, tags, views with live mirror links, linked cels, the pivot and the
+// Animation in core: frame durations, tags, views with live mirror links, linked cels, the pivot and the
 // ground line, sequences and playback timing; every one replays and round-trips the state bytes.
 import { describe, expect, it } from 'vitest';
 import {

@@ -1,4 +1,4 @@
-// G7 schemes: the resolver against a reference table for all 256
+// Schemes: the resolver against a reference table for all 256
 // neighbourhoods, built here without the resolver (the blob list from the literature, keys by
 // summing weights, quadrant kinds from the 2x2 cells meeting at each corner); every built-in scheme
 // loads with pieces for every quadrant; corner, path and bridge keys; and coverage maps.
@@ -68,12 +68,12 @@ describe('schemes', () => {
 
   it('the face scheme puts a face below the terrain, joined to the faces beside it', () => {
     const s = BUILTIN_SCHEMES.get('face')!;
-    expect(s.variants.length).toBe(75); // G16: side faces, corners, inner corners and alternate looks (47 + 28)
+    expect(s.variants.length).toBe(75); // side faces, corners, inner corners and alternate looks (47 + 28)
     const name = (here: boolean, raw: number) => { const v = resolveVariant(s, here, raw); return v === null ? null : s.variants[v]!.name; };
     expect(name(false, 0)).toBeNull();
     expect(name(false, 1)).toBe('face_o');                // terrain above only
     expect(name(false, 1 | 2)).toBe('face_e');            // and above-right, with the right cell open: a face goes on east
-    expect(name(false, 1 | 2 | 4)).toBe('face_ie');       // the right cell is terrain: an inner corner (G16; face_o before)
+    expect(name(false, 1 | 2 | 4)).toBe('face_ie');       // the right cell is terrain: an inner corner (face_o in older versions)
     expect(name(false, 1 | 2 | 128)).toBe('face_ew');
     expect(name(false, 1 | 128)).toBe('face_w');
     expect(name(true, 255)).toBe('nesw_ne_se_sw_nw');

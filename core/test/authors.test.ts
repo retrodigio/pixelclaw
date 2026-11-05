@@ -1,5 +1,5 @@
-// G3: groups per author (h<N> for people), undo and redo per author, forks, and the timeline's
-// snapshots. Plan §1.3, §7.2, §10 G3.
+// Authors: groups per author (h<N> for people), undo and redo per author, forks, and the timeline's
+// snapshots.
 
 import { describe, expect, it } from 'vitest';
 import {

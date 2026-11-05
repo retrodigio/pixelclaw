@@ -35,7 +35,7 @@ function editPalette(): void {
 }
 
 describe('tape language', () => {
-  it('language 1 tapes from G1-G4 still verify, and can be drawn on', () => {
+  it('language 1 tapes still verify, and can be drawn on', () => {
     expect(header('grass')).toBe('{"pclaw":"tape","lang":1}');
     const v = cli(['verify', proj]);
     expect(v.out).toContain('ok   grass');

@@ -1,4 +1,4 @@
-// The checks of plan §5 on synthetic fixtures with known answers. Coordinates and scores
+// The checks on synthetic fixtures with known answers. Coordinates and scores
 // are worked out by hand in the comments.
 import { describe, expect, it } from 'vitest';
 import { lstar, luma601, repetitionScore, runChecks, seamScore, type CheckId, type CheckResult, type Doc } from '../src/index.ts';
@@ -279,7 +279,7 @@ describe('repetition', () => {
     }
   });
 
-  it('G13: one mark on a calm tile is not a stripe; the limit scales with the band\'s spread', () => {
+  it('one mark on a calm tile is not a stripe; the limit scales with the band\'s spread', () => {
     // A 3x3 ink pebble on calm noise: its rows are 1/8 ink, so they are darker on average
     // (score above 3), but the difference is all in three pixels of each row.
     for (const seed of [1, 2, 3]) {

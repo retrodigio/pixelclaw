@@ -1,4 +1,4 @@
-// Plan §10 G3 on the server: people's edits arrive over the WebSocket and become tape commands
+// Editing on the server: people's edits arrive over the WebSocket and become tape commands
 // with their author (h<N> groups); `changes` returns exactly the people's lines and notes with a
 // diff image, then nothing new; forks start a branch tape that replays; undo and redo by author.
 

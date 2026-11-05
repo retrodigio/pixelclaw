@@ -1,4 +1,4 @@
-// Plan §10 G6 in the browser: every new timeline control (ticks, tags and their loops, views,
+// Animation in the browser: every new timeline control (ticks, tags and their loops, views,
 // mirror links, linked cels, the pivot and ground tool) logs a command that core replays to the
 // pixels on the canvas; a mirror view follows the agent's drawing; playback runs at the game's
 // speed; playback and the onion skin log nothing.

@@ -1,4 +1,4 @@
-// Plan §10 G5 in the browser: the check chips (computed in the page with core and the project's
+// Checks in the browser: the check chips (computed in the page with core and the project's
 // style guide) circle the flagged pixels on the canvas and open their details; a flagged group can
 // be pinned as a note; role colours and preview themes; the preview panel. Every new control that
 // changes the document logs a command that core replays to the pixels on the canvas; the chips,

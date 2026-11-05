@@ -1,4 +1,4 @@
-// Plan §10 G10 in the browser: the dashboard shows the manifest as cards by set, coloured by
+// The dashboard in the browser: the dashboard shows the manifest as cards by set, coloured by
 // status, with failing checks; Approve and "Ask for changes" log `mark approved` and
 // `mark rejected "…"` on the asset's tape with the person's name, and core's replay of the tape
 // gives the status the page shows. Tabs, filters and opening an asset log nothing.

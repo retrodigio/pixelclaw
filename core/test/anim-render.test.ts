@@ -1,4 +1,4 @@
-// G6 renders: the GIF encoder (decoded back by a small reader here), the `anim` contact sheet and
+// Animation renders: the GIF encoder (decoded back by a small reader here), the `anim` contact sheet and
 // GIF goldens, and their timing at the game's tick rate.
 import { describe, expect, it } from 'vitest';
 import { animGifFrames, animText, createRgba, encodeGif, encodePng, renderAnimSheet, type Doc, type Rgba } from '../src/index.ts';
@@ -177,8 +177,8 @@ frame set all ticks=8`;
 
 describe('the anim view', () => {
   it('contact sheet goldens: a 4-direction walker (onion skin, pivot, ground line, diffs) and a 4-frame tile', () => {
-    golden('g6/anim-walker.png', encodePng(renderAnimSheet(doc(WALKER))));
-    golden('g6/anim-water.png', encodePng(renderAnimSheet(doc(SHIMMER))));
+    golden('anim/anim-walker.png', encodePng(renderAnimSheet(doc(WALKER))));
+    golden('anim/anim-water.png', encodePng(renderAnimSheet(doc(SHIMMER))));
   });
 
   it('GIF goldens, decoded: the frames at the game\'s speed', () => {
@@ -187,12 +187,12 @@ describe('the anim view', () => {
     // 4 views side by side, each 2 frames of 12 ticks: 20 hundredths each at 60 ticks/s.
     expect(frames.map((f) => f.delay)).toEqual([20, 20]);
     const gif = encodeGif(frames);
-    golden('g6/anim-walker.gif', gif);
+    golden('anim/anim-walker.gif', gif);
     const g = decodeGif(gif);
     expect(g.frames.map((f) => f.rgb)).toEqual(frames.map((f) => rgbOfImg(f.img)));
     const t = animGifFrames(doc(SHIMMER), { tickRate: 60 });
     expect(t.map((f) => f.delay)).toEqual([13, 14, 13, 13]); // 8 ticks = 13.3 hundredths, rounded at each boundary
-    golden('g6/anim-water.gif', encodeGif(t));
+    golden('anim/anim-water.gif', encodeGif(t));
     // Sequences of different lengths share one loop: 3 and 2 frames of 10 ticks loop together every 60.
     const mixed = doc('new sprite m 4x4\nframe add\nframe add\nframe add\nframe add\ntag add a 1-3\ntag add b 4-5\nframe 1\npx 0,0 c=ink\nframe 4\npx 1,1 c=ink\nframe 5\npx 2,2 c=ink');
     expect(animGifFrames(mixed).reduce((n, f) => n + f.delay, 0)).toBe(100);

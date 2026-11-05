@@ -1,4 +1,4 @@
-// pixelclaw check | review and the G5 views from the command line, on a copy of the G1-G4 fixture
+// pixelclaw check | review and the game and recolour views from the command line, on a copy of the language 1 fixture
 // project (the chest's rivets are single pixels; the grass rows make stripes).
 import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -32,7 +32,7 @@ describe('pixelclaw check', () => {
   it('prints the table with coordinates and exits 1 when a check fails', () => {
     const r = cli(['check', proj, 'chest']);
     expect(r.code).toBe(1);
-    expect(r.out).toContain('chest: 1 of 9 checks failing'); // margin and pieces since G16
+    expect(r.out).toContain('chest: 1 of 9 checks failing'); // margin and pieces included
     expect(r.out).toContain('✗  orphans     2.4%   ≤ 1%    9 stray px in 374 (9 lone, 0 near-orphans)');
     expect(r.out).toContain('lone pixel (no neighbour shares its colour): 7,4 17,4 6,14 17,14 6,18 17,18 6,19 6,20 16,20');
     expect(r.out).toMatch(/✓ {2}readability 1 +≥ 0.8 +edge contrast: 66 of 66 edge px differ from 'grass'/);
@@ -43,7 +43,7 @@ describe('pixelclaw check', () => {
     expect(ok.code).toBe(0);
     expect(ok.out).toContain('chest: all 2 checks pass');
     const m = cli(['check', proj, 'grass_b', '--marks']);
-    // The faint rows still fail (G13's contrast-scaled limit reports the band nearest to failing).
+    // The faint rows still fail (the contrast-scaled limit reports the band nearest to failing).
     expect(m.out).toMatch(/✗ {2}repetition +3\.7 +≤ 3 +most visible stripe: rows 1-2, darker by ΔL\* 2\.6/);
     expect(m.out).toContain('rows 1-2: darker than the rest (ΔL* 2.6), a stripe when tiled: 0,1 3,1 12,1 13,1 19,1 22,1 23,1 9,2 10,2');
     expect(existsSync(join(proj, 'views', 'grass_b.tile3x3.png'))).toBe(true);

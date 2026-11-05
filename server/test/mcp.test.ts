@@ -1,4 +1,4 @@
-// Plan §10 G2: spawn the server over stdio, run a batch, get an image back, read the history.
+// MCP over stdio: spawn the server over stdio, run a batch, get an image back, read the history.
 // Also: the watch view's token is required, and every connected page gets the same stream.
 
 import { execFileSync } from 'node:child_process';

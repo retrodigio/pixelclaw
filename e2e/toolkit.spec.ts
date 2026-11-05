@@ -1,4 +1,4 @@
-// Plan §10 G4 in the browser: every new UI control (selection tools, transforms, symmetry, brush,
+// The drawing toolkit in the browser: every new UI control (selection tools, transforms, symmetry, brush,
 // gradient, dither, outline, clean, stamps, layers, frames, palette lock) logs a command that core
 // replays to the pixels on the canvas; the page sends your layer, frame, symmetry and brush with
 // your next edit only when they change; wrap ghosts let you draw across a tile's edges; the

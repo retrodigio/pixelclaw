@@ -185,14 +185,14 @@ The tests never call a model.
 
 - A fake `claude` (`server/test/fake-claude.ts`) takes the same arguments, records them, connects
   to the MCP endpoint named in `--mcp-config`, works the queue with the `work` tool and prints
-  stream-json lines ending in a made-up cost. `server/test/g12.test.ts` runs the worker with it
+  stream-json lines ending in a made-up cost. `server/test/worker.test.ts` runs the worker with it
   disabled, enabled, against the cap, twice at once, and blocked.
-- `server/test/g15.test.ts` starts `pixelclaw work` with a `claude` on the PATH that records its
+- `server/test/worker-fence.test.ts` and `server/test/worker-discipline.test.ts` start `pixelclaw work` with a `claude` on the PATH that records its
   arguments (the flags above, each once; the command reference in the system prompt); refuses
   settings that would widen it; probes the fenced MCP connection with paths outside the project;
   refuses `done` while a check fails; stalls a session (resumed and finished; stalled twice and
   blocked); and spends across three runs to the cap.
-- When Claude Code is installed, the same file checks that its `--help` documents every flag the
+- When Claude Code is installed, `worker-fence.test.ts` checks that its `--help` documents every flag the
   worker passes, and runs **the real Claude Code** with the worker's command line against a fake
   model API on localhost (a throwaway `HOME`, a dummy key, so nothing is spent and no account is
   used). The fake model asks, one call a turn, for `Bash` (inside and outside the project),

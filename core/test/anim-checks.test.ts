@@ -1,4 +1,4 @@
-// G6 checks: `anim` (frame diff share, loop seam, pivot drift, ground drift, area jumps) and `views`
+// Animation checks: `anim` (frame diff share, loop seam, pivot drift, ground drift, area jumps) and `views`
 // (distinct directions) on fixtures with known answers; and every other check over every frame.
 import { describe, expect, it } from 'vitest';
 import { flaggedOn, runChecks, type CheckResult, type Doc } from '../src/index.ts';

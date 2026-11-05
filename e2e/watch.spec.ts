@@ -1,4 +1,4 @@
-// Plan §10 G2: after playback the canvas pixels equal the core render; the token is required;
+// The watch view: after playback the canvas pixels equal the core render; the token is required;
 // two connected browsers receive the same stream. Also pause / jump to live, time travel and
 // Claude's eye.
 

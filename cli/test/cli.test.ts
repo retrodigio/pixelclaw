@@ -39,7 +39,7 @@ describe('pixelclaw CLI', () => {
     expect(cli(['new', join(root, 'bad.pclaw'), '--grid', '3']).code).not.toBe(0);
   });
 
-  it('new <project> creates the §7.1 layout with imported palettes', () => {
+  it('new <project> creates the project folder layout with imported palettes', () => {
     const r = cli(['new', proj, '--palette', join(root, 'dusk.gpl'), '--palette', join(root, 'extra.hex')]);
     expect(r.code).toBe(0);
     expect(r.out).toContain(`palette dusk-moss: 4 entries (default)`);

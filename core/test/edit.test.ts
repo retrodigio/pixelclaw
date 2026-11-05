@@ -1,4 +1,4 @@
-// G3 commands: what the UI's tools write. Strokes (pixel-perfect pencil, eraser), rectangle
+// Editing commands: what the UI's tools write. Strokes (pixel-perfect pencil, eraser), rectangle
 // selections that clip drawing, shift (move), palette edits, notes. Each replays to the same bytes.
 
 import { describe, expect, it } from 'vitest';
@@ -148,7 +148,7 @@ describe('notes', () => {
     expect(errorOf(base, 'note 1,1 ""')).toContain('the text is empty');
   });
 
-  it('notes and selections change the state bytes; documents without them keep their G1-G3 bytes too', () => {
+  it('notes and selections change the state bytes; documents without them keep their first-format bytes too', () => {
     const plain = serializeDoc(base.doc!);
     expect(serializeDoc(run(base, 'note 1,1 "a"').doc!)).not.toEqual(plain);
     expect(serializeDoc(run(base, 'select all').doc!).length).toBe(plain.length + 48 + '["test",0,0,true,null,null]'.length);
