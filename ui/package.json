@@ -1,6 +1,6 @@
 {
   "name": "@pixelclaw/ui",
-  "version": "0.2.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "description": "PixelClaw watch view: canvas, tape with live playback, Claude's eye (Vite + React + canvas 2D).",

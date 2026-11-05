@@ -1,9 +1,10 @@
-// The build step: `pnpm pack` of the cli package gives a self-contained tarball (one bundled
-// script, the built watch view, no dependencies), and `npx pixelclaw serve` from an install of it
+// The npm package: `npm pack` of the cli package gives a self-contained tarball (one bundled
+// script, the built watch view, the skill and the licences; no sources, no dependencies). Installed
+// into a temporary folder, `pixelclaw --help` and `pixelclaw new` work, and `npx pixelclaw serve`
 // speaks MCP and serves the page. Needs `pnpm build` first (pnpm test runs it).
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { PassThrough } from 'node:stream';
@@ -22,23 +23,35 @@ describe.skipIf(!built)('the packed tarball (run pnpm build first)', () => {
   let tgz = '';
 
   it('holds the bundle, the UI and licences, and no sources or dependencies', () => {
-    execFileSync('pnpm', ['pack', '--pack-destination', tmp], { cwd: CLI, stdio: 'pipe' });
+    execFileSync('npm', ['pack', '--pack-destination', tmp, '--loglevel=error'], { cwd: CLI, stdio: 'pipe' });
     tgz = join(tmp, readdirSync(tmp).find((f) => f.endsWith('.tgz'))!);
     const files = execFileSync('tar', ['-tzf', tgz], { encoding: 'utf8' }).trim().split('\n').sort();
     expect(files).toContain('package/dist/pixelclaw.js');
     expect(files).toContain('package/dist/ui/index.html');
     expect(files).toContain('package/dist/THIRD_PARTY_LICENSES.txt');
     expect(files).toContain('package/dist/LICENSE');
+    expect(files).toContain('package/README.md');
     expect(files.filter((f) => f.endsWith('.ts'))).toEqual([]);
+    expect(files.filter((f) => !/^package\/(dist\/|README\.md$|package\.json$)/.test(f))).toEqual([]);
     const pkg = JSON.parse(execFileSync('tar', ['-xzOf', tgz, 'package/package.json'], { encoding: 'utf8' }));
     expect(pkg.bin).toEqual({ pixelclaw: './dist/pixelclaw.js' });
     expect(pkg.dependencies).toBeUndefined();
+    expect(pkg.engines.node).toBe('>=22.18');
+    expect(pkg.repository.url).toContain('github.com/retrodigio/pixelclaw');
   });
 
   it('installs offline and npx pixelclaw serve works', async () => {
     mkdirSync(app);
     execFileSync('npm', ['install', tgz, '--offline', '--no-audit', '--no-fund', '--loglevel=error'], { cwd: app, stdio: 'pipe' });
+    const bin = join(app, 'node_modules', '.bin', 'pixelclaw');
+    expect(execFileSync(bin, ['--help'], { cwd: app, encoding: 'utf8' })).toContain('pixelclaw serve --project');
     expect(execFileSync('npx', ['--no-install', 'pixelclaw', 'help'], { cwd: app, encoding: 'utf8' })).toContain('pixelclaw serve --project');
+    const pal = join(app, 'moss.hex');
+    writeFileSync(pal, '1d2b1f\n3e6b3a\n8fbf6a\nd8e8b0\n');
+    expect(execFileSync(bin, ['new', 'demo.pclaw', '--palette', pal], { cwd: app, encoding: 'utf8' })).toContain("created project 'demo'");
+    expect(execFileSync(bin, ['new', 'demo.pclaw', 'tile', 'slab', '8x8'], { cwd: app, encoding: 'utf8' })).toMatch(/slab/);
+    expect(JSON.parse(readFileSync(join(app, 'demo.pclaw', 'project.json'), 'utf8')).name).toBe('demo');
+    expect(existsSync(join(app, 'demo.pclaw', 'assets', 'slab', 'tape.jsonl'))).toBe(true);
     const transport = new StdioClientTransport({
       command: 'npx', args: ['--no-install', 'pixelclaw', 'serve', '--project', 'art.pclaw', '--port', '0'], cwd: app, stderr: 'pipe',
     });

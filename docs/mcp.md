@@ -26,10 +26,10 @@ From a clone of this repo (`pnpm install && pnpm build`):
 claude mcp add pixelclaw -- node /path/to/pixelclaw/cli/dist/pixelclaw.js serve --project ~/art/mossy-ruins.pclaw --port 7417
 ```
 
-From a packed tarball (`cd cli && pnpm pack` writes `pixelclaw-0.2.0.tgz`):
+From a packed tarball (`pnpm build`, then `cd cli && npm pack` writes `pixelclaw-0.1.0.tgz`):
 
 ```sh
-claude mcp add pixelclaw -- npx -y --package /path/to/pixelclaw-0.2.0.tgz pixelclaw serve --project ~/art/mossy-ruins.pclaw --port 7417
+claude mcp add pixelclaw -- npx -y --package /path/to/pixelclaw-0.1.0.tgz pixelclaw serve --project ~/art/mossy-ruins.pclaw --port 7417
 ```
 
 Once the package is on npm, this is:

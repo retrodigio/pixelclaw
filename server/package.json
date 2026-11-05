@@ -1,6 +1,6 @@
 {
   "name": "@pixelclaw/server",
-  "version": "0.2.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "description": "PixelClaw server: the single writer for a project, the MCP server (stdio), and HTTP + WebSocket for the watch view.",
