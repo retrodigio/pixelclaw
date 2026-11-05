@@ -122,7 +122,7 @@ guide and `rubric.md` (readability, cohesion, seams and repetition, style-guide 
 coordinates in the form `<asset> <x>,<y> [<w>x<h>] "text"`). It names no method or author and
 holds no tape, so the reviewer judges blind. The tool calls no model: hand the folder to a fresh
 agent with no other context, and pin its findings on the pixels with `note` commands. The demo's
-round is in [examples/demo-g5.md](../examples/demo-g5.md).
+round is in [examples/drawing-and-checks.md](../examples/drawing-and-checks.md).
 
 Families are not shown as sheets: each goes on a map (`maps/<set>.png` at game scale, a GIF at
 1x when anything moves, and `maps/<set>.tiles.txt` naming the tile at each column and row), with

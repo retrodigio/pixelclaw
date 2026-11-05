@@ -64,7 +64,7 @@ export interface Measures {
   material: string | null;
   /** Mean number of steps used per ramp the art uses. */
   steps: number | null;
-  /** Stroke weight: the median over drawn pixels of the shorter of the horizontal and vertical drawn runs through it (icons, plan §4.5). */
+  /** Stroke weight: the median over drawn pixels of the shorter of the horizontal and vertical drawn runs through it (icons). */
   stroke: number | null;
   /** The share of the canvas the drawn box covers. */
   fill: number | null;

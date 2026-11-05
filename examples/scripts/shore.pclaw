@@ -1,4 +1,4 @@
-# Mossy ruins: a shore. A blob47 family: sand (the terrain) meeting water. Since G9
+# Mossy ruins: a shore. A blob47 family: sand (the terrain) meeting water.
 # on the project's own scheme blob47-round (schemes/blob47-round.json, copied into the tape): the
 # edges bend into every inner corner and the water cell outside it rounds it off, 12 px wider. Route 1, a band profile: from the water's edge in, 3 px of water, a line of foam, 2 px of
 # wet sand, then dry sand; outer corners round. The textures are copied from the sand tile and,

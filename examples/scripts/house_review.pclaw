@@ -1,4 +1,4 @@
-# Mossy ruins, G8 review round (reviews/2026-10-28-g8/findings.md): the house. The reviewer's
+# Mossy ruins, a blind review round: the house. The reviewer's
 # findings, pinned on the pixels, then fixed and closed.
 note 6,6 24x17 "nine lone roof3 pixels: stray single pixels on a prop; pair each into a 2 px shingle highlight"
 note 34,3 "lone stone1 pixel in the chimney face; make it a mortar joint"

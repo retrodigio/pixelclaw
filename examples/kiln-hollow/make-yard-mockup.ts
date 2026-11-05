@@ -1,4 +1,4 @@
-// Makes the G11 demo's offline mockup: the builder has no image API key, so the
+// Makes the demo's offline mockup: so the walkthrough runs without an image API key, the
 // "generated" draft of the kiln yard is made here, by the same code as the offline `fake`
 // provider: a flat layout of a 6x4-tile scene (clay terraces, a sage bank, the stream) drawn as a
 // rough pixel-art draft in the palette's colours, enlarged with a sub-pixel offset, blurred and

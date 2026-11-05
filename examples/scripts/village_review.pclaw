@@ -1,6 +1,6 @@
-# Mossy ruins, G8 review round: the village. The reviewer's findings on the scene, pinned on the
+# Mossy ruins, review round: the village. The reviewer's findings on the scene, pinned on the
 # cells; the ones fixed here are closed, the rest stay open (the sea's and the sand's repetition
-# belong to their tiles, G6's water and G7's sand; the corners' roundness to the schemes).
+# belong to their tiles, the water and the sand; the corners' roundness to the schemes).
 note 21,16 "a tree's crown within a pixel of the house's eave"
 note 18,6 "every lane ends 1-3 cells short of the beach"
 note 15,11 "the houses at 15,10 and 23,21 face no lane"

@@ -1,4 +1,4 @@
-# A test sprite for G5's checks: a glowcap mushroom with five deliberate defects, one per check.
+# A test sprite for the checks: a glowcap mushroom with five deliberate defects, one per check.
 new sprite glowcap 24x24 palette=ruins-props
 # The cap, pillow shaded (defect: banding): a dark rim, a middle ring, a light middle, the same on every side.
 ellipse 3,4 18x11 c=soil0 fill

@@ -49,7 +49,7 @@ describe('examples/mossy-ruins.pclaw', () => {
       for (const name of ASSETS) {
         const r = cli(['run', copy, join(ROOT, 'scripts', `${name}.pclaw`), '--replace']);
         expect(r.err).toBe('');
-        for (const step of ['fix', 'well', 'review', 'redraw', 'g6review', 'g9']) {
+        for (const step of ['fix', 'well', 'review', 'redraw', 'flagreview', 'notes']) {
           const f = join(ROOT, 'scripts', `${name}_${step}.pclaw`);
           // The well was moved by a person in the watch view (the maps walkthrough).
           if (existsSync(f)) expect(cli(['run', copy, f, '--asset', name, ...(step === 'well' ? ['--by', 'human:chris'] : [])]).err).toBe('');

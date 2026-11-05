@@ -5,7 +5,7 @@ From a game's theme to exported art. The agent writes a style guide and a **mani
 from the plan, writes **blind review** bundles, and shows it all in the watch view's
 **dashboard**. The **skill** teaches Claude Code the workflow.
 
-![The dashboard: 20 planned assets of the kiln-hollow example by set, three exported](screenshots/g10-dashboard.png)
+![The dashboard: 20 planned assets of the kiln-hollow example by set, three exported](screenshots/theme-dashboard.png)
 
 ## The manifest
 
@@ -75,7 +75,7 @@ a generated mockup under it; a person approves the look in the watch view; `snap
 draft layer (block R² and the material match against the layout say whether to reroll); tiles
 are cut from the draft with `import 0,0 asset=<sheet> region=… layer=draft` and cleaned with
 commands until their checks pass. Or skip the snap and trace over the underlay at 24 px. See
-[commands.md](commands.md#underlays-and-snap) and [examples/demo-g11.md](../examples/demo-g11.md).
+[commands.md](commands.md#underlays-and-snap) and [examples/theme-to-set.md](../examples/theme-to-set.md).
 
 ## Style-guide defaults and thresholds
 
@@ -143,7 +143,7 @@ manifest alone (no art needed), into `<project>/templates/`:
   and the band profile: `blob47-round` included (176 variants on 25x19 tiles). The `.txt` names the
   variant in every cell. Paint over it to cut a family from it (route 3).
 
-![The mockup screen of the kiln-hollow manifest](screenshots/g10-mockup.png) ![The bank's blob47-round coverage map](screenshots/g10-coverage-bank.png)
+![The mockup screen of the kiln-hollow manifest](screenshots/theme-mockup.png) ![The bank's blob47-round coverage map](screenshots/theme-coverage-bank.png)
 
 ## The dashboard
 
@@ -154,7 +154,7 @@ size, description, failing checks, what it needs next and any flags. A person ap
 `reviewed` asset (**✓ Approve**: `mark approved` on its tape, by them). The dashboard reloads the
 plan after every batch and when the agent writes a manifest, exports or imports.
 
-![Asking for changes](screenshots/g10-dashboard-actions.png)
+![Asking for changes](screenshots/theme-dashboard-actions.png)
 
 ## Requests from the dashboard
 
@@ -194,7 +194,7 @@ answer box when blocked; ✓ done with what changed. The agent hears through `pl
 first) and takes them with the MCP `work` tool; the skill's routine takes requests before
 planned work and calls `plan` after each finished asset.
 
-![Each state: urn_blue done, the goat blocked on a question, Claude working on the jar](screenshots/g12-states.png)
+![Each state: urn_blue done, the goat blocked on a question, Claude working on the jar](screenshots/queue-states.png)
 
 ### Requests from the CLI and MCP
 
@@ -239,7 +239,7 @@ drawn, checks failing); `plan(order="scene")` (CLI `pixelclaw plan --order scene
 work scene by scene. `map gen` on a planned map stands the drawn objects its `uses` lists on the
 ground it lays ([commands.md](commands.md)).
 
-![Scenes on the dashboard](screenshots/g12-scenes.png)
+![Scenes on the dashboard](screenshots/queue-scenes.png)
 
 ## The gallery
 
@@ -250,7 +250,7 @@ recently changed, size); tick the box on several and **Compare** shows them side
 same scale (×2, ×4 to look closer). A map lists the assets it uses, and an asset the maps that
 use it; click one to show just those. Click an asset to open it in the editor. Nothing here writes.
 
-![The gallery, sorted by recent change](screenshots/g12-gallery.png)
+![The gallery, sorted by recent change](screenshots/queue-gallery.png)
 
 ## Importing into the gallery
 
@@ -264,7 +264,7 @@ yet, and every check is run; the result says what each found (an imported asset 
 until its checks pass, like any other). MCP `import(slice=…, set=…)` and `pixelclaw import
 --slice 24x24 --set …` reach the same import.
 
-![The slice dialog](screenshots/g12-import-dialog.png)
+![The slice dialog](screenshots/queue-import-dialog.png)
 
 ## The review hand-off
 

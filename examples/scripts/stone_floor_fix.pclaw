@@ -1,4 +1,4 @@
-# The G1 stone floor under G5's checks. orphans: its moss flecks were single pixels of four
+# The stone floor under the checks. orphans: its moss flecks were single pixels of four
 # different tones (9,0 3,1 14,6 15,6 16,6 17,6 4,14 3,15 4,15 7,15 20,18 20,21; pairs 5,14 4,16).
 # Each becomes a small clump of one or two tones.
 px 9,0 c=moss1

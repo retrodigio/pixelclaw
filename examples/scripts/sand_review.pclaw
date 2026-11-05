@@ -1,4 +1,4 @@
-# Mossy ruins, G7 review round (reviews/2026-10-28-g7/findings.md): the sand. The reviewer's
+# Mossy ruins, a blind review round: the sand. The reviewer's
 # findings, pinned on the pixels, then fixed and closed.
 note 6,9 11x9 "columns 6-16 are almost plain below row 9 while the edge columns are busy: plain squares framed by marks when tiled"
 note 17,18 5x6 "a 6-px vertical sand1 line beside a sand3 cross: a '|+' that repeats on every tile"

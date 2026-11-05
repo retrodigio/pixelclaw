@@ -1,0 +1,15 @@
+# The blind reviewer's findings on the flagstones, pinned where it pointed: the floor now
+# reads as a floor; what it found is the soil dash and the thin moss.
+note 1,2 3x1 "a soil dash sits in the same spot in every tile: the most obvious repeated mark in the 3x3"
+note 6,13 3x1 "the moss is two straight 1-px dashes; grow irregular clusters along the joints"
+# The soil goes (the joint is stone1 again); the moss grows into four small clumps of different
+# shapes, all on joint pixels.
+px 1,2 2,2 3,2 c=stone1
+px 5,12 5,13 6,13 7,13 c=moss1
+px 8,13 c=moss2
+px 19,9 c=moss1
+px 5,7 5,8 c=moss1
+px 2,18 3,18 4,18 c=moss1
+px 3,18 c=moss2
+note done n3
+note done n4

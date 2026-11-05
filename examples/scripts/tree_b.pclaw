@@ -1,4 +1,4 @@
-# Mossy ruins, G8 review round ("the 22 trees are one identical sprite"): a second tree, a texture
+# Mossy ruins, review round ("the 22 trees are one identical sprite"): a second tree, a texture
 # variant of the first: the same size, footprint and light, a taller, narrower crown in two
 # masses. The village picks between them cell by cell.
 new object tree_b 24x48 cell=24x24 palette=ruins-props

@@ -18,7 +18,7 @@ const world = (docs: Record<string, Doc>) => mapWorld(Object.entries(docs).map((
 const lattice = (map: Doc, docs: Record<string, Doc>) => runChecks(map, ['lattice'], { world: world(docs) })[0]!;
 const hex = (n: string) => MOSSY.entries.find((e) => e.name === n)!.hex;
 
-/** examples/demo-g13's stream bed (as in g14.test.ts): soil noise, optionally a pebble at x,y. */
+/** the Fern Ledge stream bed (examples/ledge-agent.ts, as in lattice.test.ts): soil noise, optionally a pebble at x,y. */
 function bed(name: string, seed: number, pebble: [number, number] | null, of?: string): Doc {
   const lines = [`new tile ${name} 16x16 bg=soil1`, ...(of ? [`variant of=${of}`] : []),
     `noise 0,0 16x16 ramp=soil weights=1,6,3 cluster=1..2 density=0.25 base=soil1 wrap=on seed=${seed}`];

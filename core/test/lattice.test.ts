@@ -15,7 +15,7 @@ function run(state: AssetState, text: string, docs: Record<string, Doc> = {}): A
 const world = (docs: Record<string, Doc>) => mapWorld(Object.entries(docs).map(([name, doc]) => ({ name, doc })));
 const lattice = (map: Doc, docs: Record<string, Doc>) => runChecks(map, ['lattice'], { world: world(docs) })[0]!;
 
-/** A stream-bed tile as examples/demo-g13 draws it: soil noise (by seed), optionally a pebble at x,y, scaled by s. */
+/** A stream-bed tile as examples/ledge-agent.ts draws it: soil noise (by seed), optionally a pebble at x,y, scaled by s. */
 function bed(name: string, seed: number, pebble: [number, number] | null, o: { s?: number; of?: string } = {}): Doc {
   const s = o.s ?? 1, T = 16 * s;
   const lines = [`new tile ${name} ${T}x${T} bg=soil1`, ...(o.of ? [`variant of=${o.of}`] : []),
@@ -28,7 +28,7 @@ function bed(name: string, seed: number, pebble: [number, number] | null, o: { s
 }
 
 describe('the map-scale lattice check', () => {
-  // examples/demo-g13's floor: bed (seed 3, a pebble at 6,9) and its variant bed_b (seed 41, no pebble).
+  // Fern Ledge's floor (examples/ledge-agent.ts): bed (seed 3, a pebble at 6,9) and its variant bed_b (seed 41, no pebble).
   const g13 = { bed: bed('bed', 3, [6, 9]), bed_b: bed('bed_b', 41, null, { of: 'bed' }) };
   const floor = (docs: Record<string, Doc>, s = 1) => run(EMPTY, `new map floor 12x8 tile=${16 * s}\ntiles floor fill bed`, docs).doc!;
 

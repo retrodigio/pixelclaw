@@ -1,5 +1,5 @@
-# The G6 blind reviewer's findings on the walking figure, pinned where it pointed
-# (examples/mossy-ruins.pclaw/reviews/2026-10-28-g6/findings.md):
+# The blind reviewer's findings on the walking figure, pinned where it pointed
+# (a blind review's findings):
 note 7,20 10x3 "boots in near-black merge with the outline into a black block; the feet don't read at 1x"
 note 7,13 11x6 "south and north: only the legs change; add arm swing or a 1-px body bob"
 note 14,6 3x5 "side view: a sliver of face under a large hair mass; widen the profile by a pixel"

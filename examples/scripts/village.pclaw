@@ -1,4 +1,4 @@
-# Mossy ruins: a coastal village, a 40x30 map of 24 px cells built from the G7 shore
+# Mossy ruins: a coastal village, a 40x30 map of 24 px cells built from the shore
 # and the meadow and lane families: the sea all round, a beach, a meadow, two lanes crossing, four
 # houses, a well at the crossroads and trees; glints on the water.
 new map village 40x30 tile=24 palette=ruins-shore

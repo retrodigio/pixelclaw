@@ -1,4 +1,4 @@
-# Mossy ruins, G7 review round (reviews/2026-10-28-g7/findings.md): the shore. The reviewer's
+# Mossy ruins, a blind review round: the shore. The reviewer's
 # findings on the island, pinned on the pieces they came from, then fixed and closed.
 note 168,48 24x7 "the north edge repeats pixel for pixel every 24 px (the same foam gaps, flecks and bumps), and the band is ruler-straight: the tile grid shows along long coasts"
 note 144,24 24x24 "the east and west edges: the same straight 2-px wet band with foam gaps always in the same rows"
