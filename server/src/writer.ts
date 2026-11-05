@@ -16,7 +16,8 @@ import {
 } from './project.ts';
 import type { Eye, ServerMessage, Snapshot, WorkerStatus } from './protocol.ts';
 import { checkCacheKey, readCheckCache, readStateCache, stateKey, writeCheckCache, writeStateCache } from './cache.ts';
-import { readRequests } from './requests.ts';
+import { readRequestRecords, readRequests } from './requests.ts';
+import { Hub } from './await.ts';
 import { workerSettings, workerSpent } from './worker-settings.ts';
 import { manifestEntry, readManifest, styleDefaults } from './plan.ts';
 import { makeView, type View, type ViewMode, type ViewOptions } from './views.ts';
@@ -217,6 +218,8 @@ export class Writer {
   private readonly keys = new Map<string, string>();
   private readonly checkCache: boolean;
   lastEye: Eye | null = null;
+  /** Who is listening for requests, and the events they wait for (await.ts). */
+  readonly hub = new Hub();
   /** The headless worker's run, as the worker controller reports it. */
   worker: Omit<WorkerStatus, 'enabled'> = { running: false, by: null, startedAt: null, spent: 0, cap: 0, sessions: 0, stopped: null };
 
@@ -224,10 +227,14 @@ export class Writer {
     this.project = project;
     this.now = o.now ?? utcNow;
     this.checkCache = o.checkCache ?? true;
+    this.hub.attach(readRequestRecords(project));
+    this.hub.workerRunning = () => this.worker.running;
+    this.hub.onPresence = () => this.emit({ type: 'presence', presence: this.hub.presence() });
   }
 
   /** Tell the watchers requests.jsonl changed. */
   requestsChanged(): void {
+    this.hub.syncRequests(readRequestRecords(this.project), readRequests(this.project));
     this.emit({ type: 'requests', requests: [...readRequests(this.project).values()] });
   }
 
@@ -241,6 +248,7 @@ export class Writer {
   setWorker(s: Partial<Omit<WorkerStatus, 'enabled'>>): void {
     this.worker = { ...this.worker, ...s };
     this.emit({ type: 'worker', status: this.workerStatus() });
+    this.emit({ type: 'presence', presence: this.hub.presence() });
   }
 
   workerLog(lines: string[]): void {
@@ -285,6 +293,7 @@ export class Writer {
     this.keys.clear();
     this.live = null;
     this.lastEye = null;
+    this.hub.attach(readRequestRecords(p));
     this.emit({ type: 'hello', snapshot: this.snapshot() });
   }
 
@@ -408,6 +417,7 @@ export class Writer {
       type: 'batch', asset: name, by: req.by, group: r.group!, entries: creates ? r.state.entries : r.added,
       changed: r.changed, reset: creates,
     });
+    this.hub.marks(name, req.by, r.added, this.stamp());
     const followed = this.follow(name, req.by, r.added.some((e) => /^variant of=\S+ band=inherit/.test(e.cmd)));
     return { ok: true, ...base, warnings, ...totals(r.state), dir, ...(followed.length ? { followed } : {}) };
   }

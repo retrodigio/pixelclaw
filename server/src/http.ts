@@ -15,7 +15,7 @@ import { HUMAN_RE, type ClientMessage, type PersonRequest, type ServerMessage } 
 import { ProjectError } from './project.ts';
 import type { Writer } from './writer.ts';
 import { planReport } from './plan.ts';
-import { personRequest } from './requests.ts';
+import { awaitRequests, personRequest } from './requests.ts';
 import { importIntoProject, type ImportOptions } from './io.ts';
 import { workerLogTail, type WorkerControl } from './worker.ts';
 import { acceptWebSocket, type WsConnection } from './ws.ts';
@@ -152,7 +152,12 @@ export interface WatchOptions {
   mcp?: (o: { confined: boolean }) => ReturnType<McpServerFactory>;
   /** The headless worker, started and stopped from the dashboard. */
   worker?: WorkerControl;
+  /** Runs a CLI invocation against the writer (POST /api/cli); the CLI supplies it. */
+  runCli?: (argv: string[], writer: Writer, cwd: string) => { code: number; stdout: string; stderr: string };
 }
+
+/** Commands the CLI may send to the server (the ones that write). */
+export const FORWARDED_COMMANDS = ['new', 'run', 'seeds', 'export', 'import', 'review', 'plan', 'request', 'reply', 'cancel'];
 
 export async function startWatchServer(o: WatchOptions): Promise<WatchServer> {
   const host = o.host ?? '127.0.0.1';
@@ -206,6 +211,11 @@ export async function startWatchServer(o: WatchOptions): Promise<WatchServer> {
     res.end();
   };
 
+  const bearerOk = (req: IncomingMessage): boolean => {
+    const auth = String(req.headers.authorization ?? '');
+    return auth.startsWith('Bearer ') && tokenOk(auth.slice(7), o.token);
+  };
+
   const handle = (req: IncomingMessage, res: ServerResponse): void => {
     // Only localhost names: a page on another site can't reach us by rebinding a DNS name.
     if (!allowedHosts().includes(String(req.headers.host))) {
@@ -231,8 +241,46 @@ export async function startWatchServer(o: WatchOptions): Promise<WatchServer> {
       }).catch((e: unknown) => json(res, e instanceof ProjectError || e instanceof SyntaxError ? 400 : 500, { error: (e as Error).message }));
       return;
     }
+    if (url.pathname === '/api/cli' && req.method === 'POST') {
+      // A CLI command run in another process, sent here so it goes through the writer's queue.
+      if (!authed && !bearerOk(req)) { json(res, 401, { error: 'token required' }); return; }
+      if (!o.runCli) { json(res, 501, { error: 'this server cannot run CLI commands' }); return; }
+      readBody(req, MAX_UPLOAD).then(async (b) => {
+        const body = JSON.parse(b.toString('utf8')) as { argv?: unknown; cwd?: unknown };
+        if (!Array.isArray(body.argv) || !body.argv.every((x) => typeof x === 'string') || typeof body.cwd !== 'string') throw new ProjectError('argv and cwd are needed');
+        const argv = body.argv as string[];
+        if (!FORWARDED_COMMANDS.includes(argv[0] ?? '')) throw new ProjectError(`'${argv[0]}' is not sent through the server`);
+        const cwd = body.cwd;
+        const r = await o.writer.enqueue(() => {
+          const out = o.runCli!(argv, o.writer, cwd);
+          o.writer.requestsChanged();
+          o.writer.planChanged();
+          return out;
+        });
+        json(res, 200, r);
+      }).catch((e: unknown) => json(res, e instanceof ProjectError || e instanceof SyntaxError ? 400 : 500, { error: (e as Error).message }));
+      return;
+    }
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       res.writeHead(405, HEADERS).end();
+      return;
+    }
+    if (url.pathname === '/api/await') {
+      // Long poll: events after ?since= (a cursor), or none after ?timeout= seconds. ?as= names the listener.
+      if (!authed && !bearerOk(req)) { json(res, 401, { error: 'token required' }); return; }
+      const as = url.searchParams.get('as') ?? 'claude';
+      if (!/^[A-Za-z0-9_.:-]{1,32}$/.test(as)) { json(res, 400, { error: 'as is a short name (letters, digits, . _ : -)' }); return; }
+      const timeoutS = Number(url.searchParams.get('timeout') ?? 600);
+      if (!Number.isFinite(timeoutS) || timeoutS < 0) { json(res, 400, { error: 'timeout is seconds' }); return; }
+      const ac = new AbortController();
+      res.on('close', () => ac.abort());
+      awaitRequests(o.writer, { cursor: url.searchParams.get('since') ?? undefined, timeoutS, by: as, via: url.searchParams.get('via') === 'mcp' ? 'mcp' : 'cli', signal: ac.signal })
+        .then((r) => { if (!res.writableEnded && !ac.signal.aborted) json(res, 200, r); }, (e: unknown) => { if (!res.writableEnded) json(res, 500, { error: (e as Error).message }); });
+      return;
+    }
+    if (url.pathname === '/api/presence') {
+      if (!authed && !bearerOk(req)) { json(res, 401, { error: 'token required' }); return; }
+      json(res, 200, o.writer.hub.presence());
       return;
     }
     if (url.pathname === '/api/worker') {
@@ -364,6 +412,7 @@ export async function startWatchServer(o: WatchOptions): Promise<WatchServer> {
       }
     };
     ws.send(JSON.stringify({ type: 'hello', snapshot: o.writer.snapshot() } satisfies ServerMessage));
+    ws.send(JSON.stringify({ type: 'presence', presence: o.writer.hub.presence() } satisfies ServerMessage));
   });
 
   const tries = o.port === 0 ? 1 : Math.max(1, o.tries ?? 20);
@@ -395,6 +444,7 @@ export async function startWatchServer(o: WatchOptions): Promise<WatchServer> {
     clients: () => sockets.size,
     close: () => new Promise<void>((resolve) => {
       unsubscribe();
+      o.writer.hub.close();
       void mcpHandler?.close();
       for (const s of sockets) s.close(1001);
       server.close(() => resolve());

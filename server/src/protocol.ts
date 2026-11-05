@@ -1,6 +1,7 @@
 // Messages between the server and the watch view (WebSocket, JSON). Types only, so the UI can
 // import them without pulling in any Node code.
 
+import type { Presence } from './await.ts';
 import type { Diag, ManifestAsset, ManifestError, Palette, Status, StyleJson, TapeEntry, Theme, WorkRequest } from '@pixelclaw/core';
 
 export interface AssetTape {
@@ -79,6 +80,8 @@ export type ServerMessage =
   /** requests.jsonl changed: every request as it stands. */
   | { type: 'requests'; requests: WorkRequest[] }
   | { type: 'worker'; status: WorkerStatus }
+  /** Who is listening for requests (sent on connect and whenever it changes). */
+  | { type: 'presence'; presence: Presence }
   /** New lines of the worker's log. */
   | { type: 'workerLog'; lines: string[] }
   /** The answer to a page's request or worker message (only to that page). */

@@ -10,7 +10,7 @@ import {
 } from '@pixelclaw/core';
 import {
   AssetExistsError, NoAssetError, ProjectError, VIEW_MODES, Writer, assetDir, checkpointNames, createProject, formatChecks, isViewMode, listAssets,
-  loadProject, lockHolder, paletteSource, parseRegion, prefixHash, previewPng, readAssetJson, readCheckpoints, readPaletteFile,
+  findServer, loadProject, lockHolder, paletteSource, parseRegion, prefixHash, previewPng, readAssetJson, readCheckpoints, readPaletteFile,
   needsUnderlay, resolveUnderlays, formatSeeds, readTape, readTapeFile, readStateCacheRaw, stateKey, saveAsset, sha256, writeReview, planReport, planText, writeManifest, writeTemplates, SUMMARY_BUDGET, EXPORT_FORMATS, exportAsset, exportWithProfile, importIntoProject, importSummary, planImport, personRequest, readRequests, requestLine, toPersonRequest, type ExportFormat, type Project, type ViewMode,
 } from '@pixelclaw/server';
 
@@ -19,6 +19,8 @@ export interface Io {
   err(s: string): void;
   stdin(): string;
   now(): string;
+  /** Set when the command runs inside a server (a CLI call sent to it): its writer is used instead of a new one. */
+  writer?: Writer;
 }
 
 const nodeIo: Io = {
@@ -112,6 +114,11 @@ Command reference: docs/commands.md
 
 export class UsageError extends Error {}
 
+/** The writer a command writes through: the server's own when it was sent to one, else a new one on the folder. */
+function wr(io: Io, proj: Project): Writer {
+  return io.writer ?? new Writer(proj, { now: io.now });
+}
+
 export interface Parsed {
   pos: string[];
   flags: Map<string, string[]>;
@@ -159,11 +166,11 @@ function loadState(proj: Project, name: string): AssetState {
 /** A running server is the single writer for its project; the CLI does not write behind its back. */
 function assertNoServer(proj: Project): void {
   const held = lockHolder(proj.dir);
-  if (held) throw new ProjectError(`a pixelclaw server (pid ${held.pid}) owns ${proj.dir}; send commands through it (MCP: run, export, import, request; or its dashboard), or stop it first`);
+  if (held) throw new ProjectError(`a pixelclaw server (pid ${held.pid}) owns ${proj.dir} but its token file is not readable by this user, so the command could not be sent to it; send it through MCP or the dashboard, or stop the server first`);
 }
 
 function apply(io: Io, proj: Project, text: string, source: string, o: { asset?: string; replace: boolean; by: string; dry?: boolean }): { code: number; doc?: Doc } {
-  const w = new Writer(proj, { now: io.now });
+  const w = wr(io, proj);
   if (o.dry) return applyDry(io, w, text, source, o);
   assertNoServer(proj);
   let r;
@@ -211,7 +218,7 @@ function cmdSeeds(io: Io, p: Parsed): number {
   const checks = one(p, 'checks')?.split(',');
   for (const c of checks ?? []) if (!isCheckId(c)) throw new UsageError(`unknown check '${c}' (checks: ${CHECK_IDS.join(', ')})`);
   const seeds = one(p, 'seeds')?.split(',').map(Number);
-  const w = new Writer(proj, { now: io.now });
+  const w = wr(io, proj);
   const by = one(p, 'by') ?? 'claude';
   const before = one(p, 'before');
   const r = w.seeds({ asset, line: line.join(' '), before, by, count: num('count'), from: num('from'), seeds, checks: checks as CheckId[] | undefined });
@@ -252,7 +259,21 @@ function cmdRun(io: Io, p: Parsed): number {
   return r.code;
 }
 
-const RUN_OPTS = ['asset', 'by', 'e', 'view', 'scale', 'region', 'out', 'frame', 'marks', 'theme', 'themes', 'ground', 'with', 'size', 'seed', 'camera'];
+/** The options of the commands that write (valued, bare): the CLI uses them to send a command to a running server. */
+export const WRITE_OPTS: Record<string, [string[], string[]]> = {
+  new: [['name', 'palette', 'by', 'grid'], ['replace']],
+  run: [['asset', 'by', 'e', 'view', 'scale', 'region', 'out', 'frame', 'marks', 'theme', 'themes', 'ground', 'with', 'size', 'seed', 'camera'], ['replace', 'dry']],
+  seeds: [['count', 'from', 'seeds', 'checks', 'before', 'by'], ['apply']],
+  export: [['format', 'out', 'profile'], []],
+  import: [['profile', 'as', 'kind', 'palette', 'grid', 'by', 'slice', 'offset', 'gap', 'pattern', 'names', 'names-from', 'set'], ['build', 'cells', 'replace', 'wrap', 'no-manifest']],
+  review: [['name', 'set', 'size', 'seed'], []],
+  plan: [['set', 'manifest', 'seed', 'order'], ['json', 'templates']],
+  request: [['note', 'by', 'kind', 'size', 'set', 'description', 'height'], []],
+  reply: [['by'], []],
+  cancel: [['by'], []],
+};
+
+const RUN_OPTS = WRITE_OPTS.run![0];
 
 /**
  * `run` with `underlay generate` or `underlay import` lines: those call an image provider or read
@@ -262,17 +283,18 @@ const RUN_OPTS = ['asset', 'by', 'e', 'view', 'scale', 'region', 'out', 'frame',
 export async function resolveRunArgv(argv: string[], io: Io = nodeIo): Promise<string[]> {
   if (argv[0] !== 'run') return argv;
   let p: Parsed;
-  try { p = parseArgs(argv.slice(1), RUN_OPTS, ['replace', 'dry']); } catch { return argv; }
+  try { p = parseArgs(argv.slice(1), ...WRITE_OPTS.run!); } catch { return argv; }
   const [dir, script] = p.pos;
   if (!dir || p.flags.has('dry')) return argv;
   const inline = p.flags.get('e');
   const text = inline ? inline.join('\n') : script === '-' ? io.stdin() : script && existsSync(script) ? readFileSync(script, 'utf8') : null;
   if (text === null || (!needsUnderlay(text) && script !== '-')) return argv;
   const proj = loadProject(dir);
-  assertNoServer(proj);
+  // With a server up the run is sent to it afterwards; only the image provider call happens here.
+  if (needsUnderlay(text) && !findServer(dir)) assertNoServer(proj);
   let resolved = text;
   if (needsUnderlay(text)) {
-    const w = new Writer(proj, { now: io.now });
+    const w = wr(io, proj);
     const asset = one(p, 'asset');
     let doc: Doc | null = null;
     if (asset && listAssets(proj).includes(asset)) { try { doc = w.doc(asset); } catch { doc = null; } }
@@ -318,7 +340,7 @@ function writeViews(io: Io, proj: Project, doc: Doc, modesIn: string[], p: Parse
   const seedS = one(p, 'seed');
   const seed = seedS === undefined ? undefined : Number(seedS);
   if (seed !== undefined && (!Number.isInteger(seed) || seed < 1)) throw new UsageError('--seed must be a whole number from 1');
-  const w = new Writer(proj);
+  const w = wr(io, proj);
   for (const m of modes as ViewMode[]) {
     const out = one(p, 'out') ?? join(proj.dir, 'views');
     const v = w.view(doc.name, m, {
@@ -337,7 +359,7 @@ function cmdCheck(io: Io, p: Parsed): number {
   const [dir, ...names] = p.pos;
   if (!dir) throw new UsageError('check: give a project folder');
   const proj = loadProject(dir);
-  const w = new Writer(proj);
+  const w = wr(io, proj);
   const ids = one(p, 'checks')?.split(',').map((x) => x.trim());
   if (ids && !ids.every(isCheckId)) throw new UsageError(`--checks takes check names (${CHECK_IDS.join(', ')})`);
   const frameS = one(p, 'frame');
@@ -366,7 +388,7 @@ function cmdReview(io: Io, p: Parsed): number {
   const seed = one(p, 'seed') === undefined ? undefined : Number(one(p, 'seed'));
   if (seed !== undefined && (!Number.isInteger(seed) || seed < 1)) throw new UsageError('--seed must be a whole number from 1');
   const map = { ...(sm ? { cols: Number(sm[1]), rows: Number(sm[2]) } : {}), ...(seed ? { seed } : {}) };
-  const r = writeReview(new Writer(loadProject(dir), { now: io.now }), { assets: names.length ? names : undefined, set: one(p, 'set'), name: one(p, 'name'), map });
+  const r = writeReview(wr(io, loadProject(dir)), { assets: names.length ? names : undefined, set: one(p, 'set'), name: one(p, 'name'), map });
   io.out(`wrote ${r.files.length} files to ${r.dir}\n${r.files.map((f) => `  ${f}\n`).join('')}Hand the folder to a fresh reviewer: "Review the art in ${r.dir} by following rubric.md."\n`);
   return 0;
 }
@@ -392,8 +414,9 @@ function cmdRequest(io: Io, p: Parsed): number {
     entry = { name, kind: one(p, 'kind'), size: one(p, 'size'), ...(one(p, 'set') ? { set: one(p, 'set') } : {}), ...(one(p, 'description') ? { description: one(p, 'description') } : {}), ...(height ? { height: Number(height) } : {}) };
   }
   assertNoServer(proj);
-  const w = new Writer(proj, { now: io.now });
+  const w = wr(io, proj);
   const q = personRequest(w, one(p, 'by') ?? 'claude', toPersonRequest({ action: 'request', kind, asset: name, note: one(p, 'note'), entry }));
+  w.requestsChanged();
   io.out(`${requestLine(q)}\n`);
   return 0;
 }
@@ -405,8 +428,9 @@ function cmdAnswer(io: Io, action: string, p: Parsed): number {
   if (extra.length) throw new UsageError(`${action}: put the text in quotes (unexpected '${extra[0]}')`);
   const proj = loadProject(dir);
   assertNoServer(proj);
-  const w = new Writer(proj, { now: io.now });
+  const w = wr(io, proj);
   const q = personRequest(w, one(p, 'by') ?? 'claude', toPersonRequest({ action, id, text }));
+  w.requestsChanged();
   io.out(`${requestLine(q)}\n`);
   return 0;
 }
@@ -414,7 +438,7 @@ function cmdAnswer(io: Io, action: string, p: Parsed): number {
 function cmdPlan(io: Io, p: Parsed): number {
   const [dir] = p.pos;
   if (!dir) throw new UsageError('plan: give a project folder');
-  const w = new Writer(loadProject(dir), { now: io.now });
+  const w = wr(io, loadProject(dir));
   const manifestFile = one(p, 'manifest');
   if (manifestFile) {
     let json: unknown;
@@ -482,7 +506,7 @@ function cmdExport(io: Io, p: Parsed): number {
   if (!(EXPORT_FORMATS as readonly string[]).includes(format)) throw new UsageError(`--format must be one of ${EXPORT_FORMATS.join(', ')}`);
   const proj = loadProject(dir);
   assertNoServer(proj);
-  const w = new Writer(proj);
+  const w = wr(io, proj);
   const files = exportAsset(w.doc(name), w.assetDocs(), format, one(p, 'out') ?? join(proj.dir, 'exports', format));
   io.out(`${format}: wrote ${files.length} files\n${files.map((f) => `  ${f}\n`).join('')}`);
   return 0;
@@ -493,7 +517,7 @@ function cmdExportProfile(io: Io, p: Parsed): number {
   if (!dir) throw new UsageError('export: give a project folder');
   const proj = loadProject(dir);
   assertNoServer(proj);
-  const w = new Writer(proj);
+  const w = wr(io, proj);
   const profile = one(p, 'profile') ?? 'png';
   const r = exportWithProfile(proj, w.assetDocs(), profile, { names: names.length ? names : undefined, dest: one(p, 'out'), at: io.now() });
   io.out(`${profile}: ${r.images} images, wrote ${r.files.length} files into ${r.dir}\n${r.notes.map((n) => `  note: ${n}\n`).join('')}`);
@@ -505,7 +529,7 @@ function cmdImport(io: Io, p: Parsed): number {
   if (!dir || !path) throw new UsageError('import: give a project folder and a file or folder');
   const proj = loadProject(dir);
   assertNoServer(proj);
-  const w = new Writer(proj, { now: io.now });
+  const w = wr(io, proj);
   const pair = (k: string, re: RegExp, sep: string, what: string): [number, number] | undefined => {
     const v = one(p, k);
     if (v === undefined) return undefined;
@@ -652,32 +676,32 @@ export function main(argv: string[], io: Io = nodeIo): number {
   try {
     switch (cmd) {
       case 'new': {
-        const p = parseArgs(rest, ['name', 'palette', 'by', 'grid'], ['replace']);
+        const p = parseArgs(rest, ...WRITE_OPTS.new!);
         if (!p.pos[0]) throw new UsageError('new: give a project folder');
         return p.pos.length === 1 ? cmdNewProject(io, p.pos[0], p) : cmdNewAsset(io, p.pos[0], p);
       }
       case 'run':
-        return cmdRun(io, parseArgs(rest, RUN_OPTS, ['replace', 'dry']));
+        return cmdRun(io, parseArgs(rest, ...WRITE_OPTS.run!));
       case 'seeds':
-        return cmdSeeds(io, parseArgs(rest, ['count', 'from', 'seeds', 'checks', 'before', 'by'], ['apply']));
+        return cmdSeeds(io, parseArgs(rest, ...WRITE_OPTS.seeds!));
       case 'view':
         return cmdView(io, parseArgs(rest, ['scale', 'region', 'out', 'frame', 'marks', 'theme', 'themes', 'ground', 'with', 'size', 'seed', 'camera'], []));
       case 'export': {
-        const p = parseArgs(rest, ['format', 'out', 'profile'], []);
+        const p = parseArgs(rest, ...WRITE_OPTS.export!);
         return one(p, 'format') ? cmdExport(io, p) : cmdExportProfile(io, p);
       }
       case 'import':
-        return cmdImport(io, parseArgs(rest, ['profile', 'as', 'kind', 'palette', 'grid', 'by', 'slice', 'offset', 'gap', 'pattern', 'names', 'names-from', 'set'], ['build', 'cells', 'replace', 'wrap', 'no-manifest']));
+        return cmdImport(io, parseArgs(rest, ...WRITE_OPTS.import!));
       case 'check':
         return cmdCheck(io, parseArgs(rest, ['checks', 'frame', 'ground', 'ref'], ['marks']));
       case 'review':
-        return cmdReview(io, parseArgs(rest, ['name', 'set', 'size', 'seed'], []));
+        return cmdReview(io, parseArgs(rest, ...WRITE_OPTS.review!));
       case 'plan':
-        return cmdPlan(io, parseArgs(rest, ['set', 'manifest', 'seed', 'order'], ['json', 'templates']));
+        return cmdPlan(io, parseArgs(rest, ...WRITE_OPTS.plan!));
       case 'request':
-        return cmdRequest(io, parseArgs(rest, ['note', 'by', 'kind', 'size', 'set', 'description', 'height'], []));
+        return cmdRequest(io, parseArgs(rest, ...WRITE_OPTS.request!));
       case 'reply': case 'cancel':
-        return cmdAnswer(io, cmd, parseArgs(rest, ['by'], []));
+        return cmdAnswer(io, cmd, parseArgs(rest, ...WRITE_OPTS.reply!));
       case 'skill':
         return cmdSkill(io, parseArgs(rest, ['dest', 'project'], []));
       case 'verify':

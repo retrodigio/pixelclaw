@@ -9,7 +9,8 @@ import { formatChecks, formatSeeds } from './report.ts';
 import { writeReview } from './review.ts';
 import { EXPORT_FORMATS, exportAsset } from './export.ts';
 import { exportWithProfile, importIntoProject, importSummary, planImport, projectProfiles, projectSchemes } from './io.ts';
-import { agentWork, personRequest, readRequests, requestLine, toPersonRequest } from './requests.ts';
+import { agentWork, awaitRequests, listenerNote, markSeen, personRequest, readRequests, requestLine, toPersonRequest } from './requests.ts';
+import { formatEvents } from './await.ts';
 import { openRequests, type WorkRequest } from '@pixelclaw/core';
 import { manifestEntry, planReport, planText, readManifest, writeManifest, writeTemplates } from './plan.ts';
 import { readFileSync } from 'node:fs';
@@ -622,6 +623,26 @@ export function createMcpServer(host: McpHost, version: string, mo: McpOptions =
     }
   }));
 
+  // Waiting for people: returns as soon as one files, answers or withdraws a request, or approves
+  // or rejects an asset. Not on the worker's connection (it works the queue, it does not wait on it).
+  if (!mo.confined) server.registerTool('await_requests', {
+    title: 'Wait for requests and feedback',
+    description: 'Wait until a person files, answers or withdraws a request, or approves or rejects an asset in the dashboard, then return what happened (with the next step: `work` claims a request, `changes` reads a change). ' +
+      'Returns empty when the timeout passes. Pass back the returned cursor as `cursor` so nothing is missed or repeated; with none, requests still open and unseen are returned. ' +
+      'While you are waiting the dashboard shows that an agent is listening, and the requests handed to you are marked seen. A model is not woken by anything else, so for long waits between tasks run `pixelclaw await <project>` in the background instead (its exit wakes you).',
+    inputSchema: z.object({
+      timeout: z.number().int().min(1).max(120).optional().describe('Seconds to wait (default 30, at most 120)'),
+      cursor: z.string().optional().describe('The cursor the last call returned'),
+    }),
+  }, async (a, extra) => {
+    try {
+      const r = await awaitRequests(w, { cursor: a.cursor, timeoutS: Math.min(120, a.timeout ?? 30), by: AGENT, via: 'mcp', signal: (extra as { signal?: AbortSignal } | undefined)?.signal });
+      return { content: [text(formatEvents(r.events, r.cursor))] };
+    } catch (e) {
+      return errorResult(e);
+    }
+  });
+
   server.registerTool('review', {
     title: 'Write a blind review bundle',
     description: 'Write a review bundle for a fresh-context reviewer: each asset at game scale and with rulers for coordinates, tiles repeated 3x3, ' +
@@ -674,7 +695,13 @@ export function createMcpServer(host: McpHost, version: string, mo: McpOptions =
         content.push({ type: 'image', data: readFileSync(`${t.dir}/mockup@2x.png`).toString('base64'), mimeType: 'image/png' });
         content.push(text(readFileSync(`${t.dir}/mockup.txt`, 'utf8')));
       }
+      if (!mo.confined) {
+        w.hub.touch(AGENT);
+        markSeen(w, [...readRequests(w.project).values()].filter((q) => q.state === 'open').map((q) => q.id), AGENT);
+      }
       content.push(text(planText(planReport(w, { set: a.set }), { order: a.order })));
+      const note = listenerNote(w);
+      if (note) content.push(text(note));
       content.push(text(`the dashboard (for the person): ${host.url()}&tab=dashboard`));
       return { content };
     } catch (e) {

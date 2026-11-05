@@ -12,6 +12,7 @@ import {
 import { ProjectError, assetExists, type Project } from './project.ts';
 import { MANIFEST_FILE, knownFor, manifestEntry, readManifest, writeManifest } from './plan.ts';
 import type { PersonRequest } from './protocol.ts';
+import { unseenOpen, type AgentEvent } from './await.ts';
 import type { Writer } from './writer.ts';
 
 export const REQUESTS_FILE = 'requests.jsonl';
@@ -91,7 +92,7 @@ export function personRequest(w: Writer, by: string, q: PersonRequest): WorkRequ
   const rec: RequestRecord = { type: 'request', id, asset: q.asset, kind: 'change', note, by, at };
   const problem = requestProblem(reqs, rec);
   if (problem) throw new ProjectError(problem);
-  const r = w.run({ asset: q.asset, commands: `mark rejected ${quote(note)}`, by });
+  const r = w.hub.withoutMarkEvents(() => w.run({ asset: q.asset, commands: `mark rejected ${quote(note)}`, by }));
   if (!r.ok) throw new ProjectError(r.errors.map((e) => e.message).join('; '));
   return appendRequest(p, { ...rec, mark: r.added.at(-1)?.seq });
 }
@@ -130,6 +131,42 @@ export function toPersonRequest(a: { action?: string; kind?: string; asset?: str
   return { action, kind, asset: a.asset, ...(a.note?.trim() ? { note: a.note } : {}) };
 }
 
+/** Record that an agent was handed these requests (those still open and not seen by it yet). */
+export function markSeen(w: Writer, ids: Iterable<string>, by: string): void {
+  const reqs = readRequests(w.project);
+  let wrote = false;
+  for (const id of new Set(ids)) {
+    const q = reqs.get(id);
+    if (!q || q.state !== 'open' || q.seen.some((x) => x.by === by)) continue;
+    appendRequest(w.project, { type: 'seen', id, by, at: w.stamp() });
+    wrote = true;
+  }
+  if (wrote) w.requestsChanged();
+}
+
+/** The most seconds one await may wait (the CLI's and the HTTP endpoint's cap; MCP asks for less). */
+export const MAX_AWAIT_S = 3600;
+
+/**
+ * Wait for what people did (a request, reply or cancel; an approval or rejection) after a cursor.
+ * The requests it hands over are recorded as seen by `by`.
+ */
+export async function awaitRequests(w: Writer, o: { cursor?: string; timeoutS: number; by: string; via: 'cli' | 'mcp'; signal?: AbortSignal }): Promise<{ events: AgentEvent[]; cursor: string; timedOut: boolean }> {
+  const timeoutMs = Math.max(0, Math.min(MAX_AWAIT_S, o.timeoutS)) * 1000;
+  const r = await w.hub.wait({ cursor: o.cursor, initial: () => unseenOpen(readRequests(w.project)), timeoutMs, by: o.by, via: o.via, signal: o.signal });
+  if (r.events.length) await w.enqueue(() => markSeen(w, r.events.filter((e) => (e.kind === 'request' || e.kind === 'reply') && e.id).map((e) => e.id!), o.by));
+  return r;
+}
+
+/** The note `plan` adds when open requests have nobody waiting to take them (empty when an await is waiting, the worker runs, or none is open). */
+export function listenerNote(w: Writer): string {
+  const open = [...readRequests(w.project).values()].filter((q) => q.state === 'open');
+  // Calling plan or work does not make an agent a listener for new requests; a waiting await or the worker does.
+  const pr = w.hub.presence();
+  if (!open.length || pr.waiters.length || pr.worker) return '';
+  return `${open.length} open request${open.length === 1 ? '' : 's'} and no agent is listening for ${open.length === 1 ? 'it' : 'them'}. Take ${open.length === 1 ? 'it' : 'them'} with work, and keep \`pixelclaw await <project>\` running in the background (or call await_requests) so people's next requests reach you.`;
+}
+
 /** The agent's side (the MCP `work` tool). */
 export type AgentWork =
   | { action: 'next'; id?: string }
@@ -145,12 +182,17 @@ export function agentWork(w: Writer, agent: string, q: AgentWork): { request: Wo
   const p = w.project;
   const reqs = readRequests(p);
   const at = w.stamp();
-  if (q.action === 'list') return { request: null, message: '' };
+  w.hub.touch(agent);
+  if (q.action === 'list') {
+    markSeen(w, openRequests(reqs).filter((x) => x.state === 'open').map((x) => x.id), agent);
+    return { request: null, message: '' };
+  }
   if (q.action === 'next') {
     const held = q.id ? undefined : mine(reqs, agent);
     if (held) return { request: held, message: `you already have ${held.id}; finish it (done or blocked) before taking another` };
     const target = q.id ? reqs.get(q.id) : openRequests(reqs).find((x) => x.state === 'open');
     if (!target) return { request: null, message: q.id ? `no request ${q.id}` : 'no open requests' };
+    if (target.state === 'open' && !target.seen.some((x) => x.by === agent)) appendRequest(p, { type: 'seen', id: target.id, by: agent, at });
     return { request: appendRequest(p, { type: 'claim', id: target.id, by: agent, at }), message: `claimed ${target.id}` };
   }
   const id = q.id ?? mine(reqs, agent)?.id;

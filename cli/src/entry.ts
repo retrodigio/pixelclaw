@@ -4,7 +4,10 @@
 import { DEFAULT_PORT, serve } from '@pixelclaw/server/serve';
 import { ProjectError, lockHolder, workerLockHolder, workerSettings } from '@pixelclaw/server';
 import { resolve } from 'node:path';
-import { USAGE, UsageError, main, one, parseArgs, resolveRunArgv } from './main.ts';
+import { USAGE, UsageError, main, one, parseArgs, resolveRunArgv, type Io } from './main.ts';
+import { awaitMain, forwardToServer, listenerLine, runForwarded } from './forward.ts';
+
+const out: Pick<Io, 'out' | 'err'> = { out: (s) => process.stdout.write(s), err: (s) => process.stderr.write(s) };
 
 async function serveMain(argv: string[]): Promise<number> {
   try {
@@ -15,7 +18,7 @@ async function serveMain(argv: string[]): Promise<number> {
     const portS = one(p, 'port');
     const port = portS === undefined ? DEFAULT_PORT : Number(portS);
     if (!Number.isInteger(port) || port < 0 || port > 65535) throw new UsageError('--port must be 0..65535');
-    const s = await serve({ project, port, mcp: !p.flags.has('no-mcp'), token: one(p, 'token') });
+    const s = await serve({ project, port, mcp: !p.flags.has('no-mcp'), token: one(p, 'token'), runCli: runForwarded });
     await s.closed;
     return 0;
   } catch (e) {
@@ -47,7 +50,7 @@ export async function workMain(argv: string[]): Promise<number> {
     const portS = one(p, 'port');
     const port = portS === undefined ? 0 : Number(portS);
     if (!Number.isInteger(port) || port < 0 || port > 65535) throw new UsageError('--port must be 0..65535');
-    const served = await serve({ project: dir, port, mcp: false });
+    const served = await serve({ project: dir, port, mcp: false, runCli: runForwarded });
     let why: string;
     try {
       why = await served.worker.start('cli');
@@ -82,16 +85,24 @@ export async function cli(argv: string[]): Promise<number> {
     // Nothing else should keep the process alive once the server has stopped.
     process.exit(code);
   }
-  if (argv[0] === 'run') {
-    try {
-      return main(await resolveRunArgv(argv));
-    } catch (e) {
-      if (e instanceof ProjectError) {
-        process.stderr.write(`error: ${e.message}\n`);
-        return 1;
-      }
-      throw e;
+  try {
+    if (argv[0] === 'await') return await awaitMain(argv.slice(1), out);
+    // `run` may have underlay lines to resolve first (it reads stdin once, here).
+    const args = argv[0] === 'run' ? await resolveRunArgv(argv) : argv;
+    const sent = await forwardToServer(args, out);
+    if (sent !== null) return sent;
+    const code = main(args);
+    if (args[0] === 'plan' && args[1] && !args.includes('--json') && code !== 2) process.stdout.write(await listenerLine(args[1]));
+    return code;
+  } catch (e) {
+    if (e instanceof UsageError) {
+      process.stderr.write(`error: ${e.message}\n\n${USAGE}`);
+      return 2;
     }
+    if (e instanceof ProjectError) {
+      process.stderr.write(`error: ${e.message}\n`);
+      return 1;
+    }
+    throw e;
   }
-  return main(argv);
 }

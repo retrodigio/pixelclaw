@@ -10,6 +10,11 @@
 //    ▲                │  ▲ progress
 //    │                └──┴──blocked──▶ blocked ──reply──▶ open
 //    └── cancel (open, claimed, blocked) ──▶ cancelled
+//
+// `seen` records that an agent was handed an open request (by await, plan or work). It changes
+// no state; it lets the dashboard say "seen by claude" instead of "open". A reply opens the
+// request again and clears who has seen it, since the new answer has not been seen yet. Files
+// written before `seen` existed read the same: they simply hold no such records.
 
 export const REQUEST_KINDS = ['draw', 'change', 'new'] as const;
 export type RequestKind = (typeof REQUEST_KINDS)[number];
@@ -19,7 +24,7 @@ export type RequestState = (typeof REQUEST_STATES)[number];
 /** One line of requests.jsonl. */
 export type RequestRecord =
   | { type: 'request'; id: string; asset: string; kind: RequestKind; note: string; by: string; at: string; /** change: the `mark rejected` it goes with (tape seq). */ mark?: number }
-  | { type: 'claim' | 'progress' | 'done' | 'blocked' | 'reply' | 'cancel'; id: string; by: string; at: string; text?: string };
+  | { type: 'claim' | 'progress' | 'done' | 'blocked' | 'reply' | 'cancel' | 'seen'; id: string; by: string; at: string; text?: string };
 
 export interface RequestEvent {
   type: Exclude<RequestRecord['type'], 'request'>;
@@ -44,6 +49,8 @@ export interface WorkRequest {
   latest: string | null;
   /** The question a blocked request waits on. */
   question: string | null;
+  /** Agents handed this request while it was open (cleared when a reply opens it again). */
+  seen: { by: string; at: string }[];
   events: RequestEvent[];
 }
 
@@ -78,6 +85,8 @@ export function requestProblem(reqs: ReadonlyMap<string, WorkRequest>, r: Reques
       return need(q.state === 'claimed' && q.claimedBy === r.by, 'claim it before blocking it') ?? (r.text?.trim() ? null : 'a blocked request asks a question');
     case 'reply':
       return need(q.state === 'blocked', 'only a blocked request takes a reply') ?? (r.text?.trim() ? null : 'a reply needs text');
+    case 'seen':
+      return need(q.state === 'open', 'only an open request is handed to an agent') ?? (q.seen.some((x) => x.by === r.by) ? `${r.by} has seen ${r.id} already` : null);
     case 'cancel':
       return need(q.state === 'open' || q.state === 'claimed' || q.state === 'blocked', 'it is already finished');
     default:
@@ -90,7 +99,7 @@ export function applyRequest(reqs: Map<string, WorkRequest>, r: RequestRecord): 
   if (r.type === 'request') {
     reqs.set(r.id, {
       id: r.id, asset: r.asset, kind: r.kind, note: r.note, by: r.by, at: r.at, ...(r.mark !== undefined ? { mark: r.mark } : {}),
-      state: 'open', claimedBy: null, latest: null, question: null, events: [],
+      state: 'open', claimedBy: null, latest: null, question: null, seen: [], events: [],
     });
     return;
   }
@@ -101,7 +110,8 @@ export function applyRequest(reqs: Map<string, WorkRequest>, r: RequestRecord): 
     case 'progress': q.latest = r.text ?? null; break;
     case 'done': q.state = 'done'; q.latest = r.text ?? null; q.question = null; break;
     case 'blocked': q.state = 'blocked'; q.latest = r.text ?? null; q.question = r.text ?? null; break;
-    case 'reply': q.state = 'open'; q.claimedBy = null; q.question = null; q.latest = r.text ?? null; break;
+    case 'reply': q.state = 'open'; q.claimedBy = null; q.question = null; q.latest = r.text ?? null; q.seen = []; break;
+    case 'seen': q.seen.push({ by: r.by, at: r.at }); break;
     case 'cancel': q.state = 'cancelled'; break;
   }
 }

@@ -11,6 +11,7 @@ import { createMcpServer } from './mcp.ts';
 import { ProjectError, acquireLock, createProject, loadProject, releaseLock, type Project } from './project.ts';
 import { Writer } from './writer.ts';
 import { WorkerControl } from './worker.ts';
+import { removeTokenFile, writeTokenFile } from './runfile.ts';
 
 export const VERSION = '0.1.0';
 export const DEFAULT_PORT = 7417;
@@ -23,6 +24,8 @@ export interface ServeOptions {
   /** Speak MCP on stdin/stdout (default). Without it, serve only the watch view. */
   mcp?: boolean;
   token?: string;
+  /** Runs a CLI invocation against the writer, for commands sent by another `pixelclaw` process (the CLI supplies it). */
+  runCli?: (argv: string[], writer: Writer, cwd: string) => { code: number; stdout: string; stderr: string };
   log?: (line: string) => void;
 }
 
@@ -62,16 +65,20 @@ export async function serve(o: ServeOptions): Promise<Served> {
       if (worker.running()) throw new ProjectError('the worker is running on this project; stop it before opening another');
       const p = openProject(next, oo.create, oo.name, log);
       acquireLock(next, web.url);
+      writeTokenFile(next, { url: web.url.replace(/\?.*$/, ''), token });
       releaseLock(writer.project.dir);
+      removeTokenFile(writer.project.dir);
       writer.setProject(p);
       log(`pixelclaw: now serving ${next}`);
     },
   };
   const worker = new WorkerControl(writer, () => ({ url: `http://127.0.0.1:${web.port}/mcp` }));
-  web = await startWatchServer({ writer, token, port: o.port ?? DEFAULT_PORT, mcp: (m) => createMcpServer(host, VERSION, m), worker });
+  web = await startWatchServer({ writer, token, port: o.port ?? DEFAULT_PORT, mcp: (m) => createMcpServer(host, VERSION, m), worker, runCli: o.runCli });
   try {
     acquireLock(dir, web.url);
+    writeTokenFile(dir, { url: web.url.replace(/\?.*$/, ''), token });
   } catch (e) {
+    releaseLock(dir);
     await web.close();
     throw e;
   }
@@ -88,6 +95,7 @@ export async function serve(o: ServeOptions): Promise<Served> {
       if (worker.running()) worker.stop('the server stopping');
       await worker.settled();
       releaseLock(writer.project.dir);
+      removeTokenFile(writer.project.dir);
       await mcp?.close().catch(() => undefined);
       await web.close();
       done();
