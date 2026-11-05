@@ -35,7 +35,8 @@ If the tools are missing, the server is not connected:
    Do it, then `work(action="done", text=<what changed>)`. If you cannot go on without the person
    (a choice only they can make), `work(action="blocked", text=<one clear question>)` and move on;
    their answer opens the request again. Post `work(action="progress", text=…)` on long ones: the
-   person sees it on the card.
+   person sees it on the card. Without PixelClaw's MCP tools, the same actions are
+   `pixelclaw work <project> claim | progress "…" | done "…" | block "…"` (below).
 
 ## House rules
 
@@ -147,7 +148,22 @@ that happens as soon as they press the button, and the card never claims more th
    reply lists them; fix them, or block with a question when only the person can decide. Then `plan`, and `work` again until it says there are
    no open requests; then carry on with planned work.
 
-A headless worker (`pixelclaw work`, or Start Claude in the dashboard when the project enables
+**No PixelClaw MCP tools in this session** (the project is served with `serve --no-mcp`, or you
+only have a shell): the same routine with the CLI, which goes through the running server so the
+cards move live:
+
+```sh
+pixelclaw work <project> list                         # the open requests (now seen by claude)
+pixelclaw work <project> claim                        # step 1: the next open one (or claim r3)
+pixelclaw work <project> progress "<a short note>"
+pixelclaw work <project> done "<what changed>"        # step 3; refused while a check fails
+pixelclaw work <project> block "<one clear question>"
+```
+
+Draw with `pixelclaw run <project> -e "…"` (or a script file), look with `pixelclaw view`, check
+with `pixelclaw check`; `pixelclaw plan <project>` for what is left.
+
+A headless worker (`pixelclaw work <project> start`, or Start Claude in the dashboard when the project enables
 it) follows the same routine with no one at the keyboard: never ask in chat, ask with `blocked`.
 It has only the PixelClaw tools (no shell, files or web; files outside the project are refused),
 its system prompt ends with every command of the language, and a session that makes no tool call

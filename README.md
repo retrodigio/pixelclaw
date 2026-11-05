@@ -108,7 +108,7 @@ People can ask for work from the dashboard while no agent session is open. The o
 files, no web) to work the queue. It is **off by default** because it **spends money on your
 Anthropic account** through your Claude Code login. Turn it on per project in `project.json` with
 a spending cap that covers every run (`"worker": { "enabled": true, "cap": 5 }`), then press
-**Start Claude** in the dashboard or run `pixelclaw work <project>`. See
+**Start Claude** in the dashboard or run `pixelclaw work <project> start`. See
 [docs/worker.md](docs/worker.md).
 
 ### Underlays from an image model (optional, OpenAI)
@@ -158,13 +158,14 @@ The example projects are checked in: [`examples/mossy-ruins.pclaw`](examples/mos
 | `pixelclaw seeds <project> <asset> <generator line> [--count N] [--from N] [--checks a,b] [--apply]` | Try the line with each seed as a dry run and rank the seeds by the checks; `--apply` runs the best. |
 | `pixelclaw view <project> <asset> [render\|grid\|tile3x3\|diff\|game\|recolour\|anim\|map\|family\|density\|all] [--scale N] [--region x,y,WxH] [--frame N] [--marks failing] [--theme t]` | Write views and print the text grid (or the diff's list of changes). |
 | `pixelclaw check <project> [<asset>...] [--checks a,b] [--marks]` | Run the quality checks against the style guide; exits 1 if any fails. See [docs/checks.md](docs/checks.md). |
-| `pixelclaw export <project> [<asset>...] [--profile <name>] [--out <dir>]` | Write assets through an export profile (built-in `png`, `atlas`, `tiled`, `godot`, `aseprite-json`, `aseprite`, or the project's own). Refused while a server owns the project (export through its MCP `export`). See [docs/profiles.md](docs/profiles.md). |
+| `pixelclaw export <project> [<asset>...] [--profile <name>] [--out <dir>]` | Write assets through an export profile (built-in `png`, `atlas`, `tiled`, `godot`, `aseprite-json`, `aseprite`, or the project's own). While a server owns the project it is sent to that server and written through its writer. See [docs/profiles.md](docs/profiles.md). |
 | `pixelclaw export <project> <asset> --format split\|png\|strip\|bmfont [--out <dir>]` | One asset on its own: one-cell pieces, a PNG, or a font as a glyph strip or BMFont. |
 | `pixelclaw import <project> <file.png\|file.aseprite\|folder> [--profile <name>] [--as <name>] [--grid WxH] [--slice WxH] [--set s] [--palette <p>\|--build]` | Make new assets from an image (quantised; a grid of frames, or `--slice` into one asset per cell, with manifest entries and checks), a folder of images or an `.aseprite` file, or read a profile's export back and compare. |
 | `pixelclaw review <project> [<asset>...] [--set s] [--name n]` | Write a blind review bundle (images, palette, style guide, brief, rubric). |
 | `pixelclaw plan <project> [--set s] [--order set\|scene] [--json] [--manifest <file>] [--templates]` | Requests from the dashboard first, then the asset plan and each asset's status, by set or scene by scene; write a manifest (checked first); draw the flat templates. See [docs/pipeline.md](docs/pipeline.md). |
 | `pixelclaw request <project> [draw <asset> \| change <asset> --note "…" \| add <name> --kind k --size WxH …]`, `pixelclaw reply <project> <id> "<answer>"`, `pixelclaw cancel <project> <id>` | File, answer or withdraw requests as the dashboard does (validated the same way); without a kind, list what is open. See [docs/pipeline.md](docs/pipeline.md#requests-from-the-cli-and-mcp). |
-| `pixelclaw work <project> [--port N]` | Work the request queue with a headless Claude Code session that has only PixelClaw's tools (no shell, files or web), up to the project's budget cap; only when the project enables it. See [docs/worker.md](docs/worker.md). |
+| `pixelclaw work <project> list\|claim [<id>]\|progress "…"\|block "<question>"\|done "<what changed>"` | An agent's side of a request without PixelClaw's MCP tools (the MCP `work` tool's actions): the dashboard's cards move live through a running server. `done` is refused while the asset fails a check. See [docs/pipeline.md](docs/pipeline.md#working-requests-without-mcp). |
+| `pixelclaw work <project> start [--port N]` (or `work <project>`) | Work the request queue with a headless Claude Code session that has only PixelClaw's tools (no shell, files or web), up to the project's budget cap; only when the project enables it. See [docs/worker.md](docs/worker.md). |
 | `pixelclaw skill install [--dest <dir> \| --project <dir>]` | Install the Claude Code skill (default `~/.claude/skills/pixelclaw`). |
 | `pixelclaw verify <project> [<asset>...]` | Replay every tape and compare it with the saved state, the preview, the checkpoints and the state cache. |
 | `pixelclaw upgrade <project> [<asset>...]` | Rewrite tapes from tape language 1 in language 2 (the palette in the `new` line); written only if the replay gives the same pixels, then verified. |

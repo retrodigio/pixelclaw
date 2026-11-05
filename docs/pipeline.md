@@ -257,14 +257,47 @@ pixelclaw reply harbour.pclaw r4 "Rope, brown."    # answer a blocked request: i
 pixelclaw cancel harbour.pclaw r5 "not needed"
 ```
 
-The author is `claude` unless `--by human:<name>` says otherwise; refused while a server owns the
-project (use its dashboard, or MCP). MCP's `request` tool takes `kind` draw, change or add (with
+The author is `claude` unless `--by human:<name>` says otherwise. While a server owns the
+project these are sent to it (through its writer, so the dashboard shows them at once). MCP's `request` tool takes `kind` draw, change or add (with
 `entry`, the manifest entry), or `action` reply or cancel with `id` and `text`. The worker's own
 connection does not offer it: the worker takes requests, it does not file or answer them.
 
+### Working requests without MCP
+
+A Claude Code session with no PixelClaw MCP tools (a project served with `serve --no-mcp`, or
+an agent that only has a shell) works requests with `pixelclaw work`, which does what the MCP
+`work` tool does:
+
+```sh
+pixelclaw await ruins.pclaw &                          # wait in the background; its exit wakes you
+pixelclaw work ruins.pclaw list                        # the open requests (the cards say seen by claude)
+pixelclaw work ruins.pclaw claim                       # take the next open one (or: claim r3); prints what is asked
+pixelclaw work ruins.pclaw progress "blocking in the body"
+pixelclaw work ruins.pclaw done "drew the urn: squat, a dark lip"
+pixelclaw work ruins.pclaw block r3 "Glazed or bare clay?"
+```
+
+After `claim` the id may be left out (it is the request you hold). `done` is refused, and
+nothing is written, while the asset fails a check or is not drawn yet: the error lists the
+checks, so fix them (`pixelclaw check` shows the pixels) or `block` with a question. `--by`
+names the agent (default `claude`). While a server runs these go through it, so the card moves
+from sent to seen by claude, working and done as you go, and calling them counts as listening
+for five minutes, as MCP calls do. `pixelclaw work <project> start` (or the older
+`pixelclaw work <project>`) is the headless worker below.
+
+```
+$ pixelclaw work ruins.pclaw claim
+claimed r1
+r1 draw urn: "squat" (from human:ana at 2026-11-05T20:30:21Z; claimed by claude)
+plan: urn is a sprite 16x16 in set props: a squat stone urn (drawn height 12 px)
+status: planned → draw it
+Draw it: run with `new sprite urn` (the manifest fills in its size and palette), look, check, fix; then `pixelclaw work ruins.pclaw done r1 "<what you drew>"`.
+If you cannot go on without the person, `pixelclaw work ruins.pclaw block r1 "<one clear question>"`.
+```
+
 ### Claude without a session: the worker
 
-MCP cannot wake a Claude session, so `pixelclaw work <project>` (or **▶ Start Claude** on the
+MCP cannot wake a Claude session, so `pixelclaw work <project> start` (or **▶ Start Claude** on the
 dashboard) starts one: Claude Code headless (`claude -p`) with the PixelClaw MCP server and the
 skill, working the queue until it is empty or the budget cap is reached. Off by default (it
 spends money); see [worker.md](worker.md) for how to turn it on, the command line, the cap and the

@@ -26,6 +26,18 @@ All notable changes to PixelClaw are listed here. The format follows
 - The dashboard header shows whether an agent is listening (a waiting `await`, an MCP session that
   called `work`, `plan` or `await` in the last five minutes, or the running worker).
 - `plan` (CLI and MCP) says when open requests have no listener.
+- Agents without PixelClaw's MCP tools work requests with the CLI: `pixelclaw work <project>
+  list | claim [<id>] | progress [<id>] "…" | block [<id>] "<question>" | done [<id>] "<what
+  changed>"` [--by <agent>], the MCP `work` tool's actions with the same rules (`done` only when
+  the asset passes its checks; an error writes nothing). Through a running server the card moves
+  live and the agent counts as listening. The headless worker is now `pixelclaw work <project>
+  start`; `pixelclaw work <project>` with no action still starts it.
+- `pixelclaw request <project>` (the list) and `plan` say `seen by <agent>` for an open request
+  an agent has been handed, as the card does. `await` prints the CLI command next to `work` for
+  each request.
+- *Copy prompt for Claude* tells the session to use the MCP work tool if it has it, and otherwise
+  gives the exact `pixelclaw work` commands; the project folder is shown as `~/…` when it is
+  under the home folder.
 
 ### The CLI writes through a running server
 - `new`, `run`, `seeds --apply`, `export`, `import`, `review`, `plan --manifest/--templates`,
@@ -34,7 +46,8 @@ All notable changes to PixelClaw are listed here. The format follows
   through the same writer queue, undo groups and checks as MCP `run`, and a connected dashboard
   updates live instead of dropping to "reconnecting". Output and exit codes match the direct
   path; a refused command applies nothing. If the server cannot be reached (a stale lock, a dead
-  process) the command runs directly as before. Read-only commands still read the files.
+  process) the command runs directly as before. Read-only commands still read the files. The new
+  `work` actions are sent the same way.
 
 ## [0.1.0]
 

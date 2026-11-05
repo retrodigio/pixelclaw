@@ -40,7 +40,7 @@ You need Claude Code installed and logged in (`claude` on the PATH, or its path 
 - **From the dashboard**: **▶ Start Claude** (top right; only when enabled). The panel shows
   what it has spent of the cap and which session it is on; **Log** shows its log as it is
   written; **■ Stop Claude** ends the session in progress.
-- **From a shell**: `pixelclaw work <project> [--port N]` starts its own server (the watch view's
+- **From a shell**: `pixelclaw work <project> start [--port N]` (or the older `pixelclaw work <project>`) starts its own server (the watch view's
   link is printed, so you can watch) and runs until the queue is empty or the cap is reached. If a
   server already holds the project, use that server's dashboard button instead.
 
