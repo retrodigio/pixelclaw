@@ -1,4 +1,4 @@
-# A variant of the meadow (plan §4.1): the grass variant grass_b inside, the band drawn again and
+# A variant of the meadow: the grass variant grass_b inside, the band drawn again and
 # the tufts elsewhere, so the meadow's middle and its long edges stop repeating one tile.
 fork meadow meadow_b
 variant of=meadow

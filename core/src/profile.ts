@@ -1,4 +1,4 @@
-// Export profiles (plan §4.9, §7, §17): game-specific knowledge as data. A profile names every image
+// Export profiles: game-specific knowledge as data. A profile names every image
 // it writes from templates (single sprites, numbered sets `<name>_<n>`, directional views, autotile
 // variants through a per-scheme naming table, split pieces), lays them out (loose PNGs, an atlas page
 // with CSV or JSON records, one sheet per asset, Tiled `.tsx` wang sets and `.tmx` maps, Godot
@@ -57,7 +57,7 @@ export interface ProfileJson {
   /** Role entries are written as these colours. */
   roles?: Partial<Record<Role, string>>;
   /**
-   * A palette entry's output colour (G13): entry name, or `<palette>.<entry>`, to `#rrggbb` or a
+   * A palette entry's output colour: entry name, or `<palette>.<entry>`, to `#rrggbb` or a
    * role (written as `roles` gives it): an engine that draws in tones is targeted by mapping each
    * colour to its tone. Over `roles`; import reads the colours back (two entries as one colour are
    * noted and read back as the first).
@@ -72,7 +72,7 @@ export interface ProfileJson {
   /** Loose and sheet image file names: {name} (loose) or {asset} (sheet). */
   image?: string;
   /**
-   * Fonts (plan §4.6): written as a glyph strip (`strip`, the default: `{asset}.png` plus the
+   * Fonts: written as a glyph strip (`strip`, the default: `{asset}.png` plus the
    * characters in `{asset}.txt`), BMFont (`bmfont`: `{asset}.fnt` plus `{asset}_0.png`), both, or
    * as an ordinary sheet item (`sheet`). `separator` is the strip's separator colour; `maxLine`
    * the line-height limit (an export over it is noted, and the font check reads it).
@@ -144,7 +144,7 @@ export function loadProfile(j: ProfileJson): ProfileJson {
   return j;
 }
 
-/** The generic profiles the tool ships (a game's own profile lives with the game, plan §7.4). */
+/** The generic profiles the tool ships (a game's own profile lives with the game). */
 export const BUILTIN_PROFILES: ReadonlyMap<string, ProfileJson> = new Map(
   ([pPng, pAtlas, pTiled, pGodot, pAsepriteJson, pAseprite] as ProfileJson[]).map((x) => [x.name, loadProfile(x)]),
 );
@@ -226,7 +226,7 @@ const fontFormat = (p: ProfileJson) => p.fonts?.format ?? 'strip';
 
 /**
  * The colours an asset is written in: role entries through the profile's encoding, except icons
- * in full or channel mode, which are written exactly as drawn (plan §4.5).
+ * in full or channel mode, which are written exactly as drawn.
  */
 export function exportColours(d: Doc, roles?: ProfileJson['roles'], colours?: ProfileJson['colours']): string[] {
   if (d.kind === 'icon' && iconModeOf(d) !== 'tone') return d.palette.entries.map((e) => e.hex);

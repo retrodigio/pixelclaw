@@ -1,9 +1,9 @@
 // The G10 and G11 demo project (examples/kiln-hollow.pclaw): a manifest of 20 assets from a
-// one-paragraph theme, three of them taken end to end (G10); then a HUD set and two tiles more,
+// one-paragraph theme, three of them taken end to end; then a HUD set and two tiles more,
 // the yard's mockup underlay snapped into a draft, three tiles cut from it and cleaned, a 5x7 font
-// and four icons (G11); scenes, a sheet of pot shards imported into the gallery, and three
+// and four icons; scenes, a sheet of pot shards imported into the gallery, and three
 // requests from the dashboard: urn_blue drawn (done), the goat blocked on a question, the jar's
-// change claimed (G12). Every tape replays; running the scripts again gives the same tape commands
+// change claimed. Every tape replays; running the scripts again gives the same tape commands
 // and the same state; the plan says 3 exported, 9 checked, 3 drafted and 14 planned of 29; every
 // check passes on what is drawn but the imported shards (drafted: jaggies, as imported).
 import { cpSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -86,7 +86,7 @@ describe('examples/kiln-hollow.pclaw', () => {
       run('yard', script('yard.pclaw'));
       const u = await w.runAsync({ asset: 'yard', commands: `underlay import ${join(SRC, 'yard-mockup.png')} layout=${join(SRC, 'yard-layout.png')}`, by: 'claude' });
       expect(u.ok).toBe(true);
-      // The yard was snapped in G11, before snap fitted the placement's grid by default (G13):
+      // The yard was snapped in G11, before snap fitted the placement's grid by default:
       // the default gives the same rows (only the recorded pitch and offset round differently).
       // So the recorded G11 line is run as it is, after checking the default gives its rows.
       const placed = w.dry({ asset: 'yard', commands: 'snap', by: 'claude' });

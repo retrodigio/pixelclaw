@@ -1,4 +1,4 @@
-// G14 (plan §24) through the server: inheriting variants record only the base's pieces and
+// G14 through the server: inheriting variants record only the base's pieces and
 // detached cells, so a sync stays small; the variant's tape still replays alone.
 
 import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
@@ -13,7 +13,7 @@ import { PALETTE } from './spawn.ts';
 const root = mkdtempSync(join(tmpdir(), 'pixelclaw-g14-'));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 
-describe('item 3: inheriting variants record only the pieces and detached cells', () => {
+describe('inheriting variants record only the pieces and detached cells', () => {
   it('a sync on a 24 px blob47 sheet writes the pieces, not the whole band (tape size before and after)', () => {
     const p = createProject(join(root, 'v3.pclaw'), { palettes: [JSON.parse(readFileSync(PALETTE, 'utf8'))] });
     const w = new Writer(p, { now: () => '2026-10-29T09:00:00Z' });
@@ -39,7 +39,7 @@ family band 1:outside 1:stone5 2:soil1 jitter=2 seed=4`, by: 'claude' }));
     // The G13 form held the whole band layer: every row of the sheet above the coverage map.
     const d = w.doc('shore');
     const g13Form = d.width * layoutOf(d.family!).mapRow * T;
-    console.log(`item 3: a sync on a ${T} px blob47 sheet: G13's line held ${g13Form} pixels (about ${Math.round(g13Form / 1024)} KB); G14's tape grew ${after} bytes (${cells.length} cells: ${cells.join(', ')})`);
+    console.log(`a sync on a ${T} px blob47 sheet: G13's line held ${g13Form} pixels (about ${Math.round(g13Form / 1024)} KB); G14's tape grew ${after} bytes (${cells.length} cells: ${cells.join(', ')})`);
     expect(after).toBeLessThan(g13Form / 4);
     expect(after).toBeLessThan(6000);
     // The variant's band is the base's, and its tape replays alone to the same document.
@@ -68,7 +68,7 @@ family band 1:outside 1:stone5 2:soil1 jitter=2 seed=4`, by: 'claude' }));
   });
 });
 
-describe('item 4: the 48 px audit (what assumed 16 or 24 px)', () => {
+describe('the 48 px audit (what assumed 16 or 24 px)', () => {
   const T = 48;
   const make = (name: string, grid?: number) => {
     const p = createProject(join(root, `${name}.pclaw`), { palettes: [JSON.parse(readFileSync(join(import.meta.dirname, '..', '..', 'examples', 'ember-moor', 'ember-moor.json'), 'utf8'))], ...(grid ? { grid } : {}) });

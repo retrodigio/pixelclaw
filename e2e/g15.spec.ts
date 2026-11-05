@@ -1,4 +1,4 @@
-// G15 (plan §26) in the browser: the map editor's terrain tools set a terrain layer's border rule
+// G15 in the browser: the map editor's terrain tools set a terrain layer's border rule
 // and its inside mix (layer set <layer> border=… mix=…), and the dashboard's worker panel shows
 // what the worker has spent on the project over every run (worker-spend.jsonl), not per run.
 

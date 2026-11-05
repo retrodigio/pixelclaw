@@ -1,5 +1,5 @@
-// Tape language 2 (plan §13): a tape carries its palette in its `new` line, so changing a project
-// palette file no longer changes how it replays. Language 1 tapes (from G1-G4) still replay by
+// Tape language 2: a tape carries its palette in its `new` line, so changing a project
+// palette file no longer changes how it replays. Language 1 tapes still replay by
 // reading the project palette, and a branch of one stays in language 1.
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

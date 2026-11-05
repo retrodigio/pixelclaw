@@ -1,4 +1,4 @@
-// Reading images back in (plan §4.9): zlib inflate, a PNG decoder (every colour type, bit depths 1-16,
+// Reading images back in: zlib inflate, a PNG decoder (every colour type, bit depths 1-16,
 // not interlaced), and quantising RGBA to a palette: exact matches first, else the nearest colour by
 // a weighted RGB distance in integers. Building a palette from an image takes its colours in the
 // order they first appear (popularity when there are more than 256). No host APIs.

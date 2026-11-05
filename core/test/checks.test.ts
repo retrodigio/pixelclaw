@@ -1,4 +1,4 @@
-// The checks of plan §5 on synthetic fixtures with known answers (G5). Coordinates and scores
+// The checks of plan §5 on synthetic fixtures with known answers. Coordinates and scores
 // are worked out by hand in the comments.
 import { describe, expect, it } from 'vitest';
 import { lstar, luma601, repetitionScore, runChecks, seamScore, type CheckId, type CheckResult, type Doc } from '../src/index.ts';
@@ -151,7 +151,7 @@ describe('outline', () => {
   });
 });
 
-describe('seam (plan §13)', () => {
+describe('seam', () => {
   it('a solid tile scores 0', () => {
     const d = doc('new tile t 8x8 bg=moss');
     expect(seamScore(d).score).toBe(0);

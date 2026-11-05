@@ -1,4 +1,4 @@
-// The timeline (plan §8.3, §4.4): layers (top first) by frames. Click a cel to draw on that layer
+// The timeline: layers (top first) by frames. Click a cel to draw on that layer
 // and frame (yours alone: the page sends `layer` and `frame` with your next edit); Shift+click a
 // frame number to choose a run of frames. Above the cels: each frame's ticks (double-click to
 // change), the views (directions, with mirror links) and the tags. The bars add, move, merge and

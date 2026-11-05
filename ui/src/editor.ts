@@ -1,4 +1,4 @@
-// Editing in the page (plan §1.3, §8.3): each tool turns a gesture into the same command text the
+// Editing in the page: each tool turns a gesture into the same command text the
 // agent would write, and sends it to the single writer as one batch (one undo group) with this
 // person's name. While a gesture is in progress the canvas shows a preview: the batch applied by
 // core to a copy of the document, so what you see is exactly what will be logged.
@@ -26,7 +26,7 @@ export interface ToolInfo {
   hint: string;
 }
 
-/** Aseprite-style shortcuts (plan §8.3). */
+/** Aseprite-style shortcuts. */
 export const TOOLS: ToolInfo[] = [
   { id: 'pencil', label: 'Pencil', key: 'B', icon: '✎', hint: 'drag to draw; pixel-perfect by default; the brush size is in the options bar' },
   { id: 'eraser', label: 'Eraser', key: 'E', icon: '⌫', hint: 'drag to clear pixels' },
@@ -593,7 +593,7 @@ export class Editor {
     void this.commit(`frame remove ${f + 1}`, { context: false }).then((ok) => ok && this.setFrame(Math.max(0, f - 1)));
   }
 
-  // --- animation (plan §4.4)
+  // --- animation
 
   /** The chosen frames (0-based, inclusive): the timeline's choice, else your frame. */
   frames(doc: Doc): { from: number; to: number } {

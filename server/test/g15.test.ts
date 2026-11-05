@@ -1,4 +1,4 @@
-// G15 (plan §26) in the server. Item 1, the worker's sandbox and discipline: `pixelclaw work`
+// G15 in the server. Item 1, the worker's sandbox and discipline: `pixelclaw work`
 // starts `claude` from the PATH with no built-in tools (a fake records its arguments; the flags
 // are checked against the installed Claude Code's own help, and the real Claude Code is run
 // against a fake model API that asks for a shell, files and the web); settings cannot widen it;
@@ -72,7 +72,7 @@ function fakeOnPath(root: string, opts: string[] = []): string {
 const records = (f: string) => readFileSync(f, 'utf8').trim().split('\n').map((l) => JSON.parse(l) as { argv?: string[]; probe?: { tool: string; error: boolean; text: string }[] });
 const after = (argv: string[], flag: string) => argv[argv.indexOf(flag) + 1];
 
-describe('the worker cannot run a shell or read files outside its project (§26 item 1)', () => {
+describe('the worker cannot run a shell or read files outside its project', () => {
   it('`pixelclaw work` starts claude from the PATH with no built-in tools, only PixelClaw, and the command reference', async () => {
     const { root, dir } = scratch({ enabled: true, cap: 1 });
     try {
@@ -270,7 +270,7 @@ describe('the worker cannot run a shell or read files outside its project (§26 
   }, 120_000);
 });
 
-describe('worker discipline (§26 item 1)', () => {
+describe('worker discipline', () => {
   let root: string, dir: string, s: Served, c: Client;
   const call = async (name: string, args: Record<string, unknown> = {}) => (await c.callTool({ name, arguments: args })) as { content: Content; isError?: boolean };
   beforeAll(async () => {
@@ -303,7 +303,7 @@ describe('worker discipline (§26 item 1)', () => {
   });
 });
 
-describe('requests from MCP (§26 item 2)', () => {
+describe('requests from MCP', () => {
   it('an agent files, answers and withdraws requests as the dashboard does; the worker\'s own connection has no request tool', async () => {
     const { root, dir } = scratch({ enabled: true, cap: 1 });
     const s = await serve({ project: dir, port: 0, mcp: false, log: () => undefined });
@@ -342,7 +342,7 @@ describe('requests from MCP (§26 item 2)', () => {
   }, 60_000);
 });
 
-describe('family textures follow their source tiles (§26 item 4)', () => {
+describe('family textures follow their source tiles', () => {
   it('a change to a tile is copied into the families whose textures came from it, frame by frame; a texture drawn from rows is left alone', () => {
     const { root, dir } = scratch();
     try {
@@ -387,7 +387,7 @@ describe('family textures follow their source tiles (§26 item 4)', () => {
   }, 30_000);
 });
 
-describe('the stall watchdog and the spend ledger (§26 item 1)', () => {
+describe('the stall watchdog and the spend ledger', () => {
   const run = async (dir: string, opts: string[], worker: Record<string, unknown> = {}) => {
     const pj = JSON.parse(readFileSync(join(dir, 'project.json'), 'utf8'));
     writeFileSync(join(dir, 'project.json'), JSON.stringify({ ...pj, worker: { enabled: true, cap: 1, command: [process.execPath, FAKE, ...opts], ...worker } }, null, 2));

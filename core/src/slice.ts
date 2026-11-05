@@ -1,4 +1,4 @@
-// Slicing a sheet into assets (plan §21 "Import into the gallery"): a grid of cells (a size, an
+// Slicing a sheet into assets: a grid of cells (a size, an
 // offset to the first cell, a gap between cells), the cells read in reading order, empty ones
 // skipped, and a name for each from a pattern (`{name}_{n}`, `{name}_{col}_{row}`) or from a list
 // (the manifest's planned entries, in order). The dashboard's slice dialog and the server's import

@@ -1,4 +1,4 @@
-// Texture generators (plan §3.4): seeded clustered `noise` on a ramp, `scatter` of stamps (or
+// Texture generators: seeded clustered `noise` on a ramp, `scatter` of stamps (or
 // single pixels) with a minimum spacing, `voronoi` stones and `bricks`. Every one takes seed=; when
 // it is left out the normaliser picks one and writes it into the line. With wrap=on (the default
 // on wrap documents) a generator works on the box as a torus, so the texture tiles by construction.
@@ -74,7 +74,7 @@ const noiseCmd: CommandSpec = {
     a.done();
     const { ramp, weights } = rampAndWeights(a, doc, cmd);
     const co = a.opts.get('cluster');
-    // Specks scale with the cell (G14): 1..3 px up to 47 px cells, 2..6 at 48, and so on.
+    // Specks scale with the cell: 1..3 px up to 47 px cells, 2..6 at 48, and so on.
     const k = Math.max(1, Math.floor(doc.cellW / 24));
     const [cmin, cmax] = co ? rangeOpt(co, 1, 64) : [k, 3 * k];
     const dOpt = a.opts.get('density');

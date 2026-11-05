@@ -6,7 +6,7 @@
 // your selection (marching ants), other authors' selections, symmetry guides, the marquee or lasso
 // being dragged, notes, the pixels checks flagged (circled in magenta) and the hovered pixel.
 // Notes also get a label with their id and text. Role entries show in the chosen preview theme.
-// Underlays (full-colour images on reference layers, plan §6) are drawn faded under the art. A
+// Underlays (full-colour images on reference layers) are drawn faded under the art. A
 // font's glyph sheet sits on a dark checkerboard (HUD lettering is usually light).
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';

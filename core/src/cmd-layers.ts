@@ -1,4 +1,4 @@
-// Layers and frames (plan §3.2). Layers are listed bottom to top; each author draws on their own
+// Layers and frames. Layers are listed bottom to top; each author draws on their own
 // layer and frame (`layer <name>`, `frame <n>`), so one author's choice never moves another's.
 // Frames are numbered from 1 in the language; each has a duration in ticks (`frame set`), and
 // tags and views (cmd-anim.ts) follow frames as they are added, removed and moved.
@@ -106,7 +106,7 @@ const layerCmd: CommandSpec = {
     if (how.v === 'set') {
       a.done();
       if (a.opts.get('shadow') || a.opts.get('shadowdir')) {
-        // Objects' shadows (G16).
+        // Objects' shadows.
         const first = (a.opts.get('shadow') ?? a.opts.get('shadowdir'))!;
         if (doc.layers[i]!.map?.kind !== 'objects') throw new DiagError(first.line, first.col, `${first.key}= goes with an objects layer`);
         noOpts(['shadow', 'shadowdir']);
@@ -203,7 +203,7 @@ const layerCmd: CommandSpec = {
 };
 
 /**
- * shadow=darker|<colour>|off [shadowdir=<dir>] on an objects layer (G16): left out, the style
+ * shadow=darker|<colour>|off [shadowdir=<dir>] on an objects layer: left out, the style
  * guide's shadow (or the layer's own, on layer set); the direction defaults to the style guide's,
  * else away from its light.
  */

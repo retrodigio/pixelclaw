@@ -1,4 +1,4 @@
-// The views of plan §2 that exist so far: the scaled render, the text index grid, the 3x3 tile
+// The views: the scaled render, the text index grid, the 3x3 tile
 // preview, the diff (before / after with the changed pixels marked, plus the list of changes),
 // and the in-context previews `game` (sprites on their ground at 1x and the draw scale) and
 // `recolour` (role art under preview themes), and `anim` (a contact sheet of every sequence with
@@ -149,7 +149,7 @@ export function makeView(doc: Doc, mode: ViewMode, o: ViewOptions, outDir: strin
     const text = `${animText(doc, { tickRate: o.tickRate })}\nanimated GIF (every sequence side by side, at game speed): ${gif}`;
     return { mode, kind: 'image', png, width: img.width, height: img.height, path, text, gif };
   }
-  // render takes a region (the rulers keep the canvas's coordinates); tile3x3 a scale for its enlarged copy (G15).
+  // render takes a region (the rulers keep the canvas's coordinates); tile3x3 a scale for its enlarged copy.
   const img = mode === 'render' ? renderScaled(doc, { scale: o.scale, frame: o.frame, marks: o.marks, theme: o.theme, underlay: o.underlay, ...(o.region ? { region: o.region } : {}) })
     : mode === 'tile3x3' ? renderTile3x3(doc, o.frame, { marks: o.marks, theme: o.theme, ...(o.scale ? { scale: o.scale } : {}) })
     : mode === 'game' ? renderGame([...(o.game?.frames ?? [o.frame ?? 0]).map((f) => ({ doc, frame: f })), ...(o.game?.with ?? []).map((d) => ({ doc: d }))], { ground: o.game?.ground, scale: o.game?.scale ?? 2, theme: o.theme, marks: o.marks })

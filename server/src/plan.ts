@@ -1,4 +1,4 @@
-// The project pipeline (plan §7.3): the manifest (manifest.json, written by the agent), each
+// The project pipeline: the manifest (manifest.json, written by the agent), each
 // planned asset's status worked out from the project (its tape's marks, the checks, the record of
 // its last export in exported.json), the defaults the manifest and style guide give `new`, and
 // the flat templates drawn from the manifest (templates/). The dashboard and the MCP `plan` tool
@@ -246,7 +246,7 @@ export function planText(r: PlanReport, o: { order?: 'set' | 'scene' } = {}): st
   return lines.join('\n');
 }
 
-// --- flat templates (plan §7.3 step 3)
+// --- flat templates
 
 function flatColour(p: Project, a: ManifestAsset, i: number): [number, number, number] {
   const f = a.flat;

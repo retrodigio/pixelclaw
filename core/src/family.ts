@@ -1,4 +1,4 @@
-// Autotile families (plan §4.2, §4.3): the sheet's layout, the live derivation of every variant
+// Autotile families: the sheet's layout, the live derivation of every variant
 // from the shared textures and the authored pieces (run after every command, like mirror views),
 // sample maps composed with the scheme (random islands and coverage maps), the seam score over a
 // map, cutting variants from a painted coverage map, and overlays played over a map.
@@ -343,7 +343,7 @@ export function neighbourhoodOf(s: Scheme, v: number): Terrain | null {
 }
 
 /**
- * A coverage map (plan §4.2): a terrain laid out so every variant the scheme can produce appears
+ * A coverage map: a terrain laid out so every variant the scheme can produce appears
  * at least `copies` times. Each missing variant's neighbourhood (the 3x3 map that resolves to it)
  * is stamped where it keeps every variant already placed, trying places in a seeded order; a few
  * seeded rounds, and the first that places everything wins. Null when the map is too small.
@@ -420,11 +420,11 @@ export function coverageTerrain(s: Scheme, cols: number, rows: number, seed: num
   return null;
 }
 
-// --- The seam score over a map (plan §13's metric on a composed image instead of a 3x3 tiling)
+// --- The seam score over a map (the tile seam metric on a composed image instead of a 3x3 tiling)
 
 
 /**
- * A cliff's faces (G16: south, side and corner pieces) meet the terrain at the cell's edge by
+ * A cliff's faces (south, side and corner pieces) meet the terrain at the cell's edge by
  * design: for the seam over a family's sample map, their cells show the outside ground under them
  * (in place), so the seam is the band's and the textures'. Returns how many cells that was.
  */

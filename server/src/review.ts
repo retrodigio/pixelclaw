@@ -1,4 +1,4 @@
-// The blind review bundle (plan §5): a folder a reviewer with no other context can judge from.
+// The blind review bundle: a folder a reviewer with no other context can judge from.
 // Each asset at game scale and with rulers (for coordinates), tiles repeated 3x3, sprites on
 // their ground beside their set, the palette, the style guide and a rubric. It names no method
 // and no author, and holds no tape, so the reviewer judges the art alone. The tool calls no

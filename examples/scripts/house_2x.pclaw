@@ -1,4 +1,4 @@
-# The house at twice the density (plan §4.7, §10 G9): 96x96 on a 48 px grid, the same 2x2-cell
+# The house at twice the density: 96x96 on a 48 px grid, the same 2x2-cell
 # footprint. Started as a nearest-neighbour scale-up of the 1x house, then detailed where 2x has
 # room the 1x copy has not: courses of roof tiles, the plaster's texture, the door's planks and
 # the window glazing bars. The density check reduces it back and compares it with the 1x house.

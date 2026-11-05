@@ -32,7 +32,7 @@ From a packed tarball (`cd cli && pnpm pack` writes `pixelclaw-0.2.0.tgz`):
 claude mcp add pixelclaw -- npx -y --package /path/to/pixelclaw-0.2.0.tgz pixelclaw serve --project ~/art/mossy-ruins.pclaw --port 7417
 ```
 
-Once the package is on npm, this is the plan's line:
+Once the package is on npm, this is:
 
 ```sh
 claude mcp add pixelclaw -- npx -y pixelclaw serve --project ~/art/mossy-ruins.pclaw --port 7417
@@ -58,7 +58,7 @@ size, wrap, palette, commands and groups) and the watch link.
 | `create` | boolean, optional | With `path`: create the project if it does not exist. |
 | `name` | string, optional | With `create`: the project's name (default: the folder name without `.pclaw`). |
 | `palettes` | string[], optional | Palette files (`.json`, Lospec `.json`, `.hex`, `.gpl`) to add. The first becomes the default if the project has none. |
-| `grid` | integer 4..256, optional | The project's grid: its tile size in px (project.json `grid`, default 24). New maps without `tile=`, the camera (16x9 cells) and the draw scale (2 below 48 px, 1 from 48) follow it (G14). The summary's second line says what they are. |
+| `grid` | integer 4..256, optional | The project's grid: its tile size in px (project.json `grid`, default 24). New maps without `tile=`, the camera (16x9 cells) and the draw scale (2 below 48 px, 1 from 48) follow it. The summary's second line says what they are. |
 
 ```
 project 'mossy-ruins' at /Users/me/art/mossy-ruins.pclaw
@@ -82,7 +82,7 @@ Apply command text (see [commands.md](commands.md)) to an asset as one undo grou
 | `commands` | string | One or more lines of the command language. |
 | `view` | `render` \| `grid` \| `tile3x3` \| `diff` \| `game` \| `recolour`, optional | Also return this view of the result. |
 | `replace` | boolean, optional | With a leading `new` for an asset that exists: start its tape again. |
-| `dry` | boolean, optional | Apply to a copy, check it and report, then discard: nothing is written to the tape, the files or the watchers (G13). The view, if asked, is `render`, `grid` or `tile3x3` of the copy. |
+| `dry` | boolean, optional | Apply to a copy, check it and report, then discard: nothing is written to the tape, the files or the watchers. The view, if asked, is `render`, `grid` or `tile3x3` of the copy. |
 
 A dry run answers `turf: dry run of 1 command; 24 px would change; nothing was kept`, the commands
 as they would be written, the warnings and the check summary of the copy. Try a change this way
@@ -111,7 +111,7 @@ If any line has an error, nothing is applied and every error is listed with its 
 Warnings so far: `the batch changed no pixels`; after a `snap` below block R² 0.8 or material
 match 0.85, `snap: … the draft is unreliable: reroll the underlay (a new prompt or seed) or trace
 over it instead`; after a `family cut` whose family's seam over a sample island is over its limit,
-`family cut: the cut family's seam is … on a sample island: its tiles do not join; …` (G13). A
+`family cut: the cut family's seam is … on a sample island: its tiles do not join; …`. A
 batch on a family that texture variants inherit their band from (`variant of=<it> band=inherit`)
 also says `variants that inherit the band, brought up to date: …`: each got `family band
 from=<it>` on its own tape. The last line is the check summary: every check that applies to the asset, with
@@ -140,7 +140,7 @@ the image under `blobs/`, and writes the line as `underlay <layer> blob=<sha256>
   published when this was written; check https://openai.com/api/pricing/). An edit also pays for
   the layout image it sends: its input tokens (scaled to fit 2048 px and 768 px on the short side,
   170 tokens per 512 px tile plus 85: 1105 for 1536x1024) and the prompt's (about 4 characters a
-  token) at the model's token prices are added to the estimate (G13). Over the cap the call
+  token) at the model's token prices are added to the estimate. Over the cap the call
   is refused; a model with no price is refused too, since the cap cannot be checked. The cap is
   $0.25 a call unless `cap=` on the line, `PIXELCLAW_UNDERLAY_CAP`, or project.json
   `underlay.cap` says otherwise. project.json `underlay` also sets `provider`, `model`, `quality`,
@@ -228,7 +228,7 @@ fresh process (a CLI call, a new server) does not run every check on every asset
 
 ### `work`
 
-The request queue (plan §21; [pipeline.md](pipeline.md#requests-from-the-dashboard)). With no
+The request queue. With no
 `action` (or `"next"`): claim the next open request (or the one named by `id`) and say what is
 asked, with the asset's plan entry and status and any answer the person gave. One at a time: while
 you hold a claimed request, `work` says to finish it first. `action: "progress"` with `text`
@@ -247,7 +247,7 @@ If you cannot go on without the person, work(action="blocked", text=<one clear q
 
 ### `request`
 
-File, answer or withdraw a request as the dashboard's buttons do (G15; [pipeline.md](pipeline.md#requests-from-the-cli-and-mcp)):
+File, answer or withdraw a request as the dashboard's buttons do ([.md](pipeline.md#requests-from-the-cli-and-mcp)):
 `kind: "draw"` with `asset` (planned, not drawn), `"change"` with `asset` and `note` (also writes
 `mark rejected "<note>"` on its tape), `"add"` with `entry` (a manifest entry, validated with the
 whole manifest); `action: "reply"` with `id` and `text` (a blocked request opens again) or
@@ -277,7 +277,7 @@ and `bmfont`, a font as a glyph strip (plus its characters) or as BMFont
 
 ### `import`
 
-Bring art in (see [profiles.md](profiles.md#import)). For a set of art (plan §21): `slice:
+Bring art in (see [profiles.md](profiles.md#import)). For a set of art: `slice:
 "24x24"` (with `offset: "x,y"` and `gap: "x,y"`) cuts a sheet into **separate assets**, one per
 non-empty cell in reading order, named by `pattern` (`{name}_{n}`, `{name}_{col}_{row}`), a
 `names` list, or `namesFrom: "manifest"` (the planned, undrawn entries of `set`, in order); a
@@ -299,7 +299,7 @@ asset's tape again. A new asset's tape starts with `import` commands; the file i
 ### `seeds`
 
 Try one generator line with several seeds, each as a dry run on the asset, and rank them by the
-checks (G13): fewest failing first, then the least over their limits, then the most room on the
+checks: fewest failing first, then the least over their limits, then the most room on the
 rest. Nothing is kept unless `apply` is true.
 
 | Argument | Type | Does |
@@ -348,7 +348,7 @@ Undo is a command: `run` with `undo` or `undo group=g4`.
 
 ### `changes`
 
-What people did in the watch view since the agent last called `changes` (plan §1.3, §8.2).
+What people did in the watch view since the agent last called `changes`.
 
 | Argument | Type | Does |
 |---|---|---|
@@ -534,7 +534,7 @@ whole timeline away.
 
 ### Underlays, fonts and icons
 
-An underlay (plan §6) is drawn under the art on the canvas, faded half-way to the checkerboard as
+An underlay is drawn under the art on the canvas, faded half-way to the checkerboard as
 reference pixels are, stretched over its rectangle; the image comes from `/api/blob/<sha256>.png`
 (the token is required; blobs are content-addressed, so the browser caches them). Hiding the
 underlay's layer in the timeline hides it (that is a `layer set … hidden=on` command). A snapped
@@ -554,7 +554,7 @@ is refused with the reason), *✣ move* drags something placed to another cell (
 layer (a click: the whole layer; a drag: a box; `tiles <layer> fill <tile>`); *mix…* in its tile
 list gives each one-cell tile a weight (the chosen tile and its texture variants start at 1, 0
 leaves a tile out) and fills with a seeded scatter of them (`tiles <layer> fill mix=<tile>:<weight>,…
-variants=named`, G14). While painting a
+variants=named`). While painting a
 terrain layer, *walkable* says objects may stand on its filled ground (`layer set <layer>
 walkable=on|off`). Each is one line on the tape, written as you. *▣ camera* stands the
 camera on a cell (the engine's screen outlined; *camera view* shows only it, at game scale),

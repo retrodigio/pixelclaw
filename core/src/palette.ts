@@ -3,7 +3,7 @@
 // format, Lospec JSON, .hex and .gpl.
 
 /**
- * Colour roles for recolourable art (plan §3.1): an entry may stand for a role instead of a fixed
+ * Colour roles for recolourable art: an entry may stand for a role instead of a fixed
  * colour. A role entry is shown through a preview theme; its hex is only its colour under the
  * default theme, never an encoded export colour.
  */

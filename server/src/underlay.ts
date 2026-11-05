@@ -1,4 +1,4 @@
-// Underlays from image providers and files (plan §6, §19). A batch's `underlay generate "<prompt>"`
+// Underlays from image providers and files. A batch's `underlay generate "<prompt>"`
 // and `underlay import <file>` lines are resolved here, before the batch runs: the image is made by
 // a provider (or read from the file), kept as a blob (blobs/<sha256>.png), and the line rewritten
 // as `underlay <layer> blob=<sha256> image=<W>x<H> …` with where it came from. Core never calls a
@@ -80,7 +80,7 @@ export interface Provider {
  * Take every part of a secret out of a message (errors from a provider may echo a request, or the
  * key masked with its first and last characters showing, as OpenAI's 401 does): the key, anything
  * shaped like an API key (sk-…, masked or not), and any run of four or more of the key's own
- * first or last characters. Nothing of the key is ever written anywhere (G13).
+ * first or last characters. Nothing of the key is ever written anywhere.
  */
 export function scrub(msg: string, secret: string | undefined): string {
   let out = msg.replace(/\b(sk|rk|pk)-[A-Za-z0-9_*\-.]{2,}/g, '[key]').replace(/\*{4,}[A-Za-z0-9_-]*/g, '[key]');

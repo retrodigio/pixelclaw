@@ -1,4 +1,4 @@
-// Import and densities as commands (plan §4.7, §4.9). `import` writes an imported image's palette
+// Import and densities as commands. `import` writes an imported image's palette
 // indices onto the author's layer and frame: the rows are in the line (as `family texture` records
 // its pixels), and the source file and its blob hash are kept for the record, so a tape that
 // starts from an import replays with nothing but itself. `scale <n>` makes a nearest-neighbour

@@ -1,4 +1,4 @@
-// G11 in the server (plan §6, §19): underlays from a provider (a fake HTTP client stands in for
+// G11 in the server: underlays from a provider (a fake HTTP client stands in for
 // OpenAI) and from files, the cost cap and log, the key never written anywhere, snap through the
 // writer with its reroll warning, the underlay in the render view, fonts exported, and the MCP path.
 import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';

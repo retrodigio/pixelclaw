@@ -1,8 +1,8 @@
-// Maps and scenes (plan §4.11) and oversized assets on them (§4.10). A map document holds names,
+// Maps and scenes and oversized assets on them. A map document holds names,
 // not pixels: its layers say which cells are a family's terrain, which tiles and objects are
 // placed where. Drawing a map reads the assets it names (a `MapWorld`), so it redraws itself when
 // a tile changes. Terrain resolves through the family's autotile scheme exactly as the sample maps
-// do (`resolveMap`), each cell picks among a tile and its texture variants (§4.1) by its place,
+// do (`resolveMap`), each cell picks among a tile and its texture variants by its place,
 // objects are drawn in order of their base row and roof cells last. Also here: the map checks
 // (seams, repetition hot spots, lattices, footprints, draw order, coverage), Tiled `.tmx` export and the
 // `split` of an oversized asset into one-cell pieces.
@@ -136,7 +136,7 @@ export function layerTerrain(d: Doc, layer: number, s: Scheme): Terrain {
 // --- Composing
 
 /**
- * A terrain layer's inside mix (G15): each inside cell takes a tile by weight from a hash of its
+ * A terrain layer's inside mix: each inside cell takes a tile by weight from a hash of its
  * place and the seed, drawn again (once) when it would equal both the cell to its left and the one
  * above (two tiles: when it would complete a 2x2 block of one), so one look seldom clumps and two
  * tiles do not fall into a checkerboard. The choice is the
@@ -342,7 +342,7 @@ export function composeMapDoc(d: Doc, world: MapWorld, o: ComposeOptions = {}): 
         const x = i % cols, y = Math.floor(i / cols);
         if (v === null && !info.outside) return;
         if (mix && v !== null && fullInside(s, v)) {
-          // The terrain's inside drawn as its mix of one-cell tiles (G15).
+          // The terrain's inside drawn as its mix of one-cell tiles.
           const name = mix(x, y, (k) => k < 0 || vs[k] === null || !fullInside(s, vs[k]!));
           const tile = world.get(name);
           if (!tile) { problems.push(`layer ${l.name}: mix= names '${name}', which is not drawn`); return; }
@@ -357,7 +357,7 @@ export function composeMapDoc(d: Doc, world: MapWorld, o: ComposeOptions = {}): 
         const [cx, cy] = v === null ? L.outside : L.cells[v]!;
         if (v !== null && isFace(s.variants[v]!.on) && !info.outside) {
           // A face is art in a cell outside the terrain: all of it is drawn, whatever the layer's
-          // fill (G13); only the outside texture laid under it is left to the layers below.
+          // fill; only the outside texture laid under it is left to the layers below.
           blit(faceArt(f), f.width, cx * t, cy * t, t, t, x * t, y * t);
         } else if (v !== null && s.variants[v]!.on && !info.outside) {
           // A fillet or a face in a cell outside the terrain, on a layer that leaves the outside
@@ -435,7 +435,7 @@ export function composeMapDoc(d: Doc, world: MapWorld, o: ComposeOptions = {}): 
     }
     objects.sort((a, b) => a.base - b.base || a.layer - b.layer || a.x - b.x || a.y - b.y);
   }
-  // Shadows (G16): under each object on a layer that casts them, on the ground, before any object.
+  // Shadows: under each object on a layer that casts them, on the ground, before any object.
   const shadowed = objects.filter((ob) => ob.doc && (d.layers[ob.layer]!.map as Extract<MapLayerInfo, { kind: 'objects' }>).shadow);
   if (shadowed.length) {
     const dark = darkerMap(pal.entries, [...drawn].map((x) => ({ palette: x.palette, map: pal.of(x) })));
@@ -682,7 +682,7 @@ export function mapAscii(d: Doc, c?: ComposedMap): string {
 }
 
 /**
- * The cells of a map as a reviewer sees them (G13, the review bundle's cells.txt): a lower-case
+ * The cells of a map as a reviewer sees them (the review bundle's cells.txt): a lower-case
  * letter for the ground each cell shows (a terrain, its outside ground, a tile), a capital where
  * an object stands (its anchor cell), '+' under the rest of an object, '.' nothing.
  */
@@ -738,7 +738,7 @@ export function mapTilesText(c: ComposedMap): string {
   return out.join('\n');
 }
 
-// --- Map checks (plan §4.11): seams, repetition hot spots, footprints, draw order, coverage
+// --- Map checks: seams, repetition hot spots, footprints, draw order, coverage
 
 export interface MapCheck {
   id: 'seam' | 'repetition' | 'lattice' | 'footprint' | 'draworder' | 'coverage';
@@ -843,7 +843,7 @@ export function mapChecks(d: Doc, world: MapWorld, limits: Partial<typeof MAP_LI
     const n = new Map<number, number>();
     for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
       const k = (y + j) * cols + x + i;
-      // The open ground a map is filled with (the sea) counts too: one tile filling it is a weave (§17).
+      // The open ground a map is filled with (the sea) counts too: one tile filling it is a weave.
       if (flat[k] || !c.top[k]) continue;
       n.set(keys[k]!, (n.get(keys[k]!) ?? 0) + 1);
     }
@@ -982,7 +982,7 @@ export function mapChecks(d: Doc, world: MapWorld, limits: Partial<typeof MAP_LI
 }
 
 /**
- * Map-scale lattices (G14, G15): a mark (a few pixels well off their cell's median colour) that
+ * Map-scale lattices: a mark (a few pixels well off their cell's median colour) that
  * comes back at the same spot of the cell, cell after cell, reads as a grid of dots across the
  * ground, even when every tile passes its own checks and the map mixes several tiles (the marks sit
  * on the tile pitch, whichever cells have them). Over the plain ground cells (not edges, not one
@@ -1133,7 +1133,7 @@ function latticeCheck(c: ComposedMap, world: MapWorld, flat: Uint8Array, L: type
   };
 }
 
-// --- Texture variants (plan §4.1): the colour mix of a variant against its base, and its border
+// --- Texture variants: the colour mix of a variant against its base, and its border
 
 export interface VariantMatch {
   /** L1 distance between the colour histograms (shares), 0..2. */
@@ -1145,7 +1145,7 @@ export interface VariantMatch {
   ok: boolean;
 }
 
-/** Does a variant match its base (the pilot's rule: L1 < 0.3, ΔL* < 2), and keep its border? */
+/** Does a variant match its base (L1 < 0.3, ΔL* < 2), and keep its border? */
 export function variantMatch(base: Doc, v: Doc, frame = 0): VariantMatch {
   const a = flatten(base, frame), b = flatten(v, Math.min(frame, v.frameCount - 1));
   const hist = (px: Uint16Array, d: Doc) => {
@@ -1177,7 +1177,7 @@ export function variantMatch(base: Doc, v: Doc, frame = 0): VariantMatch {
   return { l1, dl, border, ok: l1 < 0.3 && dl < 2 };
 }
 
-// --- Split (plan §4.10): an oversized asset as one-cell pieces plus a placement stamp
+// --- Split: an oversized asset as one-cell pieces plus a placement stamp
 
 export interface SplitPiece {
   name: string;

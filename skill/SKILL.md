@@ -90,7 +90,7 @@ only its inside** (`fork moor moor_b`, `variant of=moor`, then `noise 4,4 40x40 
 wrap=off` and your own marks): two independent noise tiles side by side show a seam where their
 bigger specks are cut at the border. With the structure generators the fork can lay the same
 ground again and only change the generator's seed, keeping its `edges=` (`examples/ember-moor.pclaw`
-since G16: three looks of noise and `tufts edges=2`, map seam 0.17, lattice 12%).
+uses three looks of noise and `tufts edges=2`, map seam 0.17, lattice 12%).
 Expect more `jaggies` from long curves: a big ellipse is fine alone, but where a second shape meets
 its outline the step runs go uneven; let one shape make the silhouette and shade inside it.
 

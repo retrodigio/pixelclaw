@@ -1,4 +1,4 @@
-# Mossy ruins: a 48x48 house (plan §4.10), two cells wide and two tall on the 24 px grid. A pitched
+# Mossy ruins: a 48x48 house, two cells wide and two tall on the 24 px grid. A pitched
 # roof of red tiles over a plastered front with a timber frame, a door and two windows; lit from the
 # top left, a 1-px ink outline. Its footprint is all four cells: the wall row blocks, the roof row
 # is a roof (drawn above actors walking behind the house).

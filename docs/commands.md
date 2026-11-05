@@ -48,7 +48,7 @@ view (a pencil drag, a fill, a move, a palette edit, a note) is one group.
 
 ### Autotile families
 
-A **family** is a sheet of every variant an autotile scheme can produce (plan §4.2), with the two
+A **family** is a sheet of every variant an autotile scheme can produce, with the two
 textures they share. `new family shore 24x24 scheme=blob47 [map=14x12]` makes one: the size is
 the tile's (square, even); the canvas is the sheet. Row 0 holds the `inside` texture (the
 family's terrain) and the `outside` texture; then the variants, in the scheme's order, so many to
@@ -66,13 +66,13 @@ reduced neighbourhood it answers to, and how it is built from four 12x12 (half-t
 | `path` | 4; a strip through the middle (inset a quarter of the tile) | 16 | `o`, `nesw`, `ew`, `ns` |
 | `bridge8` | along one axis, east-west first | 8 (`v`, the north-south single, is placed by name) | `h`, `h_ew`, `v`, `v_ns` |
 | `single` | none | 1 | `o` |
-| `face` | blob47, plus a cliff's faces in the cells around the terrain (G13, G16): south faces below it, side faces beside its east and west edges, corners where they meet, alternate looks of the long middles | 47 + 28 | blob47's and `face_o`, `face_ew`, `face_ie_iw`, `side_e`, `side_e_ns`, `side_w`, `side_w_ns`, `corner_ew` |
-| `lane` | 8; a path that fills where it is wide (a corner counts when both sides beside it are the lane) and turns diagonally (a lone diagonal draws a strip to that corner); inset a quarter of the tile (G16) | 82 + 15 | `o`, `nesw`, `ew`, `ns`, `nesw_ne_se_sw_nw` and 9 for the diagonals (see the file) |
+| `face` | blob47, plus a cliff's faces in the cells around the terrain: south faces below it, side faces beside its east and west edges, corners where they meet, alternate looks of the long middles | 47 + 28 | blob47's and `face_o`, `face_ew`, `face_ie_iw`, `side_e`, `side_e_ns`, `side_w`, `side_w_ns`, `corner_ew` |
+| `lane` | 8; a path that fills where it is wide (a corner counts when both sides beside it are the lane) and turns diagonally (a lone diagonal draws a strip to that corner); inset a quarter of the tile | 82 + 15 | `o`, `nesw`, `ew`, `ns`, `nesw_ne_se_sw_nw` and 9 for the diagonals (see the file) |
 
 Variant names are the joined sides (`n e s w`, `o` for none), then each counted corner:
 `ne_ne` is joined north and east with the corner between them, `nesw_ne_se_sw_nw` the interior.
 
-**Faces (G16).** The face scheme's faces are art in cells outside the terrain, drawn by hand on the
+**Faces.** The face scheme's faces are art in cells outside the terrain, drawn by hand on the
 pieces' band layer (the band leaves them alone) and copied by quadrant to the rest:
 
 - *South faces*, in the cell below the terrain. Each half ends, joins the face beside it (`e`, `w`:
@@ -90,7 +90,7 @@ pieces' band layer (the band leaves them alone) and copied by quadrant to the re
   a copy of its middle until you `family detach face_ew_b` and draw it, so a long cliff need not
   repeat one tile.
 
-**Lanes (G16).** `lane` is for roads and rivers that are sometimes wide: a block of lane cells has
+**Lanes.** `lane` is for roads and rivers that are sometimes wide: a block of lane cells has
 a plain middle (the `path` scheme, four neighbours, shows the outside at every inside corner of a
 wide area), and a lane can step diagonally: a cell joined only across a corner draws a strip to it
 (`o_se`), the cells beside the step carry the strip's edge (`d_…`, drawn in a cell outside the lane
@@ -107,9 +107,9 @@ draw it by hand.
 
 | Command | Normal form | Notes |
 |---|---|---|
-| `family texture inside\|outside from=<tile> [frame=<n>]` | `family texture inside from=sand frame=1 <<` rows `>>` | Copies a tile asset (the family's tile size; colours matched by name, else by exact colour) into the texture cell on your frame. The line records the pixels, so replay needs no other asset; a block of rows can be given instead of `from=`. **The family follows the tile** (G15): when the tile changes, the server copies it in again, on each family frame whose latest texture line for that side came `from=` it (one undo group by the same author, the author's frame put back), like `variant of=<base> band=inherit`. A texture drawn from rows is the family's own and is left alone. |
-| `family band <w>:<fill> ... [radius=] [inset=] [jitter=<n> [seed=]] [draw=on\|off]` | `family band 3:outside 1:foam 2:sand0 radius=3 inset=0 jitter=2 seed=6 draw=on` | **Route 1, a band profile**: the band from the terrain's edge inward, each part a width and a colour, `outside` (the outside texture carries on) or `inside`; then the inside texture. `radius` rounds the band's inner edge at outer corners (the outer contours are wider arcs about the same centre); `inset` moves the edge in from the tile's (path and bridge strips; default the scheme's). Inset, band and radius must fit in half a tile. With `draw=on` it draws the colours on every piece's band layer (clearing what was there; the face scheme's face pieces are left alone, they are drawn by hand); `draw=off` only sets the geometry. `jitter=<n>` (G13) moves every band edge in or out by up to n px, along each edge, by a seeded field that repeats every tile, so the edges are not ruler-straight and the tiles still join; the seed is written in (try several with the `seeds` tool). |
-| `family band from=<family>` | `family band from=shore 3:outside 1:foam radius=3 inset=0 detached=none frames=1 cells=o,nesw,ew,ns,nesw_ne_se_sw_nw <<` rows `>>` | Copies another family's band (same scheme and tile): its geometry, its detached variants and its band layer. The line records it, so replay reads no other asset. Since G14 it records only the cells the family does not build from its pieces (`cells=`: the pieces, the detached variants and any other cell with band art, their rows side by side, frame after frame); the other variants are built again from the pieces after the line, as the source's were. On a 24 px blob47 sheet a sync went from 33 KB of tape to 4 KB. The G13 form without `cells=` (the whole sheet's rows) still replays. A texture variant with `variant of=<base> band=inherit` gets this line after every change to the base (see *Oversized assets, maps and scenes*). |
+| `family texture inside\|outside from=<tile> [frame=<n>]` | `family texture inside from=sand frame=1 <<` rows `>>` | Copies a tile asset (the family's tile size; colours matched by name, else by exact colour) into the texture cell on your frame. The line records the pixels, so replay needs no other asset; a block of rows can be given instead of `from=`. **The family follows the tile**: when the tile changes, the server copies it in again, on each family frame whose latest texture line for that side came `from=` it (one undo group by the same author, the author's frame put back), like `variant of=<base> band=inherit`. A texture drawn from rows is the family's own and is left alone. |
+| `family band <w>:<fill> ... [radius=] [inset=] [jitter=<n> [seed=]] [draw=on\|off]` | `family band 3:outside 1:foam 2:sand0 radius=3 inset=0 jitter=2 seed=6 draw=on` | **Route 1, a band profile**: the band from the terrain's edge inward, each part a width and a colour, `outside` (the outside texture carries on) or `inside`; then the inside texture. `radius` rounds the band's inner edge at outer corners (the outer contours are wider arcs about the same centre); `inset` moves the edge in from the tile's (path and bridge strips; default the scheme's). Inset, band and radius must fit in half a tile. With `draw=on` it draws the colours on every piece's band layer (clearing what was there; the face scheme's face pieces are left alone, they are drawn by hand); `draw=off` only sets the geometry. `jitter=<n>` moves every band edge in or out by up to n px, along each edge, by a seeded field that repeats every tile, so the edges are not ruler-straight and the tiles still join; the seed is written in (try several with the `seeds` tool). |
+| `family band from=<family>` | `family band from=shore 3:outside 1:foam radius=3 inset=0 detached=none frames=1 cells=o,nesw,ew,ns,nesw_ne_se_sw_nw <<` rows `>>` | Copies another family's band (same scheme and tile): its geometry, its detached variants and its band layer. The line records it, so replay reads no other asset. It records only the cells the family does not build from its pieces (`cells=`: the pieces, the detached variants and any other cell with band art, their rows side by side, frame after frame); the other variants are built again from the pieces after the line, as the source's were. On a 24 px blob47 sheet a sync went from 33 KB of tape to 4 KB. The older form without `cells=` (the whole sheet's rows) still replays. A texture variant with `variant of=<base> band=inherit` gets this line after every change to the base (see *Oversized assets, maps and scenes*). |
 | `family detach\|attach <variant>\|all` | `family detach ne_ne` | A detached variant's band layer is its own (drawn by hand or cut); attach builds it from the pieces again. Pieces are always drawn by hand. |
 | `family coverage [seed=] [copies=] [fill=on\|off]` | `family coverage seed=7 copies=1 fill=off` | Lays out the coverage map so every variant the scheme can produce appears `copies` times (a seeded search; refused, with what to try, when the map is too small: blob47 needs about 14x12), and draws its flat template (inside, outside and the band's colours) on a reference layer `template`. `fill=on` also paints the map with the current variants, to start from. |
 | `family cut [textures=on\|off]` | `family cut textures=off` | **Route 3, cut from a painted map**: every variant takes the medoid of the map tiles that resolve to it (the tile with the fewest differing band pixels to the others), keeping only its band (`family band … draw=off` says how wide; the textures stay the shared ones), and is detached. `textures=on` also takes the textures from the map's all-inside and all-outside tiles. |
@@ -119,7 +119,7 @@ draw it by hand.
 frame of an animated texture into the same frame of the family, and link the band layer's cels
 (`cel link 1-4 layer=band`) so hand detail shows on every frame.
 
-**Overlays** (plan §4.3) are small sprites played over a map's tiles: `new overlay glint 5x5`, its
+**Overlays** are small sprites played over a map's tiles: `new overlay glint 5x5`, its
 frames and ticks as usual, then
 
 | Command | Normal form | Notes |
@@ -131,30 +131,30 @@ frames and ticks as usual, then
 
 ### Oversized assets, maps and scenes
 
-**Oversized tiles and objects** (plan §4.10) are any asset bigger than a cell of the grid:
+**Oversized tiles and objects** are any asset bigger than a cell of the grid:
 `new object house 48x48 cell=24x24` is two cells by two. Its **footprint** says where it stands on
 a map:
 
 | Command | Normal form | Notes |
 |---|---|---|
 | `footprint <C>x<R> [at=<cx,cy>] [anchor=<x,y>] [<< flags >>]` | `footprint 2x2 at=0,0 anchor=0,1 <<` rows `>>` | The footprint is `C` x `R` cells of the art grid (the canvas in cells), starting at art cell `at` (default: the bottom-left of the art). `anchor` is the footprint cell it is placed by (default its bottom-left). The block has a row per art row, a character per art cell: `.` nothing, `b` blocks movement, `r` a roof or canopy (drawn above actors), `x` both. Footprint cells that do not block are walkable. Without a block, the footprint blocks and nothing is a roof. `footprint off` removes it (an asset without one stands on its whole art grid, by its bottom-left cell). |
-| `variant of=<asset> [band=inherit\|own]`, `variant off` | `variant of=lane band=inherit` | This asset is a **texture variant** of another (plan §4.1): maps pick among an asset and its variants cell by cell (a hash of the cell, moved on when it would repeat both the cell to the left and the one above). Make one with `fork`, then change the inside (keep the border, or redraw a family's band and move its detail). The `variant` check compares their colour mix. **`band=inherit`** (G13, families): the band stays the base's: the variant's band layer is locked, its own band edits (`family band`, `cut`, `detach`, `attach`) are refused, and after every batch that changes the base the server writes `family band from=<base>` on the variant's tape (one undo group, by the same author), so later fixes reach it; only its textures are its own. `band=own` makes the band its own again. |
+| `variant of=<asset> [band=inherit\|own]`, `variant off` | `variant of=lane band=inherit` | This asset is a **texture variant** of another: maps pick among an asset and its variants cell by cell (a hash of the cell, moved on when it would repeat both the cell to the left and the one above). Make one with `fork`, then change the inside (keep the border, or redraw a family's band and move its detail). The `variant` check compares their colour mix. **`band=inherit`** (families): the band stays the base's: the variant's band layer is locked, its own band edits (`family band`, `cut`, `detach`, `attach`) are refused, and after every batch that changes the base the server writes `family band from=<base>` on the variant's tape (one undo group, by the same author), so later fixes reach it; only its textures are its own. `band=own` makes the band its own again. |
 
 A 24x48 tree with `footprint 1x1 << r / b >>` stands on one cell; its crown overhangs the cell
 above as a canopy. The `fit` check flags an empty footprint cell and art outside the footprint
 that is not a roof.
 
-**Map documents** (plan §4.11) are grids of cells that hold names, not pixels: `new map village
+**Map documents** are grids of cells that hold names, not pixels: `new map village
 40x30 tile=24` is 40 x 30 cells of 24 px. Its canvas is the grid of cells (one "pixel" per cell,
 so notes and coordinates are cells), and its layers say what they hold:
 
 | Command | Normal form | Notes |
 |---|---|---|
-| `new map <name> <C>x<R> [tile=<T>] [palette=]` | `new map village 40x30 tile=24 palette=ruins-shore <<` rows `>>` | Starts with one tiles layer, `floor`. `tile=` defaults to the project's grid (project.json `grid`, 24 unless set; G14). |
-| `layer add <name> terrain=<family> [outside=on\|off] [walkable=on\|off] [border=same\|terrain\|not] [mix=<tile>:<weight>,... [variants=spread\|named] [seed=]]` | `layer add sea terrain=shore outside=on above=floor` | A terrain layer: cells are the family's terrain or not; when the map is drawn the family's scheme picks every edge tile, exactly as `resolveMap` does for sample maps. With `outside=on` the cells outside the terrain show the family's outside texture (the layer fills the map); otherwise they show what is below (a face scheme's faces are drawn either way). **`walkable=on`** (G13): the filled ground and its edges are ground, not sea: objects may stand on them (the `footprint` check). **`border=`** (G15): past the map's edge a cell counts as the edge cell's own value (`same`, the default: terrain that runs off the map has no edge band along the border), as terrain, or as not terrain (`not`, the rule before G15: a band runs round the terrain at the border). **`mix=`** (G15): the terrain's fully inside cells are drawn as a seeded scatter of one-cell tiles by weight instead of the family's inside (each tile's weight shared with its texture variants unless `variants=named`, as `tiles fill mix=`); each cell's tile comes from a hash of its place, drawn again when it would equal both the cell to its left and the one above, so painting terrain elsewhere does not reshuffle it. Edges still come from the family, so mix tiles that match the family's inside texture join cleanly. `layer set <name> walkable=on\|off`, `border=…`, `mix=…\|none` change them. |
-| `tiles <tiles layer> fill <tile>\|<family>.<variant> [<x,y> <W>x<H>] [replace]` | `tiles floor fill grass 0,0 40x30 cells=1x1 anchor=0,0` | (G13) A one-cell tile on every empty cell of the layer (or the box): the floor in one line. `replace` also covers one-cell tiles already there; multi-cell tiles stay. The cells are worked out when the line is written, so replay reads no other asset; the map picks among the tile's texture variants cell by cell. |
-| `tiles <tiles layer> fill mix=<tile>:<weight>,... [<x,y> <W>x<H>] [replace] [variants=spread\|named] [seed=]` | `tiles floor fill mix=bed:1,bed_b:2,bed_c:1 0,0 12x8 cells=1x1 anchor=0,0 variants=named seed=812` | (G14) A seeded scatter of several one-cell tiles by weight (a weight left out is 1): each cell draws a tile, leaving out the tile to its left and the one above where another is left to draw, weighted by what each tile still has to lay of its share, so the counts follow the weights as closely as that rule allows (a tile over half the mix cannot avoid equal neighbours). **Two tiles** (G15): that rule left no choice, a strict checkerboard; a cell now leaves out only the tile that would complete a 2x2 block of one, so two looks scatter (a two-tile line written before G15 replays the new way). Each tile's weight is shared evenly with its texture variants the mix does not name (`variants=spread`, the default): `mix=bed:3,gravel:1` with bed's variants bed_b and bed_c is written `mix=bed:1,bed_b:1,bed_c:1,gravel:1`. The line is written with the shared-out weights, `variants=named` and the seed, so it replays without reading any asset. Each cell shows exactly the tile drawn for it (the map does not pick among its variants again). Fixes a failing `lattice`. |
-| `layer add <name> tiles`, `layer add <name> objects [shadow=darker\|<colour>\|off] [shadowdir=<dir>]` | `layer add props objects shadow=darker shadowdir=se above=lanes` | (G16) `shadow=`: every object placed on the layer casts the `shadow` helper's ellipse on the ground under it, before any object is drawn: `darker` takes each ground pixel a step down its ramp (else the nearest entry at least 6 L* darker), a colour paints it. Left out, the style guide's `style.shadow` (none without one); `layer set <name> shadow=…\|off [shadowdir=]` changes it. The map checks read the ground without shadows. | Things placed by name. Objects on every objects layer are drawn in order of their footprint's bottom row (then layer, then column), above all the ground; roof cells are drawn again last. A footprint may not overlap another on any objects layer (on a tiles layer, on that layer). |
+| `new map <name> <C>x<R> [tile=<T>] [palette=]` | `new map village 40x30 tile=24 palette=ruins-shore <<` rows `>>` | Starts with one tiles layer, `floor`. `tile=` defaults to the project's grid (project.json `grid`, 24 unless set). |
+| `layer add <name> terrain=<family> [outside=on\|off] [walkable=on\|off] [border=same\|terrain\|not] [mix=<tile>:<weight>,... [variants=spread\|named] [seed=]]` | `layer add sea terrain=shore outside=on above=floor` | A terrain layer: cells are the family's terrain or not; when the map is drawn the family's scheme picks every edge tile, exactly as `resolveMap` does for sample maps. With `outside=on` the cells outside the terrain show the family's outside texture (the layer fills the map); otherwise they show what is below (a face scheme's faces are drawn either way). **`walkable=on`**: the filled ground and its edges are ground, not sea: objects may stand on them (the `footprint` check). **`border=`**: past the map's edge a cell counts as the edge cell's own value (`same`, the default: terrain that runs off the map has no edge band along the border), as terrain, or as not terrain (`not`, the original rule: a band runs round the terrain at the border). **`mix=`**: the terrain's fully inside cells are drawn as a seeded scatter of one-cell tiles by weight instead of the family's inside (each tile's weight shared with its texture variants unless `variants=named`, as `tiles fill mix=`); each cell's tile comes from a hash of its place, drawn again when it would equal both the cell to its left and the one above, so painting terrain elsewhere does not reshuffle it. Edges still come from the family, so mix tiles that match the family's inside texture join cleanly. `layer set <name> walkable=on\|off`, `border=…`, `mix=…\|none` change them. |
+| `tiles <tiles layer> fill <tile>\|<family>.<variant> [<x,y> <W>x<H>] [replace]` | `tiles floor fill grass 0,0 40x30 cells=1x1 anchor=0,0` | A one-cell tile on every empty cell of the layer (or the box): the floor in one line. `replace` also covers one-cell tiles already there; multi-cell tiles stay. The cells are worked out when the line is written, so replay reads no other asset; the map picks among the tile's texture variants cell by cell. |
+| `tiles <tiles layer> fill mix=<tile>:<weight>,... [<x,y> <W>x<H>] [replace] [variants=spread\|named] [seed=]` | `tiles floor fill mix=bed:1,bed_b:2,bed_c:1 0,0 12x8 cells=1x1 anchor=0,0 variants=named seed=812` | A seeded scatter of several one-cell tiles by weight (a weight left out is 1): each cell draws a tile, leaving out the tile to its left and the one above where another is left to draw, weighted by what each tile still has to lay of its share, so the counts follow the weights as closely as that rule allows (a tile over half the mix cannot avoid equal neighbours). **Two tiles**: that rule left no choice, a strict checkerboard; a cell now leaves out only the tile that would complete a 2x2 block of one, so two looks scatter (a two-tile line written by an older version replays the new way). Each tile's weight is shared evenly with its texture variants the mix does not name (`variants=spread`, the default): `mix=bed:3,gravel:1` with bed's variants bed_b and bed_c is written `mix=bed:1,bed_b:1,bed_c:1,gravel:1`. The line is written with the shared-out weights, `variants=named` and the seed, so it replays without reading any asset. Each cell shows exactly the tile drawn for it (the map does not pick among its variants again). Fixes a failing `lattice`. |
+| `layer add <name> tiles`, `layer add <name> objects [shadow=darker\|<colour>\|off] [shadowdir=<dir>]` | `layer add props objects shadow=darker shadowdir=se above=lanes` | `shadow=`: every object placed on the layer casts the `shadow` helper's ellipse on the ground under it, before any object is drawn: `darker` takes each ground pixel a step down its ramp (else the nearest entry at least 6 L* darker), a colour paints it. Left out, the style guide's `style.shadow` (none without one); `layer set <name> shadow=…\|off [shadowdir=]` changes it. The map checks read the ground without shadows. | Things placed by name. Objects on every objects layer are drawn in order of their footprint's bottom row (then layer, then column), above all the ground; roof cells are drawn again last. A footprint may not overlap another on any objects layer (on a tiles layer, on that layer). |
 | `layer add <name> overlay=<overlay> on=<where>` | `layer add glints overlay=glint on=sea:out` | An overlay played over the cells `on=` names: a terrain layer (its terrain), `<layer>:out` (outside it), or `all`. |
 | `terrain <layer> rect <x,y> <W>x<H> [erase]` | `terrain sea rect 0,20 40x10` | Also `ellipse <x,y> <W>x<H>`, `brush <x,y>... [size=<n>]` (a line through the points), `fill <x,y>` (4-connected), `paint <x,y> <<` rows of `#` (terrain), `-` (not) and `.` (leave) `>>`, and `clear`. |
 | `place <asset>\|<family>.<variant> <x,y> [layer=] [cells=<C>x<R> anchor=<x,y>]` | `place house 12,8 layer=props cells=2x2 anchor=0,1` | By its anchor cell, on your layer or `layer=`. The line records the footprint the asset had, so replay reads no other asset. A family's variant by name (`shore.ns`, bridge8's `bridge.v`) goes on a tiles layer. |
@@ -218,13 +218,13 @@ text; `export` writes a map for Tiled (the `tiled` profile) and splits an oversi
 | `outline c= [mode=outer\|inner] [corners=on\|off] [from=<layer>]` | `outline c=ink mode=outer corners=off` | See *Helpers*. Without `c=`: the style guide's outline colour (`style.outline`). |
 | `shade light= [ramp=<ramp>\|all] [edge=<n>]` | `shade light=nw ramp=wood edge=1` | Without `light=`: the style guide's (`style.light`). |
 | `clean orphans [size=<n>] [keep=none\|texture]` | `clean orphans size=1 keep=none` | |
-| `shadow [<x,y> <W>x<H>] [c=<colour>] [dir=<dir>]` | `shadow 8,20 12x4 c=soil0 dir=se` | (G16) A shadow under a sprite or an object: a flat ellipse on the ground as wide as the art's bottom third and two pixels more, a third as tall, centred on its lowest row and moved a sixth of its width toward `dir` (default the style guide's `style.shadow.dir`, else away from its light); drawn on your layer only where the art is empty, so it sits behind. `c=` defaults to `style.shadow.c` (an entry; `darker` is for maps, where there is ground under it). The line records the box. |
+| `shadow [<x,y> <W>x<H>] [c=<colour>] [dir=<dir>]` | `shadow 8,20 12x4 c=soil0 dir=se` | A shadow under a sprite or an object: a flat ellipse on the ground as wide as the art's bottom third and two pixels more, a third as tall, centred on its lowest row and moved a sixth of its width toward `dir` (default the style guide's `style.shadow.dir`, else away from its light); drawn on your layer only where the art is empty, so it sits behind. `c=` defaults to `style.shadow.c` (an entry; `darker` is for maps, where there is ground under it). The line records the box. |
 | `noise [<x,y> <W>x<H>] ramp= ...` | `noise 0,0 24x24 ramp=moss weights=0,3,12,1,0 cluster=1..2 density=0.07 base=moss2 wrap=on seed=7` | See *Generators*. |
 | `scatter [<x,y> <W>x<H>] stamp=\|c= count= ...` | `scatter 0,0 24x24 stamp=tuft count=3 minDist=10 flip=on wrap=on seed=3` | |
 | `voronoi [<x,y> <W>x<H>] cells= ramp= ...` | `voronoi 0,0 24x24 cells=7 ramp=stone weights=1,1,1,1,1,1 gap=ink relax=1 wrap=on seed=5` | |
 | `bricks [<x,y> <W>x<H>] size=<W>x<H> ramp= ...` | `bricks 0,0 24x24 size=8x4 ramp=stone weights=1,1,1,1,1,1 gap=ink offset=4 seed=4` | |
-| `pebbles [<x,y> <W>x<H>] ramp= ...` | `pebbles 0,0 24x24 ramp=stone weights=1,1,1,1 size=3..5 density=0.3 light=nw cast=none gap=1 wrap=on edges=3 seed=3` | Stones lit from the style's light (G16). See *Generators*. |
-| `tufts [<x,y> <W>x<H>] ramp= ...` | `tufts 0,0 48x48 ramp=moss size=8..12 blades=3..5 density=0.2 light=nw foot=moss0 gap=1 wrap=on edges=3 seed=3` | Grass tufts lit from the style's light (G16). |
+| `pebbles [<x,y> <W>x<H>] ramp= ...` | `pebbles 0,0 24x24 ramp=stone weights=1,1,1,1 size=3..5 density=0.3 light=nw cast=none gap=1 wrap=on edges=3 seed=3` | Stones lit from the style's light. See *Generators*. |
+| `tufts [<x,y> <W>x<H>] ramp= ...` | `tufts 0,0 48x48 ramp=moss size=8..12 blades=3..5 density=0.2 light=nw foot=moss0 gap=1 wrap=on edges=3 seed=3` | Grass tufts lit from the style's light. |
 | `stamp save <name> <x,y> <W>x<H>`, `stamp save <name> <<` rows `>>` | `stamp save tuft 4,4 3x3` | See *Stamps and brushes*. |
 | `stamp <name> <x,y> [flip=none\|h\|v\|hv]` | `stamp tuft 10,12 flip=none` | Placed by its top-left corner. |
 | `stamp remove <name>` | | |
@@ -309,7 +309,7 @@ show it faded underneath the art, and it is never exported. `layer add` puts a n
 above yours (or `above=`/`below=` another); the normal form always names the place. Layer names
 are letters, digits, `_` and `-` (not `add`, `set`, `rename`, `move`, `merge` or `remove`).
 
-Frames are the animation (plan §4.4): every layer has a cel per frame. `frame add` inserts a
+Frames are the animation: every layer has a cel per frame. `frame add` inserts a
 copy of your frame (or `copy=m`, `link=m`, or `empty`) and `frame <n>` chooses the frame you draw
 on. Views show the frame the agent draws on (`frame=` in the MCP `view`, `--frame` in the CLI);
 `preview.png` shows frame 1.
@@ -417,7 +417,7 @@ line up across a tile's edges and between boxes: `checker`, `bayer2`, `bayer4`, 
 
 ### Ramps
 
-A ramp is an ordered run of palette entries, darkest first (plan §3.1). Palette files define
+A ramp is an ordered run of palette entries, darkest first. Palette files define
 ramps; `ramp <name> = <entry> ...` defines or replaces one in this document's palette (entries by
 name or key). Ramps drive `gradient`, `shade`, `noise`, `voronoi`, `bricks` and `clean ...
 keep=texture`, and the watch view's gradient tool.
@@ -449,7 +449,7 @@ so a texture fills a tile seamlessly by construction.
 
 - `noise ramp=<ramp> weights=<w,...> cluster=a..b density=<share> base=<entry>|keep`: fills the box
   with `base` (default: the entry with the largest weight; `keep` leaves the pixels as they are),
-  then grows clusters of a..b pixels (default 1..3; on cells of 48 px and up it scales with the cell, 2..6 at 48, G14) in the other ramp colours, chosen by weight,
+  then grows clusters of a..b pixels (default 1..3; on cells of 48 px and up it scales with the cell, 2..6 at 48) in the other ramp colours, chosen by weight,
   until about `density` of the box is covered (default 0.15).
 - `scatter stamp=<name>[,<name>...] count=<n> minDist=<d>`: places stamps (chosen at random from
   the list) at points at least `minDist` apart (on a torus with wrap), each by its middle;
@@ -462,7 +462,7 @@ so a texture fills a tile seamlessly by construction.
   W by H with 1-px joints (included in the size), every other course shifted by `offset` (default
   half a brick). A box a whole number of bricks wide repeats seamlessly.
 - `pebbles ramp=<ramp> weights=… size=a..b density=<share> gap=<n> light=<dir> cast=<colour>|none`
-  (G16): stones. Each is an ellipse a..b px wide (default from the cell: 3..4 at 16 px, 3..5 at
+: stones. Each is an ellipse a..b px wide (default from the cell: 3..4 at 16 px, 3..5 at
   24, 5..11 at 48) in a body tone of the ramp (by `weights`, one per entry that has a darker and a
   lighter neighbour), its shadow side one step darker on the edges facing away from the light, and a
   lit pixel one step lighter toward it (a pair on small stones, two on stones 8 px wide or more).
@@ -470,7 +470,7 @@ so a texture fills a tile seamlessly by construction.
   (default 1) is kept clear between them. `cast=<colour>` also lays a cast shadow on the ground,
   away from the light.
 - `tufts ramp=<ramp> size=a..b blades=a..b density=<share> gap=<n> light=<dir> foot=<colour>|none`
-  (G16): grass. Each tuft is a few blades from a row of roots (default 2..3 blades at 16 px, 3..4
+: grass. Each tuft is a few blades from a row of roots (default 2..3 blades at 16 px, 3..4
   at 24, 3..5 from 32), the middle one tallest, the outer ones leaning out; blades on the light's
   side take the ramp's lightest colour, those on the far side a darker step, and `foot` (default
   the ramp's darkest) a row under the roots.
@@ -543,14 +543,14 @@ new sprite chest 24x24 palette=mossy-ruins wrap=off cell=24x24 bg=none <<
 ```
 
 You write `new sprite chest 24x24` (the project palette is read once, and written down), or give
-the block yourself. A tape in language 1 (made before G5: its `new` line has no block) still
+the block yourself. A tape in language 1 (an older tape: its `new` line has no block) still
 replays, reading the project palette as it did; a branch of such a tape stays in language 1. Its
 header says which (`{"pclaw":"tape","lang":1}`), and `verify` refuses a header that does not match
 the tape. So changing or saving a project palette (`palette save`) affects only assets made later.
 
 ### Underlays and snap
 
-An **underlay** is a full-colour image under the art (plan §6): a generated mockup, a sketch, a
+An **underlay** is a full-colour image under the art: a generated mockup, a sketch, a
 photo of a drawing. It sits on a reference layer, stretched over a rectangle of the document, is
 shown faded under transparent pixels (the `render` view, the watch view) and is never part of the
 art or an export. Images are kept as content-addressed blobs (`blobs/<sha256>.png`).
@@ -565,8 +565,8 @@ art or an export. Images are kept as content-addressed blobs (`blobs/<sha256>.pn
   The key, the cost cap and the cost log are described in [mcp.md](mcp.md#underlays-and-the-openai-provider).
 - `underlay import <file.png> [layout=<template.png>|<layer>] [layer=underlay] [at=x,y] [size=WxH]`
   takes any PNG (relative to the project, or an absolute path).
-- The size `underlay generate` asks for follows **the placed area** (`size=`, else the canvas;
-  G13): the supported size nearest its shape (1536x1024 landscape, 1024x1536 portrait, 1024x1024
+- The size `underlay generate` asks for follows **the placed area** (`size=`, else the canvas):
+  the supported size nearest its shape (1536x1024 landscape, 1024x1536 portrait, 1024x1024
   square), so a 16x32 placement on a 48x32 sheet asks for a portrait image. A layer layout is cut
   to that area too.
 - Both run through the server (the MCP `run` tool, the watch view's command line, `pixelclaw run`)
@@ -576,11 +576,11 @@ art or an export. Images are kept as content-addressed blobs (`blobs/<sha256>.pn
   Each such command goes on a line of its own.
 - `snap [from=<underlay layer>] [into=draft] [fit=placement|free]` reads the underlay back into
   pixel art on a **new draft layer** (on top): it fits the image's pixel grid. With
-  `fit=placement` (the default since G13) the grid is the placement's: the pitch is the image's
+  `fit=placement` (the default) the grid is the placement's: the pitch is the image's
   size over the placed size, exactly one block per placed pixel, and only the offset is fitted
   (the edge profile's phase at that pitch), so the draft lands on the placement pixel for pixel.
   `fit=free` searches the pitch too (the edge profile's strongest period within ±15 % of the
-  placement's; G11's rule), which can drift to a nearby period on a draft without a crisp grid.
+  placement's; the original rule), which can drift to a nearby period on a draft without a crisp grid.
   Then
   it takes each block's colour (the median of its middle), quantises it to the palette, and reports
   **block R²** (how much of the image's colour the blocks explain) and, when the underlay has a
@@ -595,7 +595,7 @@ art or an export. Images are kept as content-addressed blobs (`blobs/<sha256>.pn
 
 ### Fonts
 
-A **font** is a glyph sheet (plan §4.6): one cell per character, in the order given.
+A **font** is a glyph sheet: one cell per character, in the order given.
 
 - `new font <name> <W>x<H> [chars="ABC…"|32-126,160] [cols=16] [baseline=<row>] [line=<px>] [spacing=1]`:
   `W`x`H` is a glyph cell; the canvas is `cols` cells across and as many rows as the characters
@@ -616,7 +616,7 @@ A **font** is a glyph sheet (plan §4.6): one cell per character, in the order g
 
 ### Icons
 
-`icon mode=tone|full|channel` sets how an icon is exported (plan §4.5): **tone** art is recoloured
+`icon mode=tone|full|channel` sets how an icon is exported: **tone** art is recoloured
 by the game (role entries, written through the profile's role colours), **full** art is drawn as
 is (often a white silhouette), **channel** art is pure-RGB channel masks (every colour's channels
 0 or 255, written exactly). Without it an icon is `tone` when its palette has roles, else `full`.
@@ -635,7 +635,7 @@ reordered (pixels store entry numbers); the names on the tape stay valid.
 - `palette add [<name>] hex=#rrggbb [key=<k>]` appends an entry. Without a name it is called
   `c<N>` (N = its position); without a key it gets the first free one (`0-9`, `a-z`, `A-Z`, then
   punctuation). The normal form always records both.
-- **Roles** (recolourable art, plan §3.1): `palette add <name> role=<role>` and `palette set
+- **Roles** (recolourable art): `palette add <name> role=<role>` and `palette set
   <entry> role=<role>|none`. The roles are `black`, `white`, `light`, `dark` and `darkest`. A role
   entry stands for a colour a theme gives it; its own `hex` (by default the grey theme's) is only
   what it looks like without a theme. In role art (a palette with any role entry) the `palette`
@@ -651,7 +651,7 @@ reordered (pixels store entry numbers); the names on the tape stay valid.
 `palette lock` locks this document's palette: `palette set`, `palette add` and `ramp` are refused
 (`palette 'mossy-ruins' is locked (palette unlock to change it)`) until `palette unlock`. Colours
 outside the palette are always refused (`c=#ff00ff is not in palette 'mossy-ruins'`), locked or
-not. Importing images (G9) will quantise to a locked palette.
+not. Importing images will quantise to a locked palette.
 
 `palette save as=<name>` writes this document's palette, as it is at that line, to the project as
 `palettes/<name>.json`, for other assets to use (`new ... palette=<name>`). It is refused if the
@@ -670,7 +670,7 @@ on the canvas. `note done n1` closes one. Undoing a note's group removes it.
 
 ### Marks
 
-`mark <name> ["text"]` names this point on the tape (plan §7.2): `mark reviewed "blind review
+`mark <name> ["text"]` names this point on the tape: `mark reviewed "blind review
 g10: 5 findings fixed"`. Names are words (a-z, 0-9, `_`, `-`). Three set an asset's status
 (see [pipeline.md](pipeline.md#statuses)): `reviewed` (the agent, after a blind review's findings
 are dealt with), `approved` and `rejected` (a person, from the dashboard). Each mark keeps the
@@ -735,7 +735,7 @@ first three):
 - **render**: a nearest-neighbour PNG. The default scale gives about 192 px on the long side
   (8x for a 24 px tile). It has a faint pixel grid, stronger lines every 8 px, rulers labelled
   every 8 px, magenta cell lines on sheets, and a grey checkerboard for transparent pixels.
-  `--region` shows part of the canvas (G15), at the scale given, the rulers keeping the canvas's
+  `--region` shows part of the canvas, at the scale given, the rulers keeping the canvas's
   coordinates.
 - **grid**: the text index grid. There is one character per pixel (its key; `.` for transparent),
   with column and row numbers and a legend of the keys used with pixel counts.
@@ -743,7 +743,7 @@ first three):
 - **tile3x3**: the document repeated 3x3, at 1x and at 4x (or `--scale`) side by side, to show
   seams and repetition.
 
-A region is written the same way everywhere (G15): `x,y WxH`, `x,y,WxH` or `x,y,W,H`, in
+A region is written the same way everywhere: `x,y WxH`, `x,y,WxH` or `x,y,W,H`, in
 `--region`, MCP `view region=`, and `import … region=` (quote the form with a space:
 `region="0,0 24x24"`).
 - **diff**: before and after side by side at the render scale. Each changed pixel is outlined in
@@ -759,7 +759,7 @@ A region is written the same way everywhere (G15): `x,y WxH`, `x,y,WxH` or `x,y,
   tile; the set is `--with` (repeatable), else every other asset of the same kind and size that
   does not wrap, leaving out branches of the same asset. A sprite with views shows its other
   directions (each view's first frame) beside it first.
-- **anim**: the contact sheet (plan §2): one row per sequence (tags, views, or all frames), each
+- **anim**: the contact sheet: one row per sequence (tags, views, or all frames), each
   frame with its number and ticks above it, the frame before it in the sequence tinted red under
   it (the onion skin), the pivot and ground line in cyan, and under it the share of pixels changed
   from the frame before (`2>3 17%`; under the first frame of a cycle, the loop seam). The text gives
@@ -768,7 +768,7 @@ A region is written the same way everywhere (G15): `x,y WxH`, `x,y,WxH` or `x,y,
   speed (tiles 3x3).
 - **recolour**: role art under several preview themes side by side (`--themes a,b,c`, default the
   first six), each with a strip of its role colours.
-- **map**: a sample map built with a family's scheme (plan §2, §4.2): a random island of
+- **map**: a sample map built with a family's scheme: a random island of
   `--size CxR` tiles (default 12x10) from `--seed N` (default 1), each tile its variant, at the
   game's draw scale (`--scale`, default 2). The text gives the seam score over the map (the same
   metric as a tile's, over the composed map) and how often each variant appears. Overlays given
@@ -803,7 +803,7 @@ resolved by author when first written (the tape records the group they chose).
 
 - every line replays and is still in normal form;
 - two replays give the same bytes;
-- the result matches the state hash in `asset.json` (a hash written before G4, in the older state
+- the result matches the state hash in `asset.json` (a hash written by an early version, in the older state
   format, is accepted until the asset is saved again);
 - the result re-renders to the committed `preview.png`;
 - every checkpoint matches the replay at its point, byte for byte, and none is missing.

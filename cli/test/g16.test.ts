@@ -1,4 +1,4 @@
-// G16 (plan §26) from the command line: the structure generators take the style guide's light and
+// G16 from the command line: the structure generators take the style guide's light and
 // are ranked by `seeds`.
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -28,7 +28,7 @@ beforeEach(() => {
 });
 afterEach(() => rmSync(tmp, { recursive: true, force: true }));
 
-describe('item 1: pebbles and tufts from the CLI', () => {
+describe('pebbles and tufts from the CLI', () => {
   it('seeds ranks a pebbles line; the lines carry the style guide\'s light', () => {
     const r = cli(['seeds', proj, 'shingle', 'pebbles', 'ramp=stone', '--count', '4']);
     expect(r.err).toBe('');

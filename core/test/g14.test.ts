@@ -1,4 +1,4 @@
-// G14 (plan §24): map-scale variety and 48 px, in core. Each test failed before its change.
+// G14: map-scale variety and 48 px, in core. Each test failed before its change.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -27,7 +27,7 @@ function bed(name: string, seed: number, pebble: [number, number] | null, o: { s
   return run(EMPTY, lines.join('\n')).doc!;
 }
 
-describe('item 1: the map-scale lattice check', () => {
+describe('the map-scale lattice check', () => {
   // examples/demo-g13's floor: bed (seed 3, a pebble at 6,9) and its variant bed_b (seed 41, no pebble).
   const g13 = { bed: bed('bed', 3, [6, 9]), bed_b: bed('bed_b', 41, null, { of: 'bed' }) };
   const floor = (docs: Record<string, Doc>, s = 1) => run(EMPTY, `new map floor 12x8 tile=${16 * s}\ntiles floor fill bed`, docs).doc!;
@@ -70,7 +70,7 @@ describe('item 1: the map-scale lattice check', () => {
   });
 });
 
-describe('item 2: tiles <layer> fill mix=', () => {
+describe('tiles <layer> fill mix=', () => {
   const docs = {
     bed: bed('bed', 3, [6, 9]), bed_b: bed('bed_b', 41, null, { of: 'bed' }),
     bed_c: bed('bed_c', 52, [2, 3], { of: 'bed' }), gravel: bed('gravel', 9, null),
@@ -149,7 +149,7 @@ describe('item 2: tiles <layer> fill mix=', () => {
   });
 });
 
-describe('item 4: the 48 px audit in core', () => {
+describe('the 48 px audit in core', () => {
   it('noise: specks scale with the cell when cluster= is left out (1..3 to 47 px, 2..6 at 48)', () => {
     const at = (t: number) => run(EMPTY, `new tile n ${t}x${t} bg=moss2\nnoise ramp=moss`).entries.at(-1)!.cmd;
     expect(at(24)).toMatch(/ cluster=1\.\.3 /);

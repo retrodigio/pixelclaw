@@ -1,4 +1,4 @@
-// The MCP tools (plan §8.2): project, run, view, history and changes. Few tools; the command
+// The MCP tools: project, run, view, history and changes. Few tools; the command
 // language carries the rest. Every call goes through the writer's queue, in the order it arrives.
 
 import { McpServer, type CallToolResult } from '@modelcontextprotocol/server';
@@ -86,7 +86,7 @@ Autotile families (a sheet of every variant of a scheme: blob47, blob47-round, w
   new overlay <name> <W>x<H> ; overlay set mode=cycle|pingpong|wave|sparkle on=outside|inside|all [anchor=x,y] [spread=4x2] [every=3]   sub-tile sprites over a map (view map with=)
 Oversized tiles and objects (48x48, 24x48, …; cell= the grid): new object house 48x48 cell=24x24 ; footprint 2x1 [at=<cx,cy>] [anchor=<x,y>] << a row per art cell row: . b (blocks) r (roof, drawn above actors) x (both) >>
   variant of=<asset> [band=inherit]   this asset is a texture variant of another (fork it, change the inside, keep the border): maps pick among them cell by cell; band=inherit (families): the band stays the base's, now and after later fixes
-Maps (plan §4.11: cells of tile px holding names; a map redraws itself when a tile changes):
+Maps (cells of tile px holding names; a map redraws itself when a tile changes):
   new map <name> <C>x<R> tile=24   layer add <name> terrain=<family> [outside=on] [walkable=on] | tiles | objects [shadow=darker|<colour>|off] (objects cast shadows on the ground; default the style guide's style.shadow) | overlay=<overlay> on=<terrain layer>[:out]|all   (walkable: objects may stand on its filled ground; layer set <layer> walkable=on|off)
   tiles <tiles layer> fill <tile> [<x,y> <W>x<H>] [replace]   a one-cell tile on every empty cell (the floor in one line)
   tiles <tiles layer> fill mix=<tile>:<weight>,... [box] [variants=named]   a seeded scatter of several tiles by weight, no two equal neighbours where it can help it (two tiles: no 2x2 block of one; a tile's weight is shared with its variants the mix does not name)
@@ -202,7 +202,7 @@ export interface McpHost {
 
 export interface McpOptions {
   /**
-   * The headless worker's connection (plan §26 item 1): every file path a tool takes must be inside
+   * The headless worker's connection: every file path a tool takes must be inside
    * the project folder, another project cannot be opened, and the image provider is not called.
    */
   confined?: boolean;
@@ -487,7 +487,7 @@ export function createMcpServer(host: McpHost, version: string, mo: McpOptions =
 
   server.registerTool('export', {
     title: 'Export through a profile',
-    description: 'Write assets out through an export profile (plan §4.9): built-in png (loose PNGs), atlas (a page plus JSON records), tiled (.tsx wang sets per family, .tmx per map), ' +
+    description: 'Write assets out through an export profile: built-in png (loose PNGs), atlas (a page plus JSON records), tiled (.tsx wang sets per family, .tmx per map), ' +
       'godot (a TileSet with terrains per family), aseprite-json (Aseprite sheets), aseprite (.aseprite files), or the project\'s own (profiles/*.json: naming templates, numbered sets, density pages, role colours, CSV, snippets; docs/profiles.md). ' +
       'Without assets, every asset; a map brings what it draws, an asset its texture variants and density copies. format=split|png|strip|bmfont instead writes one asset on its own (one-cell pieces plus a stamp, a PNG, or a font as a glyph strip or BMFont).',
     inputSchema: z.object({
@@ -517,7 +517,7 @@ export function createMcpServer(host: McpHost, version: string, mo: McpOptions =
 
   server.registerTool('import', {
     title: 'Import images',
-    description: 'Bring art in (plan §4.9, §21). A PNG becomes a new asset quantised to a palette (palette=, default the project\'s; build=true makes one from the image); grid="24x24" slices a sheet into frames ' +
+    description: 'Bring art in. A PNG becomes a new asset quantised to a palette (palette=, default the project\'s; build=true makes one from the image); grid="24x24" slices a sheet into frames ' +
       '(cells=true keeps it one image with that cell grid); slice="24x24" instead cuts a sheet into separate assets, one per non-empty cell (offset="x,y", gap="x,y"), named by pattern ("{name}_{n}", "{name}_{col}_{row}"), names (a list, in reading order), or namesFrom="manifest" (the planned, undrawn entries of set=, in order). ' +
       'A folder (without profile) imports every .png and .aseprite in it. An .aseprite file keeps its layers, frames, durations, tags and views. New assets the manifest does not plan get entries (in set=; manifest=false leaves the manifest alone), and every check is run on each. ' +
       'With profile=, path is a folder a profile wrote: each image is read back by name into the asset it came from and the result says which match the project exactly; images no asset exports become new assets. The new tapes start with import commands; the files are kept under blobs/.',
@@ -564,11 +564,11 @@ export function createMcpServer(host: McpHost, version: string, mo: McpOptions =
     }
   }));
 
-  // Filing, answering and withdrawing requests (plan §26 item 2): what the dashboard's buttons do.
+  // Filing, answering and withdrawing requests: what the dashboard's buttons do.
   // Not on the worker's own connection: it takes requests, it does not file or answer them.
   if (!mo.confined) server.registerTool('request', {
     title: 'File, answer or withdraw a request',
-    description: 'Ask for work the way the dashboard does (plan §21, §26): kind "draw" a planned asset not drawn yet; "change" a drawn one (note says what; this also writes `mark rejected "<note>"` on its tape); ' +
+    description: 'Ask for work the way the dashboard does: kind "draw" a planned asset not drawn yet; "change" a drawn one (note says what; this also writes `mark rejected "<note>"` on its tape); ' +
       '"add" a new asset (entry: its manifest entry, validated with the whole manifest; nothing is written if it has problems). action "reply" answers a blocked request (id, text) and opens it again; ' +
       '"cancel" withdraws one (id, optional text). The worker (`pixelclaw work`, Start Claude) or an agent with `work` takes open requests. Returns the request as it stands.',
     inputSchema: z.object({
@@ -592,7 +592,7 @@ export function createMcpServer(host: McpHost, version: string, mo: McpOptions =
 
   server.registerTool('work', {
     title: 'Work on requests',
-    description: 'The request queue (plan §21): what people asked for in the dashboard (draw a planned asset, change a drawn one, a new asset). ' +
+    description: 'The request queue: what people asked for in the dashboard (draw a planned asset, change a drawn one, a new asset). ' +
       'With no action (or action "next"), claim the next open request (or the one named by id) and get what is asked, with the asset\'s plan entry and status. ' +
       'action "progress" posts a short note the person sees; "done" finishes it with what changed; "blocked" stops it with one clear question for the person (they answer in the dashboard and it opens again). ' +
       '"list" shows every request still open, claimed or blocked. Take requests before planned work; call plan after each one.',
@@ -624,7 +624,7 @@ export function createMcpServer(host: McpHost, version: string, mo: McpOptions =
 
   server.registerTool('review', {
     title: 'Write a blind review bundle',
-    description: 'Write a review bundle for a fresh-context reviewer (plan §5): each asset at game scale and with rulers for coordinates, tiles repeated 3x3, ' +
+    description: 'Write a review bundle for a fresh-context reviewer: each asset at game scale and with rulers for coordinates, tiles repeated 3x3, ' +
       'sprites on their ground beside their set, autotile families on a map (size and seed choose it) and every variant among its neighbours, the palette, the style guide and a rubric (readability, cohesion, seams, style-guide fit, defects with coordinates). ' +
       'It names no method and no author, so the reviewer judges blind. Hand the folder to a new agent with no other context, ask it to follow rubric.md, ' +
       'then pin its findings on the pixels with note commands.',
@@ -647,7 +647,7 @@ export function createMcpServer(host: McpHost, version: string, mo: McpOptions =
 
   server.registerTool('plan', {
     title: 'The plan: manifest and statuses',
-    description: 'The project\'s asset plan (plan §7.3) and where each asset stands: planned → drafted (exists) → checked (every check passes) → reviewed (`mark reviewed` after a blind review\'s findings are dealt with) → ' +
+    description: 'The project\'s asset plan and where each asset stands: planned → drafted (exists) → checked (every check passes) → reviewed (`mark reviewed` after a blind review\'s findings are dealt with) → ' +
       'approved (a person, in the dashboard) → exported (through a profile, with the art as it is now). Lists what is left and what is failing, by set. ' +
       'manifest= writes manifest.json (checked against its schema first; nothing is written if it has problems): { "format": "pixelclaw-manifest", "version": 1, "theme": "…", "sets": {…}, "export": { "profile": "…" }, ' +
       '"assets": [{ "name", "kind", "size", "set", "description", "palette", "scheme", "inside", "outside", "band", "frames", "ticks", "views", "mirror", "cells", "height", "variantOf", "recolourOf", "uses", "flat" }] } (docs/pipeline.md). ' +

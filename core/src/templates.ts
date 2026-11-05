@@ -1,4 +1,4 @@
-// Flat templates (plan §7.3 step 3): drawn by the tool from the manifest before any art exists,
+// Flat templates: drawn by the tool from the manifest before any art exists,
 // free to iterate. A coverage map per planned family (every variant its scheme can produce, laid
 // out by `coverageTerrain` and drawn in flat colours with the band's shape, so `blob47-round`'s
 // fillets and rounded corners show), and a mockup screen: one game screen laid out from the
@@ -59,8 +59,8 @@ function paintTerrain(img: Rgba, s: Scheme, terrain: Terrain, t: number, g: Geom
   variants.forEach((v, i) => {
     const mx = (i % terrain.cols) * t + ox, my = Math.floor(i / terrain.cols) * t + oy;
     if (v !== null && isFace(s.variants[v]!.on)) {
-      // A face (G13): a south face's upper half in the face colour, on the outside; a side face's or
-      // a corner's quadrants that carry it (G16).
+      // A face: a south face's upper half in the face colour, on the outside; a side face's or
+      // a corner's quadrants that carry it.
       if (c.outside) fillRect(img, mx, my, t, t, c.outside);
       const x = s.variants[v]!;
       if (x.on === 'face') fillRect(img, mx, my, t, Math.max(1, t / 2), darker(c.band));

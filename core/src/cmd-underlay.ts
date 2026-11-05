@@ -1,4 +1,4 @@
-// Underlays and snap as commands (plan §6). `underlay <layer> blob=<sha256> …` puts an image (a
+// Underlays and snap as commands. `underlay <layer> blob=<sha256> …` puts an image (a
 // blob in the project: a generated mockup or an imported file) on a reference layer, stretched
 // over a rectangle of the document; it is never part of the art. The server turns
 // `underlay generate "<prompt>" …` and `underlay import <file>` into this form (after calling the
@@ -128,7 +128,7 @@ const snapCmd: CommandSpec = {
       if (img.width !== u.iw || img.height !== u.ih) throw new DiagError(cmd.line, cmd.col, `snap: the blob is ${img.width}x${img.height}, the underlay says ${u.iw}x${u.ih}`);
       const layout = u.layout ? ctx.image?.(u.layout) ?? null : null;
       // fit=placement (the default): the placement's grid, one block per document pixel it covers;
-      // fit=free: the strongest grid near the placement's pitch (the G11 rule).
+      // fit=free: the strongest grid near the placement's pitch (the default rule).
       const r = snapImage(img, doc.palette, { hint: { x: u.iw / u.w, y: u.ih / u.h }, ...(free ? {} : { cells: { cols: u.w, rows: u.h } }), layout });
       const keys = doc.palette.entries.map((e) => e.key);
       rows = Array.from({ length: r.fit.rows }, (_, j) => Array.from({ length: r.fit.cols }, (_, i) => {

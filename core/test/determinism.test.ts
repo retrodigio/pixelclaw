@@ -1,4 +1,4 @@
-// core must stay host-free and deterministic (plan §8.1): no clock, no Math.random, no DOM or Node.
+// core must stay host-free and deterministic: no clock, no Math.random, no DOM or Node.
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';

@@ -1,4 +1,4 @@
-// G14 (plan §24) in the browser: a 48 px project (its grid set through MCP) is shown at its own
+// G14 in the browser: a 48 px project (its grid set through MCP) is shown at its own
 // scale: the gallery and the family's sample map at the draw scale (1x from 48 px, not 2x), the
 // preview's island about 288 px across, and the map editor's camera 16x9 cells of the grid.
 

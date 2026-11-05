@@ -1,4 +1,4 @@
-// Marks (plan §7.2, §7.3): `mark <name> ["text"]` names a point on the tape. Three names set an
+// Marks: `mark <name> ["text"]` names a point on the tape. Three names set an
 // asset's status: `reviewed` (the agent, once a blind review's findings are dealt with),
 // `approved` and `rejected` (a person, in the dashboard). Each mark keeps the art's hash, so a
 // later change to the art makes it stale; undoing the group takes the mark away.

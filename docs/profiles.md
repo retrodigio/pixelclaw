@@ -4,7 +4,7 @@ A profile is a JSON file that says how a game wants its art: what every image is
 images are laid out (loose files, an atlas page with records, sheets, Tiled or Godot tile sets,
 Aseprite files), which density levels it reads, the colours role entries are written as, and the
 text entries (snippets) it wants beside the art. Game-specific knowledge lives in profiles, not in
-the tool (plan §4.9, §7). The same profile reads its files back: **exporting and then importing
+the tool. The same profile reads its files back: **exporting and then importing
 gives the same palette indices**.
 
 - Built-in profiles: `png`, `atlas`, `tiled`, `godot`, `aseprite-json`, `aseprite`
@@ -54,20 +54,20 @@ Only `name` and `layout` are required.
 | `layout` | `loose` (one PNG per image), `atlas` (one page per density with records), `sheet` (one sheet per asset), `tiled`, `godot`, `aseprite-json`, `aseprite` | — |
 | `include`, `exclude` | Asset names or kinds. Density copies are never exported on their own (they are their base's levels). | every asset; maps only for `tiled`; families only for `godot` |
 | `names` | Templates for an image's name (below). `start` is the first number of a numbered set. | `{asset}`, `{asset}_{n}`, `{asset}_{view}_{n}`, `{asset}_{cx}_{cy}`, 0 |
-| `autotile` | Per scheme name (or `*`): `names` maps a variant (or `inside`, `outside`) to a template; other variants use `template` when their name is side letters plus corners. `sides` orders the side letters; `corners` (G13) orders the corner suffixes, the four of `ne,se,sw,nw` comma-separated (`nw,ne,se,sw` writes `nesw_nw_ne_se_sw`; default: as the variant name has them). `shapes` (G13) gives a template per shape of a side-letter variant, by its joined sides: `lone` (none), `end` (one: a path's dead end), `straight` (two opposite), `corner` (two beside), `tee` (three), `cross` (four); a shape without one uses `template`. So a path's dead ends are named apart from its straights. | `{asset}_{variant}`, `{asset}_inside`, `{asset}_outside` |
+| `autotile` | Per scheme name (or `*`): `names` maps a variant (or `inside`, `outside`) to a template; other variants use `template` when their name is side letters plus corners. `sides` orders the side letters; `corners` orders the corner suffixes, the four of `ne,se,sw,nw` comma-separated (`nw,ne,se,sw` writes `nesw_nw_ne_se_sw`; default: as the variant name has them). `shapes` gives a template per shape of a side-letter variant, by its joined sides: `lone` (none), `end` (one: a path's dead end), `straight` (two opposite), `corner` (two beside), `tee` (three), `cross` (four); a shape without one uses `template`. So a path's dead ends are named apart from its straights. | `{asset}_{variant}`, `{asset}_inside`, `{asset}_outside` |
 | `variants` | Texture variants (`variant of=`): `frames` numbers them after their base's frames (`moss_1`, `moss_2` for moss; `moss_3`, `moss_4` for moss_b); `names` exports each under its own name. | `frames` |
 | `mirrors` | Mirror views (`view W mirror=E`): `bake` writes their flipped frames; `flag` leaves them out and marks the source's images (`mirror` column, `{mirror}` in snippets) for an engine that flips at draw time. | `bake` |
 | `oversized` | Assets larger than one cell or with a footprint: `sprite` writes one image with its footprint and pivot in the records; `split` writes one-cell pieces named by `names.piece`. | `sprite` |
 | `roles` | The colour each role (`black`, `white`, `light`, `dark`, `darkest`) is written as. Import reads those colours back as the role entries. Two entries written as one colour are reported. | the entries' own colours |
-| `colours` | (G13) A per-colour output map: a palette entry (by name, or `<palette>.<entry>`) to `#rrggbb` or a role (written as `roles` gives it, which must give it). An engine that draws in tones is targeted by mapping each colour to its tone, without a script. Over `roles`. Import reads the colours back; entries written as one colour are reported and read back as the first. | none |
+| `colours` | A per-colour output map: a palette entry (by name, or `<palette>.<entry>`) to `#rrggbb` or a role (written as `roles` gives it, which must give it). An engine that draws in tones is targeted by mapping each colour to its tone, without a script. Over `roles`. Import reads the colours back; entries written as one colour are reported and read back as the first. | none |
 | `density` | The levels written (each exactly d times the base frame). File names get `suffix` except at the `plain` level. A level with an authored copy (`density of=`) uses it; else, with `reduce`, the highest authored copy above it is reduced with `reducer`; else the base is scaled up (nearest neighbour). Notes say which. | `[1]` |
 | `page` | Atlas: the page's name and file, its width at 1x (times d per level), padding between images, and whether images are trimmed to their opaque pixels. Sheets: `columns` (a family keeps its own sheet layout). | `atlas`, `{page}.png`, 256, 1, trim on |
 | `records` | `csv` or `json` beside a page (or a sheet, or loose files), the file template and the columns. | atlas: CSV, `{page}.csv`, the columns below |
 | `image` | Loose and sheet file names: `{name}` (loose) or `{asset}` (sheet). | `{name}.png`, `{asset}.png` |
-| `fonts` | Fonts (G11): `format` `strip` (a glyph strip `{asset}.png` and its characters `{asset}.txt`), `bmfont` (`{asset}.fnt` and `{asset}_0.png`), `both`, or `sheet` (the glyph sheet as an ordinary image); `separator`, the strip's separator colour; `maxLine`, the line-height limit (an export over it is noted). | `strip`, `#ff0000` |
+| `fonts` | Fonts: `format` `strip` (a glyph strip `{asset}.png` and its characters `{asset}.txt`), `bmfont` (`{asset}.fnt` and `{asset}_0.png`), `both`, or `sheet` (the glyph sheet as an ordinary image); `separator`, the strip's separator colour; `maxLine`, the line-height limit (an export over it is noted). | `strip`, `#ff0000` |
 | `snippets` | One text file; a template per asset kind (`sprite`, `tile`, `object`, `overlay`, `icon`, `sheet`, `font`), `family`, or `default`. | none |
 
-Icons are written in their export mode (G11): `tone` icons through `roles` like any role art,
+Icons are written in their export mode: `tone` icons through `roles` like any role art,
 `full` and `channel` icons in their palette colours exactly as drawn. The record column `mode` and
 the snippet variable `{mode}` give an icon's mode (empty for other kinds).
 
@@ -170,7 +170,7 @@ as `blobs/<sha256>.<ext>` and named in the line (`from="…" blob=<sha256>`).
 
 ## Densities
 
-A density set is one asset at 1x, 2x and 4x (plan §4.7):
+A density set is one asset at 1x, 2x and 4x:
 
 ```
 fork house house_2x
@@ -221,7 +221,7 @@ A project's own autotile schemes live in `<project>/schemes/*.json` (the format 
 line (`def="…"`, its JSON), like the palette, so the tape replays without the file. A project
 scheme with a built-in's name wins over the built-in.
 
-`blob47-round` (built in since G15; the example project keeps its own copy, so its lines still carry `def=`) is blob47 with rounder inner corners: a diagonal counts
+`blob47-round` (built in; the example project keeps its own copy, so its lines still carry `def=`) is blob47 with rounder inner corners: a diagonal counts
 when either side next to it is the terrain, so an edge knows the terrain turns an inner corner at
 its end and bends into it, the inner corner's arcs widen, and the cell outside the corner gets the
 rounding's tip (15 fillet variants drawn in outside cells). `family band … fillet=<px>` says how

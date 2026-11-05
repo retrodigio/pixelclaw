@@ -1,4 +1,4 @@
-// Small macros (plan §3.3): `def tuft(x,y) { px $x,$y $x+1,$y-1 c=moss2 ; px $x+2,$y c=moss1 }`
+// Small macros: `def tuft(x,y) { px $x,$y $x+1,$y-1 c=moss2 ; px $x+2,$y c=moss1 }`
 // keeps a body of commands in the document; `call tuft 5,18` runs it with x=5, y=18. In a body,
 // `$x` is a parameter, `$x+1` (and -, *, / chained left to right) is arithmetic on it, and `$(...)`
 // is any integer expression of the parameters. A call is one line on the tape; replay expands it

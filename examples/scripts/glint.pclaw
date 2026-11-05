@@ -1,4 +1,4 @@
-# Mossy ruins: a glint on the water (plan §4.3), an overlay: a 5x5 sparkle that flares and fades in
+# Mossy ruins: a glint on the water, an overlay: a 5x5 sparkle that flares and fades in
 # three frames, shown now and then on the water tiles of a map, each at its own moment and place.
 new overlay glint 5x5 palette=ruins-water
 px 2,2 c=water3

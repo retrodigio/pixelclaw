@@ -1,4 +1,4 @@
-// The project folder (plan §7.1): project.json, palettes/, assets/<name>/{asset.json, tape.jsonl,
+// The project folder: project.json, palettes/, assets/<name>/{asset.json, tape.jsonl,
 // preview.png, checkpoints/}. Everything here is plain files so a project diffs well in git.
 
 import { createHash } from 'node:crypto';
@@ -43,7 +43,7 @@ export interface AssetJson {
   views: unknown[];
   /** `{ "fork": { "from": <asset>, "at": <seq> } }` for a branch. */
   links: unknown[];
-  /** The open notes (plan §1.3): pinned to a pixel (1x1) or a region. */
+  /** The open notes: pinned to a pixel (1x1) or a region. */
   notes: Note[];
   tape: { lang: number; commands: number; groups: number };
   state: { sha256: string };
@@ -150,7 +150,7 @@ export function isInsideProject(p: Project, path: string): boolean {
   return r === root || r.startsWith(root + sep);
 }
 
-/** The worker's fence (plan §26 item 1): a ProjectError unless the path is inside the project folder. */
+/** The worker's fence: a ProjectError unless the path is inside the project folder. */
 export function needInsideProject(p: Project, path: string, what: string): void {
   if (!isInsideProject(p, path)) throw new ProjectError(`${what}: '${path}' is outside the project folder, and the worker stays inside it`);
 }
@@ -214,7 +214,7 @@ export function readPaletteFile(file: string): Palette {
   }
 }
 
-/** The project's grid: the cell size in pixels that new maps, the camera and the draw scale default to (G14). */
+/** The project's grid: the cell size in pixels that new maps, the camera and the draw scale default to. */
 export function setGrid(p: Project, grid: number): void {
   if (!Number.isInteger(grid) || grid < 4 || grid > 256) throw new ProjectError('grid must be the cell size in pixels, 4..256');
   p.json.grid = grid;
@@ -241,7 +241,7 @@ export function previewPng(doc: Doc): Uint8Array {
   return encodePng(renderFlat(doc));
 }
 
-// Checkpoints (plan §7.1): checkpoints/NNNNNN.gwc holds the document after the first N commands
+// Checkpoints: checkpoints/NNNNNN.gwc holds the document after the first N commands
 // (N a multiple of CHECKPOINT_EVERY): a header line naming N and the SHA-256 of those N tape lines,
 // then the state bytes (serializeDoc). Loading starts from the newest one whose tape prefix still
 // matches; `pixelclaw verify` replays and compares every one byte for byte.
@@ -328,7 +328,7 @@ export function saveAsset(p: Project, state: AssetState, docAt?: (n: number) => 
   return dir;
 }
 
-// Read positions (plan §8.2 `changes`): for each agent, the last tape position it has seen on each
+// Read positions: for each agent, the last tape position it has seen on each
 // asset. Kept in <project>/reads.json so a restarted server still knows what the agent has seen.
 
 export const READS_FILE = 'reads.json';

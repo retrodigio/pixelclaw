@@ -1,6 +1,6 @@
 # The worker: Claude Code without a session
 
-People ask for work in the dashboard (plan §21; [pipeline.md](pipeline.md#requests-from-the-dashboard)),
+People ask for work in the dashboard,
 but an MCP server cannot wake a Claude session. When nobody has Claude Code open on the project,
 the **worker** works the queue: a headless Claude Code session (`claude -p`) connected to the
 project's PixelClaw server and given the PixelClaw skill, which takes requests with the `work`
@@ -91,9 +91,9 @@ How each is enforced:
 | a token of its own | each run gets a fresh MCP token (not the watch link's); the server gives that connection the fenced tools above, and refuses it once the run ends |
 | `args` and `command` checked | the worker refuses to start if a setting would add or change any of these flags (below) |
 
-`--allowedTools` alone (G12) only pre-approved PixelClaw's tools: the built-in ones stayed in the
+`--allowedTools` alone only pre-approved PixelClaw's tools: the built-in ones stayed in the
 session, and Claude Code lets read-only shell commands and reads inside the working folder run
-without asking, so A2's worker ran `find`, `grep` and `python` and read another checkout.
+without asking, so a worker could run `find`, `grep` and `python` and read another checkout.
 
 ### Settings cannot widen it
 
@@ -201,5 +201,5 @@ The tests never call a model.
   request. The test checks that the model was only ever offered PixelClaw's twelve tools, that
   every built-in call came back "No such tool available", that the other project was refused, that
   nothing from outside the project (a file, a parent folder's `CLAUDE.md`) reached the model, and
-  that the request was done and its cost entered in the ledger. With G12's flags the same model
+  that the request was done and its cost entered in the ledger. With the older, weaker flags the same model
   ran `cat project.json` in a shell.

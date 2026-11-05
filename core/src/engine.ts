@@ -482,7 +482,7 @@ export function parseTape(text: string): TapeEntry[] {
 }
 
 /**
- * A language 1 tape written in the current language (plan §14 `pixelclaw upgrade`): its `new` line
+ * A language 1 tape written in the current language: its `new` line
  * takes the palette it read from the project, written into the line. Every other line, author,
  * group and time is kept. Null when the tape is already current; an error when the `new` line no
  * longer normalises (its palette is missing).

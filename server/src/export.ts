@@ -1,6 +1,6 @@
-// G8's single-asset exports (plan §4.10): an oversized asset `split` into one-cell pieces plus the
+// Single-asset exports: an oversized asset `split` into one-cell pieces plus the
 // stamp that puts them back, and a plain PNG (a map composed at 1x, or any asset's first frame);
-// G11's font formats: a glyph strip (with its characters) and BMFont (plan §4.6).
+// Font formats: a glyph strip (with its characters) and BMFont.
 // Everything else, Tiled maps included, goes through export profiles (io.ts).
 
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -10,7 +10,7 @@ import {
 } from '@pixelclaw/core';
 import { ProjectError } from './project.ts';
 
-/** G8's single-asset exports; everything else goes through a profile (io.ts). */
+/** Single-asset exports; everything else goes through a profile (io.ts). */
 export const EXPORT_FORMATS = ['split', 'png', 'strip', 'bmfont'] as const;
 export type ExportFormat = (typeof EXPORT_FORMATS)[number];
 

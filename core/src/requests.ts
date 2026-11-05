@@ -1,4 +1,4 @@
-// Requests (plan §21): what a person asks the agent for from the dashboard, kept as an append-only
+// Requests: what a person asks the agent for from the dashboard, kept as an append-only
 // list of records (requests.jsonl). A request is opened by a person (`request`: draw a planned
 // asset, change a drawn one, or a new asset), then the agent claims it, posts progress, and
 // finishes it (`done`, with what changed) or stops on a question (`blocked`). The person answers a

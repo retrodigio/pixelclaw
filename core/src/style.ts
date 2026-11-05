@@ -9,7 +9,7 @@
 //     "sizes": { "sprite": "24x24" },               required sizes per kind (coverage)
 //     "checks": { "orphans": { "max": 1.5, "tile": { "max": 3 } } },
 //     "assets": { "stone_floor": { "checks": { "repetition": { "off": true } }, "ground": "...", "set": ["..."] } },
-//     "shadow": { "c": "darker", "dir": "se" }      the shadow helper's and maps' object shadows (G16)
+//     "shadow": { "c": "darker", "dir": "se" }      the shadow helper's and maps' object shadows
 //   },
 //   "themes": { "rust": { "light": "#e0a070", "dark": "#a05030", "darkest": "#301008" } }
 
@@ -27,15 +27,15 @@ export interface StyleJson {
   /** The engine's screen in art pixels ("384x216"): the map camera's view (default 16x9 cells of the project's grid). */
   camera?: string;
   sizes?: Record<string, string>;
-  /** Densities (plan §4.7): the reducer the density check runs, and its options. */
+  /** Densities: the reducer the density check runs, and its options. */
   density?: { reducer?: string; ink?: string[]; share?: [number, number] };
   checks?: Record<string, unknown>;
   assets?: Record<string, { checks?: Record<string, unknown>; ground?: string; set?: string[] }>;
   /** The light direction (n, ne, … nw): `shade`'s default and what `consistency` holds the art to. */
   light?: string;
-  /** Colours reserved for some assets (G16): entry name → the assets that may use it (the palette check flags the rest). */
+  /** Colours reserved for some assets: entry name → the assets that may use it (the palette check flags the rest). */
   reserved?: Record<string, string[]>;
-  /** Shadows (G16): `c` an entry or `darker` (a step down the ground's ramps, on maps), `dir` where they fall (default: away from the light). */
+  /** Shadows: `c` an entry or `darker` (a step down the ground's ramps, on maps), `dir` where they fall (default: away from the light). */
   shadow?: { c?: string; dir?: string };
   /** Per manifest set: check thresholds (`{ "props": { "checks": { "orphans": { "max": 2 } } } }`). */
   sets?: Record<string, { checks?: Record<string, unknown> }>;
@@ -74,7 +74,7 @@ export interface AssetDoc {
 }
 
 /**
- * The engine's draw scale for the game view: the style guide's, else by the project's grid (G14):
+ * The engine's draw scale for the game view: the style guide's, else by the project's grid:
  * 2 below 48 px, 1 from 48 px (a game with 48 px tiles draws them at their size).
  */
 export function drawScaleOf(json: StyleJson | undefined, grid = 24): number {

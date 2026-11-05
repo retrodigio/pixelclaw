@@ -1,4 +1,4 @@
-// G15 (plan §26) from the command line. Item 2: requests filed, answered and withdrawn from the CLI,
+// G15 from the command line. Item 2: requests filed, answered and withdrawn from the CLI,
 // validated as the dashboard's are, and a change writing the same `mark rejected` on the tape.
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -37,7 +37,7 @@ beforeEach(() => {
 });
 afterEach(() => rmSync(tmp, { recursive: true, force: true }));
 
-describe('requests from the CLI (§26 item 2)', () => {
+describe('requests from the CLI', () => {
   it('draw, change (with the mark rejected on the tape) and add (the manifest entry validated)', () => {
     let r = cli(['request', proj, 'draw', 'urn', '--note', 'squat, with a lip', '--by', 'human:ana']);
     expect(r).toMatchObject({ code: 0, out: 'r1 draw urn: "squat, with a lip" (from human:ana at 2026-10-29T12:00:00Z; open)\n' });
@@ -107,7 +107,7 @@ describe('requests from the CLI (§26 item 2)', () => {
   });
 });
 
-describe('the smaller items (§26 item 6)', () => {
+describe('the smaller items', () => {
   it('plan piped into a reader that stops early (EPIPE) ends quietly', async () => {
     const { spawn } = await import('node:child_process');
     const BIN = join(import.meta.dirname, '..', 'bin', 'pixelclaw.js');

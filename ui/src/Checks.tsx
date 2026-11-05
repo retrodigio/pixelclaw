@@ -1,4 +1,4 @@
-// Checks and previews in the watch view (plan §5, §8.3): a chip per check in the header (click to
+// Checks and previews in the watch view: a chip per check in the header (click to
 // circle its flagged pixels on the canvas and open its details; a flagged group can be pinned as a
 // note for the agent), and the preview panel: the tile 3x3, the game view (the sprite on its
 // ground at 1x and the draw scale, beside its set) and the art under preview themes. Everything is

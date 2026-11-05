@@ -1,4 +1,4 @@
-# Mossy ruins: a 24x24 village well (plan §4.10): a ring of stones around dark water, two posts
+# Mossy ruins: a 24x24 village well: a ring of stones around dark water, two posts
 # and a crossbar with a rope and a bucket. One cell, which blocks.
 new object well 24x24 palette=ruins-props
 # --- the ring: stones lit from the top left, darker below, the water inside

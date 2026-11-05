@@ -1,7 +1,7 @@
-// The dashboard (plan §7.3, §21): the manifest as a grid of thumbnails coloured by status and
+// The dashboard: the manifest as a grid of thumbnails coloured by status and
 // check results, by set, with what each asset needs next. A person approves reviewed work here,
 // and asks the agent for work: "Draw this" on a planned card, "Ask for changes" on any drawn one
-// (also a `mark rejected "…"` on its tape, as in G10), "Add an asset" (a manifest entry). Requests
+// (also a `mark rejected "…"` on its tape), "Add an asset" (a manifest entry). Requests
 // are records in requests.jsonl; each card shows its request's state live, "Claude is working on
 // this" while the claimer's batches arrive. Scenes show what they still need; the worker panel
 // starts Claude headless when the project allows it. Filters and opening only change what is shown.

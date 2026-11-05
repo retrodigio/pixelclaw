@@ -1,4 +1,4 @@
-// Mixes of one-cell tiles by weight (G14 `tiles fill mix=`, G15 a terrain layer's inside):
+// Mixes of one-cell tiles by weight (`tiles fill mix=`, and a terrain layer's inside):
 // parsing `mix=<tile>:<weight>,...` and sharing each tile's weight with its texture variants. No
 // command registers here, so both command modules can import it.
 

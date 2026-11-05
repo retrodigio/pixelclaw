@@ -1,4 +1,4 @@
-# Mossy ruins: a 24x48 tree (plan §4.10): one cell on the ground, its crown overhanging the cell
+# Mossy ruins: a 24x48 tree: one cell on the ground, its crown overhanging the cell
 # above. A round crown of moss-green leaves in clumps, lit from the top left; a short trunk and a
 # soft shadow. The crown's cell is a canopy (drawn above actors walking behind the tree).
 new object tree 24x48 cell=24x24 palette=ruins-props

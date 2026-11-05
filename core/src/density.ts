@@ -1,4 +1,4 @@
-// Densities (plan §4.7): one asset at 1x, 2x and 4x. A higher copy declares `density of=<base>
+// Densities: one asset at 1x, 2x and 4x. A higher copy declares `density of=<base>
 // d=<n>`; it can start as a nearest-neighbour scale-up of the base (`scale <n>`) and is then
 // detailed. A lower copy is authored, not just reduced, so the `density` check runs a reducer over
 // the higher copy and reports where it differs from the authored lower one. Reducers are
@@ -132,7 +132,7 @@ export interface DensityView {
 const BG = [40, 42, 48];
 
 /**
- * The density view (plan §2 (4)): every copy of an asset side by side at the same size on screen
+ * The density view: every copy of an asset side by side at the same size on screen
  * (the base at its draw scale times the highest level, each copy at a share of that), then the
  * highest copy reduced to the base's size with the pixels where it differs from the authored base
  * marked in magenta.

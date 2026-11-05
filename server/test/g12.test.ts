@@ -1,4 +1,4 @@
-// G12 (plan §21) through the server: requests from a page (Draw this, Ask for changes, Add an
+// G12 through the server: requests from a page (Draw this, Ask for changes, Add an
 // asset) as records in requests.jsonl; the MCP `work` tool over the HTTP endpoint claims,
 // progresses, finishes and blocks them, and `plan` lists them first; the worker with a fake
 // `claude` (enabled, disabled, the cap, one at a time); a sheet imported into assets with
@@ -60,7 +60,7 @@ async function ask(page: Page, by: string, body: unknown): Promise<{ ok: boolean
   return page.messages.find((m) => m.type === 'answer' && m.id === id) as never;
 }
 
-describe('requests and the work tool (§21 items 1, 2)', () => {
+describe('requests and the work tool', () => {
   let b: Box;
   let page: Page;
   beforeAll(async () => {
@@ -148,7 +148,7 @@ describe('requests and the work tool (§21 items 1, 2)', () => {
   });
 });
 
-describe('the worker with a fake claude (§21 item 2)', () => {
+describe('the worker with a fake claude', () => {
   const fake = (opts: string[] = []) => ({ enabled: true, command: [process.execPath, FAKE, ...opts], cap: 1 });
   const seed = async (b: Box, n: number) => {
     expect((await b.call('plan', { manifest: { ...MANIFEST, scenes: undefined, assets: MANIFEST.assets.filter((a) => a.kind !== 'map') } })).isError).toBeFalsy();
@@ -246,7 +246,7 @@ describe('the worker with a fake claude (§21 item 2)', () => {
   }, 30000);
 });
 
-describe('import into the gallery (§21 item 4)', () => {
+describe('import into the gallery', () => {
   it('a sheet sliced into assets, with manifest entries and every check run', async () => {
     const b = await start();
     try {
@@ -296,7 +296,7 @@ describe('import into the gallery (§21 item 4)', () => {
   }, 30000);
 });
 
-describe('plan from cached check results (§21 item 6)', () => {
+describe('plan from cached check results', () => {
   it('equals the plan worked out from scratch, and is faster', () => {
     const root = mkdtempSync(join(tmpdir(), 'pixelclaw-g12-cache-'));
     try {

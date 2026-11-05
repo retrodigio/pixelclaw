@@ -1,4 +1,4 @@
-// Selections (plan §3.2): rectangle, ellipse, lasso polygon, magic wand (contiguous or global, by
+// Selections: rectangle, ellipse, lasso polygon, magic wand (contiguous or global, by
 // palette index), by colour, by a layer's opaque pixels, all, none and invert. Each author has
 // their own selection, and it clips every drawing command that author writes until `deselect`.
 // A trailing `add`, `sub` or `and` combines the new shape with the current selection.

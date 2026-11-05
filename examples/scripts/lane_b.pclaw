@@ -1,4 +1,4 @@
-# A variant of the lane (plan §4.1): the band drawn again, the ruts and stones elsewhere, so a long
+# A variant of the lane: the band drawn again, the ruts and stones elsewhere, so a long
 # straight lane stops repeating one tile. The map picks among the lane and its variants cell by cell.
 fork lane lane_b
 variant of=lane

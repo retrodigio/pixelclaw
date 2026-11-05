@@ -1,4 +1,4 @@
-# A variant of the water (plan §4.1, §17): the open sea was one water tile in every cell, and its
+# A variant of the water: the open sea was one water tile in every cell, and its
 # troughs and crests lined up into a diagonal weave across the map. The same tile with its troughs
 # and its crests moved by different amounts (on every frame alike, so it shimmers the same), so
 # neighbouring cells no longer continue each other's lines.

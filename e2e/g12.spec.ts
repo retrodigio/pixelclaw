@@ -70,7 +70,7 @@ test('request buttons write records; the cards follow the agent through claim, w
   await expect(card('urn').getByTestId('working')).toContainText('Claude is working on this');
   expect((await agent.call('work', { action: 'progress', text: 'outlining' })).isError).toBeFalsy();
   await expect(card('urn').getByTestId('working')).toContainText('outlining');
-  // Done is refused while a check fails (G15): the urn has no outline yet.
+  // Done is refused while a check fails: the urn has no outline yet.
   expect(text(await agent.call('work', { action: 'done', text: 'drew the urn with a lip' }))).toMatch(/r1 is not done: urn fails/);
   expect((await agent.call('run', { asset: 'urn', commands: 'outline c=ink' })).isError).toBeFalsy();
   expect((await agent.call('work', { action: 'done', text: 'drew the urn with a lip' })).isError).toBeFalsy();

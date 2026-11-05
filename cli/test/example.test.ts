@@ -1,4 +1,4 @@
-// The checked-in demos: the stone floor tile (plan §10 G1), the G4 grass tile with two variants and
+// The checked-in demos: the stone floor tile, the G4 grass tile with two variants and
 // the chest sprite, and G5's test sprite, with G5's fixes and review round on all of them; G6's
 // walking figure and water tile, and the stone floor redrawn as flagstones; G7's sand tile, the
 // shore family built from it and the water, and the glint overlay; G8's house, tree and well, the

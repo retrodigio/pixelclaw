@@ -1,4 +1,4 @@
-// Animation commands (plan §4.4): tags, directional views (with live mirror links), linked cels,
+// Animation commands: tags, directional views (with live mirror links), linked cels,
 // the pivot and the ground line. Frame durations are `frame set … ticks=` (cmd-layers.ts).
 
 import { VIEW_NAMES, insertFrames, opposite, viewOf } from './anim.ts';

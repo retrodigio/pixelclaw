@@ -1,4 +1,4 @@
-// The diff view (plan §2 item 3): what changed between two documents, as a list of up to 60
+// The diff view: what changed between two documents, as a list of up to 60
 // pixels and as before / after images with the changed pixels marked.
 
 import { describe, expect, it } from 'vitest';

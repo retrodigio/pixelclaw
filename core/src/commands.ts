@@ -50,7 +50,7 @@ export interface NormaliseContext {
   image?(blob: string): Rgba | undefined;
   /** A project scheme by name (a `new family` line copies it into the tape). */
   scheme?(name: string): SchemeJson | undefined;
-  /** The style guide's and the manifest's defaults (plan §7.3): filled in and written into the line, so replay never reads them. */
+  /** The style guide's and the manifest's defaults: filled in and written into the line, so replay never reads them. */
   defaults?: StyleDefaults;
 }
 
@@ -65,13 +65,13 @@ export interface StyleDefaults {
   asset?(kind: string, name: string): { size?: [number, number]; palette?: string; scheme?: string; cell?: [number, number]; chars?: string } | undefined;
   /** `shade` with no light=: the style guide's light direction. */
   light?: string;
-  /** `shadow` and a map's objects layers (G16): the style guide's shadow colour (an entry, or darker) and direction. */
+  /** `shadow` and a map's objects layers: the style guide's shadow colour (an entry, or darker) and direction. */
   shadow?: { c?: string; dir?: string };
   /** `outline` with no c=: the style guide's outline colours (the first the palette has). */
   outline?: string[];
   /** `map gen` with no objects=: the assets the manifest says this map uses (objects are stood on it). */
   mapObjects?(map: string): string[];
-  /** `new map` with no tile=: the project's grid (G14). */
+  /** `new map` with no tile=: the project's grid. */
   grid?: number;
 }
 
@@ -327,12 +327,12 @@ const newCmd: CommandSpec = {
     const tileOpt = a.opts.get('tile');
     if (tileOpt && kind !== 'map') throw new DiagError(tileOpt.line, tileOpt.col, `tile= is for new map`);
     if (kind === 'family') {
-      // The size is the tile's; the canvas is the sheet (plan §4.2).
+      // The size is the tile's; the canvas is the sheet.
       if (size.w !== size.h || size.w % 2 || size.w < 4 || size.w > 256) throw new DiagError(size.line, size.col, `a family's tiles are square, even and 4..256 px (${size.w}x${size.h})`);
       if (!schemeOpt) throw new DiagError(cmd.line, cmd.col, `new family: missing scheme=<scheme> (${[...BUILTIN_SCHEMES.keys()].join(', ')})`);
       // A built-in scheme by name; a project's own scheme is copied into the line (def=), like the
       // palette. A project scheme of a built-in's name wins (a project that kept its own copy of
-      // blob47-round, built in since G15, writes its lines as before).
+      // blob47-round, now built in, writes its lines as before).
       const defOpt = a.opts.get('def');
       let def: SchemeJson | null = null;
       let scheme: Scheme | undefined = defOpt || ctx.scheme?.(schemeOpt.value) ? undefined : schemeNamed(schemeOpt.value);
@@ -363,7 +363,7 @@ const newCmd: CommandSpec = {
       };
       extra = ` scheme=${scheme.name}${def ? ` def=${quote(JSON.stringify(def))}` : ''}${mc ? ` map=${mc}x${mr}` : ''}`;
     } else if (kind === 'map') {
-      // The size is in cells; the canvas is the grid of cells (plan §4.11).
+      // The size is in cells; the canvas is the grid of cells.
       if (size.w > 512 || size.h > 512) throw new DiagError(size.line, size.col, `a map is at most 512x512 cells`);
       for (const o of [schemeOpt, mapOpt, cellOpt, a.opts.get('wrap'), bgOpt]) if (o) throw new DiagError(o.line, o.col, `new map takes no ${o.key}= (its cells are tile= px)`);
       let tile = ctx.defaults?.grid ?? 24;
@@ -378,7 +378,7 @@ const newCmd: CommandSpec = {
       for (const o of [schemeOpt, mapOpt, a.opts.get('def')]) if (o) throw new DiagError(o.line, o.col, `${o.key}= is for new family`);
     }
     if (kind === 'font') {
-      // The size is a glyph cell's; the canvas is the sheet of cells (plan §4.6).
+      // The size is a glyph cell's; the canvas is the sheet of cells.
       const charsOpt = a.opts.get('chars') ?? (dflt?.chars ? { ...synthOpt('chars', dflt.chars, cmd), quoted: !/^[0-9U+,\-]+$/.test(dflt.chars) } : undefined);
       const chars = charsOpt ? parseChars(charsOpt.value, charsOpt.quoted) : parseChars('32-126', false);
       if (typeof chars === 'string') throw new DiagError(charsOpt!.line, charsOpt!.vcol, chars);
@@ -664,7 +664,7 @@ const paletteCmd: CommandSpec = {
       hex = normaliseHex(hexOpt.value);
       if (!hex || !hexOpt.value.startsWith('#')) throw new DiagError(hexOpt.line, hexOpt.vcol, `hex= must be a colour like #a4552e`);
     }
-    // role=<role> makes the entry stand for a colour role (plan §3.1); role=none makes it a plain colour again.
+    // role=<role> makes the entry stand for a colour role; role=none makes it a plain colour again.
     if (roleOpt && !isRole(roleOpt.value) && !(how.v === 'set' && roleOpt.value === 'none')) {
       throw new DiagError(roleOpt.line, roleOpt.vcol, `role= must be one of ${ROLES.join(', ')}${how.v === 'set' ? ' or none' : ''}`);
     }

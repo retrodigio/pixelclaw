@@ -1,4 +1,4 @@
-// G13 (plan §23) through the server: `run dry=true` applies to a copy, checks it and keeps
+// G13 through the server: `run dry=true` applies to a copy, checks it and keeps
 // nothing; `seeds` tries a generator line with several seeds and ranks them by the checks.
 
 import { execFileSync } from 'node:child_process';
@@ -88,7 +88,7 @@ describe('seeds', () => {
   });
 });
 
-describe('item 3: underlays sized from the placed area', () => {
+describe('underlays sized from the placed area', () => {
   it('a portrait area of a landscape sheet asks for a portrait image', async () => {
     const p = createProject(join(root, 'u.pclaw'), { palettes: [JSON.parse(readFileSync(PALETTE, 'utf8'))] });
     const w = new Writer(p, { now: () => '2026-10-29T09:00:00Z' });
@@ -103,7 +103,7 @@ describe('item 3: underlays sized from the placed area', () => {
   }, 60_000);
 });
 
-describe('item 4: snap on the placement grid; a high seam after family cut', () => {
+describe('snap on the placement grid; a high seam after family cut', () => {
   it('snap keeps one block per placed pixel even when the image has a stronger nearby period', () => {
     const p = createProject(join(root, 's4.pclaw'), { palettes: [JSON.parse(readFileSync(PALETTE, 'utf8'))] });
     const w = new Writer(p, { now: () => '2026-10-29T09:00:00Z' });
@@ -147,7 +147,7 @@ family coverage seed=7 copies=1 fill=on`;
   });
 });
 
-describe('item 8: variants inherit the band and override only the texture', () => {
+describe('variants inherit the band and override only the texture', () => {
   it('a band=inherit variant follows every later fix to its base; its textures stay its own', () => {
     const p = createProject(join(root, 'v8.pclaw'), { palettes: [JSON.parse(readFileSync(PALETTE, 'utf8'))] });
     const w = new Writer(p, { now: () => '2026-10-29T09:00:00Z' });
@@ -190,7 +190,7 @@ family band 1:outside 1:stone5 1:soil1`, by: 'claude' }));
   });
 });
 
-describe('item 9: no part of the key is written; input image tokens are priced', () => {
+describe('no part of the key is written; input image tokens are priced', () => {
   const KEY = 'sk-proj-PLANTEDfake0123456789abcdefWXYZ';
   /** Every window of 4 characters of the key's start or end, and its middle runs of 6. */
   const parts = [...Array.from({ length: KEY.length - 3 }, (_, i) => KEY.slice(i, i + 6)).filter((x) => x.length === 6), KEY.slice(-4), KEY.slice(0, 8)];

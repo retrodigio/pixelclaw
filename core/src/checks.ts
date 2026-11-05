@@ -1,4 +1,4 @@
-// Quality checks (plan §5). Each check reads one frame of a document's flat art and returns a
+// Quality checks. Each check reads one frame of a document's flat art and returns a
 // score, pass or fail against a threshold (defaults here, overridden by the project's style
 // guide), and the pixels it flags. Checks never change the document; they are pure functions of
 // the art, so the server, the CLI and the watch view all get the same answers.
@@ -89,7 +89,7 @@ export interface CheckStyle {
   density?: { reducer?: string } & ReducerOptions;
   /** consistency: the light direction (n, ne, … nw). */
   light?: string;
-  /** palette (G16): colours reserved for some assets: entry name → the assets that may use it. */
+  /** palette: colours reserved for some assets: entry name → the assets that may use it. */
   reserved?: Record<string, string[]>;
 }
 
@@ -128,7 +128,7 @@ const DEFAULTS: Record<CheckId, { all: Params } & Partial<Record<string, Params>
   // An overlay is flecks and sparkles: its lone pixels are its art.
   orphans: { all: { max: 1, texture: false }, tile: { max: 2, texture: true }, family: { max: 2, texture: true }, overlay: { off: true }, font: { off: true } },
   // A glyph sheet's single pixels and diagonals are its letters: it has the font check instead.
-  // Sprites and objects (G16): one more allowed per `area` px of art (none at 24x24, 2 at 48x48).
+  // Sprites and objects: one more allowed per `area` px of art (none at 24x24, 2 at 48x48).
   jaggies: { all: { max: 0, area: 1152 }, tile: { max: 2 }, family: { max: 2 }, font: { off: true } },
   // The pillow share: 1 when ramp steps follow the outline on every side alike.
   banding: { all: { max: 0.5, minEdges: 8 }, font: { off: true } },
@@ -142,21 +142,21 @@ const DEFAULTS: Record<CheckId, { all: Params } & Partial<Record<string, Params>
   // rest, ΔL* times the square root of its width.
   // The limit rises with the band's own spread along its length (contrast: standard errors; 0 turns it off).
   repetition: { all: { max: 3, contrast: 3 }, map: { edgeRun: 4, motif: 10 }, font: { off: true } },
-  // Frame diff share (changed pixels over the silhouette; the pilot's good pairs changed 16-19 %),
+  // Frame diff share (changed pixels over the silhouette; good walk cycles change 16-19 %),
   // pivot drift and ground drift in pixels, silhouette area jumps, and the loop seam.
   anim: { all: { minDiff: 0.08, maxDiff: 0.35, maxPivot: 1, maxGround: 0, maxArea: 0.15 }, tile: { minDiff: 0.03 }, family: { minDiff: 0.01 }, overlay: { minDiff: 0, maxDiff: 1 } },
   // Views must differ from each other (by colour, over both silhouettes) by at least this share.
   views: { all: { min: 0.2 } },
   // Oversized assets: footprint cells drawn, overhangs marked as roofs.
   fit: { all: { max: 0 }, font: { off: true } },
-  // A texture variant's colour mix against its base (the pilot's rule: L1 < 0.3, ΔL* < 2).
+  // A texture variant's colour mix against its base (L1 < 0.3, ΔL* < 2).
   variant: { all: { maxL1: 0.3, maxDl: 2 } },
   // Maps: footprints and draw order without problems.
   footprint: { all: { max: 0 } },
   draworder: { all: { max: 0 } },
   // Maps: the share of one ground's cells that show a mark at the same spot of the cell (a mark:
   // pixels at least `contrast` ΔL* off their cell's median).
-  lattice: { all: { max: 0.3, contrast: 18 } }, // contrast: ΔE (CIE76) from the cell's median colour (G15; ΔL* in G14)
+  lattice: { all: { max: 0.3, contrast: 18 } }, // contrast: ΔE (CIE76) from the cell's median colour (earlier versions measured ΔL* only)
   // A higher-density copy reduced to its base: the share of the base's pixels that differ (a lower
   // copy is authored, so some difference is expected; the report says where).
   density: { all: { max: 0.25 } },
@@ -166,10 +166,10 @@ const DEFAULTS: Record<CheckId, { all: Params } & Partial<Record<string, Params>
     icon: { maxStroke: 1, maxFill: 0.2, maxCentre: 1.5 } },
   // Glyph sheets: problems with cap height, x-height, the baseline, advances and the line height (maxLine: the profile's limit, 0 none).
   font: { all: { max: 0, maxLine: 0 } },
-  // Sprites and icons (G16): art touching an edge of its cell (the bottom is where a sprite stands:
+  // Sprites and icons: art touching an edge of its cell (the bottom is where a sprite stands:
   // allowed unless bottom is false). Objects fill their map cells by design: off unless turned on.
   margin: { all: { max: 0, bottom: true }, object: { off: true }, tile: { off: true }, family: { off: true }, map: { off: true }, font: { off: true }, overlay: { off: true }, sheet: { off: true } },
-  // Sprites and objects (G16): parts of the art that do not touch the rest (8-connected), of at
+  // Sprites and objects: parts of the art that do not touch the rest (8-connected), of at
   // least `min` px (smaller specks are orphans' business).
   pieces: { all: { max: 0, min: 4 }, tile: { off: true }, family: { off: true }, map: { off: true }, font: { off: true }, overlay: { off: true }, icon: { off: true }, sheet: { off: true } },
 };
@@ -280,7 +280,7 @@ function checkPalette(img: Img, p: Params, ctx: CheckContext): CheckResult {
   const roleArt = hasRoles(pal) || mode === 'tone';
   const pure = (hex: string) => rgbOf(hex).every((c) => c === 0 || c === 255);
   const allowed = ctx.style?.palettes?.length ? new Set(ctx.style.palettes.flatMap((x) => x.entries.map((e) => e.hex))) : null;
-  // Colours reserved for some assets (G16): any other asset that uses one is flagged.
+  // Colours reserved for some assets: any other asset that uses one is flagged.
   const reserved = new Map(Object.entries(ctx.style?.reserved ?? {}).filter(([, who]) => !who.includes(img.doc.name)));
   const by = new Map<string, Pt[]>();
   const add = (label: string, i: number) => { if (!by.has(label)) by.set(label, []); by.get(label)!.push(ptOf(img, i)); };
@@ -505,7 +505,7 @@ function thinChains(img: Img, min: number): Pt[][] {
 }
 
 /**
- * Shading, not a line (plan §19): two colours that are neighbouring entries of one ramp, neither
+ * Shading, not a line: two colours that are neighbouring entries of one ramp, neither
  * an outline colour. Steps between them inside a shape follow the form; outlines and lines of one
  * colour on anything else are judged as lines.
  */
@@ -616,10 +616,10 @@ function checkJaggies(img: Img, p: Params, ctx: CheckContext = {}): CheckResult 
   // Each doubled corner, spike and notch is one defect; so is an irregular run, however long.
   const runs = runSets.size;
   const n = corners + runs + spikes.length + notches.length;
-  // A texture's allowance is per 24x24 px of cell (G14): a 48 px tile has four times the room of a 24 px one.
+  // A texture's allowance is per 24x24 px of cell: a 48 px tile has four times the room of a 24 px one.
   const d = img.doc;
   const per = Number(p.max) > 0 && (d.wrap || d.family) ? Math.max(1, Math.floor((d.cellW * d.cellH) / 576)) : 1;
-  // A sprite's or an object's allowance grows with its art (G16): at 48 px a long curve meeting a
+  // A sprite's or an object's allowance grows with its art: at 48 px a long curve meeting a
   // second shape has a few uneven steps however it is drawn. An object is one piece of art over its cells.
   const art = d.kind === 'object' ? d.width * d.height : d.cellW * d.cellH;
   const grow = !d.wrap && !d.family && Number(p.area) > 0 ? Math.floor(art / Number(p.area)) : 0;
@@ -766,7 +766,7 @@ function checkOutline(img: Img, p: Params, ctx: CheckContext): CheckResult {
   });
 }
 
-// --- seam (plan §13: the pilot's metric, exactly)
+// --- seam
 
 const mean = (a: number[]): number => (a.length ? a.reduce((s, v) => s + v, 0) / a.length : 0);
 const std = (a: number[]): number => {
@@ -828,7 +828,7 @@ export function seamScore(doc: Doc, frame = 0): { score: number; jx: number; jy:
 
 function checkSeam(img: Img, p: Params, ctx: CheckContext): CheckResult {
   if (img.doc.family) {
-    // A family's seams show on a map: the score over the default island (plan §4.2 "map preview … scored for seams").
+    // A family's seams show on a map: the score over the default island.
     const d = img.doc;
     const { cols, rows, seed } = DEFAULT_MAP;
     const m = composeMap(d, islandTerrain(schemeOf(d.family!), cols, rows, seed), ctx.frame ?? 0);
@@ -863,7 +863,7 @@ function checkSeam(img: Img, p: Params, ctx: CheckContext): CheckResult {
 
 // --- coverage
 
-/** A family's coverage (plan §4.2): every name the scheme can produce has its cell drawn, on every frame, and so do the textures. */
+/** A family's coverage: every name the scheme can produce has its cell drawn, on every frame, and so do the textures. */
 function familyCoverage(d: Doc, p: Params): CheckResult {
   const f = d.family!;
   const s = schemeOf(f);
@@ -1038,7 +1038,7 @@ function checkRevert(img: Img, p: Params, ctx: CheckContext): CheckResult {
  * band's width (wider bands show at lower contrast). Random noise on a calm ramp scores about 2;
  * marks that line up in rows score more.
  *
- * The limit scales with the band's own contrast along its length (G13): a band that differs
+ * The limit scales with the band's own contrast along its length: a band that differs
  * because of one mark (a pebble, a crack on a calm tile) varies a lot along its length, and
  * tiled it reads as a dotted row of that mark, not a stripe. The limit is the larger of `max`
  * and `contrast` times the band's lightness spread (the standard deviation of its cross-section
@@ -1061,7 +1061,7 @@ export function repetitionScore(doc: Doc, frame = 0, contrast = DEFAULTS.repetit
     const len = axis === 'rows' ? w : h;
     const at = (k: number, i: number) => (axis === 'rows' ? v[k * w + i]! : v[i * w + k]!);
     const unit = Math.max(1, Math.floor(n / 24));
-    // Bands of 1 to 6 lines, up to a quarter of the tile; from 48 px, up to 6 lines per 24 px (G14: 12 at 48).
+    // Bands of 1 to 6 lines, up to a quarter of the tile; from 48 px, up to 6 lines per 24 px (12 at 48).
     for (let width = 1; width <= Math.min(6 * Math.max(1, Math.floor(n / 24)), Math.floor(n / 4)) || width === 1; width++) {
       const cross = new Float64Array(len);
       for (let k = 0; k < n; k++) {
@@ -1075,7 +1075,7 @@ export function repetitionScore(doc: Doc, frame = 0, contrast = DEFAULTS.repetit
         for (let j = 0; j < len; j++) ss += (cross[j]! - m) ** 2;
         const spread = Math.sqrt(ss / len);
         const delta = m - mu;
-        // Width in lines of a 24 px tile (G14): a 2-line band at 48 px weighs what a 1-line band does at 24.
+        // Width in lines of a 24 px tile: a 2-line band at 48 px weighs what a 1-line band does at 24.
         const score = Math.abs(delta) * Math.sqrt(width / unit);
         const limit = Math.max(max, contrast * spread * Math.sqrt(width / unit / len));
         const ratio = score / limit;
@@ -1252,7 +1252,7 @@ function checkViews(img: Img, p: Params): CheckResult {
   });
 }
 
-// --- fit and variant (plan §4.10, §4.1)
+// --- fit and variant
 
 /** An oversized asset's fit: every footprint cell drawn, and art outside the footprint marked as a roof. */
 function checkFit(img: Img, p: Params): CheckResult {
@@ -1325,7 +1325,7 @@ function checkConsistency(img: Img, p: Params, ctx: CheckContext): CheckResult {
   const d = img.doc;
   if (d.family || d.overlay) return skip('consistency', 'judged on its maps');
   const peers = (ctx.peers ?? []).filter((x) => x.doc !== d && x.name !== d.name);
-  // Limits in pixels are set for 16 px icons and 24 px cells and grow with bigger ones (G14).
+  // Limits in pixels are set for 16 px icons and 24 px cells and grow with bigger ones.
   const iconK = Math.max(1, Math.min(d.width, d.height) / 16), cellK = Math.max(1, d.cellH / 24);
   const icon = d.kind === 'icon' ? { maxStroke: Number(p.maxStroke) * iconK, maxFill: Number(p.maxFill), maxCentre: Number(p.maxCentre) * iconK } : undefined;
   if (!peers.length && ctx.expect?.height === undefined && !icon) return skip('consistency', 'no set to compare with (plan it in the manifest)');
@@ -1358,7 +1358,7 @@ function checkConsistency(img: Img, p: Params, ctx: CheckContext): CheckResult {
 }
 
 /**
- * A glyph sheet (plan §4.6): one cap height for the capitals, one x-height for the lowercase
+ * A glyph sheet: one cap height for the capitals, one x-height for the lowercase
  * letters without ascenders, letters and digits without descenders standing on the baseline, no
  * glyph drawn past its advance (or with no advance), every glyph but spaces drawn, and the line height: no shorter than the
  * tallest glyph's rows and within the profile's limit (maxLine).
@@ -1433,7 +1433,7 @@ function artCells(d: Doc): { x: number; y: number; w: number; h: number }[] {
   return out;
 }
 
-/** Art touching an edge of its cell (G16): a sprite cut by its canvas, or with no room for its outline. */
+/** Art touching an edge of its cell: a sprite cut by its canvas, or with no room for its outline. */
 function checkMargin(img: Img, p: Params): CheckResult {
   const d = img.doc;
   if (d.wrap || d.family || d.map) return skip('margin', 'tiles and families join their neighbours');
@@ -1459,7 +1459,7 @@ function checkMargin(img: Img, p: Params): CheckResult {
   });
 }
 
-/** A sprite in disconnected parts (G16): a floating lamp room, a hat beside its head. */
+/** A sprite in disconnected parts: a floating lamp room, a hat beside its head. */
 function checkPieces(img: Img, p: Params): CheckResult {
   const d = img.doc;
   if (d.wrap || d.family || d.map) return skip('pieces', 'tiles and families are texture');
@@ -1511,8 +1511,8 @@ const RUNNERS: Record<CheckId, (img: Img, p: Params, ctx: CheckContext) => Check
 /** Checks of the whole document (every frame at once); the others read one frame's image. */
 const WHOLE = new Set<CheckId>(['font', 'consistency', 'coverage', 'anim', 'views', 'footprint', 'draworder', 'lattice']);
 
-/** The checks of a map document (plan §4.11), over the map composed from the assets it names. */
-/** A map's consistency: everything standing on it on one screen (§4.11): each object against the others. */
+/** The checks of a map document, over the map composed from the assets it names. */
+/** A map's consistency: everything standing on it on one screen: each object against the others. */
 function mapConsistency(doc: Doc, p: Params, ctx: CheckContext): CheckResult {
   const placed = placements(doc, ['objects']);
   const names = [...new Set(placed.map((x) => doc.map!.entries[x.entry]!.name))];

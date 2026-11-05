@@ -134,7 +134,7 @@ main { grid-area: main; display: flex; flex-direction: column; min-width: 0; min
 .modal { position: fixed; inset: 0; background: rgba(8, 9, 12, 0.88); display: flex; flex-direction: column; gap: 10px; align-items: center; justify-content: center; cursor: zoom-out; }
 .modal img { image-rendering: pixelated; border: 1px solid var(--line); }
 
-/* Editing (G3) */
+/* Editing */
 .tools { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: 0 10px 8px; flex: none; }
 .tools button { font-size: 16px; padding: 4px 0; line-height: 20px; }
 button.mini { padding: 0 6px; font-size: 12px; line-height: 16px; }
@@ -162,7 +162,7 @@ input[type='text'], input:not([type]) { font: inherit; color: var(--text); backg
 .notes .nid { font-family: var(--mono); color: #ffd60a; font-weight: 700; }
 .notes .ntext { flex: 1; }
 
-/* G4: options bar, timeline, stamps, wrap ghosts */
+/* Options bar, timeline, stamps, wrap ghosts */
 .options { display: flex; align-items: center; gap: 10px; padding: 4px 12px; border-bottom: 1px solid var(--line); background: #1a1c21; font-size: 12px; flex-wrap: wrap; }
 .options .opt { display: inline-flex; align-items: center; gap: 5px; }
 .options button { padding: 1px 7px; font-size: 13px; line-height: 18px; }
@@ -223,7 +223,7 @@ button.mini.play.on { border-color: var(--accent); color: var(--accent); }
 aside.left .swatches { flex: 1 1 auto; min-height: 80px; }
 aside.left .stamps { max-height: 120px; overflow: auto; }
 
-/* G5: check chips, check details, the preview panel, roles and themes */
+/* Check chips, check details, the preview panel, roles and themes */
 header .crumbs { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 120px; flex: 0 4 auto; }
 .checks { display: flex; gap: 3px; min-width: 0; overflow-x: auto; scrollbar-width: none; flex: 0 1 auto; }
 .checks::-webkit-scrollbar { display: none; }
@@ -273,7 +273,7 @@ header .crumbs { white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   .toolbar { gap: 6px; padding: 5px 8px; }
 }
 
-/* G7: family views (sheet, variants among their neighbours, a sample map) and folding timeline rows */
+/* Family views (sheet, variants among their neighbours, a sample map) and folding timeline rows */
 .seg { display: inline-flex; flex: none; }
 .seg button { border-radius: 0; padding: 3px 8px; }
 .seg button:first-child { border-radius: 4px 0 0 4px; }
@@ -298,7 +298,7 @@ header .crumbs { white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 .rowhead.fold:hover { color: var(--accent); }
 .timeline.folded { flex: none; }
 
-/* The map editor (G8): tools above, the map scrolling below. */
+/* The map editor: tools above, the map scrolling below. */
 .map-editor { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .map-editor .map-tools { flex-wrap: wrap; gap: 6px; }
 .map-editor .mix { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
@@ -308,7 +308,7 @@ header .crumbs { white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 .map-editor .map-body { flex: 1; overflow: auto; padding: 8px; }
 .map-editor canvas { image-rendering: pixelated; display: block; }
 
-/* The dashboard (plan §7.3): the plan by set, each asset's status and checks. */
+/* The dashboard: the plan by set, each asset's status and checks. */
 .tabs button { padding: 2px 9px; }
 .app.dash { grid-template-areas: 'head head head' 'dash dash dash'; }
 .dashboard { grid-area: dash; overflow: auto; padding: 0 0 24px; }
@@ -356,7 +356,7 @@ button.badge.on { background: var(--st); color: #111; }
 .st-exported { --st: #8fd18b; }
 .seg-bar.st-planned, .seg-bar.st-drafted, .seg-bar.st-checked, .seg-bar.st-reviewed, .seg-bar.st-approved, .seg-bar.st-exported { background: var(--st); }
 
-/* G12 (plan §21): requests on the cards, Add an asset, the worker, scenes, import, the gallery. */
+/* Requests on the cards, Add an asset, the worker, scenes, import, the gallery. */
 .dash-row { display: flex; align-items: flex-start; gap: 12px; }
 button.link { border: 0; background: none; padding: 0 2px; color: var(--human); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 button.ask-claude { border-color: #7a5a34; color: var(--claude); }

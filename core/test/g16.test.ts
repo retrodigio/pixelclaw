@@ -1,4 +1,4 @@
-// G16 (plan §26): art help, in core. Item 1: the `pebbles` and `tufts` generators: seeded, lit
+// G16: art help, in core. Item 1: the `pebbles` and `tufts` generators: seeded, lit
 // from the style guide's light, wrap-safe (the looks of one ground share what crosses their edges),
 // and at 16, 24 and 48 px a mixed floor of four looks passes jaggies, repetition and lattice with
 // the defaults. Item 2: the face scheme's side faces, inner corners and alternate looks; the lane
@@ -20,7 +20,7 @@ function run(state: AssetState, text: string, docs: Record<string, Doc> = {}, de
 const ix = (n: string) => MOSSY.entries.findIndex((e) => e.name === n);
 const lastCmd = (st: AssetState) => st.entries.at(-1)!.cmd;
 
-describe('item 1: pebbles and tufts', () => {
+describe('pebbles and tufts', () => {
   it('normal forms: the defaults written in, the light from the style guide, sizes from the cell', () => {
     const p = run(EMPTY, 'new tile g 24x24 bg=soil1\npebbles ramp=stone seed=3', {}, { light: 'ne' });
     expect(lastCmd(p)).toBe('pebbles 0,0 24x24 ramp=stone weights=1,1,1,1 size=3..5 density=0.3 light=ne cast=none gap=1 wrap=on edges=3 seed=3');
@@ -124,7 +124,7 @@ describe('item 1: pebbles and tufts', () => {
   });
 });
 
-describe('item 2: faces of a cliff, and lanes', () => {
+describe('faces of a cliff, and lanes', () => {
   const T = 16;
   const face = BUILTIN_SCHEMES.get('face')!;
   const N = 1, NE = 2, E = 4, SE = 8, S = 16, SW = 32, W = 64, NW = 128;
@@ -276,7 +276,7 @@ describe('item 2: faces of a cliff, and lanes', () => {
   });
 });
 
-describe('item 3: shadows', () => {
+describe('shadows', () => {
   const style = { light: 'nw', shadow: { c: 'darker' } };
   it('the shadow helper: an ellipse under the art, away from the light, behind it; the style guide\'s colour and direction', () => {
     const base = 'new sprite s 24x24\nellipse 7,4 10x16 c=stone3 fill\noutline c=ink';
@@ -330,7 +330,7 @@ describe('item 3: shadows', () => {
   });
 });
 
-describe('item 4: the check changes', () => {
+describe('the check changes', () => {
   const one = (d: Doc, id: Parameters<typeof runChecks>[1][number], ctx: Parameters<typeof runChecks>[2] = {}) => runChecks(d, [id], ctx)[0]!;
 
   it('a sprite\'s jaggies allowance grows with its size: none at 24 px, 2 at 48, 8 at 96', () => {

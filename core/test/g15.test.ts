@@ -1,4 +1,4 @@
-// G15 (plan §26) in core. Item 3: the lattice check measures colour difference (ΔE), not
+// G15 in core. Item 3: the lattice check measures colour difference (ΔE), not
 // lightness alone, and weighs a repeated mark by how much of its cell's marking it is (marks matched
 // by their centres, not grown by the tolerance), so a puddle grid fails and a dense pebble floor of
 // forks that share their border passes, while Fern Ledge's floor still fails and passes after its mix.
@@ -31,7 +31,7 @@ function bed(name: string, seed: number, pebble: [number, number] | null, of?: s
   return run(EMPTY, lines.join('\n')).doc!;
 }
 
-describe('item 3: the lattice check sees colour, and a dense texture\'s shared border is not a lattice', () => {
+describe('the lattice check sees colour, and a dense texture\'s shared border is not a lattice', () => {
   it('keeps G14\'s result: Fern Ledge\'s floor fails as it stands and passes after its mix', () => {
     const g13 = { bed: bed('bed', 3, [6, 9]), bed_b: bed('bed_b', 41, null, 'bed') };
     const before = lattice(run(EMPTY, 'new map floor 12x8 tile=16\ntiles floor fill bed', g13).doc!, g13);
@@ -80,7 +80,7 @@ describe('item 3: the lattice check sees colour, and a dense texture\'s shared b
   });
 });
 
-describe('item 4: terrain on maps', () => {
+describe('terrain on maps', () => {
   const T = 8;
   const pal = { get: (n: string) => (n === TEST.name ? TEST : undefined), defaultName: TEST.name };
   const mk = (text: string, docs: Record<string, Doc> = {}) => {
@@ -157,7 +157,7 @@ describe('item 4: terrain on maps', () => {
   });
 });
 
-describe('item 5: a two-tile mix is not a strict checkerboard', () => {
+describe('a two-tile mix is not a strict checkerboard', () => {
   const docs = { bed: bed('bed', 3, [6, 9]), gravel: bed('gravel', 8, null) };
   const cells = (text: string) => {
     const d = run(EMPTY, `new map floor 12x8 tile=16\n${text}`, docs).doc!;

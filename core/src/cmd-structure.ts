@@ -1,4 +1,4 @@
-// Generators for structure (G16, plan §26 item 1): `pebbles` (stones with a lit pixel and a shadow
+// Generators for structure : `pebbles` (stones with a lit pixel and a shadow
 // side, in sizes, never overlapping) and `tufts` (blades of grass lit from one side). Both are lit
 // from the style guide's light unless light= says otherwise and take seed= like every generator
 // (so the `seeds` tool ranks them).

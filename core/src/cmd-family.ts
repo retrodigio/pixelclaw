@@ -1,4 +1,4 @@
-// Family and overlay commands (plan §4.2, §4.3): the band profile (route 1), the textures, detaching
+// Family and overlay commands: the band profile (route 1), the textures, detaching
 // variants for hand work, the coverage map (route 3's flat template) and cutting from it, and an
 // overlay's settings. The pieces (route 2) are drawn with the ordinary commands on the band layer,
 // addressed by name: `layer band ; paint @cell(o) 0,0 << … >>`.
@@ -50,7 +50,7 @@ function modeColour(d: Doc, frame: number, cx: number, cy: number, t: number): n
 /**
  * `family band from=<family>`: the band of another family of the same scheme and tile (its
  * geometry, detached variants and band layer), copied into the line so replay never reads it.
- * Only the cells the family does not assemble are recorded (G14): its pieces, its detached
+ * Only the cells the family does not assemble are recorded: its pieces, its detached
  * variants and any other cell with band art; the variants built from the pieces' quadrants are
  * built again after the line, so they come out as the source's. The line as written:
  * `family band from=<f> <bands> radius= inset= [fillet=] [jitter= seed=] detached=<a,b|none>
@@ -148,7 +148,7 @@ function bandFrom(a: Args, doc: Doc, f: FamilyState, ctx: NormaliseContext): { t
   for (const n of detachedList) if (!s.byName.has(n)) throw new DiagError(a.opts.get('detached')!.line, a.opts.get('detached')!.vcol, `${s.name} has no variant '${n}'`);
   const nf = intOpt(a, 'frames', 1, doc.frameCount, 1);
   const co = a.opts.get('cells');
-  // cells=: only those cells' rows, side by side; without it, the whole sheet (the G13 form).
+  // cells=: only those cells' rows, side by side; without it, the whole sheet (the original form).
   const cells: [number, number][] = [];
   if (co && co.value !== 'none') for (const n of co.value.split(',')) {
     const c = cellAt(n);
@@ -244,7 +244,7 @@ function bandCmd(a: Args, doc: Doc, f: FamilyState, ctx: NormaliseContext): { te
       const t = fam.tile;
       const L = layoutOf(fam);
       const maps = bandMaps(s, t, geometry);
-      // Face pieces (south, side, corner) are the face's own art, drawn by hand outside the terrain: the band leaves them (G13, G16).
+      // Face pieces (south, side, corner) are the face's own art, drawn by hand outside the terrain: the band leaves them.
       const pieces = s.pieces.map((p) => s.byName.get(p)!).filter((v) => !isFace(s.variants[v]!.on));
       const seen = new Set<Uint16Array>();
       for (const cel of d.cels[bl]!) {

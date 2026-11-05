@@ -1,4 +1,4 @@
-// Preview themes for role palettes (plan §3.1, §4.8): a theme gives each colour role a colour, so
+// Preview themes for role palettes: a theme gives each colour role a colour, so
 // recolourable art can be seen the way a game will tint it. Themes are only for looking: the
 // document stores roles, never themed colours. Projects may add their own (project.json `themes`).
 

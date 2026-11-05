@@ -43,7 +43,7 @@ crests wove a lattice; identical sand cells lining the sand's marks up into stri
 coast and the meadow's west edge running straight with near-square inner corners; and lanes
 stopping short of the beach. G9 closed them:
 
-- The repetition check's motif windows now count the open sea (plan §17). With one water tile it
+- The repetition check's motif windows now count the open sea. With one water tile it
   fails, so the water got three variants (`water_b`, `water_c`, `water_d`: its troughs and its
   crests moved by different amounts on every frame), the sand two (`sand_b`, `sand_c`), and the
   shore two more looks (`shore_c`, `shore_d`); with `shore_b` they mix four waters and three sands

@@ -1,4 +1,4 @@
-# Mossy ruins: a lane (plan §10 G8), a path family of sand through grass, for the village's roads.
+# Mossy ruins: a lane, a path family of sand through grass, for the village's roads.
 # Route 1: inside the sand tile, outside the grass tile; from the grass in, a rim of trodden soil,
 # then sand. Wheel ruts run along the straight pieces.
 new family lane 24x24 scheme=path palette=ruins-shore

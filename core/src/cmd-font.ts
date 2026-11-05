@@ -1,4 +1,4 @@
-// Glyph sheets and icons as commands (plan §4.5, §4.6). `glyph <char>` draws one glyph from rows
+// Glyph sheets and icons as commands. `glyph <char>` draws one glyph from rows
 // of palette keys into its cell (on the author's layer and frame) and sets or clears its own
 // advance; `font set` changes the metrics; `icon mode=` sets how an icon is exported.
 

@@ -1,4 +1,4 @@
-// Export and import through profiles (plan §4.9, §7): the project's own profiles (profiles/*.json,
+// Export and import through profiles: the project's own profiles (profiles/*.json,
 // or paths listed in project.json `profiles`) beside the built-in ones, written into a folder (a
 // game's folder, or <project>/exports/<profile>/); and importing images back: a profile's export
 // read into the assets it came from, or a PNG, a sheet sliced by a grid, or an `.aseprite` file
@@ -91,7 +91,7 @@ export interface ExportReport {
 
 export const EXPORTED_FILE = 'exported.json';
 
-// --- exported.json: the last export of each asset (plan §7.3 "exported")
+// --- exported.json: the last export of each asset
 
 export type { ExportRecord } from './protocol.ts';
 
@@ -209,7 +209,7 @@ export interface ImportRequest {
   cells?: boolean;
   /** Files given as bytes (a page's upload) instead of a path: each becomes an asset, or is sliced. */
   files?: { name: string; bytes: Uint8Array }[];
-  /** Slice each PNG into separate assets, one per non-empty cell (plan §21). */
+  /** Slice each PNG into separate assets, one per non-empty cell. */
   slice?: SliceGrid;
   /** Names for the new assets: a pattern ({name}, {n}, {col}, {row}), or a list in order. */
   pattern?: string;
@@ -411,7 +411,7 @@ export interface ImportResult {
 }
 
 /**
- * An import into the project (plan §21 item 4): the assets made (their tapes start with
+ * An import into the project: the assets made (their tapes start with
  * `import`), manifest entries added for the ones it does not plan yet (the manifest checked
  * first; nothing is made if it would have problems), and every check run on each. Run inside the
  * writer's queue.

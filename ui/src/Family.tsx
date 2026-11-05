@@ -1,4 +1,4 @@
-// The family views (plan §4.2, §4.3, §8.3): for a family document the middle of the page can show
+// The family views: for a family document the middle of the page can show
 // every variant among its neighbours (the 3x3 map that resolves to it), with pieces and detached
 // variants marked, or a sample map built with the scheme, with its seam score and any overlays
 // playing at the game's speed. Detaching, attaching, laying out the coverage map and cutting from

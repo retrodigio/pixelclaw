@@ -1,4 +1,4 @@
-// The manifest (plan §7.3): the asset plan a project is built from, written by the agent from the
+// The manifest: the asset plan a project is built from, written by the agent from the
 // game's description. Every asset has a name, a kind, a size and a set, and as its kind needs a
 // scheme and band (families), frames and views (sprites), a footprint (objects) and the expected
 // height of its drawn shape (the consistency check's size measure). Its status is worked out from
@@ -66,7 +66,7 @@ export interface Manifest {
   /** The export profile (and folder) the project ships through. */
   export?: { profile: string; dest?: string };
   assets: ManifestAsset[];
-  /** Places the game shows (plan §21): what each needs, and the map that builds it. */
+  /** Places the game shows: what each needs, and the map that builds it. */
   scenes?: ManifestScene[];
 }
 
@@ -294,7 +294,7 @@ function latest(marks: Mark[], names: string[]): Mark | null {
   return null;
 }
 
-/** The status of one planned asset (plan §7.3), from what the project knows. */
+/** The status of one planned asset, from what the project knows. */
 export function statusOf(f: StatusFacts): StatusReport {
   const flags: string[] = [];
   if (!f.exists) return { status: 'planned', next: 'draw it', flags };

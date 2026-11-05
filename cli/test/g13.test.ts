@@ -1,4 +1,4 @@
-// G13 (plan §23) from the command line: `run --dry` and `seeds`, and an export refused while a
+// G13 from the command line: `run --dry` and `seeds`, and an export refused while a
 // server owns the project.
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -46,7 +46,7 @@ describe('run --dry and seeds', () => {
   });
 });
 
-describe('item 10: export while a server owns the project', () => {
+describe('export while a server owns the project', () => {
   it('is refused, and nothing is written', () => {
     // A live process (this test's parent) holds the lock, as a running pixelclaw serve would.
     writeFileSync(join(proj, '.pixelclaw.lock'), JSON.stringify({ pid: process.ppid, url: 'http://127.0.0.1:7417/' }) + '\n');

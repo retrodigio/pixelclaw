@@ -1,4 +1,4 @@
-// The state cache (plan §18): each asset's document after its whole tape, kept as state bytes in
+// The state cache: each asset's document after its whole tape, kept as state bytes in
 // <project>/.cache/state/<asset>.gwc so a CLI call or a fresh server reads it instead of
 // replaying every tape. A cache file is used only when its key matches: the SHA-256 of the tape
 // file, of the engine that made it (core's sources, or the bundle) and, for a language 1 tape
@@ -89,7 +89,7 @@ export function dropStateCache(p: Project, name: string): void {
   rmSync(stateCacheFile(p, name), { force: true });
 }
 
-// Check results (plan §21 item 6): each asset's plain check run (every check, every frame) kept in
+// Check results: each asset's plain check run (every check, every frame) kept in
 // .cache/checks/<asset>.json under a key made of the engine, the style guide, the manifest, the
 // palettes and the state keys of every asset the checks read (the asset, its ground, its set and
 // peers, or every asset for map checks). `plan` in a fresh process reads them instead of running

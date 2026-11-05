@@ -68,7 +68,7 @@ describe('checkpoints', () => {
     expect(verify().code).toBe(0);
   });
 
-  it('verify accepts the G1-G3 state hash of an older asset.json', () => {
+  it('verify accepts the state hash of an older asset.json (the first state format)', () => {
     const ex = join(root, 'ex.pclaw');
     cpSync(join(import.meta.dirname, '..', '..', 'examples', 'mossy-ruins.pclaw'), ex, { recursive: true });
     const aj = join(ex, 'assets', 'stone_floor', 'asset.json');
@@ -78,7 +78,7 @@ describe('checkpoints', () => {
     j.state.sha256 = sha256(serializeDocV1(new Writer(proj).doc('stone_floor'))!);
     writeFileSync(aj, JSON.stringify(j));
     const v = verify();
-    expect(v.out).toContain('asset.json has the G1-G3 state hash');
+    expect(v.out).toContain('asset.json has a hash in the older state format');
     expect(v.code).toBe(0);
     j.state.sha256 = '0'.repeat(64);
     writeFileSync(aj, JSON.stringify(j));

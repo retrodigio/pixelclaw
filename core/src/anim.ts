@@ -1,4 +1,4 @@
-// The animation model (plan §4.4): inserting, removing and moving frames with their durations,
+// The animation model: inserting, removing and moving frames with their durations,
 // tags and views kept in step; live mirror views; and the sequences that playback, the `anim`
 // view and the `anim` checks walk through.
 

@@ -1,4 +1,4 @@
-// G13 (plan §23): fixes from the acceptance run, in core. Each test failed before its fix.
+// G13: fixes from the acceptance run, in core. Each test failed before its fix.
 import { describe, expect, it } from 'vitest';
 import { BUILTIN_SCHEMES, TRANSPARENT, coverageTemplate, mapCellsText, bandMaps, decodePng, runChecks, flatten, exportItems, exportProfile, importProfile, loadProfile, type ProfileJson, composeMapDoc, deserializeDoc, layoutOf, mapChecks, mapWorld, replay, runBatch, serializeDoc, type AssetState, type Doc } from '../src/index.ts';
 import { EMPTY, palettes, run } from './helpers.ts';
@@ -13,7 +13,7 @@ function runMap(state: AssetState, text: string, docs: Record<string, Doc>): Ass
   return r.state;
 }
 
-describe('item 2: face cells on maps', () => {
+describe('face cells on maps', () => {
   // A cliff (face scheme): the top is leaf, the outside sky, the face pieces painted rust.
   const cliff = run(EMPTY, `new family cliff ${T}x${T} scheme=face
 rect @cell(inside) 0,0 ${T}x${T} c=leaf fill
@@ -57,7 +57,7 @@ terrain top rect 1,1 4x2`, docs);
   }
 });
 
-describe('item 5: a fill for tiles layers; walkable ground', () => {
+describe('a fill for tiles layers; walkable ground', () => {
   const grass = run(EMPTY, `new tile grass ${T}x${T}\nrect 0,0 ${T}x${T} c=leaf fill`).doc!;
   const flag = run(EMPTY, `new tile flag ${T}x${T}\nrect 0,0 ${T}x${T} c=stone fill`).doc!;
   const hut = run(EMPTY, `new object hut ${T * 2}x${T} cell=${T}x${T}\nrect 0,0 ${T * 2}x${T} c=rust fill\nfootprint 2x1`).doc!;
@@ -105,7 +105,7 @@ place hut 1,4 layer=props`, docs);
   });
 });
 
-describe('item 6: profiles: corner order, path dead ends, a per-colour output map', () => {
+describe('profiles: corner order, path dead ends, a per-colour output map', () => {
   const fam = (scheme: string, name = 'f') => run(EMPTY, `new family ${name} ${T}x${T} scheme=${scheme}
 rect @cell(inside) 0,0 ${T}x${T} c=leaf fill
 rect @cell(outside) 0,0 ${T}x${T} c=sky fill
@@ -144,7 +144,7 @@ family band 1:outside 1:moss`).doc!;
   });
 });
 
-describe('item 7: band jitter', () => {
+describe('band jitter', () => {
   const T2 = 16;
   const fam = (extra: string) => run(EMPTY, `new family shore ${T2}x${T2} scheme=blob47
 rect @cell(inside) 0,0 ${T2}x${T2} c=leaf fill
@@ -181,7 +181,7 @@ family band 2:outside 1:ink 2:moss${extra}`);
   });
 });
 
-describe('item 10: the smaller items', () => {
+describe('the smaller items', () => {
   it('consistency on a small set holds each to the whole set\'s median: only the odd one out fails', () => {
     // Outline shares 1 (all ink), 0.75 (three sides) and 0 (none) in a set of three.
     const box = (name: string, sides: string) => run(EMPTY, `new sprite ${name} 10x10\nrect 2,2 6x6 c=moss fill\n${[...sides].map((k) => ({ n: 'line 2,2 7,2', s: 'line 2,7 7,7', w: 'line 2,2 2,7', e: 'line 7,2 7,7' } as Record<string, string>)[k] + ' c=ink').join('\n')}`).doc!;

@@ -1,4 +1,4 @@
-// G12 (plan §21): the request records and their state machine; scenes in the manifest and what
+// G12: the request records and their state machine; scenes in the manifest and what
 // they still need; slicing a sheet into named cells; `map gen` standing objects on the ground it
 // lays (given, or the manifest's), replayed byte for byte.
 import { describe, expect, it } from 'vitest';
@@ -12,7 +12,7 @@ const at = '2026-10-29T10:00:00Z';
 const req = (id: string, asset: string, kind: 'draw' | 'change' | 'new', note = ''): RequestRecord => ({ type: 'request', id, asset, kind, note, by: 'human:ana', at });
 const ev = (type: Exclude<RequestRecord['type'], 'request'>, id: string, by = 'claude', text?: string): RequestRecord => ({ type, id, by, at, ...(text !== undefined ? { text } : {}) });
 
-describe('requests (§21 item 1)', () => {
+describe('requests', () => {
   it('open → claimed → progress → done', () => {
     const { requests, problems } = foldRequests([req('r1', 'urn', 'draw'), ev('claim', 'r1'), ev('progress', 'r1', 'claude', 'blocked in the shape'), ev('done', 'r1', 'claude', 'drew it; checks pass')]);
     expect(problems).toEqual([]);
@@ -73,7 +73,7 @@ const MANIFEST = {
   ],
 };
 
-describe('scenes in the manifest (§21 item 5)', () => {
+describe('scenes in the manifest', () => {
   it('validates names, uses and the map', () => {
     expect(validateManifest(MANIFEST).errors).toEqual([]);
     const bad = { ...MANIFEST, scenes: [{ name: 'a', uses: ['ghost'], map: 'urn', extra: 1 }, { name: 'a', uses: 'urn' }, 'x'] };
@@ -95,7 +95,7 @@ describe('scenes in the manifest (§21 item 5)', () => {
   });
 });
 
-describe('slicing a sheet (§21 item 4)', () => {
+describe('slicing a sheet', () => {
   it('cells in reading order with an offset and a gap', () => {
     expect(sliceCells(52, 27, { cell: [16, 12], offset: [2, 1], gap: [1, 1] })).toEqual([
       { col: 0, row: 0, x: 2, y: 1 }, { col: 1, row: 0, x: 19, y: 1 }, { col: 2, row: 0, x: 36, y: 1 },
@@ -114,7 +114,7 @@ describe('slicing a sheet (§21 item 4)', () => {
   });
 });
 
-describe('map gen places objects (§21 item 6)', () => {
+describe('map gen places objects', () => {
   const T = 8;
   const land = run(EMPTY, `new family land ${T}x${T} scheme=blob47\nrect @cell(inside) 0,0 ${T}x${T} c=leaf fill\nrect @cell(outside) 0,0 ${T}x${T} c=sky fill\nfamily band 1:outside 1:moss`).doc!;
   const house = run(EMPTY, `new object house 16x16 cell=${T}x${T}\nrect 0,0 16x16 c=rust fill\nfootprint 2x1 anchor=0,0`).doc!;

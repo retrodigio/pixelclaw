@@ -1,4 +1,4 @@
-// Helpers that apply house rules exactly (plan §3.4): `outline` (a 1-px outline around the shapes
+// Helpers that apply house rules exactly: `outline` (a 1-px outline around the shapes
 // on your layer), `shade` (light the lit side of each shape a ramp step lighter and the far side a
 // step darker) and `clean` (remove lone pixels and tiny clusters). Each works on the author's
 // layer, inside their selection, and reads neighbours across the edges of wrap documents.
@@ -191,7 +191,7 @@ function cleanOrphans(d: Doc, t: Target, size: number, keepTexture: boolean): vo
 }
 
 /**
- * A shadow under a sprite or an object (G16): a flat ellipse on the ground, pushed away from the
+ * A shadow under a sprite or an object: a flat ellipse on the ground, pushed away from the
  * light, in the style guide's shadow colour and direction unless given; drawn on your layer only
  * where the art is empty, so it sits behind. The line records the box it was drawn in.
  */

@@ -1,4 +1,4 @@
-// G9 export, import and densities (plan §4.7, §4.9, §10 G9): round-trip identity (export, then
+// G9 export, import and densities: round-trip identity (export, then
 // import, gives the same indices) through every built-in profile and the sample profile; the CSV
 // page layout docs/profiles.md defines; the reducer against hand-made fixtures; `.aseprite` round
 // trip; the PNG reader; project schemes and fillets; `scale` and `density`.
@@ -134,7 +134,7 @@ describe('CSV page layout (docs/profiles.md)', () => {
   });
 });
 
-describe('reducers (plan §4.7)', () => {
+describe('reducers', () => {
   const P: Palette = TEST_PALETTE;
   // Two 4x4 blocks, hand-made: A has 4 ink pixels in 16 (a quarter) on leaf; B has 3 ink, 7 moss, 6 leaf.
   const rows = [
@@ -208,7 +208,7 @@ describe('PNG reader and inflate', () => {
   });
 });
 
-describe('project schemes and fillets (plan §17)', () => {
+describe('project schemes and fillets', () => {
   const fam = `new family coast ${T}x${T} scheme=blob47-round\nrect @cell(inside) 0,0 ${T}x${T} c=leaf fill\nrect @cell(outside) 0,0 ${T}x${T} c=sky fill\nfamily band 1:outside 1:moss fillet=3`;
   const withScheme = { ...palettes, scheme: (n: string) => (n === 'blob47-round' ? ROUND : undefined) };
   it('a new family line copies the project scheme (def=), so the tape replays without the file', () => {
@@ -219,7 +219,7 @@ describe('project schemes and fillets (plan §17)', () => {
     expect(again.problems).toEqual([]);
     expect(Buffer.compare(serializeDoc(again.doc!), serializeDoc(r.state.doc!))).toBe(0);
     expect(schemeOf(deserializeDoc(serializeDoc(r.state.doc!)).family!).variants.length).toBe(176);
-    // Without a project copy, blob47-round is built in (G15): the line names it, no def= needed.
+    // Without a project copy, blob47-round is built in: the line names it, no def= needed.
     const built = runBatch(EMPTY, fam, { by: 't', palettes });
     expect(built.ok && built.state.entries[0]!.cmd).toMatch(/^new family coast 8x8 scheme=blob47-round palette=test wrap=off/);
     expect(built.ok && built.state.entries[0]!.cmd).not.toContain('def=');

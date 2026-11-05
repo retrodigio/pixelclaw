@@ -1,4 +1,4 @@
-// The gallery (plan §21 item 3): every asset at game scale (the style guide's draw scale), animated
+// The gallery: every asset at game scale (the style guide's draw scale), animated
 // ones playing at the game's tick rate, maps composed from their assets. Filters by set, kind,
 // status and failing check, a sort, a multi-select side-by-side compare, and one click to the
 // editor. A map lists the assets it uses and an asset the maps that use it; clicking one shows

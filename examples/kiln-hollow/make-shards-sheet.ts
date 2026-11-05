@@ -1,4 +1,4 @@
-// Makes the G12 demo's sheet to import (plan §21): "an existing tile set" a person brings in, made
+// Makes the G12 demo's sheet to import: "an existing tile set" a person brings in, made
 // here so it is original. Three 24x24 heaps of broken pots (shards in the clay and glaze ramps,
 // inked) on a 2x2 grid of cells, the last cell left empty, as an artist's PNG sheet would be.
 //   node examples/kiln-hollow/make-shards-sheet.ts

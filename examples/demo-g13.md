@@ -1,6 +1,6 @@
 # Demo G13: fixes from the acceptance run
 
-The acceptance run (A1) ranked the problems that slowed a real agent using the tool (plan §23).
+The acceptance run (A1) ranked the problems that slowed a real agent using the tool.
 This demo shows the first eight fixes on a small original set, **Fern Ledge**: a mossy ledge over
 a stream bed, at 16 px, drawn by a stand-in agent through `pixelclaw serve` over stdio (MCP), as
 Claude would. No API key: the underlay uses the offline `fake` provider.

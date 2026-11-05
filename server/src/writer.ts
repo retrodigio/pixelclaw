@@ -1,4 +1,4 @@
-// The single writer for a project (plan §8.1). Every command, from the agent (MCP), the CLI or a
+// The single writer for a project. Every command, from the agent (MCP), the CLI or a
 // browser, goes through `run` in the order it arrives; each applied batch is saved and then sent
 // to every listener (the watch view's sockets). It also keeps each agent's read position for
 // `changes`, and a timeline per asset so any earlier state is quick to rebuild.
@@ -92,7 +92,7 @@ export type RunOutcome =
     groups: number;
     /** The asset folder, when something was written. */
     dir: string | null;
-    /** Texture variants that inherit this family's band and were brought up to date (G13). */
+    /** Texture variants that inherit this family's band and were brought up to date. */
     followed?: string[];
   }
   | { ok: false; errors: Diag[] };
@@ -478,7 +478,7 @@ export class Writer {
    * its band differs, as one undo group by the same author. With `self`, the asset itself is
    * brought up to its base too (it has just been made to inherit).
    *
-   * Families follow the tiles their textures came from (G15, plan §26 item 4): for each of a
+   * Families follow the tiles their textures came from : for each of a
    * family's frames, the latest `family texture inside|outside` line drawn on it decides; when it
    * copied from=<tile> and that tile has changed, the family gets the same line again (on that
    * frame, the author's frame put back after), as one undo group. A texture drawn from rows (no
@@ -844,7 +844,7 @@ export class Writer {
   }
 
   /**
-   * An object on its ground, among plain tiles (plan §4.10): a 7x6 map of the ground (a tile, or a
+   * An object on its ground, among plain tiles: a 7x6 map of the ground (a tile, or a
    * family's inside) with the object placed by its anchor near the middle.
    */
   private objectScene(asset: string, doc: Doc, all: AssetDoc[], given?: string): { doc: Doc; note: string } {

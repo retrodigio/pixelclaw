@@ -1,4 +1,4 @@
-// Requests from the dashboard (plan §21): requests.jsonl in the project, one record a line, only
+// Requests from the dashboard: requests.jsonl in the project, one record a line, only
 // ever appended. People open requests (Draw this, Ask for changes, Add an asset), answer a blocked
 // one or withdraw one; the agent claims, posts progress and finishes them through the MCP `work`
 // tool. Every record is checked against the state the file is in before it is written (core's
@@ -47,7 +47,7 @@ export function appendRequest(p: Project, r: RequestRecord): WorkRequest {
 
 /**
  * A person's request, reply or cancel. "Draw this" is for a planned asset not drawn yet; "Ask for
- * changes" writes `mark rejected "…"` on the asset's tape with the person's name (as G10's button
+ * changes" writes `mark rejected "…"` on the asset's tape with the person's name (as the dashboard's approval button
  * did) and records the request with that mark; "Add an asset" adds the manifest entry (the whole
  * manifest validated first; nothing is written if it has problems) and asks for it to be drawn.
  * Run inside the writer's queue.
@@ -104,7 +104,7 @@ export function requestLine(q: WorkRequest): string {
 }
 
 /**
- * A request, reply or cancel from the CLI or MCP (plan §26 item 2) as the dashboard's message:
+ * A request, reply or cancel from the CLI or MCP as the dashboard's message:
  * kind draw, change or add (`new`, with its manifest entry). Checked here for shape; personRequest
  * checks it against the project.
  */
@@ -157,7 +157,7 @@ export function agentWork(w: Writer, agent: string, q: AgentWork): { request: Wo
   if (!id) throw new ProjectError(`no claimed request to post ${q.action} on (give id)`);
   const target = reqs.get(id);
   if (q.action === 'done' && target && target.state === 'claimed' && target.claimedBy === agent) {
-    // Done means the asset passes its checks (plan §26 item 1); blocked stays open for anything else.
+    // Done means the asset passes its checks; blocked stays open for anything else.
     if (!assetExists(p, target.asset)) throw new ProjectError(`${id} is not done: ${target.asset} is not drawn yet. Draw it, or work(action="blocked", text=<one clear question>) if you cannot`);
     const failing = w.checks(target.asset).results.filter((r) => r.status === 'fail');
     if (failing.length) {

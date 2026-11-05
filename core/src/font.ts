@@ -1,4 +1,4 @@
-// Glyph sheets (plan §4.6): a font document is a grid of cells, one per code point. This module
+// Glyph sheets: a font document is a grid of cells, one per code point. This module
 // reads glyphs out of the sheet (each drawn from its cell's left edge), works out advances and
 // metrics, and writes the two export formats:
 //

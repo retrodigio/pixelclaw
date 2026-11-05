@@ -1,4 +1,4 @@
-// G4, the drawing toolkit (plan §10 G4): a golden render and grid per command and generator; a
+// G4, the drawing toolkit: a golden render and grid per command and generator; a
 // seed changes a generator's output while the same seed reproduces it; every tape replays in
 // normal form, and its state survives serialisation (checkpoint bodies).
 

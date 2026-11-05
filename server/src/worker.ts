@@ -1,9 +1,9 @@
-// The headless worker (plan §21 item 2): a Claude Code session started without a person at the
+// The headless worker: a Claude Code session started without a person at the
 // keyboard (`claude -p`), connected to this server's MCP endpoint (HTTP, with the watch token) and
 // given the shipped skill, that works the request queue until it is empty or the budget cap is
 // reached. It runs only when project.json `worker.enabled` is true, never twice for one project
 // (a lock file beside the project's, and one per server), and stops at the cap: the cap is a total
-// over every run (worker-spend.jsonl, plan §26 item 1), each session gets what is left of it
+// over every run (worker-spend.jsonl), each session gets what is left of it
 // (`--max-budget-usd`), and a run stops once the sessions' costs reach it. Its log
 // (logs/worker.log) goes to the dashboard line by line.
 //

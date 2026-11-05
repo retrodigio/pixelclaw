@@ -1,4 +1,4 @@
-// Write the built-in autotile schemes (plan §4.2) as JSON data in core/schemes/. The files are the
+// Write the built-in autotile schemes as JSON data in core/schemes/. The files are the
 // source of truth the tool reads; this script is how they were made, kept so they can be checked.
 //   node scripts/gen-schemes.ts
 //
@@ -109,14 +109,14 @@ function wang16(): Scheme {
 }
 
 /**
- * blob47 and the faces of a cliff drawn into the cells around it (G13, G16): a south face in the
+ * blob47 and the faces of a cliff drawn into the cells around it: a south face in the
  * cell below the terrain, side faces in the cells beside its east and west edges, and a corner
  * where a side face meets the end of the south face. Faces are art in cells outside the terrain;
  * the band leaves them alone and the pieces' art (the band layer) is copied by quadrant.
  *
  * - South faces (a cell below the terrain): each half is an end, joins the face beside it (that
  *   cell is below the terrain too: bit E or W), or meets the terrain beside it, an inner corner
- *   (bit SE or SW). 9 variants: face_o, face_e, face_w, face_ew (G13), face_ie, face_iw, face_e_iw,
+ *   (bit SE or SW). 9 variants: face_o, face_e, face_w, face_ew, face_ie, face_iw, face_e_iw,
  *   face_ie_w, face_ie_iw.
  * - Side faces (a cell beside the terrain, not below it): on its west half when the terrain is to
  *   the west (bit W: the terrain's east side), its east half when to the east (bit E); each joins
@@ -124,7 +124,7 @@ function wang16(): Scheme {
  *   is not terrain), else it ends. side_e…, side_w…, side_ew…: 12 variants.
  * - Corners (beside neither, the terrain diagonally above): corner_e (terrain to the north-west:
  *   below the terrain's east side face, past the south face's east end), corner_w, corner_ew.
- * - Alternates (G16 "face variants"): face_ew_b, face_ew_c, side_e_ns_b, side_w_ns_b are looks of
+ * - Alternates ("face variants"): face_ew_b, face_ew_c, side_e_ns_b, side_w_ns_b are looks of
  *   the long middles, placed by a hash of the cell; each is a copy of its middle until detached
  *   (`family detach face_ew_b`) and drawn.
  */
@@ -158,7 +158,7 @@ function face(): Scheme {
     { name: 'side_e_ns_b', key: null, quads: ['sidemid@nw', 'out', 'sidemid@sw', 'out'], on: 'side', alt: 'side_e_ns' },
     { name: 'side_w_ns_b', key: null, quads: ['out', 'sidemid@ne', 'out', 'sidemid@se'], on: 'side', alt: 'side_w_ns' },
   ];
-  // The G13 faces keep their places (the first four after blob47's); the rest follow.
+  // The first faces keep their places (the first four after blob47's); the rest follow.
   const g13 = ['face_o', 'face_e', 'face_ew', 'face_w'];
   const ordered = [...g13.map((n) => faces.find((f) => f.name === n)!), ...faces.filter((f) => !g13.includes(f.name))];
   return {
@@ -171,7 +171,7 @@ function face(): Scheme {
 }
 
 /**
- * A lane (G16): a path that fills where it is wide and turns diagonally. Eight neighbours: a
+ * A lane: a path that fills where it is wide and turns diagonally. Eight neighbours: a
  * diagonal counts when both sides next to it are the lane (the corner is filled, as blob47's, so a
  * lane two or more cells wide has a plain middle) and when neither is (a strip runs to that corner:
  * a diagonal turn); with one side it does not. The strip is inset from the tile's edges like the
@@ -230,7 +230,7 @@ function single(): Scheme {
 }
 
 /**
- * blob47 with rounder inner corners (a scheme option, plan §17). A diagonal counts when either side
+ * blob47 with rounder inner corners (a scheme option). A diagonal counts when either side
  * next to it is the terrain, so an edge knows when the terrain turns an inner corner at its end:
  * there its quadrant bends into the corner (vround, hround), the inner corner's arc widens, and
  * the cell outside the corner gets the rounding's tip (15 fillet variants keyed by the corners the
@@ -282,7 +282,7 @@ const write = (dir: string, s: Scheme) => {
 mkdirSync(OUT, { recursive: true });
 const EXAMPLE = join(import.meta.dirname, '..', 'examples', 'mossy-ruins.pclaw', 'schemes');
 mkdirSync(EXAMPLE, { recursive: true });
-// blob47-round is built in since G15 (plan §26 item 4); the example project keeps its own copy (its
+// blob47-round is built in; the example project keeps its own copy (its
 // tapes name it with def=, as a project scheme).
 write(EXAMPLE, blob47Round());
 for (const s of [blob47(), blob47Round(), wang16(), path(), bridge8(), single(), face(), lane()]) {

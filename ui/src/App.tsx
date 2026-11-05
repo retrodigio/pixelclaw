@@ -1,6 +1,6 @@
-// The page (plan §8.3): assets, tools and palette on the left; the canvas in the middle; the tape
+// The page: assets, tools and palette on the left; the canvas in the middle; the tape
 // with playback controls, the command line, notes and "Claude's eye" on the right. People edit
-// here: every action becomes a command on the tape with their name (plan §1.3).
+// here: every action becomes a command on the tape with their name.
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ctxOf, familyCellAt, flaggedOn, frameAtTick, sequences } from '@pixelclaw/core';

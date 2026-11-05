@@ -1,4 +1,4 @@
-# urn_blue (G12): the urn glazed blue, a palette swap the consistency check recognises as a recolour.
+# urn_blue: the urn glazed blue, a palette swap the consistency check recognises as a recolour.
 # The urn's pixels, then each clay entry swapped for its glaze step (clay4, the highlight, for smoke).
 new sprite urn_blue
 import 0,0 asset=urn region=0,0,24x24

@@ -1,4 +1,4 @@
-// Snap (plan §6): read a full-colour underlay (a generated mockup, a photo of a drawing) back into
+// Snap: read a full-colour underlay (a generated mockup, a photo of a drawing) back into
 // pixel art. Three steps:
 //
 // 1. Grid fit. An image of pixel art drawn at some scale has its colour changes on a regular grid.
@@ -125,7 +125,7 @@ export function fitAxisAt(img: Rgba, axis: 'x' | 'y', pitch: number): AxisFit {
 
 /**
  * Fit the grid on both axes (hints: the expected pitch on each). With `cells` (the placement's
- * size in document pixels, G13) the grid is the placement's: the pitch is the image's size over
+ * size in document pixels) the grid is the placement's: the pitch is the image's size over
  * the cells, exactly that many blocks, and only the offset is fitted (by less than half a block),
  * so the draft lands on the placement pixel for pixel.
  */

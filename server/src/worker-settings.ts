@@ -1,4 +1,4 @@
-// The worker's settings (plan §21 item 2, §26 item 1): project.json `worker`, read fresh each time
+// The worker's settings: project.json `worker`, read fresh each time
 // (a person turns it on by editing the file). Off by default: a worker spends money.
 //
 //   "worker": {

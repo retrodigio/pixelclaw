@@ -1,4 +1,4 @@
-// Autotile schemes (plan §4.2) are data: core/schemes/*.json says which neighbours count, the
+// Autotile schemes are data: core/schemes/*.json says which neighbours count, the
 // variants, their names and how each is built from four quadrants. This module reads them,
 // resolves a neighbourhood to its variant, finds which authored piece supplies each quadrant of
 // every other variant, and gives the quadrant geometry the derivation draws bands and lays
@@ -36,11 +36,11 @@ export interface SchemeVariant {
   quads: string[];
   /**
    * Drawn in a cell outside the terrain: 'face' below it (the face scheme's south faces), 'side'
-   * beside it and 'corner' diagonally below it (G16), 'fillet' where the terrain turns an inner
+   * beside it and 'corner' diagonally below it, 'fillet' where the terrain turns an inner
    * corner around it (the key is those corners: NE, SE, SW, NW bits).
    */
   on?: 'face' | 'side' | 'corner' | 'fillet';
-  /** Another look of this variant (G16): placed instead of it on some cells, by a hash of the cell. */
+  /** Another look of this variant: placed instead of it on some cells, by a hash of the cell. */
   alt?: string;
 }
 
@@ -54,7 +54,7 @@ export interface SchemeJson {
   /**
    * true: a diagonal counts when both sides next to it are the terrain; 'either': when either is
    * (rounder inner corners need to see them); 'diagonal': when both are or neither is (a lane's
-   * diagonal turn, G16).
+   * diagonal turn).
    */
   cornerRule?: boolean | 'either' | 'diagonal';
   /** The strip's inset from the tile's edges as a fraction of the tile (path, bridge8). */
@@ -62,7 +62,7 @@ export interface SchemeJson {
   /** Extra kinds and the geometry each is drawn with. */
   kinds?: Record<string, string>;
   faces?: boolean;
-  /** Side faces beside the terrain's east and west edges, and corners below them (G16). */
+  /** Side faces beside the terrain's east and west edges, and corners below them. */
   sides?: boolean;
   /** Rounder inner corners: outside cells get a fillet in each corner the terrain turns around (fillet variants). */
   fillets?: boolean;
@@ -89,7 +89,7 @@ export interface Scheme extends SchemeJson {
   sideByKey: Map<number, number>;
   cornerByKey: Map<number, number>;
   filletByKey: Map<number, number>;
-  /** A variant with other looks: it and its alternates (G16). */
+  /** A variant with other looks: it and its alternates. */
   alts: Map<number, number[]>;
 }
 
@@ -214,7 +214,7 @@ export function resolveVariant(s: Scheme, here: boolean, bits: number): number |
     // A south face. Each side joins the face beside it (out of the terrain, the terrain above it),
     // meets the terrain beside it (an inner corner), or ends.
     const k = (bits & E ? SE : bits & NE ? E : 0) | (bits & W ? SW : bits & NW ? W : 0);
-    // A scheme without inner corners (a tape's copy from before G16): there the face ends.
+    // A scheme without inner corners (an older tape's copy): there the face ends.
     return s.faceByKey.get(k) ?? s.faceByKey.get(k & (E | W)) ?? null;
   }
   if (!s.sides) return null;
@@ -266,9 +266,9 @@ export const terrainWidth = (s: SchemeJson, t: Terrain): number => (s.neighbours
 /**
  * Every tile of a map: its variant (index) or null for plain outside. Past the map's edge a cell is
  * outside (`border` not, the default here: a family's sample island), terrain (`terrain`), or the
- * edge cell's own value (`same`: maps since G15, so terrain running off the map has no edge band
+ * edge cell's own value (`same`: maps, so terrain running off the map has no edge band
  * along the border). Corner schemes read the terrain's own corner grid (`layerTerrain`). With
- * `looks`, a variant that has alternate looks takes one of them by a hash of the cell (G16).
+ * `looks`, a variant that has alternate looks takes one of them by a hash of the cell.
  */
 export function resolveMap(s: Scheme, t: Terrain, border: 'same' | 'terrain' | 'not' = 'not', looks = true): (number | null)[] {
   const tw = terrainWidth(s, t);
@@ -313,7 +313,7 @@ export interface Geometry {
    */
   fillet?: number;
   /**
-   * Edges that are not ruler-straight (G13): every band edge moves in or out by up to `jitter`
+   * Edges that are not ruler-straight: every band edge moves in or out by up to `jitter`
    * pixels, by a smooth field that repeats every tile (so the tiles still join), from `seed`.
    */
   jitter?: { px: number; seed: number };
@@ -369,7 +369,7 @@ function below0(base: BaseKind, U: number, V: number, K: number, C: number): boo
 }
 
 /**
- * A lane's diagonal turn (G16), in doubled pixels from the corner the quadrant faces (P, Q: across
+ * A lane's diagonal turn, in doubled pixels from the corner the quadrant faces (P, Q: across
  * and up or down from its edges); W is a straight strip's half-width (doubled: the tile less both
  * insets) and t the tile. The diagonal strips are measured across a row, so every band is the same
  * number of pixels in each row (clean 45° steps), and are as wide across as a straight strip

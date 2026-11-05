@@ -1,4 +1,4 @@
-// Shadows (G16, plan §26 item 3): a flat ellipse on the ground under a sprite or an object, pushed
+// Shadows : a flat ellipse on the ground under a sprite or an object, pushed
 // away from the light. The `shadow` helper draws one into a sprite's own art; a map's objects layer
 // with shadow= draws one under every object it places, on the ground before the objects.
 

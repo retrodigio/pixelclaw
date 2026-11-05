@@ -1,4 +1,4 @@
-// G7 schemes (plan §4.2, §10 G7): the resolver against a reference table for all 256
+// G7 schemes: the resolver against a reference table for all 256
 // neighbourhoods, built here without the resolver (the blob list from the literature, keys by
 // summing weights, quadrant kinds from the 2x2 cells meeting at each corner); every built-in scheme
 // loads with pieces for every quadrant; corner, path and bridge keys; and coverage maps.
@@ -44,7 +44,7 @@ function expectedQuad(raw: number, sx: number, sy: number): string {
   return v ? 'vert' : 'horiz';
 }
 
-describe('schemes (§4.2)', () => {
+describe('schemes', () => {
   it('blob47 resolves all 256 neighbourhoods as the reference table says', () => {
     const s = BUILTIN_SCHEMES.get('blob47')!;
     const seen = new Set<number>();

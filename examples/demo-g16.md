@@ -1,6 +1,6 @@
 # Demo G16: art help
 
-The second acceptance run's blind review (plan §26) found the weak spots where the tool had no
+The second acceptance run's blind review found the weak spots where the tool had no
 help: structured textures (pebbles, tufts), cliff sides, filled lanes, shadows. G16 adds generators
 for structure, faces round a cliff, a lane scheme, shadows, and four check changes. A stand-in agent
 drives `pixelclaw serve` over stdio (MCP), as Claude would, on a new 48 px project, Saltmere Heath

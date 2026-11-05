@@ -1,4 +1,4 @@
-// The map editor (plan §4.11, §8.3): a map document drawn from the assets it names, at 1x or the
+// The map editor: a map document drawn from the assets it names, at 1x or the
 // game's scale. Painting terrain (brush, rectangle, erase), placing objects and tiles by name,
 // moving and removing them are commands on the tape, written as you; the camera (the engine's
 // screen around a cell) and the zoom only change what you see.
@@ -28,7 +28,7 @@ export function MapEditor({ doc, store, ed, editable }: { doc: Doc; store: Store
   const [scale, setScale] = useState(1);
   const [layer, setLayer] = useState<string | null>(null);
   const [asset, setAsset] = useState<string | null>(null);
-  // The fill tool's mix (G14): a weight per one-cell tile, or null for a single tile.
+  // The fill tool's mix: a weight per one-cell tile, or null for a single tile.
   const [mix, setMix] = useState<Record<string, number> | null>(null);
   const [camera, setCamera] = useState<Pt | null>(null);
   const [showCam, setShowCam] = useState(false);

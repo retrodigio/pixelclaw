@@ -37,7 +37,7 @@ export interface Snapshot {
   worker: WorkerStatus;
 }
 
-/** What a person can ask from the dashboard (plan §21). */
+/** What a person can ask from the dashboard. */
 export type PersonRequest =
   | { action: 'request'; kind: 'draw'; asset: string; note?: string }
   | { action: 'request'; kind: 'change'; asset: string; note: string }
@@ -93,12 +93,12 @@ export type ClientMessage =
   | { type: 'ping' }
   /** Commands from a person: applied by the single writer as one undo group, written `by`. */
   | { type: 'run'; id: number; asset: string; commands: string; by: string }
-  /** A request, a reply or a cancel from the dashboard (plan §21), written \`by\`. */
+  /** A request, a reply or a cancel from the dashboard, written \`by\`. */
   | { type: 'request'; id: number; by: string; body: PersonRequest }
   /** Start or stop the headless worker (only when project.json worker.enabled). */
   | { type: 'worker'; id: number; by: string; action: 'start' | 'stop' };
 
-// The plan (plan §7.3), as the dashboard and the MCP `plan` tool show it.
+// The plan, as the dashboard and the MCP `plan` tool show it.
 
 export interface ExportRecord {
   profile: string;

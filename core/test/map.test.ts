@@ -1,4 +1,4 @@
-// G8 maps and oversized assets (plan §4.10, §4.11, §10 G8): terrain painting resolves the same
+// G8 maps and oversized assets: terrain painting resolves the same
 // variants as the scheme reference; footprints block overlapping placement; split then reassembly
 // is identity; map replay is byte-identical; draw order, roofs and the map checks; texture
 // variants; Tiled export; map gen.
@@ -43,7 +43,7 @@ rect 2,0 4x8 c=moss fill
 rect 3,8 2x8 c=ink fill
 footprint 1x1`;
 
-describe('map documents (§4.11)', () => {
+describe('map documents', () => {
   const land = run(EMPTY, FAMILY).doc!;
 
   it('terrain painting resolves every cell to the variant the scheme reference gives (random terrains)', () => {
@@ -53,7 +53,7 @@ describe('map documents (§4.11)', () => {
     for (let round = 0; round < 6; round++) {
       const W = 12, H = 9;
       const rows = Array.from({ length: H }, () => Array.from({ length: W }, () => (rnd() ? '#' : '-')).join(''));
-      // Past the map's edge a cell counts as its own (G15), or as terrain or not when the layer says so.
+      // Past the map's edge a cell counts as its own, or as terrain or not when the layer says so.
       const border = (['same', 'not', 'terrain'] as const)[round % 3]!;
       const st = runMap(EMPTY, `new map m ${W}x${H} tile=${T}\nlayer add ground terrain=land outside=on border=${border}\nterrain ground paint 0,0 <<\n${rows.map((r) => `  ${r}\n`).join('')}>>`, { land });
       const c = composeMapDoc(st.doc!, world({ land }));
@@ -129,7 +129,7 @@ describe('map documents (§4.11)', () => {
     const st = runMap(EMPTY, `new map m 14x8 tile=${T}\nlayer add ground terrain=land outside=on\nterrain ground rect 0,3 14x5`, docs);
     let rep = mapChecks(st.doc!, world(docs)).find((x) => x.id === 'repetition')!;
     expect(rep.pass).toBe(false);
-    // The edge runs the whole width: past the map's edge the terrain goes on (G15), so no corner at either end.
+    // The edge runs the whole width: past the map's edge the terrain goes on, so no corner at either end.
     expect(rep.groups[0]!.label).toMatch(/^14 land\.\w+ in a row at 0,3 14x1$/);
     // Variants with different band detail on the straight edge: the map picks among them cell by cell.
     const b = run(EMPTY, `${FAMILY.replace('land', 'land_b')}\nvariant of=land\npx @cell(ew) 2,0 2,7 c=stone`).doc!;
@@ -176,7 +176,7 @@ describe('map documents (§4.11)', () => {
   });
 });
 
-describe('oversized assets (§4.10)', () => {
+describe('oversized assets', () => {
   it('split then reassembly is identity, with the cells\' flags on the stamp', () => {
     for (const text of [HOUSE, TREE, `new object big 24x16 cell=${T}x${T}\nnoise 0,0 24x16 ramp=green seed=4\nfootprint 3x1 anchor=1,0`]) {
       const d = run(EMPTY, text).doc!;

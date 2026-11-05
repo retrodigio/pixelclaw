@@ -1,4 +1,4 @@
-// Import into the gallery (plan §21 item 4): drop a PNG sheet, a folder of PNGs or an .aseprite
+// Import into the gallery: drop a PNG sheet, a folder of PNGs or an .aseprite
 // file on the dashboard or the gallery (or pick files). A sheet gets the slice dialog: the cell
 // size, the offset to the first cell and the gap between cells, drawn over the image; names from a
 // pattern or from the manifest's planned entries (in reading order); quantise to a project palette

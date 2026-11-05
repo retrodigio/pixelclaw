@@ -89,7 +89,7 @@ function colourTable(doc: Doc, theme?: Theme | null): RGB[] {
 
 
 /**
- * Circle flagged pixels in magenta (plan §2): a ring around each pixel of an image drawn at
+ * Circle flagged pixels in magenta: a ring around each pixel of an image drawn at
  * `s` px per pixel with its top-left pixel at ox,oy. Below 4x the pixel is filled instead.
  */
 export function drawMarks(img: Rgba, ox: number, oy: number, s: number, marks: readonly Pt[], w: number, h: number): void {
@@ -144,12 +144,12 @@ export interface ScaledOptions {
   theme?: Theme | null;
   /** The document's underlays composed over it (`composeUnderlay`), shown faded under transparent art. */
   underlay?: Rgba | null;
-  /** Only this part of the canvas (G15); the rulers keep the canvas's coordinates. */
+  /** Only this part of the canvas; the rulers keep the canvas's coordinates. */
   region?: { x: number; y: number; w: number; h: number };
 }
 
 /**
- * The visible underlays of a document (plan §6) composed into one image over the document, at k
+ * The visible underlays of a document composed into one image over the document, at k
  * image pixels per document pixel (enough to show the images' detail, at most 8): each image
  * stretched over its rectangle, nearest neighbour, top layers over lower ones. Null when there is
  * none or no image is available.
@@ -478,7 +478,7 @@ export function renderDiff(before: Doc | null, after: Doc, o: { scale?: number; 
 const PLAIN_GROUND: RGB = [88, 94, 102];
 
 /**
- * The game preview (plan §2): sprites side by side on their ground tile (repeated), at 1x (real
+ * The game preview: sprites side by side on their ground tile (repeated), at 1x (real
  * size) and again at the engine's draw scale. Sprites stand on a common baseline. The first item
  * is the asset being judged; the rest are its neighbours in the set.
  */
@@ -510,7 +510,7 @@ export function renderGame(items: { doc: Doc; frame?: number }[], o: { ground?: 
     ox += it.doc.width + gap;
   }
   const pad = 8;
-  // At a draw scale of 1 (48 px games, G14) the scene is shown once, not twice at the same size.
+  // At a draw scale of 1 (48 px games) the scene is shown once, not twice at the same size.
   const once = k === 1;
   const top = once ? 0 : sceneH + pad;
   const img = createRgba(pad + Math.max(sceneW, sceneW * k) + pad, pad + top + sceneH * k + pad);
@@ -525,7 +525,7 @@ export function renderGame(items: { doc: Doc; frame?: number }[], o: { ground?: 
 }
 
 /**
- * The recolour preview (plan §2, §4.8): the art under several preview themes side by side, each
+ * The recolour preview: the art under several preview themes side by side, each
  * with a strip of its role colours (black, white, light, dark, darkest) underneath.
  */
 export function renderRecolour(doc: Doc, themes: Theme[], o: { scale?: number; frame?: number } = {}): Rgba {
@@ -554,7 +554,7 @@ export function renderRecolour(doc: Doc, themes: Theme[], o: { scale?: number; f
   return img;
 }
 
-// --- animation (plan §2 `anim`, §4.4)
+// --- animation
 
 const GUIDE: RGB = [64, 220, 230];
 const ONION_PREV: RGB = [255, 110, 70];
@@ -720,7 +720,7 @@ export function animGifFrames(doc: Doc, o: AnimOptions = {}): GifFrame[] {
   });
 }
 
-// --- Maps and families (plan §2 `map`, §4.2, §4.3)
+// --- Maps and families
 
 export interface MapViewOptions {
   /** The map's size in tiles and the island's seed (a family's default: 12x10, seed 1). */
@@ -791,7 +791,7 @@ export function renderMap(doc: Doc, o: MapViewOptions = {}): Rgba {
 export function mapText(doc: Doc, o: MapViewOptions = {}): string {
   const sc = mapScene(doc, o, o.tick ?? 0);
   const { img, base } = sc;
-  // The seam as the check measures it: a cliff's faces as the ground under them (G16).
+  // The seam as the check measures it: a cliff's faces as the ground under them.
   const ground = { ...img, px: img.px.slice() };
   if (base.family && !o.terrain) groundUnderFaces(ground, base, 0);
   const seam = mapSeam(ground, base);

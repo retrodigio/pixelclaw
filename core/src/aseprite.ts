@@ -1,4 +1,4 @@
-// `.aseprite` files (plan §4.9, §9: "`.aseprite` interop"): read and write, so people can round-trip
+// `.aseprite` files: read and write, so people can round-trip
 // with Aseprite. Written files are indexed (8 bits a pixel): file index 0 is transparent and palette
 // entry i is file index i + 1, so a palette may have 255 entries. Layers bottom to top as here
 // (hidden, reference), every frame's duration (ticks at the project's tick rate, as milliseconds),

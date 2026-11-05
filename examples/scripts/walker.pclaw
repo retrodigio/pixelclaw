@@ -1,4 +1,4 @@
-# Mossy ruins: a 24x24 walking figure in four directions, two frames each (plan §10 G6).
+# Mossy ruins: a 24x24 walking figure in four directions, two frames each.
 # A wanderer with a red tunic, a satchel on a strap and brown hair, lit from the top left.
 # Frames 1-2 face south, 3-4 north, 5-6 east; west is a live mirror of east (frames 7-8).
 # The feet rest on row 22 (the ground line); the pivot is the pixel between them.

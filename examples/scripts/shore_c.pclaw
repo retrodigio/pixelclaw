@@ -1,4 +1,4 @@
-# A third look for the shore (plan §4.1, §17): shore_b's band with the third water and the third sand.
+# A third look for the shore: shore_b's band with the third water and the third sand.
 fork shore_b shore_c
 variant of=shore
 frame 1

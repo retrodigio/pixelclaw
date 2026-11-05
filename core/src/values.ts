@@ -1,4 +1,4 @@
-// Option values shared by the G4 commands: fractions (level=0.25, density=3/16), ranges (2..4),
+// Option values shared by the drawing commands: fractions (level=0.25, density=3/16), ranges (2..4),
 // lists of weights, ramps (a palette ramp's name or an inline list of entries), and exact integer
 // helpers (floor division, square root) so every generator stays in integer maths.
 
@@ -8,7 +8,7 @@ import type { Palette } from './palette.ts';
 type Kv = Extract<Token, { t: 'kv' }>;
 
 /**
- * A region of a canvas or a map, in the one format every command, tool and flag takes (G15):
+ * A region of a canvas or a map, in the one format every command, tool and flag takes:
  * "x,y WxH", "x,y,WxH" or "x,y,W,H". Null when it is none of them.
  */
 export function parseRegionText(s: string): { x: number; y: number; w: number; h: number } | null {

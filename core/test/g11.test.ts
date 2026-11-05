@@ -1,4 +1,4 @@
-// G11: jaggies on ramp shading (plan §19), icons (§4.5), fonts (§4.6), underlays and snap (§6).
+// G11: jaggies on ramp shading, icons, fonts, underlays and snap.
 import { describe, expect, it } from 'vitest';
 import { charText, exportColours, exportProfile, fontBmfont, fontStrip, glyphCell, glyphs, iconModeOf, materialMatch, Pcg32, createRgba, readStrip, runChecks, snapImage, artHash, deserializeDoc, replay, runBatch, serializeDoc, type Rgba, type CheckId, type CheckResult, type Doc } from '../src/index.ts';
 import { EMPTY, TEST_PALETTE, palettes, run } from './helpers.ts';
@@ -29,7 +29,7 @@ const ball = (rows: string[], ramp = 'ramp green = moss leaf lime') => doc([
   `paint 0,0 <<\n${rows.join('\n')}\n>>`,
 ].join('\n'));
 
-describe('jaggies on ramp shading (§19)', () => {
+describe('jaggies on ramp shading', () => {
   it('steps between neighbouring entries of one ramp inside a shape are shading', () => {
     const r = check(ball(BALL), 'jaggies');
     expect(r).toMatchObject({ status: 'pass', score: 0 });
@@ -70,7 +70,7 @@ const FONT = [
   'glyph U+002E <<\n.\n.\n.\n.\n.\n.\n0\n>>',
 ].join('\n');
 
-describe('fonts (§4.6)', () => {
+describe('fonts', () => {
   it('a glyph sheet: cells in chars order, normal forms, advances', () => {
     const s = run(EMPTY, FONT);
     const d = s.doc!;
@@ -154,7 +154,7 @@ describe('fonts (§4.6)', () => {
   });
 });
 
-describe('icons (§4.5)', () => {
+describe('icons', () => {
   const icon = (mode: string, body: string, name = 'i') => doc(`new icon ${name} 8x8\n${mode}\n${body}`);
   it('export modes: tone through roles, full and channel as drawn', () => {
     const tone = icon('palette add hi role=light\nicon mode=tone', 'rect 2,2 4x4 c=hi fill');
@@ -197,7 +197,7 @@ describe('icons (§4.5)', () => {
   });
 });
 
-// --- snap (§6): a synthetic grid with known pitch and offset
+// --- snap: a synthetic grid with known pitch and offset
 
 /** Random art of `cols` x `rows` palette indices drawn at a pitch and offset, blurred and with noise: a stand-in for a generated draft. */
 function synthetic(cols: number, rows: number, pitch: number, ox: number, oy: number, seed: number): { art: Uint16Array; img: Rgba } {
@@ -227,7 +227,7 @@ function synthetic(cols: number, rows: number, pitch: number, ox: number, oy: nu
   return { art, img };
 }
 
-describe('snap (§6)', () => {
+describe('snap', () => {
   for (const [pitch, ox, oy, hinted] of [[7.3, 3.2, 1.7, true], [10.667, 5.5, 0.4, true], [6, 2, 4, false], [12.5, 9.1, 7.8, false]] as const) {
     it(`recovers pitch ${pitch} and offset ${ox},${oy}${hinted ? ' (with the expected pitch)' : ' (no hint)'}`, () => {
       const cols = 36, rows = 24;
@@ -271,7 +271,7 @@ describe('snap (§6)', () => {
   });
 });
 
-describe('underlay and snap commands (§6)', () => {
+describe('underlay and snap commands', () => {
   const SHA = 'ab'.repeat(32), LAYOUT = 'cd'.repeat(32);
   it('underlay: an image on a new reference layer at the bottom, never part of the art', () => {
     const s = run(EMPTY, `new sheet scene 24x16 cell=8x8\nrect 0,0 4x4 c=moss fill\nunderlay mock blob=${SHA} image=144x96 layout=${LAYOUT} prompt="mossy ruins, a draft" provider=fake cost=0`);

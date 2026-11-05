@@ -1,6 +1,6 @@
-// Consistency across a set (plan §5): each asset is measured the same way and held to the rest
+// Consistency across a set: each asset is measured the same way and held to the rest
 // of its set (the manifest's set, else its kind), and to what the style guide and the manifest
-// expect. Measures: the drawn shape's height against the manifest's (G6's note: a chest as tall as
+// expect. Measures: the drawn shape's height against the manifest's (a chest as tall as
 // the walker), mean lightness, the outline's share of the silhouette edge, the light direction
 // (from where the light pixels sit against the shape's middle) against the style guide's, the
 // mean size of same-colour clusters, and how many steps of each ramp (material) are used. An
@@ -174,7 +174,7 @@ export function measure(d: Doc, ink: string[]): Measures {
   if (!n) return { box: null, lightness: null, outline: null, light: null, cluster: null, steps: null, material: null, stroke: null, fill: null, centre: null };
   const mag = Math.hypot(gx, gy);
   const strength = gw > 0 ? mag / gw : 0;
-  // Ramp steps (G16): an entry drawn on only a few pixels (a lone accent: a glint, a gem) is not a
+  // Ramp steps: an entry drawn on only a few pixels (a lone accent: a glint, a gem) is not a
   // step of its material; a ramp with no other entries is not a material of the art.
   const accent = Math.max(3, Math.floor(n / 100));
   const uses = [...rampUse.values()].map((s) => [...s].filter((v) => (entryCount.get(v) ?? 0) >= accent).length).filter((k) => k > 0);
@@ -223,7 +223,7 @@ export interface ConsistencyOptions {
   maxCluster: number;
   maxSteps: number;
   heightTol: number;
-  /** Icons (plan §4.5): stroke weight difference in px, box fill difference, the optical centre's distance from the canvas centre in px. */
+  /** Icons: stroke weight difference in px, box fill difference, the optical centre's distance from the canvas centre in px. */
   icon?: { maxStroke: number; maxFill: number; maxCentre: number };
 }
 
@@ -262,11 +262,11 @@ export function consistencyOf(d: Doc, peers: { name: string; doc: Doc }[], o: Co
     const mine = get(me);
     const vals = theirs.filter((t) => !sameMaterial || (t.m.material !== null && t.m.material === me.material)).map((t) => get(t.m)).filter((x): x is number => x !== null);
     if (mine === null || vals.length < 2) return;
-    // The median of the whole set, this asset included (G13): every member is held to one centre,
+    // The median of the whole set, this asset included: every member is held to one centre,
     // so on a small set one odd asset is the outlier, not the two that disagree with it.
     const med = median([...vals, mine]);
     if (band) {
-      // Held to the set's middle half (G16): the distance outside its quartiles, so one more member
+      // Held to the set's middle half: the distance outside its quartiles, so one more member
       // (an import, a new prop) moves the band a little and does not flip an asset that was inside it.
       const [q1, q3] = quartiles([...vals, mine]);
       const off = mine < q1 ? q1 - mine : mine > q3 ? mine - q3 : 0;
@@ -290,7 +290,7 @@ export function consistencyOf(d: Doc, peers: { name: string; doc: Doc }[], o: Co
   vs('cluster', 'cluster size', (m) => m.cluster, o.maxCluster, (x) => String(r2(x)), true);
   vs('steps', 'ramp steps', (m) => m.steps, o.maxSteps, (x) => String(r1(x)), false, false, true);
   if (o.icon) {
-    // The icon set (plan §4.5): one stroke weight, boxes that fill the canvas alike, each icon optically centred.
+    // The icon set: one stroke weight, boxes that fill the canvas alike, each icon optically centred.
     vs('stroke', 'stroke weight', (m) => m.stroke, o.icon.maxStroke, (x) => String(r1(x)));
     vs('fill', 'box fill', (m) => m.fill, o.icon.maxFill, (x) => String(r2(x)));
     if (me.centre) {

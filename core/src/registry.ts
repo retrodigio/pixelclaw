@@ -1,4 +1,4 @@
-// Every command beyond the G1-G3 set registers itself when its module loads; importing this makes
+// Every command beyond the basic set registers itself when its module loads; importing this makes
 // sure they are all in COMMANDS before anything is normalised.
 
 import './cmd-layers.ts';

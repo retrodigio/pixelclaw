@@ -1,6 +1,6 @@
 # The project pipeline: manifest, statuses, review and the skill
 
-From a game's theme to exported art (plan §7.3). The agent writes a style guide and a **manifest**
+From a game's theme to exported art. The agent writes a style guide and a **manifest**
 (the asset plan); the tool works out where every planned asset stands, draws **flat templates**
 from the plan, writes **blind review** bundles, and shows it all in the watch view's
 **dashboard**. The **skill** teaches Claude Code the workflow.
@@ -69,7 +69,7 @@ set and with its planned `height` (only like with like: ground tiles, figures, i
 never a peer); `review(set=…)` reviews a set; templates come from it. `new font <name>` takes the
 cell size and `chars` from its entry.
 
-**Mockup first** (plan §6, G11). The flat templates are the layout an image provider follows:
+**Mockup first**. The flat templates are the layout an image provider follows:
 `underlay generate "<prompt>" layout=templates/mockup.png` on a sheet the size of the scene puts
 a generated mockup under it; a person approves the look in the watch view; `snap` reads it into a
 draft layer (block R² and the material match against the layout say whether to reroll); tiles
@@ -80,7 +80,7 @@ commands until their checks pass. Or skip the snap and trace over the underlay a
 ## Style-guide defaults and thresholds
 
 The style guide is `style.md` in words and `project.json` `style` as settings
-([checks.md](checks.md#the-style-guide)). G10 adds:
+([checks.md](checks.md#the-style-guide)). The pipeline adds:
 
 - `light` (`n` … `nw`): `shade` without `light=` uses it, and `consistency` holds the art to it.
 - `outline` (already the outline colours): `outline` without `c=` draws in the first one the
@@ -103,7 +103,7 @@ Worked out from the project every time, never set by hand. Each stage needs the 
 | `approved` | a later `mark approved` (a person, in the dashboard), the art unchanged since |
 | `exported` | its last export (`exported.json`) has the art as it is now |
 
-**Marks** (plan §7.2) are tape commands: `mark <name> ["text"]`. Each keeps a hash of the art
+**Marks** are tape commands: `mark <name> ["text"]`. Each keeps a hash of the art
 (its frames as they look: not notes, marks or selections), so a later change to the pixels makes
 it stale and the asset falls back to `checked`; `plan` says why (*the art changed since it was
 reviewed (#30)*). `mark rejected "…"` (the dashboard's *Ask for changes*) after an approval sends
@@ -158,7 +158,7 @@ plan after every batch and when the agent writes a manifest, exports or imports.
 
 ## Requests from the dashboard
 
-People ask Claude for work without a chat (plan §21):
+People ask Claude for work without a chat:
 
 - **Draw this…** on a planned card (an optional note): a `draw` request.
 - **Ask for changes…** on any drawn card (what should change): a `change` request, and the same
@@ -184,7 +184,7 @@ not fit is refused before it is written:
 |---|---|---|
 | open | `request`, or `reply` to a blocked one | a person |
 | claimed | `claim` (open only; the claimer may claim again); `progress` posts a note | the agent |
-| done | `done` with what changed (claimed, by the claimer; refused while the asset fails a check or is not drawn, G15) | the agent |
+| done | `done` with what changed (claimed, by the claimer; refused while the asset fails a check or is not drawn) | the agent |
 | blocked | `blocked` with a question (claimed, by the claimer) | the agent |
 | cancelled | `cancel` (open, claimed or blocked) | a person |
 
@@ -198,7 +198,7 @@ planned work and calls `plan` after each finished asset.
 
 ### Requests from the CLI and MCP
 
-The same requests, checked the same way (G15, plan §26 item 2), for an agent or a script that
+The same requests, checked the same way for an agent or a script that
 plans the work and leaves the drawing to the worker:
 
 ```sh

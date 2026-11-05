@@ -12,7 +12,7 @@ font) and two tiles more, then:
 - draws **four HUD icons** and lets the **icon-set check** (stroke weight, box fill, optical centre)
   hold them to each other; three are fixed after it and the other checks flag them.
 
-The builder has no image API key, so the demo's mockup was made offline (plan §19):
+The builder has no image API key, so the demo's mockup was made offline:
 [kiln-hollow/make-yard-mockup.ts](kiln-hollow/make-yard-mockup.ts) draws the yard's flat layout
 ([yard-layout.png](kiln-hollow/yard-layout.png): clay, a sage bank, the stream) as a rough
 pixel-art draft in the palette's colours, enlarges it to 768x512 with a sub-pixel offset, blurs it

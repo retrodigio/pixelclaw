@@ -1,4 +1,4 @@
-# Mossy ruins: a 24x24 seamless water tile that shimmers in four frames (plan §10 G6).
+# Mossy ruins: a 24x24 seamless water tile that shimmers in four frames.
 # The deep body (layer main) is the same in every frame: its cels are linked. The crests (layer
 # crest) drift a quarter of the tile per frame and come back round (24 = 4 x 6), so the loop has
 # no seam; the glints (layer glint) catch the light in a different place in each frame.

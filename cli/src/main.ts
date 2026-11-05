@@ -99,7 +99,7 @@ export const USAGE = `pixelclaw: a pixel art editor driven by commands
       --profile, a folder an export wrote is read back by name and compared with the project;
       images no asset exports become new assets.
   pixelclaw upgrade <project> [<asset>...]
-      Rewrite language 1 tapes (G1-G4) in the current language: the palette goes into the 'new'
+      Rewrite language 1 tapes in the current language: the palette goes into the 'new'
       line. Each is replayed before and after; it is written only if the pixels are the same.
   pixelclaw verify <project> [<asset>...]
       Replay every tape and compare with asset.json, preview.png and checkpoints.
@@ -636,7 +636,7 @@ function cmdVerify(io: Io, p: Parsed): number {
       if (cached && current && Buffer.compare(Buffer.from(bytes), Buffer.from(cached.body)) !== 0) problems.push('the state cache differs from the replay (delete .cache/ to rebuild it)');
       const missing = checkpointNames(entries.length).filter((f) => !cps.some((c) => c.file === f));
       if (missing.length) problems.push(`checkpoint${missing.length === 1 ? '' : 's'} missing: ${missing.join(', ')}`);
-      summary = `${entries.length} commands, ${new Set(entries.map((e) => e.group)).size} groups, state ${hash.slice(0, 12)}${legacy ? ' (asset.json has the G1-G3 state hash; it is updated on the next save)' : ''}, ${cps.length ? cps.length + ' checkpoint' + (cps.length === 1 ? '' : 's') + ' checked' : 'no checkpoints'}${current ? ', cache checked' : ''}`;
+      summary = `${entries.length} commands, ${new Set(entries.map((e) => e.group)).size} groups, state ${hash.slice(0, 12)}${legacy ? ' (asset.json has a hash in the older state format; it is updated on the next save)' : ''}, ${cps.length ? cps.length + ' checkpoint' + (cps.length === 1 ? '' : 's') + ' checked' : 'no checkpoints'}${current ? ', cache checked' : ''}`;
     } else if (!a.doc && !a.problems.length) problems.push('the tape has no document');
     if (problems.length) {
       failed++;

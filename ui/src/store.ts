@@ -97,9 +97,9 @@ export class Store {
   marked = new Set<CheckId>();
   /** The check whose details are open under the toolbar. */
   openCheck: CheckId | null = null;
-  /** The tab shown: the editor, or the dashboard (the plan, plan §7.3). Only for looking. */
+  /** The tab shown: the editor, or the dashboard (the asset plan). Only for looking. */
   tab: Tab = (TABS as string[]).includes(new URLSearchParams(location.search).get('tab') ?? '') ? (new URLSearchParams(location.search).get('tab') as Tab) : 'editor';
-  /** Every request (plan §21) as it stands: from the plan report, then as the server sends them. */
+  /** Every request as it stands: from the plan report, then as the server sends them. */
   requests: WorkRequest[] = [];
   /** The headless worker, and its log as far as this page has seen it. */
   worker: WorkerStatus | null = null;
@@ -177,7 +177,7 @@ export class Store {
     }));
   }
 
-  /** A request, a reply or a cancel, written as this person (plan §21). */
+  /** A request, a reply or a cancel, written as this person. */
   request(body: PersonRequest): Promise<Answer> {
     return this.ask({ type: 'request', body });
   }
@@ -195,7 +195,7 @@ export class Store {
     return new Promise((resolve) => this.answers.set(id, resolve));
   }
 
-  /** Import files into the gallery (plan §21): new assets, manifest entries, checks. */
+  /** Import files into the gallery: new assets, manifest entries, checks. */
   async importFiles(files: File[], choice: ImportChoice): Promise<ImportAnswer> {
     const enc = await Promise.all(files.map(async (f) => {
       const b = new Uint8Array(await f.arrayBuffer());

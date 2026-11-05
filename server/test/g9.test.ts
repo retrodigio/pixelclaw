@@ -1,4 +1,4 @@
-// G9 through MCP and the CLI (plan §4.7, §4.9, §10 G9): export through the sample profile into a
+// G9 through MCP and the CLI: export through the sample profile into a
 // game folder, read it back (every asset the same), import a PNG sheet sliced by a grid and an
 // .aseprite file as new assets whose tapes start with import commands, a density copy with its
 // check and view, project schemes copied into a family's tape, and verify.
@@ -89,7 +89,7 @@ describe('export, import and densities through MCP', () => {
     expect(h2).toMatch(/tag add blink 1-3 loop=pingpong/);
   }, 30000);
 
-  it('the CLI refuses to export while the server owns the project (G13); MCP exports; every tape verifies', async () => {
+  it('the CLI refuses to export while the server owns the project; MCP exports; every tape verifies', async () => {
     const out = join(s.root, 'atlas-out');
     expect(() => execFileSync(process.execPath, [BIN, 'export', s.proj, 'imp', '--profile', 'atlas', '--out', out], { encoding: 'utf8', stdio: 'pipe' })).toThrow(/a pixelclaw server \(pid \d+\) owns/);
     expect(texts((await call('export', { profile: 'atlas', assets: ['imp'], dest: out })).content)).toMatch(/atlas: 1 images/);

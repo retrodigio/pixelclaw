@@ -24,7 +24,7 @@ Old stone half taken back by moss, under a soft light from the top left.
   then dry sand. Corners are rounded, never square; the edge should read as one coastline, with
   no tile grid showing. Glints flash now and then on the water, never in step.
 
-## Objects and scenes (G8)
+## Objects and scenes
 
 - Objects sit on the 24 px grid: a house is 48x48 (2x2 cells), a tree 24x48 (one cell on the
   ground, its crown over the cell above), small props 24x24. Their footprints say which cells block

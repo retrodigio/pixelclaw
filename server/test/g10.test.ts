@@ -1,4 +1,4 @@
-// G10 through MCP, HTTP and the CLI (plan §7.3, §5, §10 G10): the plan tool writes a manifest only
+// G10 through MCP, HTTP and the CLI: the plan tool writes a manifest only
 // when it is valid and reports each asset's status; a planned asset's `new` takes its size from the
 // manifest; marks, checks and an export move it up the ladder (exported.json), a change sends it
 // back; the review bundle of a manifest set carries the brief and names no author or method; the

@@ -9,13 +9,13 @@ Every edit is a line of a small command language. A document *is* its tape of co
 and replay is deterministic (integer maths, seeded randomness), so the same tape always gives the
 same pixels.
 
-**Status: step G11 (the last builder step; the acceptance project A1 is next).** The core library and CLI (G1); the MCP server and the live watch view (G2);
-editing in the browser, every action a command on the tape, and the agent's `changes` tool (G3);
-the drawing toolkit (G4); checks and in-context previews against the project's style guide, with
-flagged pixels circled, and a blind review bundle (G5); animation and sprites (G6); autotile
-schemes as data and family documents built live from a band profile and a few pieces (G7); map
-documents, terrain painting, oversized objects and the map checks (G8); export profiles, import
-and densities (G9); and the project pipeline (G10): a manifest of the assets a game needs, each
+**Status: step G11 (the last builder step; the acceptance project A1 is next).** The core library and CLI; the MCP server and the live watch view;
+editing in the browser, every action a command on the tape, and the agent's `changes` tool;
+the drawing toolkit; checks and in-context previews against the project's style guide, with
+flagged pixels circled, and a blind review bundle; animation and sprites; autotile
+schemes as data and family documents built live from a band profile and a few pieces; map
+documents, terrain painting, oversized objects and the map checks; export profiles, import
+and densities; and the project pipeline: a manifest of the assets a game needs, each
 asset's status worked out from the project (planned, drafted, checked, reviewed, approved,
 exported), style-guide defaults, the `consistency` check across a set, flat templates (a mockup
 screen and coverage maps) from the plan, a dashboard where a person approves work, the MCP `plan`
@@ -105,7 +105,7 @@ node cli/bin/pixelclaw.js verify my-art.pclaw
 | `pixelclaw work <project> [--port N]` | Work the request queue with a headless Claude Code session that has only PixelClaw's tools (no shell, files or web), up to the project's budget cap; only when the project enables it. See [docs/worker.md](docs/worker.md). |
 | `pixelclaw skill install [--dest <dir> \| --project <dir>]` | Install the Claude Code skill (default `~/.claude/skills/pixelclaw`). |
 | `pixelclaw verify <project> [<asset>...]` | Replay every tape and compare it with the saved state, the preview, the checkpoints and the state cache. |
-| `pixelclaw upgrade <project> [<asset>...]` | Rewrite tapes from tape language 1 (G1-G4) in language 2 (the palette in the `new` line); written only if the replay gives the same pixels, then verified. |
+| `pixelclaw upgrade <project> [<asset>...]` | Rewrite tapes from tape language 1 in language 2 (the palette in the `new` line); written only if the replay gives the same pixels, then verified. |
 | `pixelclaw serve --project <project> [--port 7417] [--no-mcp]` | Own the project: MCP on stdin/stdout and the live watch view on localhost (the link, with its token, is printed to stderr). See [docs/mcp.md](docs/mcp.md). |
 
 The command language is described in [docs/commands.md](docs/commands.md).
@@ -173,7 +173,7 @@ checked in:
 - the house at 2x, a density copy: [the levels and the reduction](docs/screenshots/g9-house-density.png); the walker,
   house and glints through the sample profile: [atlas page and CSV](examples/mossy-ruins.pclaw/exports/bramble/)
 
-**At 48 px** (G14): [`examples/ember-moor.pclaw`](examples/ember-moor.pclaw), an original heather
+**At 48 px**: [`examples/ember-moor.pclaw`](examples/ember-moor.pclaw), an original heather
 moor with its own palette ([`examples/ember-moor/`](examples/ember-moor/): theme, palette and the
 scripts that build it), its project grid set to 48: a moor ground and two texture variants forked
 from it, bog water, a blob47 bog pool, a waystone two cells tall, and a 20x12 map whose floor is a

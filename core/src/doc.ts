@@ -1,7 +1,7 @@
 // The indexed document: layers x frames of cels (palette indices or transparent), a cell grid, a
 // wrap flag, the document's own palette (lockable), open notes, stamps, macros, each author's
 // editing context (the layer and frame they draw on, their selection, symmetry and brush), and the
-// animation (plan §4.4): frame durations in ticks, tags, directional views (a view can be a live
+// animation: frame durations in ticks, tags, directional views (a view can be a live
 // mirror of another), a pivot and a ground line. Linked cels are one shared pixel array.
 
 import type { Palette, Role } from './palette.ts';
@@ -14,7 +14,7 @@ export type DocKind = 'tile' | 'sprite' | 'sheet' | 'icon' | 'family' | 'overlay
 export const DOC_KINDS: readonly DocKind[] = ['tile', 'sprite', 'sheet', 'icon', 'family', 'overlay', 'object', 'map', 'font'];
 
 /**
- * How an icon is exported (plan §4.5): `tone` art is recoloured by the game (role entries, written
+ * How an icon is exported: `tone` art is recoloured by the game (role entries, written
  * through the profile's encoding), `full` art is drawn as is (often a white silhouette), `channel`
  * art is pure-RGB channel masks (every colour's channels 0 or 255, written exactly).
  */
@@ -22,7 +22,7 @@ export type IconMode = 'tone' | 'full' | 'channel';
 export const ICON_MODES: readonly IconMode[] = ['tone', 'full', 'channel'];
 
 /**
- * A glyph sheet (plan §4.6): a grid of cells, one per code point in `chars` order (row-major,
+ * A glyph sheet: a grid of cells, one per code point in `chars` order (row-major,
  * `cols` cells a row), each glyph drawn from its cell's left edge. `baseline` is the cell row the
  * glyphs stand on (the bottom row of a capital), `line` the line height in pixels, `spacing` the
  * pixels added after each glyph's advance. A glyph's advance is its own (`advances`, by code
@@ -38,7 +38,7 @@ export interface FontState {
 }
 
 /**
- * An image under the art (plan §6): a content-addressed blob (blobs/<sha256>.png) of `iw` x `ih`
+ * An image under the art: a content-addressed blob (blobs/<sha256>.png) of `iw` x `ih`
  * pixels shown on a reference layer, stretched over the document rectangle x,y w x h. Never part
  * of the art or an export; `snap` reads it into a draft layer. `layout` is the flat template the
  * image was made from (a blob too), when there was one.
@@ -55,7 +55,7 @@ export interface Underlay {
 }
 
 /**
- * An asset's footprint on a map (plan §4.10): `cols` x `rows` grid cells of its art grid (the
+ * An asset's footprint on a map: `cols` x `rows` grid cells of its art grid (the
  * canvas in cells), starting at art cell `at` (default: the bottom-left of the art), placed by
  * its `anchor` cell (within the footprint). `flags` has a row per art cell row, a character per
  * art cell: `.` nothing, `b` blocks movement, `r` roof or canopy (drawn above actors), `x` both.
@@ -70,14 +70,14 @@ export interface Footprint {
 }
 
 /**
- * What a map layer holds (plan §4.11). Terrain layers hold 1 where their family's terrain is; past
- * the map's edge a cell counts as its own (G15; `border` terrain or not says otherwise), and `mix`
+ * What a map layer holds. Terrain layers hold 1 where their family's terrain is; past
+ * the map's edge a cell counts as its own (`border` terrain or not says otherwise), and `mix`
  * draws the terrain's inside cells as a weighted scatter of one-cell tiles (from `seed`).
  */
 export type MapLayerInfo =
   | { kind: 'terrain'; family: string; outside: boolean; walkable?: boolean; border?: 'terrain' | 'not'; mix?: { name: string; weight: number }[]; seed?: number }
   | { kind: 'tiles' }
-  /** shadow (G16): every object placed on the layer casts one on the ground (c: an entry of the map's palette, or darker). */
+  /** shadow: every object placed on the layer casts one on the ground (c: an entry of the map's palette, or darker). */
   | { kind: 'objects'; shadow?: { c: string; dir: string } }
   | { kind: 'overlay'; overlay: string; on: string };
 
@@ -89,12 +89,12 @@ export interface MapEntry {
   cols: number;
   rows: number;
   anchor: [number, number];
-  /** Drawn as named: the map does not pick among the tile's texture variants (a `tiles … fill mix=` cell, G14). */
+  /** Drawn as named: the map does not pick among the tile's texture variants (a `tiles … fill mix=` cell). */
   exact?: boolean;
 }
 
 /**
- * A map document (plan §4.11): its canvas is the grid of cells (one 'pixel' per cell), each
+ * A map document: its canvas is the grid of cells (one 'pixel' per cell), each
  * layer's cels hold what is in each cell (terrain: 1; tiles and objects: an entry index at the
  * anchor cell). The art is read from the assets it names when it is drawn, so a map redraws
  * itself when a tile changes, and its tape never reads another asset.
@@ -106,7 +106,7 @@ export interface MapState {
 }
 
 /**
- * An autotile family (plan §4.2): a sheet of the scheme's variants, with the two textures the
+ * An autotile family: a sheet of the scheme's variants, with the two textures the
  * variants share and, optionally, a coverage map to paint and cut from. The `ground` layer of
  * every variant is the textures laid by the band geometry; the `band` layer of every variant that
  * is not a piece (and not detached) is assembled from the pieces' quadrants after every command.
@@ -125,7 +125,7 @@ export interface FamilyState {
   terrain: Uint8Array;
   /** A project's own scheme, as its tape recorded it (null: a built-in scheme by name). */
   def?: SchemeJson | null;
-  /** A texture variant that inherits its band from this family (G13): `variant of=<it> band=inherit`. */
+  /** A texture variant that inherits its band from this family: `variant of=<it> band=inherit`. */
   bandOf?: string;
 }
 
@@ -133,7 +133,7 @@ export type OverlayMode = 'cycle' | 'pingpong' | 'wave' | 'sparkle';
 export const OVERLAY_MODES: readonly OverlayMode[] = ['cycle', 'pingpong', 'wave', 'sparkle'];
 
 /**
- * An overlay (plan §4.3): a sub-tile sprite drawn over tiles of a map in a mode: all in step
+ * An overlay: a sub-tile sprite drawn over tiles of a map in a mode: all in step
  * (cycle, pingpong), in a wave across the map, or as sparkles at random times.
  */
 export interface OverlayState {
@@ -167,7 +167,7 @@ export interface Layer {
   underlay?: Underlay;
 }
 
-/** A note pinned to a pixel (1x1) or a region, for whoever reads the tape next (plan §1.3). */
+/** A note pinned to a pixel (1x1) or a region, for whoever reads the tape next. */
 export interface Note {
   id: string;
   x: number;
@@ -207,7 +207,7 @@ export interface Macro {
   body: string;
 }
 
-/** The default frame duration in ticks (the engine profile's `frameTicks` default, §7.4). */
+/** The default frame duration in ticks (a profile's `frameTicks` default). */
 export const DEFAULT_TICKS = 10;
 
 export type Loop = 'cycle' | 'pingpong';
@@ -263,12 +263,12 @@ export interface Doc {
   overlay: OverlayState | null;
   /** Where the asset stands on a map (null: its whole art grid, placed by the bottom-left cell). */
   footprint: Footprint | null;
-  /** The asset this one is a texture variant of (plan §4.1): maps pick among an asset and its variants per cell. */
+  /** The asset this one is a texture variant of: maps pick among an asset and its variants per cell. */
   variantOf: string | null;
-  /** The asset this one is a higher-density copy of, and how many times its size (plan §4.7). */
+  /** The asset this one is a higher-density copy of, and how many times its size. */
   densityOf: { of: string; d: number } | null;
   map: MapState | null;
-  /** Named points on the tape (plan §7.2 marks); `reviewed`, `approved` and `rejected` set the asset's status (plan §7.3). */
+  /** Named points on the tape; `reviewed`, `approved` and `rejected` set the asset's status. */
   marks: Mark[];
   /** An icon's export mode (null: tone when the palette has roles, else full). */
   iconMode: IconMode | null;
@@ -650,7 +650,7 @@ function mapLayerFromJson(a: string[]): MapLayerInfo {
 }
 
 /**
- * The state bytes of language versions G1-G3 (PCLAWDOC 1), for documents that use none of the
+ * The state bytes of the first state format (PCLAWDOC 1), for documents that use none of the
  * later state: `verify` accepts an asset.json hash made this way until the asset is saved again.
  * Returns null when the document has state that format could not hold.
  */

@@ -1,10 +1,10 @@
-// Map commands (plan §4.11) and oversized assets' footprints (§4.10). On a map document:
+// Map commands and oversized assets' footprints. On a map document:
 // `terrain` paints a terrain layer (the family's scheme picks every edge variant when the map is
 // drawn), `place`, `move` and `remove` put tiles and multi-cell objects by name with footprint
 // collision, `road` lays a path terrain along a route, `scatter` places objects at random, and
 // `map gen` lays out an island, a village or a dungeon. Footprints are written into the lines that
 // place things, so a map's tape never reads another asset. On any asset: `footprint` (cells,
-// anchor, blocking and roof flags) and `variant of=<base>` (a texture variant, §4.1).
+// anchor, blocking and roof flags) and `variant of=<base>` (a texture variant).
 
 import { COMMANDS, Args, fn, needDoc, pt, ptText, registerCommand, type CommandSpec, type NormaliseContext } from './commands.ts';
 import { TRANSPARENT, ctxOf, type Doc, type Footprint, type MapEntry } from './doc.ts';
@@ -292,7 +292,7 @@ function unlockBand(d: Doc): void {
  * of the cell to its left and the one above where another tile is left to draw. Draws are weighted
  * by what each tile still has to lay of its share (weight × cells), so the counts follow the weights
  * as closely as the neighbour rule allows (a tile over half the mix cannot have no equal neighbours).
- * Two tiles (G15): that rule leaves no choice at all, a strict checkerboard, which reads as a
+ * Two tiles: that rule leaves no choice at all, a strict checkerboard, which reads as a
  * pattern of its own (and banning only an L of three alike still locks rows into alternation); a
  * cell then leaves out only the tile that would complete a 2x2 block of one tile.
  */

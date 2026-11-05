@@ -29,7 +29,7 @@ afterAll(() => {
 });
 
 describe('pixelclaw CLI', () => {
-  it('new <project> --grid sets the tile size new maps, the camera and the draw scale follow (G14)', () => {
+  it('new <project> --grid sets the tile size new maps, the camera and the draw scale follow', () => {
     const g = join(root, 'grid48.pclaw');
     expect(cli(['new', g, '--palette', join(root, 'dusk.gpl'), '--grid', '48']).code).toBe(0);
     expect(JSON.parse(readFileSync(join(g, 'project.json'), 'utf8')).grid).toBe(48);

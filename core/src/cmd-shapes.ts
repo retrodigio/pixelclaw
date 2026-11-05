@@ -1,4 +1,4 @@
-// Curves and polygons, dithering, gradients and ramps (plan §3.3, §3.4). Patterns are ordered
+// Curves and polygons, dithering, gradients and ramps. Patterns are ordered
 // threshold matrices anchored to the canvas (not the box), so dithered areas on a tile line up
 // across its edges.
 

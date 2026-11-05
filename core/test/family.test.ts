@@ -1,4 +1,4 @@
-// G7 families (plan §4.2, §4.3, §10 G7): derivation from a band profile, from quadrant pieces and
+// G7 families: derivation from a band profile, from quadrant pieces and
 // cut from a painted map, with the textures re-projected; checked pixel by pixel against the
 // picture a map of cells makes, and as goldens; the map preview, its seam score and overlays;
 // coverage; and replay.
@@ -34,7 +34,7 @@ function picture(scheme: string, t: Terrain, size: number): boolean[] {
   return out;
 }
 
-describe('family derivation (§4.2)', () => {
+describe('family derivation', () => {
   it('a 1-pixel band drawn on the pieces lands, in every one of the 256 neighbourhoods, exactly on the terrain pixels touching the outside', () => {
     for (const scheme of ['blob47', 'wang16-corner']) {
       const d = docOf(`${BASE(scheme)}\nfamily band 1:ink`);
@@ -193,7 +193,7 @@ describe('family derivation (§4.2)', () => {
   });
 });
 
-describe('maps and overlays (§2 map, §4.3)', () => {
+describe('maps and overlays', () => {
   it('composes a random island (golden), with its text', () => {
     const d = docOf(`${BASE('blob47')}\nfamily band 2:outside 1:ink 1:rust radius=1`);
     golden('g7/island.png', encodePng(renderMap(d, { cols: 10, rows: 8, seed: 5, scale: 2 })));

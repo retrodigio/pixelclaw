@@ -1,6 +1,6 @@
 # Demo G14: map-scale variety and 48 px
 
-G13's demo left a problem the reader saw at once (plan §24): Fern Ledge's floor is a stream-bed
+G13's demo left a problem the reader saw at once: Fern Ledge's floor is a stream-bed
 tile with one pebble, and every tile passes its checks, but the map shows an even lattice of
 pebbles. G14 adds a check that sees it, a fill that cures it, a smaller tape for inheriting
 variants, and the groundwork for 48 px sets. A stand-in agent drives `pixelclaw serve` over stdio
