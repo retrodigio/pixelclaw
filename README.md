@@ -1,90 +1,136 @@
 # PixelClaw
 
 A pixel art editor built for an AI agent to drive by command. The agent draws with exact
-commands, sees exact feedback, and checks its own work. People watch and edit in a live browser
-view, and every human edit is written down as a command, so the agent reads what changed and
-carries on from there. All art is indexed colour.
+commands, sees exact feedback (images, text grids of palette keys, scores with pixel coordinates)
+and checks its own work. People watch and edit in a live browser view, and every human edit is
+written down as a command, so the agent reads what changed and carries on from there. All art is
+indexed colour.
 
 Every edit is a line of a small command language. A document *is* its tape of commands replayed,
 and replay is deterministic (integer maths, seeded randomness), so the same tape always gives the
-same pixels.
+same pixels. How it fits together: [docs/design.md](docs/design.md).
 
-**Status: step G11 (the last builder step; the acceptance project A1 is next).** The core library and CLI; the MCP server and the live watch view;
-editing in the browser, every action a command on the tape, and the agent's `changes` tool;
-the drawing toolkit; checks and in-context previews against the project's style guide, with
-flagged pixels circled, and a blind review bundle; animation and sprites; autotile
-schemes as data and family documents built live from a band profile and a few pieces; map
-documents, terrain painting, oversized objects and the map checks; export profiles, import
-and densities; and the project pipeline: a manifest of the assets a game needs, each
-asset's status worked out from the project (planned, drafted, checked, reviewed, approved,
-exported), style-guide defaults, the `consistency` check across a set, flat templates (a mockup
-screen and coverage maps) from the plan, a dashboard where a person approves work, the MCP `plan`
-tool, a state cache, and a Claude Code skill; and G11: AI image underlays (an OpenAI provider with
-the key from the environment, a cost cap and a cost log; any PNG imported) and `snap`, which fits
-an underlay's pixel grid and quantises it into a draft layer; glyph-sheet fonts exported as a glyph
-strip and BMFont; icon export modes and the icon-set checks. See [PROGRESS.md](PROGRESS.md).
+![The watch view mid-playback: the canvas, and the agent's commands on the tape beside it](docs/screenshots/watch-playback.png)
 
-![The dashboard: the kiln-hollow example's 20 planned assets by set, three of them drawn, reviewed, approved and exported](docs/screenshots/theme-dashboard.png)
+What it does:
 
-## Use it from Claude Code
+- **Draw by command**: pixels, lines, shapes, fills, layers and frames, selections, symmetry,
+  dithering, ramps and shading helpers, seeded texture generators, stamps and macros.
+- **Check the work**: stray pixels, jaggies, pillow shading, outlines, seams and repetition on
+  tiles, readability, animation, consistency across a set and more, each against the project's
+  style guide and pointing at the pixels it flags ([docs/checks.md](docs/checks.md)).
+- **Game art**: tiles, sprites with directions and animation, objects bigger than a cell,
+  autotile families from data-driven schemes, maps, fonts and icons.
+- **A whole set from a theme**: a manifest of every asset a game needs, each asset's status
+  worked out from the project, blind review bundles, and a dashboard where people approve work
+  and ask for more ([docs/pipeline.md](docs/pipeline.md)).
+- **Export and import** through profiles (PNG, atlas, Tiled, Godot, Aseprite, or a game's own)
+  ([docs/profiles.md](docs/profiles.md)).
 
-Build once (Node 22.18 or later, pnpm):
+## Quick start
+
+You need Node.js 22.18 or later.
+
+### Install
+
+PixelClaw is not on npm yet. Build it from source (pnpm 10):
 
 ```sh
+git clone https://github.com/retrodigio/pixelclaw.git
+cd pixelclaw
 pnpm install
-pnpm build
+pnpm build                 # builds the watch view and the bundled CLI in cli/dist
+cd cli && npm pack && npm install -g ./pixelclaw-0.1.0.tgz && cd ..   # optional: `pixelclaw` on your PATH
 ```
 
-Register the MCP server with Claude Code, pointing at a project folder (created if missing):
+Without the global install, run `node cli/dist/pixelclaw.js` wherever this README says
+`pixelclaw`. Once it is published, `npm install -g pixelclaw` (or `npx pixelclaw`) will do.
+
+### Make a project
 
 ```sh
-claude mcp add pixelclaw -- node /path/to/pixelclaw/cli/dist/pixelclaw.js serve --project ~/art/mossy-ruins.pclaw --port 7417
-```
-
-Once the package is published to npm, the same thing is
-`claude mcp add pixelclaw -- npx -y pixelclaw serve --project ~/art/mossy-ruins.pclaw --port 7417`
-(until then, `npx -y --package /path/to/pixelclaw-0.2.0.tgz pixelclaw serve …` works from a tarball
-made with `cd cli && pnpm pack`).
-
-Install the skill, which teaches Claude Code the workflows, the house rules and the blind-review
-hand-off ([docs/pipeline.md](docs/pipeline.md#the-skill)):
-
-```sh
-node /path/to/pixelclaw/cli/dist/pixelclaw.js skill install     # into ~/.claude/skills/pixelclaw
-```
-
-Start `claude` and ask for the watch link: the `project` tool returns
-`http://127.0.0.1:7417/?token=…`. Open it, then ask Claude to draw. Draw in the page too, or pin a
-note on a pixel, and tell Claude: its `changes` tool returns your lines, your notes and a diff
-image. Give it a theme and it plans a whole set: a manifest you follow on the page's Dashboard tab.
-The tools are `project`, `run`, `view`, `check`, `changes`, `history`, `plan`, `review`, `export`
-and `import`; see [docs/mcp.md](docs/mcp.md). [examples/watch-and-edit.md](examples/watch-and-edit.md),
-[examples/watch-and-edit.md](examples/watch-and-edit.md) and [examples/drawing-and-checks.md](examples/drawing-and-checks.md) walk
-through sessions, with scripts that stand in for the agent.
-
-## Quick start (CLI)
-
-The TypeScript sources run directly under Node 22.18+; `pnpm build` is only needed for the watch
-view and the packaged `pixelclaw`.
-
-```sh
-pnpm install
-pnpm test        # builds, then runs vitest and the Playwright browser tests
-
-# make a project with a palette, then a 16x16 tile
-node cli/bin/pixelclaw.js new my-art.pclaw --palette examples/src/mossy-ruins.json
-node cli/bin/pixelclaw.js new my-art.pclaw tile slab 16x16 bg=stone1
-
-# draw, then look
-node cli/bin/pixelclaw.js run my-art.pclaw --asset slab -e "rect 1,1 14x14 c=stone3 fill
+pixelclaw new ~/art/my-game.pclaw --palette examples/src/mossy-ruins.json
+pixelclaw new ~/art/my-game.pclaw tile slab 16x16 bg=stone1
+pixelclaw run ~/art/my-game.pclaw --asset slab -e "rect 1,1 14x14 c=stone3 fill
 line 1,1 14,1 c=stone4 ; line 1,14 14,14 c=stone2"
-node cli/bin/pixelclaw.js view my-art.pclaw slab all
-
-# replay every tape and check it against the saved state
-node cli/bin/pixelclaw.js verify my-art.pclaw
+pixelclaw view ~/art/my-game.pclaw slab all     # renders into ~/art/my-game.pclaw/views
+pixelclaw check ~/art/my-game.pclaw
 ```
 
-`pnpm pixelclaw <args>` is the same as `node cli/bin/pixelclaw.js <args>`.
+Palettes can be `.json`, Lospec `.json`, `.hex` or `.gpl` files. The command language is in
+[docs/commands.md](docs/commands.md).
+
+### Connect Claude Code over MCP
+
+Register the server with Claude Code, pointing at a project folder (created if missing):
+
+```sh
+claude mcp add pixelclaw -- pixelclaw serve --project ~/art/my-game.pclaw --port 7417
+pixelclaw skill install          # the Claude Code skill: workflows, house rules, the review hand-off
+```
+
+(From a source checkout without the global install: `claude mcp add pixelclaw -- node
+/path/to/pixelclaw/cli/dist/pixelclaw.js serve --project …`.) Start `claude` and ask it to draw.
+Its tools are `project`, `run`, `view`, `check`, `seeds`, `changes`, `history`, `plan`,
+`request`, `work`, `review`, `export` and `import` ([docs/mcp.md](docs/mcp.md)).
+
+### Watch, edit and approve in the browser
+
+The server prints a watch link to stderr, and the `project` tool returns it:
+`http://127.0.0.1:7417/?token=…`. It listens on localhost only and needs the token. Open it to
+watch the agent draw command by command. Draw in the page too, or pin a note on a pixel: the
+agent's `changes` tool returns your lines, your notes and a diff image. The **Dashboard** tab shows
+every planned asset by set with its status; approve work or ask for changes there.
+`pixelclaw serve --project <dir> --no-mcp` opens a project in the browser without an agent.
+
+![The dashboard: an example's planned assets by set, three of them drawn, reviewed, approved and exported](docs/screenshots/theme-dashboard.png)
+
+### The worker (off by default; it spends money)
+
+People can ask for work from the dashboard while no agent session is open. The optional
+**worker** then runs a headless Claude Code session that has only PixelClaw's tools (no shell, no
+files, no web) to work the queue. It is **off by default** because it **spends money on your
+Anthropic account** through your Claude Code login. Turn it on per project in `project.json` with
+a spending cap that covers every run (`"worker": { "enabled": true, "cap": 5 }`), then press
+**Start Claude** in the dashboard or run `pixelclaw work <project>`. See
+[docs/worker.md](docs/worker.md).
+
+### Underlays from an image model (optional, OpenAI)
+
+`underlay generate` can ask an image model for a reference picture to put under the canvas, which
+`snap` then turns into a palette-true draft layer. The provider is OpenAI and needs your own key
+in the environment, `OPENAI_API_KEY`; it is read from the environment only and never written to
+disk. Each request is priced against a cost cap and logged. Nothing calls OpenAI unless you use
+`underlay generate` with the `openai` provider; `underlay import <file.png>` works with any image
+and no key. See [docs/mcp.md](docs/mcp.md#underlays-and-the-openai-provider).
+
+## Walkthroughs
+
+Each walkthrough comes with a stand-in agent script that drives `pixelclaw serve` over MCP the way
+Claude Code would, so you can run it without an agent or an API key.
+
+- [Watch and edit](examples/watch-and-edit.md): the agent draws a tile while you watch; you fix
+  pixels and leave a note, and the agent reads them with `changes`.
+- [Drawing, checks and a blind review](examples/drawing-and-checks.md): the drawing toolkit on a
+  grass tile, its variants and a chest; the checks, fixes by coordinates and a blind review.
+- [Animation and sprites](examples/animation.md): a walking figure in four directions and a
+  shimmering water tile, played at the game's speed.
+- [Tile sets, autotiling and maps](examples/tilesets-and-maps.md): a 47-variant shore family from
+  a band profile and three pieces, then a village map with objects bigger than a cell.
+- [Export, import and densities](examples/export-import.md): export through a sample profile and
+  read it back exactly, Tiled maps, re-importing a sheet, and a house at twice the density.
+- [From a theme to a whole set](examples/theme-to-set.md): a palette, style guide and manifest
+  from one paragraph; assets taken from planned to exported; an underlay snapped into tiles; a
+  pixel font and an icon set.
+- [The work queue](examples/work-queue.md): a person imports a sheet and asks for work from the
+  dashboard; the agent takes the requests; the fenced worker.
+- [Map variety, 48 px tiles and art help](examples/map-variety.md): seed search and dry runs, the
+  map-scale lattice check and mixed fills, 48 px sets, the pebble and tuft generators, cliff
+  faces, lanes and shadows.
+
+The example projects are checked in: [`examples/mossy-ruins.pclaw`](examples/mossy-ruins.pclaw)
+(an original 16-colour "mossy ruins" set at 24 px), [`examples/kiln-hollow.pclaw`](examples/kiln-hollow.pclaw)
+(a planned set with a manifest) and [`examples/ember-moor.pclaw`](examples/ember-moor.pclaw) (48 px).
 
 ## The CLI
 
@@ -132,137 +178,26 @@ my-art.pclaw/
   .cache/state/<asset>.gwc  each asset's state after its tape, keyed by the tape (never committed)
 ```
 
-## The demo
-
-[`examples/mossy-ruins.pclaw`](examples/mossy-ruins.pclaw) uses an original 16-colour "mossy
-ruins" palette and a style guide. Its seamless 24x24 stone floor tile is drawn by
-[`examples/scripts/stone_floor.pclaw`](examples/scripts/stone_floor.pclaw); a seamless grass tile
-with two variants and a treasure chest sprite by the G4 scripts beside it; a test sprite, the
-glowcap, by G5's. G5's `*_fix.pclaw` and `*_review.pclaw` scripts fix what the checks and a blind
-reviewer found, and G6's [`stone_floor_redraw.pclaw`](examples/scripts/stone_floor_redraw.pclaw)
-lays the floor again as flagstones. G6 adds a walking figure in four directions
-([`walker.pclaw`](examples/scripts/walker.pclaw)) and a shimmering water tile
-([`water.pclaw`](examples/scripts/water.pclaw)). Every check passes on every asset. The views are
-checked in:
-
-- the stone floor: [8x render](examples/mossy-ruins.pclaw/views/stone_floor.render.png),
-  [index grid](examples/mossy-ruins.pclaw/views/stone_floor.grid.txt),
-  [3x3 preview](examples/mossy-ruins.pclaw/views/stone_floor.tile3x3.png)
-- the grass: [3x3 preview](examples/mossy-ruins.pclaw/views/grass.tile3x3.png) (and
-  [grass_b](examples/mossy-ruins.pclaw/views/grass_b.tile3x3.png),
-  [grass_c](examples/mossy-ruins.pclaw/views/grass_c.tile3x3.png)),
-  [index grid](examples/mossy-ruins.pclaw/views/grass.grid.txt)
-- the chest: [8x render](examples/mossy-ruins.pclaw/views/chest.render.png),
-  [game view](examples/mossy-ruins.pclaw/views/chest.game.png),
-  [index grid](examples/mossy-ruins.pclaw/views/chest.grid.txt)
-- the glowcap: [8x render](examples/mossy-ruins.pclaw/views/glowcap.render.png),
-  [game view](examples/mossy-ruins.pclaw/views/glowcap.game.png)
-- the walker: [anim sheet](examples/mossy-ruins.pclaw/views/walker.anim.png),
-  [GIF](examples/mossy-ruins.pclaw/views/walker.anim.gif),
-  [game view](examples/mossy-ruins.pclaw/views/walker.game.png)
-- the water: [anim sheet](examples/mossy-ruins.pclaw/views/water.anim.png),
-  [GIF](examples/mossy-ruins.pclaw/views/water.anim.gif),
-  [3x3 preview](examples/mossy-ruins.pclaw/views/water.tile3x3.png)
-- the shore (a blob47 family of 47 variants, sand meeting the shimmering water):
-  [on an island](docs/screenshots/families-shore-map.png), [playing with glints](docs/screenshots/families-shore-map.gif),
-  [every variant among its neighbours](docs/screenshots/families-shore-family.png)
-- the village (a 40x30 map: the shore, a meadow and lanes, four 48x48 houses, 24x48 trees and a
-  well): [whole at 1x](docs/screenshots/maps-village.png), [a screen at game scale](docs/screenshots/maps-village-camera.png),
-  [the hot spots before the variants](docs/screenshots/maps-hotspots.png), [in Tiled's format](examples/mossy-ruins.pclaw/exports/tiled/village.tmx);
-  since G9 with rounder corners and its notes closed: [whole](docs/screenshots/export-village.png), [a screen on the beach](docs/screenshots/export-village-camera.png)
-- the house at 2x, a density copy: [the levels and the reduction](docs/screenshots/export-house-density.png); the walker,
-  house and glints through the sample profile: [atlas page and CSV](examples/mossy-ruins.pclaw/exports/bramble/)
-
-**At 48 px**: [`examples/ember-moor.pclaw`](examples/ember-moor.pclaw), an original heather
-moor with its own palette ([`examples/ember-moor/`](examples/ember-moor/): theme, palette and the
-scripts that build it), its project grid set to 48: a moor ground and two texture variants forked
-from it, bog water, a blob47 bog pool, a waystone two cells tall, and a 20x12 map whose floor is a
-`fill mix=` of the moor's looks ([the map](docs/screenshots/variety-moor-map.png)). The skill's
-*Per-size defaults* table says what changes with the tile size.
-
-The G2 demo ([examples/watch-and-edit.md](examples/watch-and-edit.md)) draws the same tile through MCP while you
-watch. In the G3 demo ([examples/watch-and-edit.md](examples/watch-and-edit.md)) you fix three pixels and leave a
-note, and the agent reads them with `changes` and carries on. The G4 demo
-([examples/drawing-and-checks.md](examples/drawing-and-checks.md)) draws the grass, its variants and the chest. The G5
-demo ([examples/drawing-and-checks.md](examples/drawing-and-checks.md)) checks them, fixes them by coordinates, and runs
-a blind review. The G6 demo ([examples/animation.md](examples/animation.md)) animates the walker and
-the water and plays them in the watch view at the game's speed. The G7 demo
-([examples/tilesets-and-maps.md](examples/tilesets-and-maps.md)) builds a shore family of 47 variants from a band
-profile and three hand-drawn pieces, puts it on a random island with the seam score over it, and
-runs a blind review on the island. The G8 demo ([examples/tilesets-and-maps.md](examples/tilesets-and-maps.md)) builds
-a coastal village map from those families plus a house, a tree and a well bigger than a cell,
-finds where it repeats with the map checks and fixes it with texture variants; you move the well
-in the watch view and the agent reads the move; then a blind review of the village at game scale.
-The G9 demo ([examples/export-import.md](examples/export-import.md)) exports the G6-G8 art through a sample
-export profile into a scratch game folder and reads it back exactly, writes the village for Tiled,
-re-imports a sheet and edits it, and shows the village with its review notes closed and the house
-at twice the density. Export profiles, import and densities: [docs/profiles.md](docs/profiles.md).
-The G10 demo ([examples/theme-to-set.md](examples/theme-to-set.md)) starts a new game, *Kiln Hollow*
-([`examples/kiln-hollow.pclaw`](examples/kiln-hollow.pclaw)), from a one-paragraph theme: a
-palette, a style guide and a manifest of 20 assets, flat templates, then the clay tile, an urn and
-a bottle kiln taken end to end (drawn, checked, reviewed blind, approved in the dashboard,
-exported). The pipeline: [docs/pipeline.md](docs/pipeline.md).
-The G11 demo ([examples/theme-to-set.md](examples/theme-to-set.md)) carries Kiln Hollow on: a mockup of a
-6x4-tile yard (made offline, no key) as an **underlay**, **snapped** into a draft layer and three
-tiles cut from it and cleaned by coordinates; a 5x7 **font** exported as a glyph strip and BMFont;
-four HUD **icons** held to each other by the icon-set check. It also says how to run a live
-underlay with your own OpenAI key ([how](examples/theme-to-set.md#a-live-underlay-with-your-own-key)).
-Screenshots: [the underlay](docs/screenshots/underlays-yard-underlay.png), [the snapped draft](docs/screenshots/underlays-yard-draft.png),
-[the font](docs/screenshots/font-editor.png), [its strip](docs/screenshots/font-strip.png).
-The G12 demo ([examples/work-queue.md](examples/work-queue.md)) is the work queue: a person imports
-a sheet of pot shards into the **gallery** through the slice dialog, asks Claude for two planned
-assets and a change from the **dashboard**, and the agent takes them with `plan` and `work`:
-one done, one blocked on a question, one in progress. Scenes show what each place still needs.
-To let Claude work the queue headless (it spends money), see [docs/worker.md](docs/worker.md).
-Screenshots: [the request states](docs/screenshots/queue-states.png), [the gallery](docs/screenshots/queue-gallery.png),
-[the slice dialog](docs/screenshots/queue-import-dialog.png), [scenes](docs/screenshots/queue-scenes.png).
-The G13 demo ([examples/map-variety.md](examples/map-variety.md)) shows the fixes from the acceptance
-run on a small set, Fern Ledge: a **seed search** on a calm tile and a pebble tried with a **dry
-run**, a cliff family with **faces** and a **jittered** edge, a texture variant that **inherits the
-band**, a map whose floor is **filled** in one line and whose ground is **walkable**, an underlay
-**in the shape of its area** snapped on the **placement's grid**, and an export through a profile
-with a **corner order**, **path shapes** and a **per-colour output map** (five tones).
-Screenshots: [the map](docs/screenshots/ledge-fern-ledge-map.png), [the fill tool](docs/screenshots/ledge-map-fill.png),
-[walkable](docs/screenshots/ledge-map-walkable.png), [the tones](docs/screenshots/ledge-export-tones.png).
-
-The G14 demo ([examples/map-variety.md](examples/map-variety.md)) fixes what that map showed: Fern
-Ledge's floor passes every per-tile check but shows a lattice of pebbles; the map-scale **lattice**
-check fails it, and two more looks of the bed laid with **`fill mix=`** pass it. Then the **48 px**
-example, Ember Moor, its project grid 48. Screenshots: [before](docs/screenshots/variety-fern-before.png)
-and [after](docs/screenshots/variety-fern-after.png), [the fill tool's mix](docs/screenshots/variety-map-fill-mix.png),
-[Ember Moor](docs/screenshots/variety-moor-map.png).
-
-The G15 demo ([examples/work-queue.md](examples/work-queue.md)): requests **filed from the CLI**; the
-worker run with the real Claude Code and a **stand-in model** that has `done` **refused while a check
-fails**, fixes it and finishes, and finds it has **no shell and no files** (only PixelClaw's tools,
-fenced to the project; see [docs/worker.md](docs/worker.md)); a terrain map with **no band along the
-map's border** and its **inside a mix** of tiles. Screenshots: [before](docs/screenshots/worker-hollow-before.png)
-and [after](docs/screenshots/worker-hollow-after.png), [the terrain tools](docs/screenshots/worker-map-terrain-tools.png),
-[the worker's log](docs/screenshots/worker-log.png).
-
-The G16 demo ([examples/map-variety.md](examples/map-variety.md)): art help on a 48 px heath. A shingle and
-a grass floor from the new **`pebbles`** and **`tufts`** generators (each a base and two looks
-sharing `edges=`, seeds ranked by the checks), a **cliff plateau with side faces, corners and inner
-corners**, a **lane** that widens with a plain middle and **turns diagonally**, standing stones that
-**cast shadows**, and the new checks catching a **floating part** (`pieces`), **art on the canvas
-edge** (`margin`) and a **reserved colour** misused. Screenshots: [the heath](docs/screenshots/heath.png),
-[the map editor](docs/screenshots/heath-map-editor.png), [the cliff](docs/screenshots/heath-cliff-map.png),
-[pieces](docs/screenshots/heath-check-pieces.png).
-
 ## Packages
 
-- `core`: the document (layers, frames, each author's context), palettes, command parser and
+- `core`: the document (layers, frames, each author's context), palettes, the command parser and
   normaliser, raster operations, helpers and generators, tape and replay, a PCG random generator,
-  the checks, renders and previews, autotile schemes (data in `core/schemes`), families, maps and
-  overlays, and PNG and GIF encoders. It uses no DOM or Node APIs, so it
-  runs anywhere.
+  the checks, renders and previews, autotile schemes (data in `core/schemes`), families, maps,
+  export profiles (data in `core/profiles`), and PNG and GIF encoders. It uses no DOM or Node
+  APIs, so it runs anywhere.
 - `server`: the project folder, the single writer (one queue for every command), views, the MCP
-  server (stdio) and the HTTP + WebSocket server for the watch view.
-- `ui`: the watch view and editor (Vite + React + canvas 2D). It replays the tape with `core`
-  itself, and its tools write commands that `core` previews before they are sent.
+  server and the HTTP + WebSocket server for the watch view, and the worker.
+- `ui`: the watch view, editor and dashboard (Vite + React + canvas 2D). It replays the tape with
+  `core` itself, and its tools write commands that `core` previews before they are sent.
 - `skill/`: the Claude Code skill (`pixelclaw skill install`).
 - `cli`: the `pixelclaw` command. `pnpm build` bundles it with `core`, `server` and the built UI
-  into `cli/dist` (no runtime dependencies), which is what `pnpm pack` ships.
+  into `cli/dist` (no runtime dependencies), which is what the npm package ships.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) (and [CLAUDE.md](CLAUDE.md) for coding agents). Report
+security problems as described in [SECURITY.md](SECURITY.md). Changes are listed in
+[CHANGELOG.md](CHANGELOG.md).
 
 ## Licence
 
