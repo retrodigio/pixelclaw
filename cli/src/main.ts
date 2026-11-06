@@ -10,7 +10,7 @@ import {
 } from '@pixelclaw/core';
 import {
   AssetExistsError, NoAssetError, ProjectError, VIEW_MODES, Writer, assetDir, checkpointNames, createProject, formatChecks, isViewMode, listAssets,
-  findServer, loadProject, lockHolder, paletteSource, parseRegion, prefixHash, previewPng, readAssetJson, readCheckpoints, readPaletteFile,
+  findServer, formatJudge, judgeReport, loadProject, lockHolder, paletteSource, parseRegion, prefixHash, previewPng, readAssetJson, readCheckpoints, readPaletteFile,
   needsUnderlay, resolveUnderlays, formatSeeds, readTape, readTapeFile, readStateCacheRaw, stateKey, saveAsset, sha256, writeReview, planReport, planText, writeManifest, writeTemplates, SUMMARY_BUDGET, EXPORT_FORMATS, exportAsset, exportWithProfile, importIntoProject, importSummary, planImport, personRequest, readRequests, requestLine, toPersonRequest, agentWork, cliSteps, requestBrief, shellArg, type ExportFormat, type Project, type ViewMode,
 } from '@pixelclaw/server';
 
@@ -59,6 +59,15 @@ export const USAGE = `pixelclaw: a pixel art editor driven by commands
       Run the quality checks against the style guide (project.json style): scores, pass or fail,
       and the flagged pixels. Exits 1 if any check fails. --marks writes the render (tile3x3 for
       tiles) with the flagged pixels circled.
+  pixelclaw judge <project> [<asset>...] [--questions <id,...>] [--fresh]
+      An optional second opinion from a model (experimental, off by default; docs/judge.md): asks
+      the questions in judge/questions.json (or the built-in set) about each asset's pictures and
+      prints a table of probabilities against the thresholds (sure at 0.7 / 0.3, between is
+      "unsure"): recognisable as itself, the manifest's reads, seams, style against the approved
+      mockup, the same object after an edit, a located stray blob. Needs "judge": { "provider":
+      "jev" } in project.json and TYPESAFE_API_KEY in the environment. Images are sent to a
+      third-party API. Answers that are current are not asked again (--fresh asks anyway). Exit 1
+      if a question fails or the judge could not answer. \`check\` shows the last answers.
   pixelclaw review <project> [<asset>...] [--set <manifest set>] [--name <name>] [--size CxR] [--seed N]
       Write a blind review bundle under <project>/reviews/<date>-<name>/ (rubric.md inside; brief.md
       from the manifest). --set reviews a manifest set's drawn assets.
@@ -404,6 +413,8 @@ function cmdCheck(io: Io, p: Parsed): number {
     const bad = results.filter((r) => r.status === 'fail').map((r) => r.id);
     if (bad.length) failing++;
     io.out(formatChecks(name, results, problems, frame) + '\n');
+    const judged = formatJudge(judgeReport(w, name), dir);
+    if (judged) io.out(judged + '\n');
     if (p.flags.has('marks') && bad.length) {
       const v = w.view(name, w.doc(name).wrap ? 'tile3x3' : 'render', { frame: frame ?? results.find((r) => r.status === 'fail')?.frame, marks: bad });
       io.out(`  wrote ${v.path}\n`);

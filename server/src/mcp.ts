@@ -17,6 +17,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { VIEW_MODES, makeView, parseRegion, type View, type ViewMode } from './views.ts';
 import { needsUnderlay } from './underlay.ts';
+import { formatJudge, formatRun, judgeReport, planJudge, runJudge } from './judge.ts';
 import { SUMMARY_BUDGET, type AssetChanges, type Writer } from './writer.ts';
 
 /** The author name every MCP batch is written with, and whose read position `changes` keeps. */
@@ -28,7 +29,7 @@ export const INSTRUCTIONS = `PixelClaw is a pixel art editor you drive with a sm
 
 Start with the \`project\` tool: it lists palettes and assets, and gives a watch link (http://127.0.0.1:…/?token=…). Give the person that link so they can watch you draw live, and edit too.
 
-Draw with \`run\` (one batch = one undo group; any error applies nothing); every result ends with a one-line check summary. \`run\` with dry=true applies to a copy, checks it and keeps nothing. \`seeds\` tries a generator line (noise, scatter, voronoi, bricks, map gen, family coverage) with N seeds and ranks them by the checks (apply=true runs the best): use it instead of guessing seeds by hand. Look with \`view\` (render: scaled PNG with grid and rulers; tile3x3: seams and repetition; grid: exact palette keys per pixel; diff: what the last group changed; game: a sprite on its ground at 1x and the draw scale beside its set; recolour: role art under preview themes; map: a family on a random island with the seam score; family: every variant among its neighbours; marks: "failing" circles flagged pixels in magenta). \`check\` gives the full table: each check's score against the style guide's threshold and the exact pixels it flags; fix them by coordinates. Read the tape with \`history\`. \`review\` writes a blind review bundle: hand its folder to a fresh agent with no context, and bring its findings back as notes on the pixels.
+Draw with \`run\` (one batch = one undo group; any error applies nothing); every result ends with a one-line check summary. \`run\` with dry=true applies to a copy, checks it and keeps nothing. \`seeds\` tries a generator line (noise, scatter, voronoi, bricks, map gen, family coverage) with N seeds and ranks them by the checks (apply=true runs the best): use it instead of guessing seeds by hand. Look with \`view\` (render: scaled PNG with grid and rulers; tile3x3: seams and repetition; grid: exact palette keys per pixel; diff: what the last group changed; game: a sprite on its ground at 1x and the draw scale beside its set; recolour: role art under preview themes; map: a family on a random island with the seam score; family: every variant among its neighbours; marks: "failing" circles flagged pixels in magenta). \`check\` gives the full table: each check's score against the style guide's threshold and the exact pixels it flags; fix them by coordinates. Read the tape with \`history\`. \`judge\` (off unless the project sets it; docs/judge.md) asks an optional model for a second opinion on how the art reads (recognisable as itself, a readable face, seams, style, the same object after an edit) with probabilities; \`check\` shows its last answers beside the code checks. \`review\` writes a blind review bundle: hand its folder to a fresh agent with no context, and bring its findings back as notes on the pixels.
 
 People edit in the watch view too. Their edits are commands on the same tape, written by human:<name>. Call \`changes\` at the start of each turn while someone is watching, and whenever they say they changed something: it returns their commands and notes since you last looked, with a before/after diff image. Carry on from what they did; never silently redo their pixels. Close a note you have dealt with: note done <id>.
 
@@ -471,7 +472,8 @@ export function createMcpServer(host: McpHost, version: string, mo: McpOptions =
       }
       const only = a.frame !== undefined ? a.frame - 1 : undefined;
       const { results, problems } = w.checks(a.asset, { checks: a.checks, frame: only, ground: a.ground, ref: a.ref, set: a.set });
-      const content: CallToolResult['content'] = [text(formatChecks(a.asset, results, problems, w.doc(a.asset).frameCount > 1 ? only : undefined))];
+      const judged = formatJudge(judgeReport(w, a.asset), w.project.dir);
+      const content: CallToolResult['content'] = [text(formatChecks(a.asset, results, problems, w.doc(a.asset).frameCount > 1 ? only : undefined) + (judged ? `\n\n${judged}` : ''))];
       const failing = results.filter((r) => r.status === 'fail').map((r) => r.id);
       if (a.image ?? failing.length > 0) {
         // The image shows the frame of the first failing check (or the one asked for).
@@ -485,6 +487,36 @@ export function createMcpServer(host: McpHost, version: string, mo: McpOptions =
       return errorResult(e);
     }
   }));
+
+  server.registerTool('judge', {
+    title: 'Ask the judge',
+    description: 'An optional second opinion on assets from a model that answers yes/no, choice and where-is questions about their pictures with probabilities, beside the code checks (experimental; off unless project.json sets "judge": { "provider": "jev" } and TYPESAFE_API_KEY is in the server\'s environment; it sends images to a third-party API). ' +
+      'Asks the questions that apply to each asset (docs/judge.md: recognisable as itself among its set, the manifest\'s "reads", seams on tiles and maps, style against the approved mockup, "same object as before the last change", a stray blob placed with a box and marked); answers that are still current are not asked again. ' +
+      'Returns a table of probabilities against the thresholds (sure at 0.7 / 0.3; between is "unsure"), and a render with the located problems circled. `check` shows the last answers without asking. Advisory unless the project gates on it. Costs a few thousandths of a cent per asset.',
+    annotations: { openWorldHint: true },
+    inputSchema: z.object({
+      assets: z.array(z.string()).optional().describe('The assets to judge (default: every asset)'),
+      questions: z.array(z.string()).optional().describe('Only these question ids (judge/questions.json; default: all that apply)'),
+      fresh: z.boolean().optional().describe('Ask again even when the answers are current'),
+    }),
+  }, async (a) => {
+    try {
+      const plan = await w.enqueue(() => planJudge(w, a.assets, { fresh: a.fresh, questions: a.questions }));
+      const run = await runJudge(w, plan);
+      const content: CallToolResult['content'] = [text(formatRun(run))];
+      const marked = run.assets.find((x) => x.findings.some((f) => f.status === 'fail' && f.marks?.length));
+      if (marked) {
+        const marks = marked.findings.flatMap((f) => (f.status === 'fail' ? f.marks ?? [] : []));
+        const v = await w.enqueue(() => w.view(marked.asset, 'render', { markPixels: marks }));
+        w.showEye(marked.asset, v);
+        content.push(...viewContent(v));
+      }
+      w.planChanged();
+      return { content, ...(run.refused ? { isError: true } : {}) };
+    } catch (e) {
+      return errorResult(e);
+    }
+  });
 
   server.registerTool('export', {
     title: 'Export through a profile',

@@ -166,13 +166,15 @@ function factsOf(w: Writer, name: string, hasMockup: boolean): AssetFacts {
   };
 }
 
-function mockupOf(p: Project, s: JudgeSettings): Rgba | null {
+/** The approved mockup (a PNG inside the project) and a key for its bytes; null when none is set or it cannot be read. */
+function mockupOf(p: Project, s: JudgeSettings): { img: Rgba; key: string } | null {
   if (!s.mockup) return null;
   const f = resolve(p.dir, s.mockup);
   const rel = relative(resolve(p.dir), f);
   if (rel.startsWith('..') || isAbsolute(rel) || !existsSync(f)) return null;
   try {
-    return decodePng(readFileSync(f));
+    const bytes = readFileSync(f);
+    return { img: decodePng(bytes), key: sha(bytes) };
   } catch {
     return null;
   }
@@ -352,6 +354,8 @@ interface AskPlan {
   keys: Map<string, { ctx: string; state: string; content: string }>;
   pictures: Partial<Record<ImageName, Picture>>;
   mockup?: Picture;
+  /** A plain asset: its `render` picture is the canvas itself, so a box on it maps back to canvas pixels. */
+  flat: boolean;
   /** Findings for questions that could not be asked at all (a picture could not be made). */
   failed: Map<string, JudgeFinding>;
   prior: Store | null;
@@ -381,7 +385,7 @@ export function planJudge(w: Writer, names: string[] | undefined, o: JudgeOption
   const all = w.assets();
   for (const n of names ?? all) if (!all.includes(n)) plan.errors[n] = `no asset '${n}'`;
   const mock = mockupOf(p, settings);
-  const mockPic = mock ? picture(mock) : undefined;
+  const mockPic = mock ? picture(mock.img) : undefined;
   for (const asset of (names ?? all).filter((n) => all.includes(n))) {
     try {
       const facts = factsOf(w, asset, !!mockPic);
@@ -390,7 +394,7 @@ export function planJudge(w: Writer, names: string[] | undefined, o: JudgeOption
       const prior = readStore(p, asset);
       const keys = new Map<string, { ctx: string; state: string; content: string }>();
       const kept = new Map<string, Stored>();
-      const ctxOf = (q: ResolvedQuestion) => sha(JSON.stringify([q, settings.model, q.usesMockup ? mockPic?.hash : null]));
+      const ctxOf = (q: ResolvedQuestion) => sha(JSON.stringify([q, settings.model, q.usesMockup ? mock?.key : null]));
       let stale: ResolvedQuestion[] = [];
       for (const q of resolved) {
         const k = { ctx: ctxOf(q), state: stateKeyFor(w, asset, needsWorld(q, doc)), content: '' };
@@ -441,7 +445,7 @@ export function planJudge(w: Writer, names: string[] | undefined, o: JudgeOption
           return false;
         });
       }
-      plan.assets.push({ asset, model: settings.model, facts, resolved, kept, ask: stale, keys, pictures, mockup: mockPic, failed, prior });
+      plan.assets.push({ asset, model: settings.model, facts, resolved, kept, ask: stale, keys, pictures, mockup: mockPic, flat: !doc.map && !doc.family, failed, prior });
     } catch (e) {
       plan.errors[asset] = (e as Error).message;
     }
@@ -529,7 +533,7 @@ export async function runJudge(w: Writer, plan: JudgePlan, env: JudgeEnv = {}): 
               const pic = ap.pictures.render;
               if (b.ok && b.answer.type === 'box' && pic) {
                 f.box = b.answer.box;
-                f.marks = boxMarks(b.answer.box, pic.prep);
+                if (ap.flat) f.marks = boxMarks(b.answer.box, pic.prep);
               }
             }
           }
@@ -594,7 +598,7 @@ export function judgeReport(w: Writer, asset: string, shared?: Map<string, Judge
   const store = readStore(p, asset);
   const doc = w.doc(asset);
   const resolved = resolveQuestions(qr.file, factsOf(w, asset, !!mock));
-  const mockHash = mock ? picture(mock).hash : null;
+  const mockHash = mock?.key ?? null;
   for (const q of resolved) {
     const ctx = sha(JSON.stringify([q, settings.model, q.usesMockup ? mockHash : null]));
     const s = store?.findings[q.id];

@@ -11,6 +11,7 @@ import {
   cameraOf, type Doc, type Manifest, type ManifestAsset, type ManifestError, type ManifestKnown, type Scheme, type Status, type StyleDefaults,
 } from '@pixelclaw/core';
 import { projectProfiles, projectSchemes, readExported } from './io.ts';
+import { judgeReport } from './judge.ts';
 import type { PlanAsset, PlanReport, PlanScene } from './protocol.ts';
 import { readRequests } from './requests.ts';
 export type { PlanAsset, PlanReport } from './protocol.ts';
@@ -131,7 +132,7 @@ export function planReport(w: Writer, o: { set?: string } = {}): PlanReport {
   for (const a of entries) {
     const set = a.planned ? setName(a) : 'unplanned';
     if (o.set && set !== o.set) continue;
-    let doc: Doc | null = null, seq: number | null = null, failing: string[] = [], checks: PlanAsset['checks'] = [], pass: boolean | null = null;
+    let doc: Doc | null = null, seq: number | null = null, failing: string[] = [], checks: PlanAsset['checks'] = [], pass: boolean | null = null, judge: PlanAsset['judge'] = null;
     const flags: string[] = [];
     if (existing.has(a.name)) {
       try {
@@ -142,6 +143,7 @@ export function planReport(w: Writer, o: { set?: string } = {}): PlanReport {
         checks = r.filter((x) => x.status !== 'skip').map((x) => ({ id: x.id, status: x.status, shown: x.shown }));
         failing = r.filter((x) => x.status === 'fail').map((x) => x.id);
         pass = failing.length === 0;
+        judge = planJudgeOf(w, a.name);
       } catch (e) {
         flags.push(`does not load: ${(e as Error).message}`);
       }
@@ -159,7 +161,7 @@ export function planReport(w: Writer, o: { set?: string } = {}): PlanReport {
     if (doc?.notes.length) flags.push(`${doc.notes.length} open note${doc.notes.length === 1 ? '' : 's'}`);
     out.push({
       name: a.name, kind: a.kind, size: a.size, set, description: a.description ?? '', status: st.status, next: st.next, flags: [...flags, ...st.flags],
-      planned: a.planned, exists: !!doc, failing, checks, notes: doc?.notes.length ?? 0, seq, exported: ex,
+      planned: a.planned, exists: !!doc, failing, checks, judge, notes: doc?.notes.length ?? 0, seq, exported: ex,
       at: last?.at ?? null, by: last?.by ?? null,
       width: doc?.width ?? 0, height: doc?.height ?? 0, frames: doc?.frameCount ?? 0, ticks: doc && doc.frameCount > 1 ? [...doc.ticks] : [],
       uses: doc ? docUses(doc) : [...(a.uses ?? [])], usedBy: [], scenes: [],
@@ -182,7 +184,8 @@ export function planReport(w: Writer, o: { set?: string } = {}): PlanReport {
 
 /** One asset's line in the plan's text. */
 function assetLine(a: PlanAsset): string {
-  const why = [a.failing.length ? `failing: ${a.failing.join(', ')}` : '', ...a.flags].filter(Boolean).join('; ');
+  const judged = a.judge?.findings.filter((f) => f.status === 'fail').map((f) => f.label) ?? [];
+  const why = [a.failing.length ? `failing: ${a.failing.join(', ')}` : '', judged.length ? `judge (${a.judge!.gate ? 'gating' : 'advisory'}): ${judged.join(', ')}` : '', ...a.flags].filter(Boolean).join('; ');
   return `  ${a.status.padEnd(8)} ${a.name} (${a.kind} ${a.size})${a.status !== 'exported' ? ` → ${a.next}` : a.exported ? ` → ${a.exported.profile} in ${a.exported.dir}` : ''}${why ? `  [${why}]` : ''}`;
 }
 
@@ -299,4 +302,14 @@ export function writeTemplates(w: Writer, o: { seed?: number } = {}): { dir: str
     save(`${f.name}.coverage.txt`, cov.text);
   }
   return { dir, files };
+}
+
+/** The judge's stored answers for an asset as the plan carries them (null when the judge is off). */
+function planJudgeOf(w: Writer, asset: string): PlanAsset['judge'] {
+  const r = judgeReport(w, asset);
+  if (!r.enabled) return null;
+  return {
+    gate: r.gate, model: r.model, notAsked: r.notAsked.length, error: r.error,
+    findings: r.findings.map((f) => ({ id: f.id, label: f.label, status: f.status, p: f.p, expect: f.expect, yes: f.yes, no: f.no, detail: f.detail })),
+  };
 }

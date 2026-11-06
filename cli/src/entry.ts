@@ -5,6 +5,7 @@ import { DEFAULT_PORT, serve } from '@pixelclaw/server/serve';
 import { ProjectError, lockHolder, workerLockHolder, workerSettings } from '@pixelclaw/server';
 import { resolve } from 'node:path';
 import { USAGE, UsageError, main, one, parseArgs, resolveRunArgv, startsWorker, type Io } from './main.ts';
+import { judgeMain } from './judge.ts';
 import { awaitMain, forwardToServer, listenerLine, runForwarded } from './forward.ts';
 
 const out: Pick<Io, 'out' | 'err'> = { out: (s) => process.stdout.write(s), err: (s) => process.stderr.write(s) };
@@ -90,6 +91,7 @@ export async function cli(argv: string[]): Promise<number> {
   }
   try {
     if (argv[0] === 'await') return await awaitMain(argv.slice(1), out);
+    if (argv[0] === 'judge') return await judgeMain(argv.slice(1), out);
     // `run` may have underlay lines to resolve first (it reads stdin once, here).
     const args = argv[0] === 'run' ? await resolveRunArgv(argv) : argv;
     const sent = await forwardToServer(args, out);

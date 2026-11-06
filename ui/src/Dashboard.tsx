@@ -8,7 +8,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { DOC_KINDS, STATUSES, type Status, type WorkRequest } from '@pixelclaw/core';
-import type { PlanAsset, PlanReport } from '@pixelclaw/server/protocol';
+import type { PlanAsset, PlanJudge, PlanReport } from '@pixelclaw/server/protocol';
 import type { Store } from './store.ts';
 import { ImportButton, ImportDrop } from './Import.tsx';
 import { ListenerChip, NoListener, unattended, useNow } from './Listening.tsx';
@@ -105,6 +105,24 @@ function RequestLine({ q, store }: { q: WorkRequest; store: Store }) {
   );
 }
 
+/** The judge's answers on a card: advisory unless the project gates on them; "unsure" is shown as such. */
+function JudgeRow({ j }: { j: PlanJudge }) {
+  const f2 = (n: number) => n.toFixed(2);
+  const tip = [
+    `The judge (${j.model}) is ${j.gate ? 'gating: failing answers block done' : 'advisory: it blocks nothing'}.`,
+    ...j.findings.map((f) => `${f.label}: ${f.p === null ? '–' : f2(f.p)} (${f.expect === 'yes' ? '≥ ' + f2(f.yes) : '≤ ' + f2(f.no)}) ${f.status}${f.status === 'unsure' ? ' (between the thresholds)' : ''}: ${f.detail}`),
+    ...(j.notAsked ? [`${j.notAsked} not asked yet`] : []), ...(j.error ? [`last request failed: ${j.error}`] : []),
+  ].join('\n');
+  return (
+    <div className="card-judge" data-testid="judge" data-gate={j.gate} title={tip}>
+      <span className="chk judge-tag" data-testid="judge-tag">{j.gate ? 'judge · gates' : 'judge · advisory'}</span>
+      {j.findings.filter((f) => f.status !== 'skip').map((f) => <span key={f.id} className={`chk judge-${f.status}`} data-judge={f.id} data-status={f.status}>{f.label}{f.status === 'unsure' ? ' unsure' : ''}{f.p !== null ? ` ${f2(f.p)}` : ''}</span>)}
+      {j.notAsked > 0 && <span className="chk missing" data-testid="judge-notasked">{j.notAsked} not asked</span>}
+      {j.error && <span className="chk judge-error" data-testid="judge-error">judge failed</span>}
+    </div>
+  );
+}
+
 function Card({ a, store, requests }: { a: PlanAsset; store: Store; requests: WorkRequest[] }) {
   const [asking, setAsking] = useState<'draw' | 'change' | null>(null);
   const [why, setWhy] = useState('');
@@ -153,6 +171,7 @@ function Card({ a, store, requests }: { a: PlanAsset; store: Store; requests: Wo
             {a.failing.length ? a.failing.map((id) => <span key={id} className="chk fail">{id}</span>) : <span className="chk pass">{a.checks.length} checks ✓</span>}
           </div>
         )}
+        {a.exists && a.judge && <JudgeRow j={a.judge} />}
         {a.status !== 'exported' && <div className="next">→ {a.next}</div>}
         {a.status === 'exported' && a.exported && <div className="next dim">{a.exported.profile} → {a.exported.dir}</div>}
         {a.flags.map((f) => <div key={f} className="flag">{f}</div>)}

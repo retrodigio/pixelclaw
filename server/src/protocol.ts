@@ -131,6 +131,8 @@ export interface PlanAsset {
   /** Failing checks (ids), and every check's line. */
   failing: string[];
   checks: { id: string; status: string; shown: string }[];
+  /** The judge's current answers (null when the judge is off for the project or the asset is not drawn). Advisory unless `gate`. */
+  judge: PlanJudge | null;
   notes: number;
   /** The tape's last command, when it was written and by whom. */
   seq: number | null;
@@ -147,6 +149,16 @@ export interface PlanAsset {
   usedBy: string[];
   /** The scenes that need it. */
   scenes: string[];
+}
+
+export interface PlanJudge {
+  gate: boolean;
+  model: string;
+  findings: { id: string; label: string; status: string; p: number | null; expect: string; yes: number; no: number; detail: string }[];
+  /** Questions that apply but have no current answer. */
+  notAsked: number;
+  /** The last request failed (nothing since has answered). */
+  error: string | null;
 }
 
 export interface PlanScene {

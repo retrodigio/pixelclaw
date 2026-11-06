@@ -13,6 +13,7 @@ import { ProjectError, assetExists, type Project } from './project.ts';
 import { MANIFEST_FILE, knownFor, manifestEntry, planReport, readManifest, writeManifest } from './plan.ts';
 import type { PersonRequest } from './protocol.ts';
 import { unseenOpen, type AgentEvent } from './await.ts';
+import { judgeBlockers } from './judge.ts';
 import type { Writer } from './writer.ts';
 
 export const REQUESTS_FILE = 'requests.jsonl';
@@ -203,6 +204,10 @@ export function agentWork(w: Writer, agent: string, q: AgentWork, steps: WorkSte
     // Done means the asset passes its checks; blocked stays open for anything else.
     if (!assetExists(p, target.asset)) throw new ProjectError(`${id} is not done: ${target.asset} is not drawn yet. Draw it, or ${steps.blocked(id)} if you cannot`);
     const failing = w.checks(target.asset).results.filter((r) => r.status === 'fail');
+    const judged = judgeBlockers(w, target.asset);
+    if (!failing.length && judged.length) {
+      throw new ProjectError(`${id} is not done: the project's judge gates done and ${target.asset} has not satisfied it:\n${judged.join('\n')}\nFix it (or run the judge again once it is fixed) and finish again, or ${steps.blocked(id)} if you cannot.`);
+    }
     if (failing.length) {
       throw new ProjectError(`${id} is not done: ${target.asset} fails ${failing.length} check${failing.length === 1 ? '' : 's'}:\n` +
         failing.map((r) => `  ${r.id}${r.score !== null ? ` ${r.shown}` : ''}${r.limit ? ` (limit ${r.limit})` : ''}${r.detail ? `: ${r.detail}` : ''}`).join('\n') +

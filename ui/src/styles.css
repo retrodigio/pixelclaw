@@ -339,6 +339,12 @@ header .crumbs { white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 .card-checks { display: flex; flex-wrap: wrap; gap: 3px; }
 .chk { font: 11px var(--mono); padding: 0 6px; border-radius: 8px; border: 1px solid var(--line); }
 .chk.pass { color: #8fd18b; }
+.card-judge { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
+.chk.judge-tag { color: #9aa3b5; border-style: dashed; }
+.chk.judge-pass { color: #8fd18b; }
+.chk.judge-fail { color: #ffb38a; border-color: #7a4a30; background: #3a2a1d; }
+.chk.judge-unsure { color: #e6d58a; border-color: #6a6030; border-style: dotted; }
+.chk.judge-error { color: #c9ccd2; border-color: #7a3036; }
 .chk.fail { color: #ff9a9a; border-color: #7a3036; background: #3a1d20; }
 .card-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .card-actions button { white-space: nowrap; }

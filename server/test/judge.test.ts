@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { decodePng, defaultQuestionFile, importPalette } from '@pixelclaw/core';
 import {
-  JUDGE_URL, Writer, createProject, formatJudge, formatRun, judgeBlockers, judgeReport, judgeSettings, logFile, planJudge, runJudge, writeManifest,
+  JUDGE_URL, Writer, agentWork, createProject, formatJudge, formatRun, judgeBlockers, judgeReport, judgeSettings, logFile, planJudge, runJudge, writeManifest,
   type JudgeEnv, type JudgeRun,
 } from '../src/index.ts';
 import { PALETTE } from './spawn.ts';
@@ -325,5 +325,27 @@ describe('the gate', () => {
     writeFileSync(join(w.project.dir, 'project.json'), JSON.stringify({ ...pj, judge: { provider: 'jev', gate: true } }));
     await ask(['urn'], fake((id, q) => (q.type === 'box' ? box() : q.type === 'choice' ? choice('urn', { urn: 0.5, jar: 0.5 }) : noul(0.5))).env);
     expect(judgeBlockers(w, 'urn')).toEqual([]);
+  });
+});
+
+describe('done with the gate on', () => {
+  it('is refused while a judge question fails, and allowed when it is advisory', async () => {
+    // A drawing whose code checks all pass, so only the judge can stop `done`.
+    const r = w.run({ asset: 'urn', by: 'claude', replace: true, commands: 'new sprite urn 16x16\nrect 4,4 8x10 c=stone2 fill\nline 4,4 11,4 c=stone4\nline 4,4 4,13 c=stone4\nline 5,13 11,13 c=stone1\noutline c=ink' });
+    expect(r.ok).toBe(true);
+    // (the look-alike jar would trip readability; this test is about the judge)
+    const base = JSON.parse(readFileSync(join(w.project.dir, 'project.json'), 'utf8'));
+    writeFileSync(join(w.project.dir, 'project.json'), JSON.stringify({ ...base, style: { checks: { readability: { off: true } } } }));
+    const failing = w.checks('urn').results.filter((x) => x.status === 'fail').map((x) => x.id);
+    expect(failing, 'the fixture drawing passes the code checks').toEqual([]);
+    writeFileSync(join(w.project.dir, 'requests.jsonl'), JSON.stringify({ type: 'request', id: 'r1', asset: 'urn', kind: 'change', note: 'tidy', by: 'human:ana', at: '2026-11-06T09:00:00Z' }) + '\n');
+    const pj = JSON.parse(readFileSync(join(w.project.dir, 'project.json'), 'utf8'));
+    const gate = (g: boolean) => writeFileSync(join(w.project.dir, 'project.json'), JSON.stringify({ ...pj, judge: { provider: 'jev', gate: g } }));
+    await ask(['urn'], fake((id, q) => (q.type === 'box' ? box() : q.type === 'choice' ? choice('jar', { urn: 0.1, jar: 0.9 }) : noul(id === 'stray' ? 0.05 : 0.9))).env);
+    gate(true);
+    agentWork(w, 'claude', { action: 'next', id: 'r1' });
+    expect(() => agentWork(w, 'claude', { action: 'done', text: 'tidied' })).toThrow(/judge gates done[\s\S]*judge recognisable/);
+    gate(false);
+    expect(agentWork(w, 'claude', { action: 'done', text: 'tidied' }).message).toBe('r1: done');
   });
 });
