@@ -4,7 +4,7 @@
 import { DEFAULT_PORT, serve } from '@pixelclaw/server/serve';
 import { ProjectError, lockHolder, workerLockHolder, workerSettings } from '@pixelclaw/server';
 import { resolve } from 'node:path';
-import { USAGE, UsageError, main, one, parseArgs, resolveRunArgv, startsWorker, type Io } from './main.ts';
+import { USAGE, UsageError, main, metaCommand, one, parseArgs, resolveRunArgv, startsWorker, type Io } from './main.ts';
 import { judgeMain } from './judge.ts';
 import { awaitMain, forwardToServer, listenerLine, runForwarded } from './forward.ts';
 
@@ -82,6 +82,15 @@ export async function cli(argv: string[]): Promise<number> {
     if (e.code === 'EPIPE') process.exit(0);
     throw e;
   });
+  // --version, help <command> and <command> --help need no project (and `await`, `serve` and `judge` are not parsed by main).
+  try {
+    const meta = metaCommand(argv, out);
+    if (meta !== null) return meta;
+  } catch (e) {
+    if (!(e instanceof UsageError)) throw e;
+    process.stderr.write(`error: ${e.message}\n\n${USAGE}`);
+    return 2;
+  }
   // `work <project> start` (or the older `work <project>`) runs the worker; the other work actions write requests.
   if (startsWorker(argv)) process.exit(await workMain(argv.slice(1)));
   if (argv[0] === 'serve') {

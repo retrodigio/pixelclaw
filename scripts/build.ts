@@ -26,6 +26,8 @@ const result = await build({
   legalComments: 'none',
   minify: true,
   logLevel: 'warning',
+  // `pixelclaw --version`.
+  define: { __PIXELCLAW_VERSION__: JSON.stringify((JSON.parse(readFileSync(join(REPO, 'cli', 'package.json'), 'utf8')) as { version: string }).version) },
   // CommonJS dependencies inside an ES module bundle need a require.
   banner: { js: "import { createRequire as __pclawRequire } from 'node:module'; const require = __pclawRequire(import.meta.url);" },
 });

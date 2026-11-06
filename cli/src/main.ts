@@ -1,5 +1,6 @@
 // pixelclaw: new | run | view | check | review | plan | request | reply | cancel | work (its actions) | export | import | verify | upgrade | skill (work start and serve: entry.ts). A thin layer over @pixelclaw/core and the project folder.
 
+import { pixelclawVersion } from './version.ts';
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
@@ -31,6 +32,9 @@ const nodeIo: Io = {
 };
 
 export const USAGE = `pixelclaw: a pixel art editor driven by commands
+
+  pixelclaw --version | pixelclaw <command> --help | pixelclaw help <command>
+      The version; the usage of one command.
 
   pixelclaw new <project> [--name <name>] [--palette <file.json|.hex|.gpl>]... [--grid <px>]
       Create a project folder. The first palette becomes the default. --grid is the tile size
@@ -143,6 +147,38 @@ Command reference: docs/commands.md
 `;
 
 export class UsageError extends Error {}
+
+/** The usage blocks of one command (a command may have several), or null when there is no such command. */
+export function commandHelp(cmd: string): string | null {
+  const blocks: string[][] = [];
+  let cur: string[] | null = null;
+  for (const line of USAGE.split('\n')) {
+    const m = /^  pixelclaw (\S+)/.exec(line);
+    if (m) {
+      cur = m[1] === cmd ? [] : null;
+      if (cur) blocks.push(cur);
+    }
+    if (cur && (m || line.startsWith('  '))) cur.push(line);
+    else if (!line.startsWith('  ')) cur = null;
+  }
+  if (!blocks.length) return null;
+  return `${blocks.map((b) => b.join('\n')).join('\n')}\n\nAll commands: pixelclaw --help. The command language: docs/commands.md\n`;
+}
+
+/** `--version`, `help <command>` and `<command> --help`: answered without touching a project. Null when argv is none of them. */
+export function metaCommand(argv: string[], io: Pick<Io, 'out' | 'err'>): number | null {
+  const [cmd, ...rest] = argv;
+  if (cmd === '--version' || cmd === '-V' || cmd === 'version') {
+    io.out(`pixelclaw ${pixelclawVersion()}\n`);
+    return 0;
+  }
+  const target = cmd === 'help' ? rest[0] : rest.some((a) => a === '--help' || a === '-h') ? cmd : undefined;
+  if (target === undefined) return null;
+  const h = commandHelp(target);
+  if (!h) throw new UsageError(`unknown command '${target}'`);
+  io.out(h);
+  return 0;
+}
 
 /** The writer a command writes through: the server's own when it was sent to one, else a new one on the folder. */
 function wr(io: Io, proj: Project): Writer {
@@ -767,6 +803,8 @@ function cmdVerify(io: Io, p: Parsed): number {
 export function main(argv: string[], io: Io = nodeIo): number {
   const [cmd, ...rest] = argv;
   try {
+    const meta = metaCommand(argv, io);
+    if (meta !== null) return meta;
     switch (cmd) {
       case 'new': {
         const p = parseArgs(rest, ...WRITE_OPTS.new!);

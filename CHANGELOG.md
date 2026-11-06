@@ -26,6 +26,13 @@ All notable changes to PixelClaw are listed here. The format follows
 - docs/judge.md; an opt-in live smoke test (`server/test/judge-live.test.ts`, runs only with
   `TYPESAFE_API_KEY` set and never in CI).
 
+### Smaller changes
+- `import <x,y> asset=<name> region=… frame=<n>` copies a chosen frame of the source asset.
+- A manifest asset can be `"reference": true` (a sheet to copy from, a study): the code checks that
+  compare an asset with its set, and the judge's recognisability options, leave it out.
+- `pixelclaw --version`, and `pixelclaw <command> --help` (also `help <command>`) prints that
+  command's usage, including `await`, `serve`, `work` and `judge`.
+
 ## [0.2.0] - 2026-11-06
 
 ### Feedback from the dashboard reaches an agent
