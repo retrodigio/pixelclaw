@@ -1,6 +1,6 @@
 {
   "name": "pixelclaw",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "description": "A pixel art editor for AI agents: indexed-colour art drawn by command through an MCP server and a CLI, with a live browser view where people watch and edit.",
   "license": "MIT",

@@ -6,6 +6,8 @@ All notable changes to PixelClaw are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-06
+
 ### An optional judge beside the code checks (experimental)
 - `pixelclaw judge <project> [<asset>...] [--questions a,b] [--fresh]` and the MCP `judge` tool
   ask a model (TypeSafe's Jev) typed questions about an asset's pictures and return probabilities:
@@ -138,6 +140,7 @@ The first public release.
   spending cap) that works them in a fenced headless Claude Code session.
 - A Claude Code skill (`pixelclaw skill install`).
 
-[Unreleased]: https://github.com/retrodigio/pixelclaw/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/retrodigio/pixelclaw/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/retrodigio/pixelclaw/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/retrodigio/pixelclaw/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/retrodigio/pixelclaw/releases/tag/v0.1.0
