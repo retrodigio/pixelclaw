@@ -72,7 +72,7 @@ pixelclaw skill install          # the Claude Code skill: workflows, house rules
 (From a source checkout without the global install: `claude mcp add pixelclaw -- node
 /path/to/pixelclaw/cli/dist/pixelclaw.js serve --project …`.) Start `claude` and ask it to draw.
 Its tools are `project`, `run`, `view`, `check`, `seeds`, `changes`, `history`, `plan`,
-`request`, `work`, `await_requests`, `review`, `export` and `import` ([docs/mcp.md](docs/mcp.md)).
+`request`, `work`, `await_requests`, `review`, `judge` (optional), `export` and `import` ([docs/mcp.md](docs/mcp.md)).
 
 ### Feedback from the dashboard
 
