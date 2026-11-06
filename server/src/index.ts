@@ -17,3 +17,4 @@ export * from './worker.ts';
 export * from './worker-settings.ts';
 export * from './await.ts';
 export * from './runfile.ts';
+export * from './judge.ts';

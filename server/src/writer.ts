@@ -28,6 +28,8 @@ import { blobImage, needsUnderlay, resolveUnderlays, type ProviderEnv } from './
 export interface ViewRequest extends Omit<ViewOptions, 'marks' | 'theme' | 'themes' | 'game'> {
   /** Circle the pixels these checks flag ('failing': every failing check). */
   marks?: CheckId[] | 'failing';
+  /** Circle these pixels too (the judge's boxes). */
+  markPixels?: Pt[];
   /** render, tile3x3, game: show role entries under this theme. */
   theme?: string;
   /** recolour: these themes (default: the first six). */
@@ -361,6 +363,12 @@ export class Writer {
   }
 
   /** The document right after command `seq` of an asset's tape (null before its first command). */
+  /** The key of an asset's state (its tape and the engine): changes whenever the art may have. */
+  stateKeyOf(name: string): string {
+    this.state(name);
+    return this.keys.get(name) ?? '';
+  }
+
   docAt(name: string, seq: number): Doc | null {
     const r = this.timeline(name).docAfter(this.state(name).entries, seq);
     if (r.problem) throw new ProjectError(`asset '${name}': ${r.problem}`);
@@ -795,6 +803,7 @@ export class Writer {
       }
       o.marks = marks;
     }
+    if (req.markPixels?.length) o.marks = [...(o.marks ?? []), ...req.markPixels];
     if (mode === 'game') {
       const all = this.assetDocs();
       const ground = groundOf(asset, all, style, req.ground);
