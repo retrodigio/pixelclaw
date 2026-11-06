@@ -274,7 +274,7 @@ describe('the worker cannot run a shell or read files outside its project', () =
       // The PixelClaw tools worked: the urn drawn, its request done, the session's cost in the ledger.
       expect(readRequestRecords(loadProject(dir)).filter((x) => x.type === 'done').map((x) => [x.id, x.by])).toEqual([['r1', 'claude']]);
       expect(readSpend(dir)).toHaveLength(1);
-      expect(readFileSync(join(dir, 'logs', 'worker.log'), 'utf8')).toMatch(/tools: 12 PixelClaw, nothing else/);
+      expect(readFileSync(join(dir, 'logs', 'worker.log'), 'utf8')).toMatch(/tools: 13 PixelClaw, nothing else/);
     } finally {
       await api.close();
       rmSync(root, { recursive: true, force: true });
