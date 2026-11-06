@@ -16,9 +16,9 @@ and accuracy can change, and it is known to be weak at counting.
 - The API key comes **only from the environment** (`TYPESAFE_API_KEY`). It is never written to the
   project, the history, the request log, a view or any tool's output, and the headless worker's
   session does not inherit it.
-- Cost is per input token only (output is free); a small asset is a few hundred tokens a
-  question's worth, which is a few thousandths of a cent. Every run prints the tokens it used and a
-  rough dollar figure at the published rate.
+- Cost is per input token only (output is free). A small asset's picture is a few hundred
+  tokens, so a run over a whole asset costs a few thousandths of a cent. Every run prints the tokens
+  it used and a rough dollar figure at the published rate ($0.042 per million input tokens).
 - Answers that are still current are **not asked again**: a run only asks what the art or the
   questions changed.
 
@@ -122,7 +122,8 @@ is used. A broken file is reported and the default set is used.
 - `check` (CLI and MCP) prints the **judge** table of the last answers under the code checks. It
   never calls the API. Answers for art that has changed since are listed as "not asked yet".
 - The dashboard card shows an **advisory** (or **gates**) badge with a chip per answer; "unsure" is
-  shown as unsure. Requests on a card are on the same card.
+  shown as unsure. Requests on a card are on the same card. The MCP tool refreshes the dashboard; after
+  `pixelclaw judge` (a separate process) reload the page.
 - With `"gate": true`, `done` on a request is refused while a judge question fails, and while
   there is no current answer (run the judge first). Unsure answers do not block.
 
