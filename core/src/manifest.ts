@@ -55,6 +55,8 @@ export interface ManifestAsset {
   flat?: string;
   /** Fonts: the characters, as `new font … chars=` takes them ("32-126", "U+0041-U+005A", or the characters themselves). */
   chars?: string;
+  /** What the judge checks it shows ("a readable face"): each becomes a yes/no question. */
+  reads?: string[];
 }
 
 export interface Manifest {
@@ -97,7 +99,7 @@ const SIZE_RE = /^(\d+)x(\d+)$/;
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 const ASSET_KEYS = new Set([
   'name', 'kind', 'size', 'set', 'description', 'palette', 'scheme', 'inside', 'outside', 'band', 'frames', 'ticks', 'views', 'mirror', 'cells',
-  'height', 'variantOf', 'recolourOf', 'uses', 'flat', 'chars',
+  'height', 'variantOf', 'recolourOf', 'uses', 'flat', 'chars', 'reads',
 ]);
 const TOP_KEYS = new Set(['format', 'version', 'theme', 'sets', 'export', 'assets', 'scenes']);
 const SCENE_KEYS = new Set(['name', 'description', 'uses', 'map']);
@@ -187,6 +189,7 @@ export function validateManifest(json: unknown, known: ManifestKnown = {}): { ma
       int('height', 1, 4096);
       if (size && Number.isInteger(a.height) && (a.height as number) > size[1]) err(at('height'), `taller than its size (${a.size})`);
     }
+    if (a.reads !== undefined && (!Array.isArray(a.reads) || a.reads.length > 12 || !a.reads.every((r) => typeof r === 'string' && r.trim() && r.length <= 160))) err(at('reads'), 'up to 12 short phrases ("a readable face")');
     if (a.views !== undefined) {
       if (!Array.isArray(a.views) || !a.views.every((v) => (VIEW_DIRS as readonly unknown[]).includes(v)) || new Set(a.views).size !== a.views.length) err(at('views'), `directions from ${VIEW_DIRS.join(', ')}, each once`);
       if (!['sprite', 'object', 'sheet'].includes(kind)) err(at('views'), 'views are for sprites and objects');

@@ -38,3 +38,5 @@ export * from './font.ts';
 export * from './snap.ts';
 export * from './requests.ts';
 export * from './slice.ts';
+export * from './judge.ts';
+export { DEFAULT_QUESTIONS } from './judge-text.ts';
