@@ -254,6 +254,28 @@ holds cap height, x-height, the baseline and advances; the preview's text tab se
 as drawn; channel: pure-RGB masks), then as a small sprite. Plan the icons as one manifest set:
 `consistency` holds them to one stroke weight and box fill, each optically centred.
 
+## The judge (optional; experimental)
+
+If the project has `"judge": { "provider": "jev" }` in `project.json` (and the person has put
+`TYPESAFE_API_KEY` in the environment), `judge` gives a cheap second opinion on how the art
+*reads*: is a sprite recognisable as itself among its set, does it show what the manifest's
+`reads` say (`"a readable face"`), are there seams on a tile or map, does it match the approved
+mockup, is it still the same object after your last change, where is a stray blob (a box, marked
+on a render). Use it:
+
+- after a sprite passes its code checks and before you call it done, when the person cares how it
+  reads (not on every edit: a run costs a little and asks only what changed);
+- after a fix to something already approved: the `identity` question tells you if you changed
+  what it is;
+- to place a problem by pixels: a failing `stray` gives `marks`.
+
+Answers are probabilities. At 0.7 or more it says yes, at 0.3 or less no, between is **unsure**:
+look yourself, do not treat unsure as pass or fail. It is advisory unless the project gates on it
+(then `done` is refused while it fails or has not answered). `check` shows its last answers.
+If `judge` says it is off or has no key, say so to the person; do not set it up yourself: it
+sends images to a third-party API and spends their money. Never put a key in a file or a
+command. docs/judge.md.
+
 ## The blind review hand-off
 
 The tool calls no model. You hand its bundle to a fresh agent and bring the findings back:
@@ -275,7 +297,7 @@ The tool calls no model. You hand its bundle to a fresh agent and bring the find
 
 `project` open/list · `run` a batch (one undo group; any error applies nothing; ends with a check
 summary; `dry=true` keeps nothing) · `seeds` rank a generator line's seeds by the checks · `view` render, grid, diff, tile3x3, game, recolour, anim, map, family, density ·
-`check` the full table with coordinates · `changes` the person's edits and notes · `history` the
+`check` the full table with coordinates · `judge` the optional model's second opinion · `changes` the person's edits and notes · `history` the
 tape · `plan` the manifest and statuses (write a manifest, draw templates) · `review` a blind
 bundle · `export` / `import` through profiles. The command language: commands.md beside this
 file, or `docs/commands.md` in the PixelClaw repo.

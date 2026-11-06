@@ -111,6 +111,16 @@ a spending cap that covers every run (`"worker": { "enabled": true, "cap": 5 }`)
 **Start Claude** in the dashboard or run `pixelclaw work <project> start`. See
 [docs/worker.md](docs/worker.md).
 
+### A second opinion from a model (optional, experimental)
+
+The code checks measure pixels; they cannot say whether a sprite *reads* as what it should. The
+optional **judge** asks a model typed questions about an asset's picture (is it recognisable as
+itself among its set, is there a readable face, are there seams, does it match the approved
+mockup, is it still the same object after an edit) and shows probabilities beside the code
+checks. It is **off by default**, advisory when on, and **sends images to a third-party API**
+(TypeSafe's Jev), so it is enabled per project (`"judge": { "provider": "jev" }`) with a key in
+the environment (`TYPESAFE_API_KEY`). See [docs/judge.md](docs/judge.md).
+
 ### Underlays from an image model (optional, OpenAI)
 
 `underlay generate` can ask an image model for a reference picture to put under the canvas, which
@@ -158,6 +168,7 @@ The example projects are checked in: [`examples/mossy-ruins.pclaw`](examples/mos
 | `pixelclaw seeds <project> <asset> <generator line> [--count N] [--from N] [--checks a,b] [--apply]` | Try the line with each seed as a dry run and rank the seeds by the checks; `--apply` runs the best. |
 | `pixelclaw view <project> <asset> [render\|grid\|tile3x3\|diff\|game\|recolour\|anim\|map\|family\|density\|all] [--scale N] [--region x,y,WxH] [--frame N] [--marks failing] [--theme t]` | Write views and print the text grid (or the diff's list of changes). |
 | `pixelclaw check <project> [<asset>...] [--checks a,b] [--marks]` | Run the quality checks against the style guide; exits 1 if any fails. See [docs/checks.md](docs/checks.md). |
+| `pixelclaw judge <project> [<asset>...] [--questions a,b] [--fresh]` | Ask the optional judge (off by default; sends images to a third-party API) and print its table; `check` shows the last answers ([docs/judge.md](docs/judge.md)). |
 | `pixelclaw export <project> [<asset>...] [--profile <name>] [--out <dir>]` | Write assets through an export profile (built-in `png`, `atlas`, `tiled`, `godot`, `aseprite-json`, `aseprite`, or the project's own). While a server owns the project it is sent to that server and written through its writer. See [docs/profiles.md](docs/profiles.md). |
 | `pixelclaw export <project> <asset> --format split\|png\|strip\|bmfont [--out <dir>]` | One asset on its own: one-cell pieces, a PNG, or a font as a glyph strip or BMFont. |
 | `pixelclaw import <project> <file.png\|file.aseprite\|folder> [--profile <name>] [--as <name>] [--grid WxH] [--slice WxH] [--set s] [--palette <p>\|--build]` | Make new assets from an image (quantised; a grid of frames, or `--slice` into one asset per cell, with manifest entries and checks), a folder of images or an `.aseprite` file, or read a profile's export back and compare. |
@@ -193,7 +204,9 @@ my-art.pclaw/
   reviews/<date>-<set>/     blind review bundles (and the findings brought back)
   reads.json                how far each agent has read each tape (for 'changes')
   .pixelclaw.lock           present while a server owns the project (not for git; no token in it)
+  judge/questions.json      the judge's questions, optional (docs/judge.md)
   .cache/state/<asset>.gwc  each asset's state after its tape, keyed by the tape (never committed)
+  .cache/judge/             the judge's answers and the requests it sent (never committed)
 ```
 
 ## Packages

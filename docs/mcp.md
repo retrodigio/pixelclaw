@@ -203,6 +203,18 @@ glowcap: 5 of 7 checks failing
   –  seam        skipped: not a wrap (tile) document
 ```
 
+### `judge`
+
+An optional second opinion on how an asset reads, from a model that answers typed questions about its picture with probabilities (experimental; off unless `project.json` has `"judge": { "provider": "jev" }`; the key is `TYPESAFE_API_KEY` in the server's environment; images are sent to a third-party API). See [judge.md](judge.md).
+
+| argument | |
+|---|---|
+| `assets` | the assets to judge (default every asset) |
+| `questions` | only these question ids from `judge/questions.json` (or the built-in set) |
+| `fresh` | ask again even when the answers are current |
+
+Returns the table of probabilities against the thresholds (0.7 yes / 0.3 no; between is "unsure"), the tokens used, and, when a no-question fails with a located problem, a render with it circled. Errors (no key, the API failing, a malformed answer) are errors, never answers. `check` shows the last answers as a separate judge table without asking.
+
 ### `review`
 
 Write a blind review bundle under `reviews/<date>-<set>/` (see [checks.md](checks.md#the-review-bundle)):

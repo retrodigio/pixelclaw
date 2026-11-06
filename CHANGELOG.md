@@ -6,6 +6,26 @@ All notable changes to PixelClaw are listed here. The format follows
 
 ## [Unreleased]
 
+### An optional judge beside the code checks (experimental)
+- `pixelclaw judge <project> [<asset>...] [--questions a,b] [--fresh]` and the MCP `judge` tool
+  ask a model (TypeSafe's Jev) typed questions about an asset's pictures and return probabilities:
+  recognisable as itself among its manifest set (and which sprites are read as each other), the
+  manifest's new `"reads"` per asset (`"a readable face"`), seams on tiles and maps, style against
+  an approved mockup, "the same object after the last change", and a box that places a stray blob
+  as marked pixels. Thresholds are 0.7 yes / 0.3 no per question; between is shown as unsure.
+- Off by default and per project: `"judge": { "provider": "none" | "jev", "model", "gate": false }`
+  in `project.json`. The key is only `TYPESAFE_API_KEY` from the environment (not stored, logged
+  or shown; the headless worker does not inherit it). Images are sent to a third-party API.
+- Questions are data: `judge/questions.json` (documented in docs/judge.md) over a generic default
+  set. One request per asset per run, each picture once, upscaled nearest-neighbour and padded to
+  the API's limits; answers that are current are not asked again; every request is logged for
+  rerun (without image bytes or key). Failures are errors, never answers.
+- `check` (CLI and MCP) prints the last judge answers as a separate table; the dashboard shows an
+  advisory badge on each card ("unsure" as unsure). With `"gate": true` failing answers block
+  `done` on a request like failing checks.
+- docs/judge.md; an opt-in live smoke test (`server/test/judge-live.test.ts`, runs only with
+  `TYPESAFE_API_KEY` set and never in CI).
+
 ## [0.2.0] - 2026-11-06
 
 ### Feedback from the dashboard reaches an agent

@@ -54,6 +54,7 @@ the manifest was not written; 2 problems:
 | `height` | props, figures | the drawn shape's height in pixels; `consistency` holds the art to it (± 2) |
 | `variantOf`, `recolourOf` | all | a texture variant or a palette-swap recolour of another planned asset of the same kind |
 | `uses` | map | the planned assets it is built from |
+| `reads` | all | up to 12 short phrases the art should show (`"a readable face"`); each is a yes/no question for the optional judge ([judge.md](judge.md)) |
 | `flat` | all | its colour in the flat templates: a palette entry name or `#rrggbb` |
 | `chars` | font | the characters, as `new font … chars=` takes them: the characters themselves, or code points and ranges (`"32-126"`, `"U+0041-U+005A"`) |
 
