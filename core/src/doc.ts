@@ -249,6 +249,8 @@ export interface Doc {
   home: { layer: number; frame: number };
   /** Open notes, in the order they were written. */
   notes: Note[];
+  /** Rectangles of intended single pixels (an eye, a mouth): the orphans check does not count strays inside them. */
+  keeps: { x: number; y: number; w: number; h: number }[];
   stamps: Record<string, Stamp>;
   macros: Record<string, Macro>;
   /** Each frame's duration in ticks (the project sets the tick rate). */
@@ -320,7 +322,7 @@ export function createDoc(o: {
     kind: o.kind, name: o.name, width: o.width, height: o.height, cellW: o.cellW, cellH: o.cellH,
     wrap: o.wrap, palette: o.palette, paletteLocked: false, layers, frameCount: 1, cels,
     // A family's authors draw on its band layer unless they choose another.
-    ctx: {}, home: { layer: o.family ? 1 : 0, frame: 0 }, notes: [], stamps: {}, macros: {},
+    ctx: {}, home: { layer: o.family ? 1 : 0, frame: 0 }, notes: [], keeps: [], stamps: {}, macros: {},
     ticks: [DEFAULT_TICKS], tags: [], views: [], pivot: null, ground: null,
     family: o.family ? cloneFamily(o.family) : null, overlay: o.overlay ? cloneOverlay(o.overlay) : null,
     footprint: null, variantOf: null, densityOf: null, map: o.map ? cloneMap(o.map) : null, marks: [],
@@ -375,7 +377,7 @@ export function cloneDoc(d: Doc): Doc {
     home: { ...d.home },
     family: d.family ? cloneFamily(d.family) : null, overlay: d.overlay ? cloneOverlay(d.overlay) : null,
     footprint: d.footprint ? cloneFootprint(d.footprint) : null, map: d.map ? cloneMap(d.map) : null,
-    notes: d.notes.map((n) => ({ ...n })), marks: d.marks.map((m) => ({ ...m })), font: d.font ? cloneFont(d.font) : null,
+    notes: d.notes.map((n) => ({ ...n })), keeps: d.keeps.map((k) => ({ ...k })), marks: d.marks.map((m) => ({ ...m })), font: d.font ? cloneFont(d.font) : null,
     stamps: Object.fromEntries(Object.entries(d.stamps).map(([k, s]) => [k, { ...s, px: s.px.slice() }])),
     macros: Object.fromEntries(Object.entries(d.macros).map(([k, m]) => [k, { params: [...m.params], body: m.body }])),
   };
@@ -516,6 +518,8 @@ export function serializeDoc(d: Doc): Uint8Array {
     ...(d.densityOf ? { densityOf: [d.densityOf.of, d.densityOf.d] } : {}),
     ...(d.map ? { map: { tile: d.map.tile, entries: d.map.entries.map((e) => (e.exact ? [e.name, e.variant, e.cols, e.rows, e.anchor, 1] : [e.name, e.variant, e.cols, e.rows, e.anchor])) } } : {}),
     ...(d.marks.length ? { marks: d.marks.map((m) => [m.name, m.seq, m.by, m.text, m.art]) } : {}),
+    // Written only when set, so documents without keeps keep the bytes (and hashes) they had.
+    ...(d.keeps.length ? { keeps: d.keeps.map((k) => [k.x, k.y, k.w, k.h]) } : {}),
     ...(d.iconMode ? { iconMode: d.iconMode } : {}),
     ...(d.font ? { font: [d.font.chars.join(','), d.font.cols, d.font.baseline, d.font.line, d.font.spacing, Object.keys(d.font.advances).map(Number).sort((a, b) => a - b).map((c) => [c, d.font!.advances[c]])] } : {}),
     ...(d.layers.some((l) => l.underlay) ? {
@@ -561,6 +565,7 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
     densityOf?: [string, number];
     map?: { tile: number; entries: ([string, string | null, number, number, [number, number]] | [string, string | null, number, number, [number, number], 1])[] };
     marks?: [string, number, string, string, string][];
+    keeps?: [number, number, number, number][];
     iconMode?: IconMode;
     font?: [string, number, number, number, number, [number, number][]];
     underlays?: [number, string, number, number, number, number, number, number, string | null][];
@@ -598,6 +603,7 @@ export function deserializeDoc(bytes: Uint8Array): Doc {
     layers,
     frameCount: h.frameCount, cels, ctx, home: { layer: h.home[0], frame: h.home[1] },
     notes: h.notes.map(([id, x, y, w, nh, text]) => ({ id, x, y, w, h: nh, text })),
+    keeps: (h.keeps ?? []).map(([x, y, w, kh]) => ({ x, y, w, h: kh })),
     stamps, macros: Object.fromEntries(h.macros.map(([m, params, body]) => [m, { params, body }])),
     ticks: h.anim?.ticks ?? Array.from({ length: h.frameCount }, () => DEFAULT_TICKS),
     tags: (h.anim?.tags ?? []).map(([name, from, to, loop]) => ({ name, from, to, loop })),

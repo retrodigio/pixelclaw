@@ -340,6 +340,7 @@ function checkOrphans(img: Img, p: Params): CheckResult {
   const near: Pt[] = [];
   let opaque = 0;
   let excused = 0;
+  let kept = 0;
   for (let i = 0; i < img.px.length; i++) {
     const c = img.px[i]!;
     if (c === TRANSPARENT) continue;
@@ -349,6 +350,8 @@ function checkOrphans(img: Img, p: Params): CheckResult {
     // A pixel on a diagonal line is not a stray: only clusters of one, or two touching corners.
     const size = clusterSize(img, i, 3);
     if (size > 2) continue;
+    // Meant to be on its own (a `keep` region: an eye, a mouth).
+    if (img.doc.keeps.some((k) => x >= k.x && x < k.x + k.w && y >= k.y && y < k.y + k.h)) { kept++; continue; }
     if (p.texture) {
       const counts = new Map<number, number>();
       for (const [dx, dy] of N4) {
@@ -369,7 +372,7 @@ function checkOrphans(img: Img, p: Params): CheckResult {
   ];
   return result('orphans', {
     status: score <= max ? 'pass' : 'fail', score, shown: `${fmt(score, 1)}%`, limit: `≤ ${max}%`, groups,
-    detail: `${n} stray px in ${opaque} (${lone.length} lone, ${near.length} near-orphans)${p.texture ? `; ${excused} one ramp step from their surroundings allowed as texture` : ''}`,
+    detail: `${n} stray px in ${opaque} (${lone.length} lone, ${near.length} near-orphans)${p.texture ? `; ${excused} one ramp step from their surroundings allowed as texture` : ''}${kept ? `; ${kept} kept on purpose (keep)` : ''}`,
   });
 }
 

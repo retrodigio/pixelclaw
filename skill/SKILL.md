@@ -192,7 +192,7 @@ ground laid again and the same generator with **the same `edges=` and another se
 ### A sprite or prop
 
 Silhouette first (`paint` or primitives), then materials in ramp steps, `shade`, `outline`,
-`clean orphans`; `view game` on its ground beside its set; `check` readability (edge contrast,
+`clean orphans` (or `keep <x,y>` for a pixel that is meant to stand alone, an eye or a mouth); `view game` on its ground beside its set; `check` readability (edge contrast,
 distinct silhouette, lightness spread) and consistency. Animation: frames with ticks, `view S
 frames=…`, `view W mirror=E`, `view anim`; the anim check (8-35 % change per frame, no drift).
 

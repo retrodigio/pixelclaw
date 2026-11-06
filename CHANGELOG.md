@@ -30,6 +30,10 @@ All notable changes to PixelClaw are listed here. The format follows
 - `import <x,y> asset=<name> region=… frame=<n>` copies a chosen frame of the source asset.
 - A manifest asset can be `"reference": true` (a sheet to copy from, a study): the code checks that
   compare an asset with its set, and the judge's recognisability options, leave it out.
+- `keep <x,y> [<W>x<H>]` (also `keep remove`, `keep clear`) marks single pixels that are meant to stand
+  alone, an eye or a mouth; the `orphans` check leaves them out and says how many it kept.
+- Per-asset overrides for the `anim` and `margin` checks (`style.assets.<name>.checks`) are
+  documented with an example and covered by tests.
 - `outline` with `corners=off` (the default) round a diagonal stroke: the `jaggies` check no longer
   counts the outline wrapping round the stroke's tips as spikes, so the command's own output passes.
 - `pixelclaw --version`, and `pixelclaw <command> --help` (also `help <command>`) prints that

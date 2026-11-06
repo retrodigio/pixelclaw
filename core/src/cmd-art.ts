@@ -3,7 +3,7 @@
 // step darker) and `clean` (remove lone pixels and tiny clusters). Each works on the author's
 // layer, inside their selection, and reads neighbours across the edges of wrap documents.
 
-import { Args, drawable, fn, registerCommand, resolveColour, synthOpt, type CommandSpec } from './commands.ts';
+import { Args, drawable, fn, needDoc, registerCommand, resolveColour, synthOpt, type CommandSpec } from './commands.ts';
 import { TRANSPARENT, ctxOf, flatten, type Doc } from './doc.ts';
 import { SHADOW_DIRS, shadowBox, shadowDirOf, shadowPixels } from './shadow.ts';
 import { targetOf } from './draw.ts';
@@ -236,6 +236,42 @@ const shadowCmd: CommandSpec = {
   },
 };
 
+const keepCmd: CommandSpec = {
+  name: 'keep',
+  summary: 'keep <x,y> [<W>x<H>]   (a single pixel or a region that is meant to be on its own, an eye or a mouth: the orphans check leaves it alone)   or   keep remove <x,y>   or   keep clear',
+  normalise(cmd, ctx) {
+    const doc = needDoc(cmd, ctx);
+    const a = new Args(cmd, []);
+    const first = a.peek();
+    if (first?.t === 'word' && first.v === 'clear') {
+      a.take('word', 'clear');
+      a.done();
+      return { text: 'keep clear', op: fn((d) => { d.keeps = []; }) };
+    }
+    if (first?.t === 'word' && first.v === 'remove') {
+      a.take('word', 'remove');
+      const p = a.take('point', 'a point x,y inside the kept pixels to forget');
+      a.done();
+      const hit = (k: { x: number; y: number; w: number; h: number }) => p.x >= k.x && p.x < k.x + k.w && p.y >= k.y && p.y < k.y + k.h;
+      if (!doc.keeps.some(hit)) throw new DiagError(p.line, p.col, `keep remove: nothing kept at ${p.x},${p.y}${doc.keeps.length ? ` (kept: ${doc.keeps.map((k) => `${k.x},${k.y}${k.w * k.h > 1 ? ` ${k.w}x${k.h}` : ''}`).join('; ')})` : ''}`);
+      return { text: `keep remove ${p.x},${p.y}`, op: fn((d) => { d.keeps = d.keeps.filter((k) => !hit(k)); }) };
+    }
+    const p = a.take('point', 'a point x,y (or remove x,y, or clear)');
+    const sz = a.peek()?.t === 'size' ? a.take('size', 'a size WxH') : null;
+    a.done();
+    const w = sz?.w ?? 1, h = sz?.h ?? 1;
+    if (w < 1 || h < 1) throw new DiagError(sz!.line, sz!.col, 'keep: size must be at least 1x1');
+    if (p.x < 0 || p.y < 0 || p.x + w > doc.width || p.y + h > doc.height) throw new DiagError(p.line, p.col, `keep: ${p.x},${p.y}${sz ? ` ${w}x${h}` : ''} is outside the ${doc.width}x${doc.height} canvas`);
+    if (doc.keeps.length >= 64) throw new DiagError(cmd.line, cmd.col, 'keep: 64 kept regions is enough; use a larger region or keep clear');
+    const same = doc.keeps.some((k) => k.x === p.x && k.y === p.y && k.w === w && k.h === h);
+    return {
+      text: `keep ${p.x},${p.y}${sz ? ` ${w}x${h}` : ''}`,
+      op: fn((d) => { if (!same) d.keeps = [...d.keeps, { x: p.x, y: p.y, w, h }]; }),
+    };
+  },
+};
+
+registerCommand(keepCmd);
 registerCommand(outlineCmd);
 registerCommand(shadowCmd);
 registerCommand(shadeCmd);
