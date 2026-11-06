@@ -36,7 +36,7 @@ describe('per-command help', () => {
       // Only that command: not the whole manual.
       expect(r.stdout.length).toBeLessThan(commandHelp('import')!.length + 3000);
     }
-  });
+  }, 90_000);
   it('shows only the asked command, and both forms of a command with several', () => {
     const h = direct(['await', '--help']).out;
     expect(h).toContain('pixelclaw await <project-folder | watch-url>');

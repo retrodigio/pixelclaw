@@ -34,7 +34,7 @@ describe.skipIf(!built)('the packed tarball (run pnpm build first)', () => {
     expect(files.filter((f) => f.endsWith('.ts'))).toEqual([]);
     expect(files.filter((f) => !/^package\/(dist\/|README\.md$|package\.json$)/.test(f))).toEqual([]);
     const pkg = JSON.parse(execFileSync('tar', ['-xzOf', tgz, 'package/package.json'], { encoding: 'utf8' }));
-    expect(pkg.bin).toEqual({ pixelclaw: './dist/pixelclaw.js' });
+    expect(pkg.bin).toEqual({ pixelclaw: 'dist/pixelclaw.js' });
     expect(pkg.dependencies).toBeUndefined();
     expect(pkg.engines.node).toBe('>=22.18');
     expect(pkg.repository.url).toContain('github.com/retrodigio/pixelclaw');

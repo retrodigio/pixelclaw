@@ -262,7 +262,7 @@ describe('the worker cannot run a shell or read files outside its project', () =
       // The model is offered PixelClaw's tools and no built-in one, on every turn.
       for (const x of seen) for (const t of x.tools) expect(BUILTIN_TOOLS, t).not.toContain(t);
       expect(main[0]!.tools.filter((t) => t.startsWith('mcp__pixelclaw__')).sort()).toEqual(
-        ['changes', 'check', 'export', 'history', 'import', 'plan', 'project', 'review', 'run', 'seeds', 'view', 'work'].map((t) => `mcp__pixelclaw__${t}`));
+        ['changes', 'check', 'export', 'history', 'import', 'judge', 'plan', 'project', 'review', 'run', 'seeds', 'view', 'work'].map((t) => `mcp__pixelclaw__${t}`));
       // Every built-in call was refused as a tool that does not exist; the shell never ran.
       for (let i = 0; i < 13; i++) expect(results[i], script[i]![0]).toMatch(/No such tool available/);
       expect(results[13]).toMatch(/the worker stays in its project/);
