@@ -627,6 +627,9 @@ export function judgeBlockers(w: Writer, asset: string): string[] {
 const f2 = (n: number) => n.toFixed(2);
 const mark = { pass: '✓', fail: '✗', unsure: '?', error: '!', skip: '–' } as const;
 
+/** The label column: the longest label (at most 30), at least 14. */
+const labelWidth = (fs: readonly JudgeFinding[]): number => Math.min(30, Math.max(14, ...fs.map((f) => f.label.length)));
+
 function limitOf(f: JudgeFinding): string {
   return f.expect === 'yes' ? `≥ ${f2(f.yes)}` : `≤ ${f2(f.no)}`;
 }
@@ -635,9 +638,10 @@ function limitOf(f: JudgeFinding): string {
 export function formatJudge(r: JudgeReport, dir = '<project>'): string {
   if (!r.enabled) return '';
   const out = [`judge ${r.asset}: ${r.gate ? 'gates done' : 'advisory'}, ${r.model} (thresholds: sure at ≥ yes / ≤ no; between is "unsure")`];
-  for (const f of r.findings) {
+  const fs = r.findings;
+  for (const f of fs) {
     const p = f.p === null ? '–' : f2(f.p);
-    out.push(`  ${mark[f.status]}  ${f.label.padEnd(14)} ${p.padEnd(5)} ${limitOf(f).padEnd(7)} ${f.status === 'unsure' ? 'unsure: ' : ''}${f.detail}`);
+    out.push(`  ${mark[f.status]}  ${f.label.padEnd(labelWidth(fs))} ${p.padEnd(5)} ${limitOf(f).padEnd(7)} ${f.status === 'unsure' ? 'unsure: ' : ''}${f.detail}`);
     if (f.marks?.length && f.status === 'fail') out.push(`       marks: ${f.marks.slice(0, 24).map(([x, y]) => `${x},${y}`).join(' ')}${f.marks.length > 24 ? ` … and ${f.marks.length - 24} more` : ''}`);
   }
   if (r.notAsked.length) out.push(`  not asked yet: ${r.notAsked.join(', ')} (pixelclaw judge ${dir} ${r.asset})`);
@@ -659,8 +663,9 @@ export function formatRun(run: JudgeRun): string {
     const unsure = a.findings.filter((f) => f.status === 'unsure').length;
     out.push(`${a.asset}: ${a.findings.length ? `${a.findings.length - bad - unsure} pass${bad ? `, ${bad} fail` : ''}${unsure ? `, ${unsure} unsure` : ''}` : 'no questions apply'} (${a.asked} asked, ${a.cached} from the cache)`);
     for (const f of a.findings) {
+      const fs = a.findings;
       const p = f.p === null ? '–' : f2(f.p);
-      out.push(`  ${mark[f.status]}  ${f.label.padEnd(14)} ${p.padEnd(5)} ${limitOf(f).padEnd(7)} ${f.status === 'unsure' ? 'unsure: ' : ''}${f.detail}`);
+      out.push(`  ${mark[f.status]}  ${f.label.padEnd(labelWidth(fs))} ${p.padEnd(5)} ${limitOf(f).padEnd(7)} ${f.status === 'unsure' ? 'unsure: ' : ''}${f.detail}`);
       if (f.marks?.length && f.status === 'fail') out.push(`       marks: ${f.marks.slice(0, 24).map(([x, y]) => `${x},${y}`).join(' ')}${f.marks.length > 24 ? ` … and ${f.marks.length - 24} more` : ''}`);
     }
   }
