@@ -108,6 +108,21 @@ shadows (an entry, or `darker`: a step down the ramps of the ground under it), `
 `banding.minEdges`, `readability.delta`, `readability.maxIou`, `readability.minSpread`. The server
 reads `project.json` again when it changes, and tells the watch view.
 
+**Overrides for one asset.** Any check can be tuned or turned off for one asset under
+`style.assets.<asset>.checks`, for example a hand-drawn figure whose frames differ little, and an
+object that fills its cells on purpose:
+
+```json
+"assets": {
+  "reaper_walk": { "checks": { "anim": { "minDiff": 0.02, "maxPivot": 2 } } },
+  "market_hall": { "checks": { "margin": { "off": false, "max": 24 } } }
+}
+```
+
+`anim` takes `minDiff`, `maxDiff`, `maxPivot`, `maxGround`, `maxArea` and `off`; `margin` takes `max`,
+`bottom` (`false`: the bottom edge may touch) and `off` (`false` turns it on for an object, which is
+off by default). An asset's own value wins over the project's and its set's.
+
 `style.md` beside it is the style guide in words, for people and for prompts; the review bundle
 includes it.
 
