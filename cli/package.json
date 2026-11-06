@@ -33,7 +33,7 @@
     "node": ">=22.18"
   },
   "bin": {
-    "pixelclaw": "./dist/pixelclaw.js"
+    "pixelclaw": "dist/pixelclaw.js"
   },
   "files": [
     "dist/pixelclaw.js",
