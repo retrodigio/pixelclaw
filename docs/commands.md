@@ -243,7 +243,7 @@ text; `export` writes a map for Tiled (the `tiled` profile) and splits an oversi
 | `fork <from> <to> [at=<n>]` | `fork chest chest_b at=20` | Start asset `<to>` as a branch of `<from>`. See *Forks*. |
 | `underlay generate "<prompt>" [layout=] [image=] [provider=] [model=] [quality=] [cap=] [layer=]`, `underlay import <file.png> [layout=] [layer=]` | `underlay mockup blob=<sha256> image=1536x1024 at=0,0 size=144x96 layout=<sha256> prompt="…" provider=openai model=gpt-image-1.5 quality=medium cost=0.05` | An image under the art on a reference layer; resolved by the server. See *Underlays and snap*. |
 | `snap [from=<layer>] [into=<layer>]` | `snap from=mockup into=draft at=0,0 grid=144x96 pitch=5.333x5.334 offset=0.66,0.65 r2=0.97 material=0.98 <<` | The underlay quantised into a new draft layer. |
-| `import <x,y> asset=<name> region=<x,y,WxH> [layer=]` | `import 0,0 from="yard:draft 120,0,24x24" <<` | A region of another asset, its pixels in the line. |
+| `import <x,y> asset=<name> region=<x,y,WxH> [layer=] [frame=<n>]` | `import 0,0 from="yard:draft 120,0,24x24" <<` | A region of another asset, its pixels in the line. |
 | `new font <name> <W>x<H> [chars=] [cols=] [baseline=] [line=] [spacing=]` | `new font hud 5x7 palette=… wrap=off cell=5x7 bg=none chars=65-90,48-57 cols=16 baseline=6 line=8 spacing=1 <<` | A glyph sheet. See *Fonts*. |
 | `glyph <char> [advance=<n>\|auto] [<< rows >>]` | `glyph U+0021 <<` | One glyph's cell (and its advance). |
 | `font set [baseline=] [line=] [spacing=]` | `font set baseline=6 line=9 spacing=1` | |
@@ -589,8 +589,9 @@ art or an export. Images are kept as content-addressed blobs (`blobs/<sha256>.pn
   `snap from=mockup into=draft at=0,0 grid=144x96 pitch=5.333x5.334 offset=0.66,0.65 r2=0.97 material=0.98 << rows >>`,
   so replay never reads the image. Below R² 0.8 or material 0.85 the run warns: reroll the
   underlay, or trace over it instead.
-- `import <x,y> asset=<name> region=<x,y,WxH> [layer=<layer>]` copies a region of another asset (one
-  of its layers, or its flat art) onto your layer: a tile cut from a snapped scene. The line
+- `import <x,y> asset=<name> region=<x,y,WxH> [layer=<layer>] [frame=<n>]` copies a region of another asset (one
+  of its layers, or its flat art; its first frame, or frame `n`) onto your layer: a tile cut from a snapped scene,
+  or one frame of an animated sprite. The line
   records the pixels (`import 0,0 from="yard:draft 120,0,24x24" << rows >>`).
 
 ### Fonts

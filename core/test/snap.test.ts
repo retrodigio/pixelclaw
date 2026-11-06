@@ -1,7 +1,7 @@
 // Underlays and snap: fitting an underlay's pixel grid and quantising it into a draft layer, and the
 // underlay and snap commands on the tape.
 import { describe, expect, it } from 'vitest';
-import { charText, exportColours, exportProfile, fontBmfont, fontStrip, glyphCell, glyphs, iconModeOf, materialMatch, Pcg32, createRgba, readStrip, runChecks, snapImage, artHash, deserializeDoc, replay, runBatch, serializeDoc, type Rgba, type CheckId, type CheckResult, type Doc } from '../src/index.ts';
+import { TRANSPARENT, charText, exportColours, exportProfile, fontBmfont, fontStrip, glyphCell, glyphs, iconModeOf, materialMatch, Pcg32, createRgba, readStrip, runChecks, snapImage, artHash, deserializeDoc, replay, runBatch, serializeDoc, type Rgba, type CheckId, type CheckResult, type Doc } from '../src/index.ts';
 import { EMPTY, TEST_PALETTE, palettes, run } from './helpers.ts';
 
 const doc = (text: string): Doc => run(EMPTY, text).doc!;
@@ -163,5 +163,21 @@ describe('underlay and snap commands', () => {
     expect(r.added[1]!.cmd.split('\n')[0]).toBe('import 0,0 from="scene 8,0,8x8" <<');
     expect(r.state.doc!.cels[0]![0]![1 * 8 + 1]).toBe(0);
     expect(replay(r.state.entries, palettes).problems).toEqual([]);
+  });
+
+  it('import asset= region= frame=: copies the chosen frame, recorded in the line', () => {
+    const sheet = run(EMPTY, 'new sprite walk 8x8\npx 1,1 c=ink\nframe add empty\nframe 2\npx 2,2 c=leaf').doc!;
+    const lines = (cmd: string) => runBatch(EMPTY, `new sprite cut 8x8\n${cmd}`, { by: 'test', palettes, assets: (n) => (n === 'walk' ? sheet : undefined) });
+    const first = lines('import 0,0 asset=walk region=0,0,8x8');
+    const second = lines('import 0,0 asset=walk region=0,0,8x8 frame=2');
+    if (!first.ok || !second.ok) throw new Error(JSON.stringify([first, second]));
+    expect(first.state.doc!.cels[0]![0]![1 * 8 + 1]).not.toBe(TRANSPARENT);
+    expect(second.state.doc!.cels[0]![0]![1 * 8 + 1]).toBe(TRANSPARENT);
+    expect(second.state.doc!.cels[0]![0]![2 * 8 + 2]).not.toBe(TRANSPARENT);
+    expect(second.added[1]!.cmd.split('\n')[0]).toBe('import 0,0 from="walk 0,0,8x8 frame 2" <<');
+    expect(replay(second.state.entries, palettes).problems).toEqual([]);
+    const bad = lines('import 0,0 asset=walk region=0,0,8x8 frame=3');
+    expect(bad.ok).toBe(false);
+    expect(JSON.stringify(bad)).toContain('frames 1..2');
   });
 });

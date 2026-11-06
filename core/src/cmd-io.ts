@@ -13,10 +13,10 @@ import { intOpt, parseRegionText } from './values.ts';
 
 const importCmd: CommandSpec = {
   name: 'import',
-  summary: "import <x,y> [from=\"<file>\"] [blob=<sha256>] << rows of palette keys ('.' is transparent) >> | import <x,y> asset=<name> region=<x,y,WxH> [layer=<layer>]   (an imported image's pixels, or a region of another asset's art (one layer of it, or its flat art); replaces the rectangle on your layer and frame)",
+  summary: "import <x,y> [from=\"<file>\"] [blob=<sha256>] << rows of palette keys ('.' is transparent) >> | import <x,y> asset=<name> region=<x,y,WxH> [layer=<layer>] [frame=<n>]   (an imported image's pixels, or a region of another asset's art (one layer of it, or its flat art, of its first frame or frame n); replaces the rectangle on your layer and frame)",
   normalise(cmd, ctx) {
     const doc = drawable(cmd, ctx);
-    const a = new Args(cmd, ['from', 'blob', 'asset', 'region', 'layer']);
+    const a = new Args(cmd, ['from', 'blob', 'asset', 'region', 'layer', 'frame']);
     const p = a.take('point', 'a top-left corner x,y');
     const block = a.peek()?.t === 'block' ? a.take('block', `the image's rows in a block`) : null;
     a.done();
@@ -40,7 +40,10 @@ const importCmd: CommandSpec = {
       const layerOpt = a.opts.get('layer');
       const li = layerOpt ? src.layers.findIndex((l) => l.name === layerOpt.value) : -1;
       if (layerOpt && li < 0) throw new DiagError(layerOpt.line, layerOpt.vcol, `import: '${src.name}' has no layer '${layerOpt.value}'`);
-      const px = li >= 0 ? src.cels[li]![0]! : flatten(src, 0);
+      const frameOpt = a.opts.get('frame');
+      const fr = frameOpt ? Number(frameOpt.value) : 1;
+      if (frameOpt && (!/^\d+$/.test(frameOpt.value) || fr < 1 || fr > src.frameCount)) throw new DiagError(frameOpt.line, frameOpt.vcol, `import: '${src.name}' has frames 1..${src.frameCount}, not ${frameOpt.value}`);
+      const px = li >= 0 ? src.cels[li]![fr - 1]! : flatten(src, fr - 1);
       rowText = Array.from({ length: rh }, (_, j) => Array.from({ length: rw }, (_, i) => {
         const v = px[(ry + j) * src.width + rx + i]!;
         if (v === TRANSPARENT) return '.';
@@ -50,9 +53,9 @@ const importCmd: CommandSpec = {
         return doc.palette.entries[k]!.key;
       }).join(''));
       rowsAt = rowText.map(() => ({ line: cmd.line, col: cmd.col }));
-      from = `${src.name}${li >= 0 ? `:${src.layers[li]!.name}` : ''} ${rx},${ry},${rw}x${rh}`;
+      from = `${src.name}${li >= 0 ? `:${src.layers[li]!.name}` : ''} ${rx},${ry},${rw}x${rh}${fr > 1 ? ` frame ${fr}` : ''}`;
     } else {
-      for (const k of ['region', 'layer'] as const) if (a.opts.get(k)) throw new DiagError(a.opts.get(k)!.line, a.opts.get(k)!.col, `import: ${k}= goes with asset=`);
+      for (const k of ['region', 'layer', 'frame'] as const) if (a.opts.get(k)) throw new DiagError(a.opts.get(k)!.line, a.opts.get(k)!.col, `import: ${k}= goes with asset=`);
       if (!block) throw new DiagError(cmd.line, cmd.col, `import: expected the image's rows in a block (or asset= region=)`);
       rowText = block.rows.map((r: BlockRow) => r.text);
       rowsAt = block.rows;
