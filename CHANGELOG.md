@@ -4,7 +4,9 @@ All notable changes to PixelClaw are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased] (0.2.0)
+## [Unreleased]
+
+## [0.2.0] - 2026-11-06
 
 ### Feedback from the dashboard reaches an agent
 - `pixelclaw await <project-folder | watch-url> [--timeout <s>] [--since <cursor>]` waits on the
@@ -103,5 +105,6 @@ The first public release.
   spending cap) that works them in a fenced headless Claude Code session.
 - A Claude Code skill (`pixelclaw skill install`).
 
-[Unreleased]: https://github.com/retrodigio/pixelclaw/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/retrodigio/pixelclaw/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/retrodigio/pixelclaw/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/retrodigio/pixelclaw/releases/tag/v0.1.0
