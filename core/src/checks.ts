@@ -590,6 +590,16 @@ function checkJaggies(img: Img, p: Params, ctx: CheckContext = {}): CheckResult 
   const notches: Pt[] = [];
   if (!isTile(img.doc)) {
     const op = (x: number, y: number) => img.get(x, y) !== TRANSPARENT;
+    // A pixel of another colour than the one it touches, flanked on both sides by pixels of its own
+    // colour that touch that one too, is an outline wrapping round the tip of a thin line (a
+    // diagonal stroke's end), not a spike stuck on an edge.
+    const wrapsAround = (x: number, y: number, qx: number, qy: number): boolean => {
+      const c = img.get(x, y);
+      if (img.get(qx, qy) === c) return false;
+      const [dx, dy] = [qx - x, qy - y];
+      const flanks: Pt[] = dx === 0 ? [[x - 1, qy], [x + 1, qy]] : [[qx, y - 1], [qx, y + 1]];
+      return flanks.every(([fx, fy]) => img.get(fx!, fy!) === c);
+    };
     for (let y = 0; y < img.h; y++) for (let x = 0; x < img.w; x++) {
       const n4 = N4.filter(([dx, dy]) => op(x + dx, y + dy));
       if (op(x, y)) {
@@ -597,7 +607,7 @@ function checkJaggies(img: Img, p: Params, ctx: CheckContext = {}): CheckResult 
         const [qx, qy] = [x + n4[0]![0], y + n4[0]![1]];
         const base = N4.filter(([dx, dy]) => op(qx + dx, qy + dy)).length;
         const n8 = N8.filter(([dx, dy]) => op(x + dx, y + dy)).length;
-        if (base >= 3 && n8 <= 3) spikes.push([x, y]);
+        if (base >= 3 && n8 <= 3 && !wrapsAround(x, y, qx, qy)) spikes.push([x, y]);
       } else if (n4.length === 4) notches.push([x, y]);
       else if (n4.length === 3) {
         // A dent in a solid edge: the shape is at least two pixels deep behind it (the inside of

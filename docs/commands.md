@@ -426,7 +426,9 @@ keep=texture`, and the watch view's gradient tool.
 
 - `outline c=<colour>` draws a 1-px outline around the shapes on your layer: `mode=outer` (the
   default) colours the transparent pixels next to a shape; `mode=inner` colours the shape's own
-  edge pixels. `corners=off` (the default) looks at the four side neighbours, `on` at all eight.
+  edge pixels. `corners=off` (the default) looks at the four side neighbours: a one-pixel ring that steps
+  diagonally round a diagonal stroke and wraps its tips, which the `jaggies` check passes; `on` looks at all
+  eight, a thicker ring whose corners double up into L-shapes on diagonals (use it for blobby shapes).
   `from=<layer>` outlines the shapes on another layer, onto yours (an outline layer under the art).
 - `shade light=<n|ne|e|se|s|sw|w|nw>` lights each shape: a pixel whose colour is in a ramp, within
   `edge` pixels (default 1) of the shape's boundary on the lit side, goes a ramp step lighter; on

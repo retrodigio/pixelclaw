@@ -30,6 +30,8 @@ All notable changes to PixelClaw are listed here. The format follows
 - `import <x,y> asset=<name> region=… frame=<n>` copies a chosen frame of the source asset.
 - A manifest asset can be `"reference": true` (a sheet to copy from, a study): the code checks that
   compare an asset with its set, and the judge's recognisability options, leave it out.
+- `outline` with `corners=off` (the default) round a diagonal stroke: the `jaggies` check no longer
+  counts the outline wrapping round the stroke's tips as spikes, so the command's own output passes.
 - `pixelclaw --version`, and `pixelclaw <command> --help` (also `help <command>`) prints that
   command's usage, including `await`, `serve`, `work` and `judge`.
 
