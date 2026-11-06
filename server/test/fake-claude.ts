@@ -29,7 +29,7 @@ import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/cli
 
 const argv = process.argv.slice(2);
 const record = (j: unknown) => { if (process.env.FAKE_CLAUDE_RECORD) appendFileSync(process.env.FAKE_CLAUDE_RECORD, JSON.stringify(j) + '\n'); };
-record({ argv });
+record({ argv, typesafeEnv: Object.keys(process.env).filter((k) => k.startsWith('TYPESAFE')) });
 const opt = (k: string) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : undefined; };
 const out = (j: unknown) => process.stdout.write(JSON.stringify(j) + '\n');
 

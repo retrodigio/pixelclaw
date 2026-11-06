@@ -76,6 +76,12 @@ export const SANDBOX_FLAGS = [
   '--strict-mcp-config',
 ] as const;
 
+/** The environment the worker's session gets: the user's own, without the judge's API key (the key stays with the server). */
+export function workerEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const { TYPESAFE_API_KEY: _key, ...rest } = env;
+  return rest;
+}
+
 /** The worker's system prompt: the skill, then every command of the language. */
 export function workerSystemPrompt(skill: string): string {
   return `${skill ? `${skill.trim()}\n\n` : ''}# Every PixelClaw command\n\nOne line each, from the editor itself (the MCP server's instructions explain them; this is the full list):\n\n${commandReference()}\n`;
@@ -330,7 +336,7 @@ export class WorkerControl {
       const usage = new Map<string, Usage>();
       let buf = '';
       let last = Date.now();
-      const child = spawn(argv[0]!, argv.slice(1), { cwd: dir, stdio: ['ignore', 'pipe', 'pipe'], env: process.env });
+      const child = spawn(argv[0]!, argv.slice(1), { cwd: dir, stdio: ['ignore', 'pipe', 'pipe'], env: workerEnv(process.env) });
       this.child = child;
       const watchdog = setInterval(() => {
         if (Date.now() - last <= stallMs || stalled) return;

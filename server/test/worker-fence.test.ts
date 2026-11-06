@@ -101,6 +101,20 @@ describe('the worker cannot run a shell or read files outside its project', () =
     } finally { rmSync(root, { recursive: true, force: true }); }
   }, 60_000);
 
+  it('the judge\'s API key stays with the server: the worker\'s session does not get it', async () => {
+    const { root, dir } = scratch({ enabled: true, cap: 1 });
+    try {
+      ask(dir, ['urn']);
+      const rec = join(root, 'argv.jsonl');
+      const r = await work(dir, { PATH: `${fakeOnPath(root)}:${process.env.PATH}`, FAKE_CLAUDE_RECORD: rec, TYPESAFE_API_KEY: 'tsk_secret_for_the_judge' });
+      expect(r.stderr).toMatch(/worker stopped/);
+      expect(readFileSync(rec, 'utf8')).not.toContain('tsk_secret_for_the_judge');
+      expect((records(rec)[0] as { typesafeEnv?: string[] }).typesafeEnv).toEqual([]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 60_000);
+
   it('settings cannot widen it: args take only a model and effort; command may not carry tool or permission flags', async () => {
     const base = { enabled: true, command: ['claude'], args: [] as string[], cap: 1, maxSessions: 1, stall: 10 };
     expect(workerSettingsProblem({ ...base, args: ['--model', 'sonnet', '--effort=low', '--fallback-model', 'haiku'] })).toBeNull();
