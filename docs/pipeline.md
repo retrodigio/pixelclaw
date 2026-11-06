@@ -53,6 +53,7 @@ the manifest was not written; 2 problems:
 | `cells` | object | the footprint in cells |
 | `height` | props, figures | the drawn shape's height in pixels; `consistency` holds the art to it (± 2) |
 | `variantOf`, `recolourOf` | all | a texture variant or a palette-swap recolour of another planned asset of the same kind |
+| `reference` | all | `true` for a reference piece (a sheet to copy from, a study): the code checks and the judge do not count it among its set's members (it is still checked itself) |
 | `uses` | map | the planned assets it is built from |
 | `reads` | all | up to 12 short phrases the art should show (`"a readable face"`); each is a yes/no question for the optional judge ([judge.md](judge.md)) |
 | `flat` | all | its colour in the flat templates: a palette entry name or `#rrggbb` |

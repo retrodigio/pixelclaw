@@ -122,7 +122,7 @@ export function setOf(name: string, doc: Doc, assets: AssetDoc[], json: StyleJso
 /** Everything a check run needs for one asset of a project. */
 export function checkContextFor(
   name: string, doc: Doc, assets: AssetDoc[], json: StyleJson | undefined, palette: (n: string) => Palette | undefined,
-  o: { frame?: number; ground?: string; ref?: string; set?: string[]; peers?: string[]; expect?: { height?: number }; setChecks?: Record<string, unknown> } = {},
+  o: { frame?: number; ground?: string; ref?: string; set?: string[]; peers?: string[]; expect?: { height?: number }; setChecks?: Record<string, unknown>; reference?: string[] } = {},
 ): { ctx: CheckContext; problems: string[] } {
   const { style, problems } = checkStyleOf(json, palette);
   // A manifest set's thresholds sit between the style guide's and the asset's own.
@@ -131,13 +131,15 @@ export function checkContextFor(
   if (o.ground && !ground) problems.push(`no asset '${o.ground}' to use as ground`);
   const ref = o.ref ? assets.find((a) => a.name === o.ref) ?? null : null;
   if (o.ref && !ref) problems.push(`no asset '${o.ref}' to compare with`);
+  // Reference-only assets (a manifest's `reference: true`) are not members of any set: not neighbours, not peers.
+  const members = o.reference?.length ? assets.filter((a) => a.name === name || !o.reference!.includes(a.name)) : assets;
   return {
     ctx: {
       frame: o.frame, style, ground: ground?.doc ?? null, ref: ref?.doc ?? null,
-      set: setOf(name, doc, assets, json, o.set).map((a) => ({ name: a.name, doc: a.doc })),
+      set: setOf(name, doc, members, json, o.set).map((a) => ({ name: a.name, doc: a.doc })),
       ...(doc.map || doc.variantOf || doc.densityOf ? { world: mapWorld(assets) } : {}),
       // A manifest set may mix kinds (tiles and families, icons and a font): only like is held to like.
-      peers: (o.peers ? assets.filter((a) => o.peers!.includes(a.name) && consistencyClass(a.doc) === consistencyClass(doc)) : peersOf(name, doc, assets)).map((a) => ({ name: a.name, doc: a.doc })),
+      peers: (o.peers ? members.filter((a) => o.peers!.includes(a.name) && consistencyClass(a.doc) === consistencyClass(doc)) : peersOf(name, doc, members)).map((a) => ({ name: a.name, doc: a.doc })),
       ...(o.expect ? { expect: o.expect } : {}),
     },
     problems,

@@ -148,15 +148,13 @@ function writeStore(p: Project, s: Store): void {
 
 // ---- what an asset is, for the questions ----
 
-const isReference = (a: object): boolean => (a as { reference?: boolean }).reference === true;
-
 function factsOf(w: Writer, name: string, hasMockup: boolean): AssetFacts {
   const p = w.project;
   const m = readManifest(p).manifest;
   const e = manifestEntry(m, name);
   const doc = w.doc(name);
   const set = e ? e.set ?? e.kind : doc.kind;
-  const peers = (m?.assets.filter((a) => (a.set ?? a.kind) === set && a.name !== name && !isReference(a)) ?? [])
+  const peers = (m?.assets.filter((a) => (a.set ?? a.kind) === set && a.name !== name && !a.reference) ?? [])
     .map((a) => ({ name: a.name, description: a.description ?? '' }));
   if (!m) for (const n of w.assets()) if (n !== name) { try { if (w.doc(n).kind === doc.kind) peers.push({ name: n, description: '' }); } catch { /* not loadable */ } }
   const groups = new Set(w.state(name).entries.map((x) => x.group)).size;

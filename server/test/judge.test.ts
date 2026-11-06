@@ -349,3 +349,19 @@ describe('done with the gate on', () => {
     expect(agentWork(w, 'claude', { action: 'done', text: 'tidied' }).message).toBe('r1: done');
   });
 });
+
+describe('reference-only assets', () => {
+  it('are not offered as options for recognisability', async () => {
+    writeManifest(w.project, {
+      format: 'pixelclaw-manifest', version: 1, theme: 'Old stone under moss.',
+      assets: [
+        { name: 'urn', kind: 'sprite', size: '16x16', set: 'props', description: 'a squat stone urn' },
+        { name: 'jar', kind: 'sprite', size: '16x16', set: 'props', description: 'a clay jar' },
+        { name: 'sheet', kind: 'sprite', size: '16x16', set: 'props', description: 'a sheet to copy from', reference: true },
+      ],
+    });
+    const f = fake(happy('urn'));
+    await ask(['urn'], f.env, { questions: ['recognisable'] });
+    expect(Object.keys(f.sent[0]!.body.questions.recognisable.criteria)).toEqual(['jar', 'urn']);
+  });
+});

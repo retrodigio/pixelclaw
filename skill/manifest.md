@@ -37,6 +37,7 @@ nothing when it has problems (each reported with its path, like `assets[3].size`
 | `scheme`, `inside`, `outside`, `band` | family | the autotile scheme (built in or `schemes/*.json`), the tiles on each side, the band profile |
 | `frames`, `ticks` | animated | frames (per view), ticks per frame |
 | `views`, `mirror` | sprite, object | directions (S, N, E, W) and mirrors (`{ "W": "E" }`) |
+| `reference` | all | `true` for a reference piece (a sheet to copy from): checks and the judge do not count it among the set's members |
 | `cells` | object | the footprint in cells `CxR` |
 | `reads` | all | up to 12 short phrases the art should show (`"a readable face"`): each is a yes/no question for the optional judge |
 | `height` | props, figures | the drawn shape's height in pixels; `consistency` holds the art to it (± 2) |

@@ -758,7 +758,8 @@ export class Writer {
     // A dry run's document stands in for the asset, as the project's other assets see it too.
     const saved = this.assetDocs();
     const all = dry ? [...saved.filter((a) => a.name !== asset), { name: asset, doc: dry, forkOf: saved.find((a) => a.name === asset)?.forkOf ?? null }] : saved;
-    const { ctx, problems } = checkContextFor(asset, doc, all, this.project.json.style, (n) => this.project.palettes.get(n), { ...o, ...plan });
+    const reference = m?.assets.filter((a) => a.reference).map((a) => a.name);
+    const { ctx, problems } = checkContextFor(asset, doc, all, this.project.json.style, (n) => this.project.palettes.get(n), { ...o, ...plan, ...(reference?.length ? { reference } : {}) });
     const plain = !dry && !o.checks && o.frame === undefined && o.budget === undefined && o.ground === undefined && o.ref === undefined && o.set === undefined;
     const v = (n: string) => `${n}:${this.versions.get(n) ?? 0}`;
     const deps = ctx.world ? all.map((a) => a.name) : [asset, ...(ctx.ground ? [ctx.ground.name] : []), ...(ctx.set ?? []).map((x) => x.name), ...(ctx.peers ?? []).map((x) => x.name)];
