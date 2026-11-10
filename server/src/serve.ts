@@ -13,7 +13,7 @@ import { Writer } from './writer.ts';
 import { WorkerControl } from './worker.ts';
 import { removeTokenFile, writeTokenFile } from './runfile.ts';
 
-export const VERSION = '0.3.0';
+export const VERSION = '0.3.1';
 export const DEFAULT_PORT = 7417;
 
 export interface ServeOptions {

@@ -6,6 +6,11 @@ All notable changes to PixelClaw are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-10
+
+### Release
+- Published from GitHub Actions by npm trusted publishing, with a provenance statement. No code changes since 0.3.0.
+
 ## [0.3.0] - 2026-11-06
 
 ### An optional judge beside the code checks (experimental)
@@ -140,7 +145,8 @@ The first public release.
   spending cap) that works them in a fenced headless Claude Code session.
 - A Claude Code skill (`pixelclaw skill install`).
 
-[Unreleased]: https://github.com/retrodigio/pixelclaw/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/retrodigio/pixelclaw/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/retrodigio/pixelclaw/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/retrodigio/pixelclaw/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/retrodigio/pixelclaw/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/retrodigio/pixelclaw/releases/tag/v0.1.0
