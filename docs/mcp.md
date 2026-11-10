@@ -597,8 +597,8 @@ tile and anything placed on it.
   token file, and send the command to it (`POST /api/cli`, a bearer token) so it goes through the
   writer queue; `upgrade` still refuses. `view`, `check`, `verify` and the other readers read the
   files. Add `.pixelclaw.lock` to a project's `.gitignore`.
-- The token file sits outside the project folder (`$XDG_RUNTIME_DIR/pixelclaw`, else
-  `~/.pixelclaw/run`, or `PIXELCLAW_STATE_DIR`), is mode 0600 in a 0700 folder, is named by a hash
+- The token file sits outside the project folder (`~/.pixelclaw/run`, or
+  `PIXELCLAW_STATE_DIR`), is mode 0600 in a 0700 folder, is named by a hash
   of the project path, and is removed when the server stops. No PixelClaw tool or view reads it, and
   the worker's connection (its own token) cannot use `/api/cli` or `/api/await`.
 - `GET /api/await?since=&timeout=&as=` (long poll; bearer token) returns

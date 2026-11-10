@@ -8,8 +8,13 @@ All notable changes to PixelClaw are listed here. The format follows
 
 ## [0.3.1] - 2026-11-10
 
+### Fixed
+- On Linux, a CLI command could not reach a server an MCP client had started: the token file went under
+  `$XDG_RUNTIME_DIR`, which MCP clients do not pass to the servers they start, so the two looked in different
+  folders. The token file is now always in `~/.pixelclaw/run` (or `PIXELCLAW_STATE_DIR`).
+
 ### Release
-- Published from GitHub Actions by npm trusted publishing, with a provenance statement. No code changes since 0.3.0.
+- Published from GitHub Actions by npm trusted publishing, with a provenance statement.
 
 ## [0.3.0] - 2026-11-06
 

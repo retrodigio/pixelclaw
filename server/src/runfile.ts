@@ -19,12 +19,14 @@ export interface TokenFile {
   dir: string;
 }
 
-/** The folder token files live in: PIXELCLAW_STATE_DIR, else $XDG_RUNTIME_DIR/pixelclaw, else ~/.pixelclaw/run. */
+/**
+ * The folder token files live in: PIXELCLAW_STATE_DIR, else ~/.pixelclaw/run. Not $XDG_RUNTIME_DIR:
+ * MCP clients start servers with a short list of environment variables (the MCP SDK passes HOME,
+ * PATH, USER and a few more), so a server and a CLI in the user's shell would look in different folders.
+ */
 export function stateDir(): string {
   const env = process.env.PIXELCLAW_STATE_DIR;
   if (env) return resolve(env);
-  const xdg = process.env.XDG_RUNTIME_DIR;
-  if (xdg) return join(xdg, 'pixelclaw');
   return join(homedir(), '.pixelclaw', 'run');
 }
 
