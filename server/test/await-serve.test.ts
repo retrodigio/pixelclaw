@@ -83,6 +83,23 @@ async function page(): Promise<{ msgs: { type: string; [k: string]: unknown }[];
   };
 }
 
+/**
+ * The states r1's card went through, from every requests message the page received, in order.
+ * Read from the whole history, not sampled: frames that reach the page in one read are all
+ * delivered before the test runs again, so a sample can miss a state the page did get.
+ */
+function cardStates(msgs: { type: string; [k: string]: unknown }[]): string[] {
+  const states: string[] = [];
+  for (const m of msgs) {
+    if (m.type !== 'requests') continue;
+    const q = (m.requests as { id: string; state: string; seen: unknown[] }[]).find((x) => x.id === 'r1');
+    if (!q) continue;
+    const l = q.state === 'open' ? (q.seen.length ? 'seen' : 'sent') : q.state === 'claimed' ? 'working' : q.state;
+    if (states.at(-1) !== l) states.push(l);
+  }
+  return states;
+}
+
 const MANIFEST = {
   format: 'pixelclaw-manifest', version: 1, theme: 'Old stone under moss.',
   sets: { props: { description: 'things that stand' } },
@@ -115,13 +132,7 @@ describe('pixelclaw await against a real server', () => {
   it('blocks until a request arrives, then the request is seen, claimed, finished', async () => {
     await startServe();
     const p = await page();
-    const states: string[] = [];
-    const label = (): string => {
-      const last = [...p.msgs].reverse().find((m) => m.type === 'requests') as { requests: { id: string; state: string; seen: unknown[] }[] } | undefined;
-      const q = last?.requests.find((x) => x.id === 'r1');
-      return !q ? 'none' : q.state === 'open' ? (q.seen.length ? 'seen' : 'sent') : q.state === 'claimed' ? 'working' : q.state;
-    };
-    const note = (): void => { const l = label(); if (states.at(-1) !== l) states.push(l); };
+    const label = (): string => cardStates(p.msgs).at(-1) ?? 'none';
     // Nobody is listening yet.
     expect(((await api('/api/presence')) as { listening: boolean }).listening).toBe(false);
     const waiter = spawn(process.execPath, [BIN, 'await', dir, '--timeout', '30'], { env, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -134,26 +145,25 @@ describe('pixelclaw await against a real server', () => {
     // A person asks for the urn to be drawn.
     const sent = await p.send({ action: 'request', kind: 'draw', asset: 'urn', note: 'squat' });
     expect(sent.ok).toBe(true);
-    note();
     expect(await exited).toBe(0);
     expect(out).toContain('request r1 (urn) from human:ana');
     expect(out).toContain('next: work');
     const cursor = /next cursor: (\S+)/.exec(out)![1]!;
-    await until(() => (note(), label() === 'seen'), 'seen');
+    await until(() => label() === 'seen', 'seen');
     // The agent claims it over MCP, draws with the CLI (through the server), finishes it.
     const mcp = new Client({ name: 'test', version: '1' });
     await mcp.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}/mcp`), { requestInit: { headers: { Authorization: `Bearer ${token}` } } }));
     const text = async (name: string, args: Record<string, unknown>): Promise<string> => ((await mcp.callTool({ name, arguments: args })) as { content: { text?: string }[] }).content.map((c) => c.text ?? '').join('\n');
     expect(await text('work', {})).toContain('claimed r1');
-    await until(() => (note(), label() === 'working'), 'working');
+    await until(() => label() === 'working', 'working');
     const draw = await cli(['run', dir, '-e', 'new sprite urn\nrect 4,4 8x10 c=stone2 fill\noutline c=ink', '--by', 'claude']);
     expect(draw.err).toBe('');
     expect(draw.code).toBe(0);
     const done = await text('work', { action: 'done', text: 'drew the urn' });
     expect(done).toMatch(/r1: done|not done/);
     if (/not done/.test(done)) throw new Error(`the urn did not pass its checks: ${done}`);
-    await until(() => (note(), label() === 'done'), 'done');
-    expect(states).toEqual(['sent', 'seen', 'working', 'done']);
+    await until(() => label() === 'done', 'done');
+    expect(cardStates(p.msgs)).toEqual(['sent', 'seen', 'working', 'done']);
     // Awaiting again from the cursor does not repeat r1; a status mark by a person is an event.
     const again = cli(['await', dir, '--since', cursor, '--timeout', '30']);
     await until(async () => ((await api('/api/presence')) as { waiters: unknown[] }).waiters.length === 1, 'the second waiter');
@@ -196,23 +206,17 @@ describe('an agent with no MCP works requests with the CLI', () => {
   it('serve --no-mcp: the card goes sent → seen → working → done, driven only by the CLI', async () => {
     await startServe();
     const p = await page();
-    const states: string[] = [];
-    const label = (): string => {
-      const last = [...p.msgs].reverse().find((m) => m.type === 'requests') as { requests: { id: string; state: string; seen: unknown[] }[] } | undefined;
-      const q = last?.requests.find((x) => x.id === 'r1');
-      return !q ? 'none' : q.state === 'open' ? (q.seen.length ? 'seen' : 'sent') : q.state === 'claimed' ? 'working' : q.state;
-    };
-    const note = (): void => { const l = label(); if (states.at(-1) !== l) states.push(l); };
+    const label = (): string => cardStates(p.msgs).at(-1) ?? 'none';
     const presence = async () => (await api('/api/presence')) as { listening: boolean; agents: { by: string }[] };
     expect((await presence()).listening).toBe(false);
     // A person asks for the urn in the dashboard.
     expect((await p.send({ action: 'request', kind: 'draw', asset: 'urn', note: 'squat' })).ok).toBe(true);
-    await until(() => (note(), label() === 'sent'), 'sent');
+    await until(() => label() === 'sent', 'sent');
     // The agent hears of it, then lists the requests (which hands r1 over).
     const heard = await cli(['await', dir, '--timeout', '10']);
     expect(heard.code).toBe(0);
     expect(heard.out).toContain(`without MCP: pixelclaw work ${dir} claim r1`);
-    await until(() => (note(), label() === 'seen'), 'seen');
+    await until(() => label() === 'seen', 'seen');
     const list = await cli(['work', dir, 'list']);
     expect(list.out).toContain('r1 draw urn: "squat" (from human:ana');
     expect(list.out).toContain('seen by claude)');
@@ -223,7 +227,7 @@ describe('an agent with no MCP works requests with the CLI', () => {
     const claim = await cli(['work', dir, 'claim']);
     expect(claim.err).toBe('');
     expect(claim.out).toContain('claimed r1');
-    await until(() => (note(), label() === 'working'), 'working');
+    await until(() => label() === 'working', 'working');
     expect((await presence()).agents.map((a) => a.by)).toContain('claude');
     expect((await presence()).listening).toBe(true);
     const progress = await cli(['work', dir, 'progress', 'blocking in the body']);
@@ -242,8 +246,8 @@ describe('an agent with no MCP works requests with the CLI', () => {
     const done = await cli(['work', dir, 'done', 'drew the urn']);
     expect(done.err).toBe('');
     expect(done.out).toMatch(/^r1: done\n/);
-    await until(() => (note(), label() === 'done'), 'done');
-    expect(states).toEqual(['sent', 'seen', 'working', 'done']);
+    await until(() => label() === 'done', 'done');
+    expect(cardStates(p.msgs)).toEqual(['sent', 'seen', 'working', 'done']);
     // Written by the server's writer, with the agent as author.
     const recs = readFileSync(join(dir, 'requests.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l) as { type: string; by: string });
     expect(recs.map((x) => x.type)).toEqual(['request', 'seen', 'claim', 'progress', 'done']);
